@@ -35,17 +35,27 @@ router.get('/insurers', async (req, res, next) => {
  * List all insurers from Prarambh_UAT.vw_InsurancePlans (CategoryId=16 = Motor)
  * Used in the upload dropdown so any insurer's file can be uploaded.
  */
+// In-process cache for /all-insurers — the view spans many tables and is
+// slow on cold cache.  The list only changes when an insurer is added in
+// Prarambh, which is rare, so a 1h TTL is safe.
+let _allInsurersCache = { at: 0, payload: null };
+const ALL_INSURERS_TTL_MS = 60 * 60 * 1000;
+
 router.get('/all-insurers', async (req, res, next) => {
   try {
+    const now = Date.now();
+    if (_allInsurersCache.payload && (now - _allInsurersCache.at) < ALL_INSURERS_TTL_MS) {
+      return res.json(_allInsurersCache.payload);
+    }
     const pool = await getPool();
-    const result = await pool
-      .request()
-      .query(
-        `SELECT DISTINCT InsurerId, InsurerName
-         FROM Prarambh_UAT.dbo.vw_InsurancePlans
-         WHERE CategoryId = 16
-         ORDER BY InsurerName`
-      );
+    const rq = pool.request();
+    rq.timeout = 600000;   // first call may take minutes on cold cache
+    const result = await rq.query(
+      `SELECT DISTINCT InsurerId, InsurerName
+       FROM Prarambh_UAT.dbo.vw_InsurancePlans
+       WHERE CategoryId = 16
+       ORDER BY InsurerName`
+    );
 
     // Brand-name slug overrides — for short single-word brands (SBI, HDFC,
     // SBIG, IFFCO) the generic "strip General Insurance, snake-case the
@@ -77,7 +87,9 @@ router.get('/all-insurers', async (req, res, next) => {
       slug: deriveSlug(r.InsurerName),
     }));
 
-    res.json({ success: true, insurers });
+    const payload = { success: true, insurers };
+    _allInsurersCache = { at: now, payload };
+    res.json(payload);
   } catch (err) {
     next(err);
   }
