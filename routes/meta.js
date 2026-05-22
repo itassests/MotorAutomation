@@ -37,9 +37,19 @@ router.get('/insurers', async (req, res, next) => {
  */
 // In-process cache for /all-insurers — the view spans many tables and is
 // slow on cold cache.  The list only changes when an insurer is added in
-// Prarambh, which is rare, so a 1h TTL is safe.
+// Prarambh, which is rare, so a 12h TTL is safe.  We ALSO persist the
+// cache to disk so an app-pool restart doesn't drop it (the cold DB
+// query takes 5+ minutes under iisnode load).
+const _path = require('path');
+const _fs = require('fs');
+const _CACHE_FILE = _path.join(__dirname, '..', 'all-insurers-cache.json');
 let _allInsurersCache = { at: 0, payload: null };
-const ALL_INSURERS_TTL_MS = 60 * 60 * 1000;
+try {
+  const raw = _fs.readFileSync(_CACHE_FILE, 'utf8');
+  _allInsurersCache = { at: Date.now(), payload: JSON.parse(raw) };
+  console.log('[meta] /all-insurers cache loaded from disk');
+} catch { /* file missing — populate on first request */ }
+const ALL_INSURERS_TTL_MS = 12 * 60 * 60 * 1000;
 
 router.get('/all-insurers', async (req, res, next) => {
   try {
@@ -91,6 +101,7 @@ router.get('/all-insurers', async (req, res, next) => {
 
     const payload = { success: true, insurers };
     _allInsurersCache = { at: now, payload };
+    try { _fs.writeFileSync(_CACHE_FILE, JSON.stringify(payload), 'utf8'); } catch { /* ignore */ }
     res.json(payload);
   } catch (err) {
     next(err);

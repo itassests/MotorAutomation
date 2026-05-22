@@ -46,3 +46,6 @@ tmp_rules*.json
 
 # Misc temp Excel locks
 ~$*.xlsx
+
+# Runtime caches
+all-insurers-cache.json
