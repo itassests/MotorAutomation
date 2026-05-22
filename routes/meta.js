@@ -50,9 +50,11 @@ router.get('/all-insurers', async (req, res, next) => {
     const pool = await getPool();
     const rq = pool.request();
     rq.timeout = 600000;   // first call may take minutes on cold cache
+    // Use vw_InsurancePlansMin (lighter view, ~1.4s) instead of
+    // vw_InsurancePlans (heavy join, 5+ minutes on cold cache).
     const result = await rq.query(
       `SELECT DISTINCT InsurerId, InsurerName
-       FROM Prarambh_UAT.dbo.vw_InsurancePlans
+       FROM Prarambh_UAT.dbo.vw_InsurancePlansMin
        WHERE CategoryId = 16
        ORDER BY InsurerName`
     );
