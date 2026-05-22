@@ -1,0 +1,204 @@
+{
+  "insurer": "chola_ms",
+  "display_name": "Cholamandalam MS General Insurance",
+  "file_patterns": ["Chola*", "CHOLA*", "Cholamandalam*", "Effective*Broker*"],
+  "sheets": [
+    {
+      "name": "TW MARCH 26",
+      "name_pattern": "^(?:prop\\s+)?tw\\s+(?:march|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[\\s_-]*\\d{2,4}$",
+      "layout": "cross_tab",
+      "product": "TW",
+      "config": {
+        "header_rows": {
+          "make_row": 3,
+          "segment_row": 4
+        },
+        "data_start_row": 5,
+        "row_keys": {
+          "region": 1,
+          "sub_type": 2
+        },
+        "column_groups": [
+          { "make": "Hero OEM",    "start_col": 3,  "segments": ["150cc", "SCOOTER", "150_350cc", "350cc"] },
+          { "make": "TVS OEM",     "start_col": 8,  "segments": ["150cc", "SCOOTER", "150_350cc", "350cc"] },
+          { "make": "Suzuki OEM",  "start_col": 13, "segments": ["150cc", "SCOOTER", "150_350cc", "350cc"] },
+          { "make": "Yamaha OEM",  "start_col": 18, "segments": ["150cc", "SCOOTER", "150_350cc", "350cc"] },
+          { "make": "RE OEM",      "start_col": 23, "segments": ["150_350cc", "350cc"] },
+          { "make": "Honda",       "start_col": 26, "segments": ["150cc", "SCOOTER", "150_350cc", "350cc"] }
+        ],
+        "decline_markers": ["NA", "0"],
+        "region_carries_down": true
+      }
+    },
+    {
+      "_comment": "TW Electric grid embedded inside the TW MARCH 26 sheet at columns AP-AU (41-46). detectSheetFuelHint() picks up the 'TW Electric' / 'All Electric Make' banner and sets fuel_type=Electric. Column 42 (Type) carries ANNUAL/ACT/NEW(...NOP) — NOP is auto-parsed and vehicle_age=0 for NEW rows.",
+      "name": "TW MARCH 26",
+      "name_pattern": "^(?:prop\\s+)?tw\\s+(?:march|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[\\s_-]*\\d{2,4}$",
+      "layout": "flat_table",
+      "product": "TW_EV",
+      "config": {
+        "header_row": 3,
+        "data_start_row": 4,
+        "data_end_row": 80,
+        "column_map": {
+          "region": 41,
+          "sub_type": 42
+        },
+        "rate_columns": [
+          { "column": 43, "rate_type": "COMP_MAX_CD2", "make": "All Electric Make", "fuel_type": "Electric", "segment": "Bike <=7 KW" },
+          { "column": 44, "rate_type": "COMP_MAX_CD2", "make": "All Electric Make", "fuel_type": "Electric", "segment": "Scooter <=7 KW" },
+          { "column": 45, "rate_type": "COMP_MAX_CD2", "make": "All Electric Make", "fuel_type": "Electric", "segment": "7 KW - 16 KW" },
+          { "column": 46, "rate_type": "COMP_MAX_CD2", "make": "All Electric Make", "fuel_type": "Electric", "segment": ">16 KW" }
+        ],
+        "region_carries_down": true,
+        "decline_markers": ["NA", "D", "Decline"]
+      }
+    },
+    {
+      "name": "Private car Mar 26",
+      "name_pattern": "^private\\s*car\\s*(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[\\s_-]*\\d{2,4}$",
+      "layout": "grouped_columns",
+      "product": "CAR",
+      "config": {
+        "header_rows": {
+          "region_row": 3,
+          "rate_type_row": 5
+        },
+        "data_start_row": 6,
+        "key_columns": {
+          "product": 1,
+          "subclass": 2
+        },
+        "region_groups": [
+          { "region": "AP/TS",          "columns": { "ACT": 4,  "PACK": 5  } },
+          { "region": "TN",             "columns": { "ACT": 7,  "PACK": 8  } },
+          { "region": "KA",             "columns": { "ACT": 10, "PACK": 11 } },
+          { "region": "MH/GA",          "columns": { "ACT": 13, "PACK": 14 } },
+          { "region": "GJ",             "columns": { "ACT": 16, "PACK": 17 } },
+          { "region": "BH",             "columns": { "ACT": 19, "PACK": 20 } },
+          { "region": "JH",             "columns": { "ACT": 22, "PACK": 23 } },
+          { "region": "OD",             "columns": { "ACT": 25, "PACK": 26 } },
+          { "region": "WB",             "columns": { "ACT": 28, "PACK": 29 } },
+          { "region": "CG",             "columns": { "ACT": 31, "PACK": 32 } },
+          { "region": "AS/ML/TR/AR/NL", "columns": { "ACT": 34, "PACK": 35 } },
+          { "region": "DL",             "columns": { "ACT": 37, "PACK": 38 } },
+          { "region": "PB",             "columns": { "ACT": 40, "PACK": 41 } },
+          { "region": "HP",             "columns": { "ACT": 43, "PACK": 44 } },
+          { "region": "JK",             "columns": { "ACT": 46, "PACK": 47 } },
+          { "region": "UP- East",       "columns": { "ACT": 49, "PACK": 50 } },
+          { "region": "UP",             "columns": { "ACT": 52, "PACK": 53 } },
+          { "region": "UK",             "columns": { "ACT": 55, "PACK": 56 } },
+          { "region": "AN",             "columns": { "ACT": 58, "PACK": 59 } },
+          { "region": "RJ",             "columns": { "ACT": 61, "PACK": 62 } },
+          { "region": "MP",             "columns": { "ACT": 63, "PACK": 64 } }
+        ],
+        "decline_markers": ["NA", ""]
+      }
+    },
+    {
+      "name": "CV MARCH 2026",
+      "name_pattern": "^cv\\s+(?:march|january|february|april|may|june|july|august|september|october|november|december)\\s*\\d{2,4}$",
+      "layout": "grouped_columns",
+      "product": "CV",
+      "config": {
+        "header_rows": {
+          "region_row": 2,
+          "rate_type_row": 4
+        },
+        "data_start_row": 5,
+        "key_columns": {
+          "product": 2,
+          "subclass": 3,
+          "make": 4,
+          "model": 5
+        },
+        "region_groups": [
+          { "region": "AP/TS",          "columns": { "ACT": 6,  "PACK": 7  } },
+          { "region": "TN-Chennai",     "columns": { "ACT": 9,  "PACK": 10 } },
+          { "region": "ROTN",           "columns": { "ACT": 12, "PACK": 13 } },
+          { "region": "KA",             "columns": { "ACT": 14, "PACK": 15 } },
+          { "region": "ROM",            "columns": { "ACT": 17, "PACK": 18 } },
+          { "region": "Mumbai/GA/Pune/Central MH", "columns": { "ACT": 20, "PACK": 21 } },
+          { "region": "GJ",             "columns": { "ACT": 22, "PACK": 23 } },
+          { "region": "BH",             "columns": { "ACT": 25, "PACK": 26 } },
+          { "region": "JH",             "columns": { "ACT": 28, "PACK": 29 } },
+          { "region": "OD",             "columns": { "ACT": 30, "PACK": 31 } },
+          { "region": "WB",             "columns": { "ACT": 33, "PACK": 34 } },
+          { "region": "CG",             "columns": { "ACT": 36, "PACK": 37 } },
+          { "region": "AS/ML/TR/AR/NL", "columns": { "ACT": 39, "PACK": 40 } },
+          { "region": "DL",             "columns": { "ACT": 42, "PACK": 43 } },
+          { "region": "PB",             "columns": { "ACT": 45, "PACK": 46 } },
+          { "region": "HP",             "columns": { "ACT": 48, "PACK": 49 } },
+          { "region": "JK",             "columns": { "ACT": 51, "PACK": 52 } },
+          { "region": "UP- East",       "columns": { "ACT": 54, "PACK": 55 } },
+          { "region": "UP",             "columns": { "ACT": 57, "PACK": 58 } },
+          { "region": "UK",             "columns": { "ACT": 60, "PACK": 61 } },
+          { "region": "AN",             "columns": { "ACT": 63, "PACK": 64 } },
+          { "region": "RJ",             "columns": { "ACT": 65, "PACK": 66 } },
+          { "region": "MP",             "columns": { "ACT": 67, "PACK": 68 } }
+        ],
+        "decline_markers": ["NA", ""]
+      }
+    },
+    {
+      "_comment": "Chola Apr-26+ CV grid: AP and TS split into separate columns (March had AP/TS combined), shifting all downstream regions. Column 0 of the sheet is blank, so PROD/SUBCLASS/MAKE/MODEL live at cols 2/3/4/5 (same as March).",
+      "name": "CV Apr-26",
+      "name_pattern": "^\\s*cv[\\s_-]*(?:apr|jan|feb|mar|may|jun|jul|aug|sep|oct|nov|dec)[\\s_-]*\\d{2,4}\\s*$",
+      "layout": "grouped_columns",
+      "product": "CV",
+      "config": {
+        "header_rows": {
+          "region_row": 2,
+          "rate_type_row": 4
+        },
+        "data_start_row": 5,
+        "key_columns": {
+          "product": 2,
+          "subclass": 3,
+          "make": 4,
+          "model": 5
+        },
+        "region_groups": [
+          { "region": "AP",                          "columns": { "ACT": 6,  "PACK": 7  } },
+          { "region": "TS",                          "columns": { "ACT": 9,  "PACK": 10 } },
+          { "region": "TN-Chennai",                  "columns": { "ACT": 12, "PACK": 13 } },
+          { "region": "ROTN",                        "columns": { "ACT": 15, "PACK": 16 } },
+          { "region": "KA",                          "columns": { "ACT": 17, "PACK": 18 } },
+          { "region": "ROM",                         "columns": { "ACT": 20, "PACK": 21 } },
+          { "region": "Mumbai/GA/Pune/Central MH",   "columns": { "ACT": 23, "PACK": 24 } },
+          { "region": "GJ",                          "columns": { "ACT": 25, "PACK": 26 } },
+          { "region": "BH",                          "columns": { "ACT": 28, "PACK": 29 } },
+          { "region": "JH",                          "columns": { "ACT": 31, "PACK": 32 } },
+          { "region": "OD",                          "columns": { "ACT": 33, "PACK": 34 } },
+          { "region": "WB",                          "columns": { "ACT": 36, "PACK": 37 } },
+          { "region": "CG",                          "columns": { "ACT": 39, "PACK": 40 } },
+          { "region": "AS/ML/TR/AR/NL/SK",           "columns": { "ACT": 42, "PACK": 43 } },
+          { "region": "DL",                          "columns": { "ACT": 45, "PACK": 46 } },
+          { "region": "PB",                          "columns": { "ACT": 48, "PACK": 49 } },
+          { "region": "HP",                          "columns": { "ACT": 51, "PACK": 52 } },
+          { "region": "JK",                          "columns": { "ACT": 54, "PACK": 55 } },
+          { "region": "UP- East",                    "columns": { "ACT": 57, "PACK": 58 } },
+          { "region": "UP",                          "columns": { "ACT": 60, "PACK": 61 } },
+          { "region": "UK",                          "columns": { "ACT": 63, "PACK": 64 } },
+          { "region": "AN",                          "columns": { "ACT": 66, "PACK": 67 } },
+          { "region": "RJ",                          "columns": { "ACT": 68, "PACK": 69 } },
+          { "region": "MP",                          "columns": { "ACT": 70, "PACK": 71 } }
+        ],
+        "decline_markers": ["NA", ""]
+      }
+    },
+    {
+      "name": "RTO",
+      "layout": "rto_mapping",
+      "product": "ALL",
+      "config": {
+        "header_row": 4,
+        "data_start_row": 5,
+        "column_map": {
+          "rto_code": 0,
+          "region": 2
+        }
+      }
+    }
+  ]
+}

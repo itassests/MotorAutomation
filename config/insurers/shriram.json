@@ -1,0 +1,41 @@
+{
+  "insurer": "shriram",
+  "display_name": "Shriram General Insurance",
+  "file_patterns": ["*Shriram*", "*BROKER*GRID*", "*2W*Bundle*"],
+
+  "_layout_notes": [
+    "Shriram ships two related workbooks per month:",
+    "  1. 'MAR'YY BROKER GRID.xlsx' — main 4W/CV/PCV grid plus 2W companion sheets (NB / Rollover) plus reference sheets (Declined RTOs, PAN India, Metro RTO, Zone, Declined vehicle, TW decline make model, NM grid).",
+    "  2. '2W Bundle grid.xlsx' — standalone copy of the 'New Business - 2W' sheet for circulation to 2W desks.",
+    "Both books share identical headers, so the same engine handles them.",
+    "Reference / declined-list sheets are NOT parsed into rate_rules (they're informational); a follow-up RTO-decline integration can pick them up later."
+  ],
+
+  "sheets": [
+    {
+      "name": "BROKER GRID MAR 26",
+      "name_pattern": "broker[\\s_]*grid",
+      "layout": "shriram_grid",
+      "config": { "sheet_kind": "broker_grid", "data_start_row": 1 },
+      "metro_lookup": { "sheet": "Metro RTO Codes" }
+    },
+    {
+      "name": "Short-term policy",
+      "name_pattern": "short[\\s_-]*term[\\s_]*polic",
+      "layout": "shriram_grid",
+      "config": { "sheet_kind": "broker_grid", "data_start_row": 1 }
+    },
+    {
+      "name": "New Business - 2W",
+      "name_pattern": "new[\\s_]*business[\\s_-]*2w",
+      "layout": "shriram_grid",
+      "config": { "sheet_kind": "two_wheeler", "layout_variant": "new_biz", "data_start_row": 1 }
+    },
+    {
+      "name": "ROLLOVE (PKG+TP) - 2W",
+      "name_pattern": "rollove[r]?[\\s_]*\\(?pkg",
+      "layout": "shriram_grid",
+      "config": { "sheet_kind": "two_wheeler", "layout_variant": "rollover", "data_start_row": 1 }
+    }
+  ]
+}

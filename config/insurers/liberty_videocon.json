@@ -1,0 +1,184 @@
+{
+  "insurer": "liberty_videocon",
+  "display_name": "Liberty General Insurance",
+  "file_patterns": ["*Liberty*Robinhood*", "*Robinhood*Liberty*", "Robinhood*"],
+
+  "_layout_notes": [
+    "Liberty (Robinhood) ships one workbook per month with 6 motor sheets plus CL/Health (skipped — non-motor).",
+    "Every motor sheet is a wide cross-tab: rows = state-cluster regions ('ANDHRA PRADESH - 1 KV'), columns = (segment × age/cc band × OD/SATP).",
+    "The state-cluster string in column 0 is the join key against the RTO mapping file's 'Geo Cluster' sheet (3 cluster columns per RTO — one per product family).",
+    "Age band labels in the source ('New', '>1 - 5', '>5 - 10', '>10') translate to {0-0, 1-5, 5-10, 10-99}.",
+    "For weight bands, '<7.5T' / '12-20T' columns set weight_band_min/max in tonnes (matches HDFC/Chola/Shriram convention).",
+    "TW bike CC bands: <75 / >75-150 / >150-350 / >350 → cc_band_min/max in CC.",
+    "Pvt Car TP CC bands: <1000 / 1000-1500 / >1500 → cc_band_min/max in CC.",
+    "RTO mapping is processed via the rto_mapping engine — three clusters per RTO are emitted as separate cluster_for_* fields in cluster column."
+  ],
+
+  "sheets": [
+    {
+      "name": "GCV3W & 4W,<7.5T,PCV3W & Taxi",
+      "name_pattern": "GCV3W.*<7\\.5T",
+      "layout": "liberty_grid",
+      "file_pattern": "Robinhood",
+      "config": {
+        "product": "GCV",
+        "data_start_row": 3,
+        "region_col": 0,
+        "column_groups": [
+          { "ins_product": "Comp", "applied_on": "OD", "sub_type": "GCV LCV", "weight_band_min": 0,    "weight_band_max": 2.5, "start_col": 1,  "ages": [{"min":0,"max":0},{"min":1,"max":5},{"min":5,"max":10},{"min":10,"max":99}] },
+          { "ins_product": "Comp", "applied_on": "OD", "sub_type": "GCV LCV", "weight_band_min": 2.5,  "weight_band_max": 3.5, "start_col": 5,  "ages": [{"min":0,"max":0},{"min":1,"max":5},{"min":5,"max":10},{"min":10,"max":99}] },
+          { "ins_product": "Comp", "applied_on": "OD", "sub_type": "GCV LCV", "weight_band_min": 3.5,  "weight_band_max": 7.5, "start_col": 9,  "ages": [{"min":0,"max":0},{"min":1,"max":5},{"min":5,"max":10},{"min":10,"max":99}] },
+          { "ins_product": "Comp", "applied_on": "OD", "product": "PCV", "sub_type": "PCV 3W",  "start_col": 13, "ages": [{"min":0,"max":0},{"min":1,"max":5},{"min":5,"max":10},{"min":10,"max":99}] },
+          { "ins_product": "Comp", "applied_on": "OD", "sub_type": "GCV 3W",  "start_col": 17, "ages": [{"min":0,"max":0},{"min":1,"max":5},{"min":5,"max":10},{"min":10,"max":99}] },
+          { "ins_product": "TP",   "applied_on": "TP", "sub_type": "GCV LCV", "weight_band_min": 0,    "weight_band_max": 2.5, "start_col": 21, "ages": [{"min":0,"max":0},{"min":1,"max":5},{"min":5,"max":10},{"min":10,"max":99}] },
+          { "ins_product": "TP",   "applied_on": "TP", "sub_type": "GCV LCV", "weight_band_min": 2.5,  "weight_band_max": 3.5, "start_col": 25, "ages": [{"min":0,"max":0},{"min":1,"max":5},{"min":5,"max":10},{"min":10,"max":99}] },
+          { "ins_product": "TP",   "applied_on": "TP", "sub_type": "GCV LCV", "weight_band_min": 3.5,  "weight_band_max": 7.5, "start_col": 29, "ages": [{"min":0,"max":0},{"min":1,"max":5},{"min":5,"max":10},{"min":10,"max":99}] },
+          { "ins_product": "TP",   "applied_on": "TP", "product": "PCV", "sub_type": "PCV 3W",  "start_col": 33, "ages": [{"min":0,"max":0},{"min":1,"max":5},{"min":5,"max":10},{"min":10,"max":99}] },
+          { "ins_product": "TP",   "applied_on": "TP", "sub_type": "GCV 3W",  "start_col": 37, "ages": [{"min":0,"max":0},{"min":1,"max":5},{"min":5,"max":10},{"min":10,"max":99}] }
+        ]
+      }
+    },
+    {
+      "name": "GCV4W,>7.5T,PCV4W Others MisD",
+      "name_pattern": "GCV4W.*>7\\.5T",
+      "layout": "liberty_grid",
+      "file_pattern": "Robinhood",
+      "config": {
+        "product": "GCV",
+        "data_start_row": 3,
+        "region_col": 0,
+        "column_groups": [
+          { "ins_product": "Comp", "applied_on": "OD", "sub_type": "GCV MCV",     "weight_band_min": 12, "weight_band_max": 20, "start_col": 1,  "ages": [{"min":0,"max":0},{"min":1,"max":5},{"min":5,"max":10},{"min":10,"max":99}] },
+          { "ins_product": "Comp", "applied_on": "OD", "sub_type": "GCV HCV",     "weight_band_min": 20, "weight_band_max": 43, "start_col": 5,  "ages": [{"min":0,"max":0},{"min":1,"max":5},{"min":5,"max":10},{"min":10,"max":99}] },
+          { "ins_product": "Comp", "applied_on": "OD", "product": "MISC", "sub_type": "MISC Tractor", "start_col": 9,  "ages": [{"min":0,"max":0},{"min":1,"max":5},{"min":5,"max":10},{"min":10,"max":99}] },
+          { "ins_product": "TP",   "applied_on": "TP", "sub_type": "GCV MCV",     "weight_band_min": 12, "weight_band_max": 20, "start_col": 13, "ages": [{"min":0,"max":0},{"min":1,"max":5},{"min":5,"max":10},{"min":10,"max":99}] },
+          { "ins_product": "TP",   "applied_on": "TP", "sub_type": "GCV HCV",     "weight_band_min": 20, "weight_band_max": 43, "start_col": 17, "ages": [{"min":0,"max":0},{"min":1,"max":5},{"min":5,"max":10},{"min":10,"max":99}] },
+          { "ins_product": "TP",   "applied_on": "TP", "product": "MISC", "sub_type": "MISC Tractor", "start_col": 21, "ages": [{"min":0,"max":0},{"min":1,"max":5},{"min":5,"max":10},{"min":10,"max":99}] }
+        ]
+      }
+    },
+    {
+      "name": "PC",
+      "name_pattern": "^PC$",
+      "layout": "liberty_grid",
+      "file_pattern": "Robinhood",
+      "config": {
+        "product": "CAR",
+        "data_start_row": 2,
+        "region_col": 0,
+        "column_groups": [
+          { "ins_product": "Comp", "applied_on": "OD", "fuel_type": "Petrol", "addon": "Yes",
+            "start_col": 1, "variant_label": "Comp (P)", "ages": [null] },
+          { "ins_product": "Comp", "applied_on": "OD", "fuel_types": ["Diesel","CNG","Electric"], "addon": "Yes",
+            "start_col": 2, "variant_label": "Comp (D+CNG+EV)", "ages": [null] },
+          { "ins_product": "SAOD", "applied_on": "OD", "fuel_types": ["Petrol","CNG","Electric","Diesel"],
+            "addon": "Yes", "ncb_min": 1, "ncb_max": 99,
+            "start_col": 3, "variant_label": "SOD NCB (P+CNG+EV) D", "ages": [null] },
+          { "ins_product": "SAOD", "applied_on": "OD", "fuel_types": ["Petrol","CNG","Electric","Diesel"],
+            "addon": "Yes", "ncb_min": 0, "ncb_max": 0,
+            "start_col": 4, "variant_label": "SOD WO NCB (P+CNG+EV) D", "ages": [null] },
+          { "ins_products": ["Comp","SAOD"], "applied_on": "OD", "addon": "No",
+            "start_col": 5, "variant_label": "PC -Non Add on Cases (Comp & SOD)", "ages": [null] },
+          { "ins_product": "Comp", "applied_on": "NET", "nil_dep": "No",
+            "start_col": 6, "variant_label": "PC >5 Year Non ZD (Net) - MH Only",
+            "ages": [{"min":5,"max":99}] }
+        ]
+      }
+    },
+    {
+      "name": "PCTP",
+      "name_pattern": "^PCTP$",
+      "layout": "liberty_grid",
+      "file_pattern": "Robinhood",
+      "config": {
+        "product": "CAR",
+        "data_start_row": 2,
+        "region_col": 0,
+        "column_groups": [
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "Petrol", "cc_band_min": 0,    "cc_band_max": 1000, "start_col": 1, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "Petrol", "cc_band_min": 1000, "cc_band_max": 1500, "start_col": 2, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "Petrol", "cc_band_min": 1500, "cc_band_max": 9999, "start_col": 3, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "Diesel", "cc_band_min": 0,    "cc_band_max": 1000, "start_col": 4, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "Diesel", "cc_band_min": 1000, "cc_band_max": 1500, "start_col": 5, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "Diesel", "cc_band_min": 1500, "cc_band_max": 9999, "start_col": 6, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "CNG",    "cc_band_min": 0,    "cc_band_max": 1000, "start_col": 7, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "CNG",    "cc_band_min": 1000, "cc_band_max": 1500, "start_col": 8, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "CNG",    "cc_band_min": 1500, "cc_band_max": 9999, "start_col": 9, "ages": [null] }
+        ]
+      }
+    },
+    {
+      "name": "TW Comp & TP",
+      "name_pattern": "TW\\s*Comp.*TP",
+      "layout": "liberty_grid",
+      "file_pattern": "Robinhood",
+      "config": {
+        "product": "TW",
+        "data_start_row": 2,
+        "region_col": 0,
+        "column_groups": [
+          { "ins_product": "Comp", "applied_on": "OD", "sub_type": "Bike",    "start_col": 1, "ages": [null] },
+          { "ins_product": "Comp", "applied_on": "OD", "sub_type": "Scooter", "start_col": 2, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "sub_type": "Bike",    "cc_band_min": 0,   "cc_band_max": 75,  "start_col": 3, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "sub_type": "Bike",    "cc_band_min": 75,  "cc_band_max": 150, "start_col": 4, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "sub_type": "Bike",    "cc_band_min": 150, "cc_band_max": 350, "start_col": 5, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "sub_type": "Bike",    "cc_band_min": 350, "cc_band_max": 9999,"start_col": 6, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "sub_type": "Scooter", "cc_band_min": 0,   "cc_band_max": 75,  "start_col": 7, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "sub_type": "Scooter", "cc_band_min": 75,  "cc_band_max": 150, "start_col": 8, "ages": [null] }
+        ]
+      }
+    },
+    {
+      "name": "TW SOD",
+      "name_pattern": "TW\\s*SOD",
+      "layout": "liberty_grid",
+      "file_pattern": "Robinhood",
+      "config": {
+        "product": "TW",
+        "data_start_row": 2,
+        "region_col": 0,
+        "column_groups": [
+          { "ins_product": "SAOD", "applied_on": "OD", "sub_type": "Bike",    "cc_band_min": 0,   "cc_band_max": 75,  "start_col": 1, "ages": [null] },
+          { "ins_product": "SAOD", "applied_on": "OD", "sub_type": "Bike",    "cc_band_min": 75,  "cc_band_max": 150, "start_col": 2, "ages": [null] },
+          { "ins_product": "SAOD", "applied_on": "OD", "sub_type": "Bike",    "cc_band_min": 150, "cc_band_max": 350, "start_col": 3, "ages": [null] },
+          { "ins_product": "SAOD", "applied_on": "OD", "sub_type": "Bike",    "cc_band_min": 350, "cc_band_max": 9999,"start_col": 4, "ages": [null] },
+          { "ins_product": "SAOD", "applied_on": "OD", "sub_type": "Scooter", "cc_band_min": 0,   "cc_band_max": 75,  "start_col": 5, "ages": [null] },
+          { "ins_product": "SAOD", "applied_on": "OD", "sub_type": "Scooter", "cc_band_min": 75,  "cc_band_max": 150, "start_col": 6, "ages": [null] }
+        ]
+      }
+    },
+    {
+      "name": "Geo Cluster",
+      "name_pattern": "Geo\\s*Cluster",
+      "layout": "rto_mapping",
+      "file_pattern": "Geo\\s*Cluster|RTO_TP",
+      "config": {
+        "product": "CAR_TW",
+        "data_start_row": 1,
+        "column_map": { "rto_code": 0, "region": 3, "cluster": 5 }
+      }
+    },
+    {
+      "name": "Geo Cluster",
+      "name_pattern": "Geo\\s*Cluster",
+      "layout": "rto_mapping",
+      "file_pattern": "Geo\\s*Cluster|RTO_TP",
+      "config": {
+        "product": "GCV_LCV_PCV3W",
+        "data_start_row": 1,
+        "column_map": { "rto_code": 0, "region": 3, "cluster": 6 }
+      }
+    },
+    {
+      "name": "Geo Cluster",
+      "name_pattern": "Geo\\s*Cluster",
+      "layout": "rto_mapping",
+      "file_pattern": "Geo\\s*Cluster|RTO_TP",
+      "config": {
+        "product": "GCV_HCV_PCV4W",
+        "data_start_row": 1,
+        "column_map": { "rto_code": 0, "region": 3, "cluster": 7 }
+      }
+    }
+  ]
+}

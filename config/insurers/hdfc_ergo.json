@@ -1,0 +1,65 @@
+{
+  "insurer": "hdfc_ergo",
+  "display_name": "HDFC ERGO General Insurance",
+  "file_patterns": ["HDFC*", "*HDFC*", "*ROBINHOOD*", "*GCV Grid*", "*SA-TP*", "*TW Non New*", "Revised Geography*"],
+
+  "_layout_notes": [
+    "HDFC ships per-LOB files for the monthly cycle (5 files for April 2026):",
+    "  1. ROBINHOOD Final Rate Pvt Car.xlsx       — Pvt Car Comp+SAOD by Zone1/Zone2",
+    "  2. Revised Geography Groupings -Pvt Car.xlsx — state→zone master (Sheet2 used)",
+    "  3. SA-TP Grid St v1.xlsx                   — Pvt Car SATP by Zone+State+Location+Fuel+CC",
+    "  4. TW Non New Combined Grid ST.xlsx        — TW Comp/TP, SAOD with make exclusions",
+    "  5. GCV Grid Effective 01042026 - With RTO List.xlsx — GCV multi-weight-band grid with",
+    "     free-text cell rules (Bolero/Tata/age/decline carve-outs, Grid+N% formulas)",
+    "Sheet matching uses file_pattern to disambiguate (multiple files have a 'Grid' sheet).",
+    "Geography master and Location master sheets are loaded in-engine as state→zone /",
+    "location→cluster lookups; they are NOT emitted as rate rules."
+  ],
+
+  "sheets": [
+    { "name": "PVT Car",
+      "name_pattern": "^pvt[\\s_]*car$",
+      "file_pattern": "robinhood",
+      "layout": "hdfc_grid",
+      "config": { "sheet_kind": "robinhood" } },
+
+    { "name": "Grid",
+      "name_pattern": "^grid$",
+      "file_pattern": "sa-?tp",
+      "layout": "hdfc_grid",
+      "config": { "sheet_kind": "satp" } },
+
+    { "name": "Grid - Comp, TP only",
+      "name_pattern": "comp,?\\s*tp\\s*only",
+      "file_pattern": "tw\\s*non\\s*new|tw\\s*combined",
+      "layout": "hdfc_grid",
+      "config": { "sheet_kind": "tw_comp" } },
+
+    { "name": "Grid - SA-OD",
+      "name_pattern": "(?:grid\\s*-\\s*)?sa-?od",
+      "file_pattern": "tw\\s*non\\s*new|tw\\s*combined",
+      "layout": "hdfc_grid",
+      "config": { "sheet_kind": "tw_saod" } },
+
+    { "name": "Grid",
+      "name_pattern": "^grid$",
+      "file_pattern": "gcv\\s*grid|gcv\\s*effective",
+      "layout": "hdfc_grid",
+      "config": { "sheet_kind": "gcv" } },
+
+    { "name": "3W-GRID",
+      "name_pattern": "3w[\\s_-]*grid",
+      "file_pattern": "pccv\\s*3w|pcv\\s*3w",
+      "layout": "hdfc_grid",
+      "config": { "sheet_kind": "pcv_3w" } },
+
+    { "name": "RTO Master",
+      "name_pattern": "^rto\\s*master\\s*2?$",
+      "file_pattern": "tw\\s*non\\s*new|tw\\s*combined",
+      "layout": "rto_mapping",
+      "config": {
+        "data_start_row": 1,
+        "column_map": { "rto_code": 3, "region": 1, "cluster": 1 }
+      } }
+  ]
+}

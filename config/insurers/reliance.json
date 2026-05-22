@@ -1,0 +1,18 @@
+{
+  "insurer": "reliance",
+  "display_name": "Reliance General Insurance",
+  "file_patterns": ["Reliance*", "*Reliance*", "*GRID*"],
+
+  "_layout_notes": [
+    "Reliance ships a 9-sheet workbook: 4 rate sheets (April CV26 / April-Short Term PCV Taxi / April TW26 / April PVT COM) + 5 reference / contest / master sheets.",
+    "Ignored for now: 'Enabler & Volume Slab' and 'Winter Bonanza' (volume contests, separate task), plus 'PVT car Group' / 'PVT car Segment' / 'Obsolete Models Declined' (master tables — kept on disk only, used at calc time later).",
+    "All four rate sheets share a common skeleton: Zone (col 1) + RTO Region cluster (col 2) + RTO Region city (col 3) + paired COMP/STP rate columns. April CV26 has the most columns (~50) covering PCV 3W, School Bus, PCV Taxi (multiple variants), GCV 2.5K-50K+, GCV 3W, Car Carrier, Flat Bed, MISD-CPM, Tractor, Employee Pickup."
+  ],
+
+  "sheets": [
+    { "name": "April CV26",                 "name_pattern": "april[\\s_]*cv|^cv\\s*$",                "layout": "reliance_grid", "config": { "sheet_kind": "cv",         "header_row": 4, "data_start_row": 5 } },
+    { "name": "April-Short Term PCV Taxi",  "name_pattern": "short[\\s_]*term[\\s_]*pcv",             "layout": "reliance_grid", "config": { "sheet_kind": "pcv_short",  "header_row": 3, "data_start_row": 4 } },
+    { "name": "April TW26",                 "name_pattern": "april[\\s_]*tw|^tw\\s*$",                "layout": "reliance_grid", "config": { "sheet_kind": "tw",         "header_row": 3, "data_start_row": 4 } },
+    { "name": "April PVT COM ",             "name_pattern": "april[\\s_]*pvt|pvt[\\s_]*com",          "layout": "reliance_grid", "config": { "sheet_kind": "pvt_car",    "header_row": 2, "data_start_row": 3 } }
+  ]
+}

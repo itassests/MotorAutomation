@@ -1,0 +1,296 @@
+{
+  "insurer": "icici_lombard",
+  "display_name": "ICICI Lombard General Insurance",
+  "file_patterns": ["*Pvt Car Grid*", "*CV GRID*", "*TW * Grid*", "*School Bus PO Grid*", "*RTO Code master*"],
+
+  "_v1_scope": [
+    "Pvt Car master grid (RTO category EMG/PMG x state/city x 13 product+fuel rate columns)",
+    "TW grid (TW New 1+5 / TW Old / Annexure)",
+    "CV master grid (CV_COMP + CV_AOTP)",
+    "School Bus PO grid",
+    "RTO Code master Vertical (GEO and Cluster)"
+  ],
+
+  "sheets": [
+    {
+      "name": "Sheet1",
+      "_label": "Pvt Car Grid (single-sheet workbook)",
+      "file_pattern": "Pvt[\\s_]*Car[\\s_]*Grid",
+      "layout": "flat_table",
+      "product": "CAR",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": {
+          "remarks": 1,
+          "region": 1,
+          "carrier_type": 0
+        },
+        "rate_columns": [
+          { "column": 2,  "rate_type": "Comp_NEW_1+3",
+            "segment": "Pvt Car New 1+3", "applied_on": "OD",
+            "vehicle_age_min": 0, "vehicle_age_max": 0,
+            "remarks": "[NEW]" },
+          { "column": 2,  "rate_type": "Comp_NEW_3+3",
+            "segment": "Pvt Car New 3+3", "applied_on": "OD",
+            "vehicle_age_min": 0, "vehicle_age_max": 0,
+            "remarks": "[NEW]" },
+
+          { "column": 3,  "rate_type": "SAOD|NCB:GT0",
+            "segment": "Pvt Car SAOD with NCB > 0% (3001/O, 3001/O2)",
+            "applied_on": "OD", "fuel_type": "Petrol" },
+          { "column": 4,  "rate_type": "SAOD|NCB:GT0",
+            "segment": "Pvt Car SAOD with NCB > 0% (3001/O, 3001/O2)",
+            "applied_on": "OD", "fuel_type": "CNG" },
+          { "column": 5,  "rate_type": "SAOD|NCB:GT0",
+            "segment": "Pvt Car SAOD with NCB > 0% (3001/O, 3001/O2)",
+            "applied_on": "OD", "fuel_type": "Diesel" },
+          { "column": 6,  "rate_type": "SAOD|NCB:GT0",
+            "segment": "Pvt Car SAOD with NCB > 0% (3001/O, 3001/O2)",
+            "applied_on": "OD", "fuel_type": "Electric" },
+
+          { "column": 7,  "rate_type": "Comp|NCB:GT0",
+            "segment": "Pvt Car Comprehensive with NCB > 0%",
+            "applied_on": "OD", "fuel_type": "Petrol" },
+          { "column": 8,  "rate_type": "Comp|NCB:GT0",
+            "segment": "Pvt Car Comprehensive with NCB > 0%",
+            "applied_on": "OD", "fuel_type": "CNG" },
+          { "column": 9,  "rate_type": "Comp|NCB:GT0",
+            "segment": "Pvt Car Comprehensive with NCB > 0%",
+            "applied_on": "OD", "fuel_type": "Diesel" },
+          { "column": 10, "rate_type": "Comp|NCB:GT0",
+            "segment": "Pvt Car Comprehensive with NCB > 0%",
+            "applied_on": "OD", "fuel_type": "Electric" },
+
+          { "column": 11, "rate_type": "TP|NCB:No",
+            "segment": "Pvt Car Act Only", "applied_on": "Net" },
+
+          { "column": 12, "rate_type": "Comp|NCB:None",
+            "segment": "Pvt Car Comp Non-NCB Renewal",
+            "applied_on": "OD", "remarks": "[RENEWAL]" },
+          { "column": 12, "rate_type": "Comp|NCB:None",
+            "segment": "Pvt Car Comp Non-NCB Rollover",
+            "applied_on": "OD", "remarks": "[ROLLOVER]" },
+          { "column": 12, "rate_type": "SAOD|NCB:None",
+            "segment": "Pvt Car SAOD Non-NCB Renewal",
+            "applied_on": "OD", "remarks": "[RENEWAL]" },
+          { "column": 12, "rate_type": "SAOD|NCB:None",
+            "segment": "Pvt Car SAOD Non-NCB Rollover",
+            "applied_on": "OD", "remarks": "[ROLLOVER]" },
+
+          { "column": 13, "rate_type": "Comp_USED",
+            "segment": "Pvt Car Used Car", "applied_on": "OD",
+            "remarks": "[USED CAR]" },
+          { "column": 13, "rate_type": "SAOD_USED",
+            "segment": "Pvt Car Used Car", "applied_on": "OD",
+            "remarks": "[USED CAR]" },
+          { "column": 13, "rate_type": "TP_USED",
+            "segment": "Pvt Car Used Car", "applied_on": "Net",
+            "remarks": "[USED CAR]" }
+        ],
+        "decline_markers": ["NA", "D", "DECLINE"]
+      }
+    },
+
+    {
+      "name": "TW New 1+5",
+      "name_pattern": "^tw[\\s_]*(?:new[\\s_]*)?1[+]5\\s*$",
+      "file_pattern": "TW.*Grid",
+      "layout": "flat_table",
+      "product": "TW",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": { "remarks": 1, "region": 1, "carrier_type": 0 },
+        "rate_columns": [
+          { "column": 2,  "rate_type": "Comp_NEW_1+5", "segment": "TW Bike (1+5) New",   "make": "Hero MotoCorp", "applied_on": "OD", "vehicle_age_min": 0, "vehicle_age_max": 0, "remarks": "[NEW]" },
+          { "column": 3,  "rate_type": "Comp_NEW_1+5", "segment": "TW Scooter (1+5) New","make": "Hero MotoCorp", "applied_on": "OD", "vehicle_age_min": 0, "vehicle_age_max": 0, "remarks": "[NEW]" },
+          { "column": 4,  "rate_type": "Comp_NEW_1+5", "segment": "TW Bike (1+5) New",   "make": "Honda",         "applied_on": "OD", "vehicle_age_min": 0, "vehicle_age_max": 0, "remarks": "[NEW]" },
+          { "column": 5,  "rate_type": "Comp_NEW_1+5", "segment": "TW Scooter (1+5) New","make": "Honda",         "applied_on": "OD", "vehicle_age_min": 0, "vehicle_age_max": 0, "remarks": "[NEW]" },
+          { "column": 6,  "rate_type": "Comp_NEW_1+5", "segment": "TW Bike (1+5) New",   "make": "Royal Enfield", "applied_on": "OD", "vehicle_age_min": 0, "vehicle_age_max": 0, "remarks": "[NEW]" },
+          { "column": 7,  "rate_type": "Comp_NEW_1+5", "segment": "TW Bike (1+5) New",   "make": "Suzuki",        "applied_on": "OD", "vehicle_age_min": 0, "vehicle_age_max": 0, "remarks": "[NEW]" },
+          { "column": 8,  "rate_type": "Comp_NEW_1+5", "segment": "TW Scooter (1+5) New","make": "Suzuki",        "applied_on": "OD", "vehicle_age_min": 0, "vehicle_age_max": 0, "remarks": "[NEW]" },
+          { "column": 9,  "rate_type": "Comp_NEW_1+5", "segment": "TW Bike (1+5) New",   "make": "TVS",           "applied_on": "OD", "vehicle_age_min": 0, "vehicle_age_max": 0, "remarks": "[NEW]" },
+          { "column": 10, "rate_type": "Comp_NEW_1+5", "segment": "TW Scooter (1+5) New","make": "TVS",           "applied_on": "OD", "vehicle_age_min": 0, "vehicle_age_max": 0, "remarks": "[NEW]" },
+          { "column": 11, "rate_type": "Comp_NEW_1+5", "segment": "TW Bike (1+5) New",   "make": "Yamaha",        "applied_on": "OD", "vehicle_age_min": 0, "vehicle_age_max": 0, "remarks": "[NEW]" },
+          { "column": 12, "rate_type": "Comp_NEW_1+5", "segment": "TW Scooter (1+5) New","make": "Yamaha",        "applied_on": "OD", "vehicle_age_min": 0, "vehicle_age_max": 0, "remarks": "[NEW]" },
+          { "column": 13, "rate_type": "Comp_NEW_1+5", "segment": "TW Bike & Scooter (1+5) Electric New", "fuel_type": "Electric", "applied_on": "OD", "vehicle_age_min": 0, "vehicle_age_max": 0, "remarks": "[NEW]" }
+        ],
+        "decline_markers": ["NA", "D", "DECLINE"],
+        "annexure_lookup": {
+          "sheet": "Annexure",
+          "match": { "state_col": 1, "body_col": 2, "make_col": 3 },
+          "rto_col": 5,
+          "marker": "Refer Annexure"
+        }
+      }
+    },
+
+    {
+      "name": "Sheet1",
+      "_label": "ICICI CV Grid (April'26+ long-form: RTO | Cluster | Segment | PolicyType | MarRate | AprRate)",
+      "name_pattern": "^Sheet1$",
+      "file_pattern": "Final[\\s_]*CV[\\s_]*Grid|CV[\\s_]*Grid.*Apr|Apr.*CV[\\s_]*Grid",
+      "layout": "flat_table",
+      "product": "GCV",
+      "config": {
+        "header_row": 0,
+        "data_start_row": 1,
+        "column_map": {
+          "carrier_type": 0,
+          "region":       1,
+          "segment":      2,
+          "remarks":      3
+        },
+        "parse_conditional_cells": true,
+        "rate_type_prefix_column": 3,
+        "rate_columns": [
+          { "column": 5, "rate_type": "Net", "applied_on": "Net" }
+        ],
+        "decline_markers": ["No Biz", "NoBiz", "CC", "NA", "N/A"]
+      }
+    },
+
+    {
+      "name": "CV_COMP",
+      "name_pattern": "^cv[\\s_]*comp$",
+      "file_pattern": "CV[\\s_]*GRID",
+      "layout": "flat_table",
+      "product": "GCV",
+      "config": {
+        "header_row": 0,
+        "data_start_row": 2,
+        "column_map": { "remarks": 0, "region": 0 },
+        "parse_conditional_cells": true,
+        "rate_columns": [
+          { "column": 1,  "rate_type": "Comp", "segment": "GCV 3W (New)",                 "applied_on": "Net", "vehicle_age_min": 0, "vehicle_age_max": 0 },
+          { "column": 2,  "rate_type": "Comp", "segment": "GCV 3W (Old)",                 "applied_on": "Net", "vehicle_age_min": 1 },
+          { "column": 3,  "rate_type": "Comp", "segment": "GCV 3W Electric",              "applied_on": "Net", "fuel_type": "Electric" },
+          { "column": 4,  "rate_type": "Comp", "segment": "SCV <2.45T GVW (New)",         "applied_on": "Net", "vehicle_age_min": 0, "vehicle_age_max": 0 },
+          { "column": 5,  "rate_type": "Comp", "segment": "SCV <2.45T GVW (Old)",         "applied_on": "Net", "vehicle_age_min": 1 },
+          { "column": 6,  "rate_type": "Comp", "segment": "SCV >=2.45T GVW (New)",        "applied_on": "Net", "vehicle_age_min": 0, "vehicle_age_max": 0 },
+          { "column": 7,  "rate_type": "Comp", "segment": "SCV >=2.45T GVW (Old)",        "applied_on": "Net", "vehicle_age_min": 1 },
+          { "column": 8,  "rate_type": "Comp", "segment": "LCV 3.5-7.5T",                 "applied_on": "Net" },
+          { "column": 9,  "rate_type": "Comp", "segment": "LCV 7.5-12T",                  "applied_on": "Net" },
+          { "column": 10, "rate_type": "Comp", "segment": "MHCV 12-20T Tanker",           "applied_on": "Net" },
+          { "column": 11, "rate_type": "Comp", "segment": "MHCV 12-20T Tipper",           "applied_on": "Net" },
+          { "column": 12, "rate_type": "Comp", "segment": "MHCV 12-20T Truck",            "applied_on": "Net" },
+          { "column": 13, "rate_type": "Comp", "segment": "MHCV 20-40T Tanker",           "applied_on": "Net" },
+          { "column": 14, "rate_type": "Comp", "segment": "MHCV 20-40T Tipper",           "applied_on": "Net" },
+          { "column": 15, "rate_type": "Comp", "segment": "MHCV 20-40T Truck",            "applied_on": "Net" },
+          { "column": 16, "rate_type": "Comp", "segment": "MHCV 20-40T Trailer",          "applied_on": "Net" },
+          { "column": 17, "rate_type": "Comp", "segment": "MHCV >40T Tanker",             "applied_on": "Net" },
+          { "column": 18, "rate_type": "Comp", "segment": "MHCV >40T Tipper/Dumper",      "applied_on": "Net" },
+          { "column": 19, "rate_type": "Comp", "segment": "MHCV >40T Trailer",            "applied_on": "Net" },
+          { "column": 20, "rate_type": "Comp", "segment": "MHCV >40T Truck",              "applied_on": "Net" },
+          { "column": 21, "rate_type": "Comp", "segment": "Misc D CE (Excluding CRANES)", "applied_on": "Net" },
+          { "column": 22, "rate_type": "Comp", "segment": "Tractor (New)",                "applied_on": "Net", "vehicle_age_min": 0, "vehicle_age_max": 0 },
+          { "column": 23, "rate_type": "Comp", "segment": "Tractor (Old)",                "applied_on": "Net", "vehicle_age_min": 1 },
+          { "column": 24, "rate_type": "Comp", "segment": "PCV 3W Petrol/CNG (New)",      "applied_on": "Net", "fuel_type": "Petrol/CNG", "vehicle_age_min": 0, "vehicle_age_max": 0 },
+          { "column": 25, "rate_type": "Comp", "segment": "PCV 3W Petrol/CNG (Old)",      "applied_on": "Net", "fuel_type": "Petrol/CNG", "vehicle_age_min": 1 },
+          { "column": 26, "rate_type": "Comp", "segment": "PCV 3W Diesel",                "applied_on": "Net", "fuel_type": "Diesel" },
+          { "column": 27, "rate_type": "Comp", "segment": "PCV 3W Electric",              "applied_on": "Net", "fuel_type": "Electric" },
+          { "column": 28, "rate_type": "Comp", "segment": "School Bus <=18 Seater",       "applied_on": "Net" },
+          { "column": 29, "rate_type": "Comp", "segment": "School Bus 18-36 Seater",      "applied_on": "Net" },
+          { "column": 30, "rate_type": "Comp", "segment": "School Bus >36 Seater",        "applied_on": "Net" },
+          { "column": 31, "rate_type": "Comp", "segment": "Staff Bus >18 Seater",         "applied_on": "Net" },
+          { "column": 32, "rate_type": "Comp", "segment": "PCV Taxi Electric",            "applied_on": "Net", "fuel_type": "Electric" },
+          { "column": 33, "rate_type": "Comp", "segment": "PCV Taxi <=1000CC",            "applied_on": "Net" },
+          { "column": 34, "rate_type": "Comp", "segment": "PCV Taxi >1000CC",             "applied_on": "Net" },
+          { "column": 35, "rate_type": "Comp", "segment": "PCV 2W",                       "applied_on": "Net" }
+        ],
+        "decline_markers": ["No Biz", "NoBiz", "CC", "NA", "N/A"]
+      }
+    },
+
+    {
+      "name": "CV_AOTP",
+      "name_pattern": "^cv[\\s_]*aotp$",
+      "file_pattern": "CV[\\s_]*GRID",
+      "layout": "flat_table",
+      "product": "GCV",
+      "config": {
+        "header_row": 0,
+        "data_start_row": 2,
+        "column_map": { "remarks": 0, "region": 0 },
+        "parse_conditional_cells": true,
+        "rate_columns": [
+          { "column": 1,  "rate_type": "TP", "segment": "LCV 3.5-7.5T",            "applied_on": "Net" },
+          { "column": 2,  "rate_type": "TP", "segment": "LCV 7.5-12T",             "applied_on": "Net" },
+          { "column": 3,  "rate_type": "TP", "segment": "MHCV 12-20T Tanker",      "applied_on": "Net" },
+          { "column": 4,  "rate_type": "TP", "segment": "MHCV 12-20T Tipper",      "applied_on": "Net" },
+          { "column": 5,  "rate_type": "TP", "segment": "MHCV 12-20T Truck",       "applied_on": "Net" },
+          { "column": 6,  "rate_type": "TP", "segment": "MHCV 20-40T Tanker",      "applied_on": "Net" },
+          { "column": 7,  "rate_type": "TP", "segment": "MHCV 20-40T Tipper",      "applied_on": "Net" },
+          { "column": 8,  "rate_type": "TP", "segment": "MHCV 20-40T Truck",       "applied_on": "Net" },
+          { "column": 9,  "rate_type": "TP", "segment": "MHCV 20-40T Trailer",     "applied_on": "Net" },
+          { "column": 10, "rate_type": "TP", "segment": "MHCV >40T Tanker",        "applied_on": "Net" },
+          { "column": 11, "rate_type": "TP", "segment": "MHCV >40T Tipper/Dumper", "applied_on": "Net" },
+          { "column": 12, "rate_type": "TP", "segment": "MHCV >40T Trailer",       "applied_on": "Net" },
+          { "column": 13, "rate_type": "TP", "segment": "MHCV >40T Truck",         "applied_on": "Net" }
+        ],
+        "decline_markers": ["No Biz", "NoBiz", "CC", "NA", "N/A"]
+      }
+    },
+
+    {
+      "name": "CC CALL",
+      "name_pattern": "^cc[\\s_]*call$",
+      "file_pattern": "CV[\\s_]*GRID",
+      "layout": "flat_table",
+      "product": "GCV",
+      "config": {
+        "header_row": 0,
+        "data_start_row": 1,
+        "column_map": {
+          "carrier_type": 0,
+          "remarks": 1,
+          "segment": 2,
+          "make": 5,
+          "model": 6,
+          "region": 7,
+          "fuel_type": 11,
+          "sub_type": 12
+        },
+        "rate_columns": [
+          { "column": 9, "rate_type": "Comp_CC_Call", "applied_on": "Net" }
+        ],
+        "decline_markers": ["NA", "N/A", "Inactive"]
+      }
+    },
+
+    {
+      "name": "TW Old",
+      "name_pattern": "^tw[\\s_]*old\\s*$",
+      "file_pattern": "TW.*Grid",
+      "layout": "flat_table",
+      "product": "TW",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": { "remarks": 1, "region": 1, "carrier_type": 0 },
+        "rate_columns": [
+          { "column": 2, "rate_type": "Comp_1+1", "segment": "TW Bike Comp 1+1 Old",    "applied_on": "OD", "vehicle_age_min": 1, "remarks": "[ROLLOVER]" },
+          { "column": 2, "rate_type": "Comp_2+2", "segment": "TW Bike Comp 2+2 Old",    "applied_on": "OD", "vehicle_age_min": 1, "remarks": "[ROLLOVER]" },
+          { "column": 2, "rate_type": "Comp_3+3", "segment": "TW Bike Comp 3+3 Old",    "applied_on": "OD", "vehicle_age_min": 1, "remarks": "[ROLLOVER]" },
+
+          { "column": 3, "rate_type": "Comp_1+1", "segment": "TW Scooter Comp 1+1 Old", "applied_on": "OD", "vehicle_age_min": 1, "remarks": "[ROLLOVER]" },
+          { "column": 3, "rate_type": "Comp_2+2", "segment": "TW Scooter Comp 2+2 Old", "applied_on": "OD", "vehicle_age_min": 1, "remarks": "[ROLLOVER]" },
+          { "column": 3, "rate_type": "Comp_3+3", "segment": "TW Scooter Comp 3+3 Old", "applied_on": "OD", "vehicle_age_min": 1, "remarks": "[ROLLOVER]" },
+
+          { "column": 4, "rate_type": "SAOD_1+1", "segment": "TW Bike SAOD 1yr Old",    "applied_on": "OD", "vehicle_age_min": 1, "remarks": "[ROLLOVER]" },
+          { "column": 4, "rate_type": "SAOD_2+2", "segment": "TW Bike SAOD 2yr Old",    "applied_on": "OD", "vehicle_age_min": 1, "remarks": "[ROLLOVER]" },
+          { "column": 4, "rate_type": "SAOD_3+3", "segment": "TW Bike SAOD 3yr Old",    "applied_on": "OD", "vehicle_age_min": 1, "remarks": "[ROLLOVER]" },
+
+          { "column": 5, "rate_type": "SAOD_1+1", "segment": "TW Scooter SAOD 1yr Old", "applied_on": "OD", "vehicle_age_min": 1, "remarks": "[ROLLOVER]" },
+          { "column": 5, "rate_type": "SAOD_2+2", "segment": "TW Scooter SAOD 2yr Old", "applied_on": "OD", "vehicle_age_min": 1, "remarks": "[ROLLOVER]" },
+          { "column": 5, "rate_type": "SAOD_3+3", "segment": "TW Scooter SAOD 3yr Old", "applied_on": "OD", "vehicle_age_min": 1, "remarks": "[ROLLOVER]" },
+
+          { "column": 6, "rate_type": "TP",        "segment": "TW Bike AOTP Old",        "applied_on": "Net", "vehicle_age_min": 1, "remarks": "[ROLLOVER]" },
+          { "column": 7, "rate_type": "TP",        "segment": "TW Scooter AOTP Old",     "applied_on": "Net", "vehicle_age_min": 1, "remarks": "[ROLLOVER]" }
+        ],
+        "decline_markers": ["NA", "D", "DECLINE"]
+      }
+    }
+  ]
+}

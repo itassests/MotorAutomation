@@ -1,0 +1,901 @@
+{
+  "insurer": "royal_sundaram",
+  "display_name": "Royal Sundaram General Insurance",
+  "file_patterns": ["Effective From*", "Royal*", "RTO Master*", "*CV Grid*", "*Other than CV*"],
+
+  "_v1_scope": [
+    "Pan-India CV STP (state x tonnage)",
+    "Private Car STP (RTO x CC band x ACT/PACK)",
+    "TW STP (zone/state/city x bike/scooter)",
+    "Tractor flat",
+    "3W GCV Non-EV / EV (paired columns)",
+    "4W GCV EV (FuelType x GVW x Type)",
+    "RTO Master (5 LOB clusters: PvtCar, GCV, 3W PCV, Taxi, 2W)"
+  ],
+  "_phase2_pending": [
+    "State-specific CV sheets (TN, MP, Punjab, CH&RJ, West UP, WB, Odisha, Bihar, AP, TS, East UP, JH, GJ, MH, KAR, ROI, ROI(2)) — multi-row banner with discount/make qualifiers",
+    "PC Comp1 — multi-region pivot with discount bands",
+    "PC Comp / 2w Comp — older comp grids",
+    "PCV STP — wide pivot (multiple seating columns)",
+    "Taxi Comp / School Bus / 3W PCV Comp / EV 3w Comp / EV STP",
+    "New Car standalone make-CC-fuel-geo grid"
+  ],
+
+  "sheets": [
+    {
+      "name": "Pan India -CV STP",
+      "name_pattern": "pan[\\s_-]*india.*cv[\\s_-]*stp|cv[\\s_-]*stp[\\s_-]*pan[\\s_-]*india",
+      "layout": "flat_table",
+      "product": "GCV",
+      "config": {
+        "header_row": 0,
+        "data_start_row": 1,
+        "column_map": {
+          "remarks": 0,
+          "region": 1
+        },
+        "rate_columns": [
+          { "column": 2, "rate_type": "SATP", "segment": "GCV 0-2.3T" },
+          { "column": 3, "rate_type": "SATP", "segment": "GCV 2.3-3.5T" },
+          { "column": 4, "rate_type": "SATP", "segment": "GCV 3.5-7.5T" },
+          { "column": 5, "rate_type": "SATP", "segment": "GCV 7.5-12T" },
+          { "column": 6, "rate_type": "SATP", "segment": "GCV 12-20T" },
+          { "column": 7, "rate_type": "SATP", "segment": "GCV 20-40T" },
+          { "column": 8, "rate_type": "SATP", "segment": "GCV 40-45T" },
+          { "column": 9, "rate_type": "SATP", "segment": "GCV >45T" }
+        ],
+        "decline_markers": ["IRDA", "NA", "D"],
+        "skip_zero_rates": false
+      }
+    },
+
+    {
+      "name": "PC STP",
+      "name_pattern": "^pc[\\s_]*stp$|pvt[\\s_]*car[\\s_]*stp",
+      "layout": "flat_table",
+      "product": "CAR",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "column_map": {
+          "remarks": 0,
+          "region": 1
+        },
+        "rate_columns": [
+          { "column": 2, "rate_type": "SATP_ACT", "segment": "Pvt Car <1000CC" },
+          { "column": 3, "rate_type": "SATP_ACT", "segment": "Pvt Car 1000-1500CC" },
+          { "column": 4, "rate_type": "SATP_ACT", "segment": "Pvt Car >1500CC" },
+          { "column": 5, "rate_type": "SATP_PACK", "segment": "Pvt Car <1000CC" },
+          { "column": 6, "rate_type": "SATP_PACK", "segment": "Pvt Car 1000-1500CC" },
+          { "column": 7, "rate_type": "SATP_PACK", "segment": "Pvt Car >1500CC" }
+        ],
+        "decline_markers": ["IRDA", "NA", "D"]
+      }
+    },
+
+    {
+      "name": "2W STP",
+      "name_pattern": "^2w[\\s_]*stp$|^tw[\\s_]*stp$",
+      "layout": "flat_table",
+      "product": "TW",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 4,
+        "column_map": {
+          "remarks": 1,
+          "region": 2
+        },
+        "rate_columns": [
+          { "column": 3, "rate_type": "SATP", "segment": "Bike <150CC" },
+          { "column": 4, "rate_type": "SATP", "segment": "Scooter" }
+        ],
+        "decline_markers": ["IRDA", "NA", "D"]
+      }
+    },
+
+    {
+      "name": "Tractor",
+      "name_pattern": "^tractor$|^tractors?$",
+      "layout": "flat_table",
+      "product": "MISC",
+      "_layout_note": "col 0 = State, col 1 = OD Disc, col 2 = Comp Payout, col 3 = STP Payout. Two rate rules per state (Comp + STP) and OD Disc fed through volume_tier so the export's discount-band extractor surfaces it as Min discount=0 / Discount=<od disc %>.",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": {
+          "remarks": 0,
+          "region": 0,
+          "volume_tier": 1
+        },
+        "rate_columns": [
+          { "column": 2, "rate_type": "Comp_NoNilDep", "segment": "Tractor (IMT23 covered, Trolleys/Trailers excluded)" },
+          { "column": 3, "rate_type": "SATP_NoNilDep", "segment": "Tractor (IMT23 covered, Trolleys/Trailers excluded)" }
+        ],
+        "decline_markers": ["NA", "D"]
+      }
+    },
+
+    {
+      "name": "3W GCV Non EV ",
+      "name_pattern": "3w[\\s_]*gcv[\\s_]*non[\\s_-]*ev",
+      "layout": "flat_table",
+      "product": "GCV",
+      "_block": "LEFT (STP)",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 3,
+        "column_map": { "remarks": 0, "region": 1 },
+        "rate_columns": [
+          { "column": 2, "rate_type": "SATP_BAC", "segment": "3W GCV Non-EV", "fuel_type": "Petrol / Diesel / CNG" }
+        ],
+        "decline_markers": ["NA"]
+      }
+    },
+    {
+      "name": "3W GCV Non EV ",
+      "name_pattern": "3w[\\s_]*gcv[\\s_]*non[\\s_-]*ev",
+      "layout": "flat_table",
+      "product": "GCV",
+      "_block": "RIGHT (Comprehensive)",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 3,
+        "column_map": { "remarks": 4, "region": 5 },
+        "rate_columns": [
+          { "column": 6, "rate_type": "Comp_BAC", "segment": "3W GCV Non-EV", "fuel_type": "Petrol / Diesel / CNG" }
+        ],
+        "decline_markers": ["NA"]
+      }
+    },
+
+    {
+      "name": "3W GCV EV",
+      "name_pattern": "3w[\\s_]*gcv[\\s_]*ev$|3w[\\s_]*ev[\\s_]*gcv",
+      "layout": "flat_table",
+      "product": "GCV",
+      "_block": "LEFT (STP)",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 3,
+        "column_map": { "remarks": 0, "region": 1 },
+        "rate_columns": [
+          { "column": 2, "rate_type": "SATP_BAC", "segment": "3W GCV EV", "fuel_type": "Electric" }
+        ],
+        "decline_markers": ["NA"]
+      }
+    },
+    {
+      "name": "3W GCV EV",
+      "name_pattern": "3w[\\s_]*gcv[\\s_]*ev$|3w[\\s_]*ev[\\s_]*gcv",
+      "layout": "flat_table",
+      "product": "GCV",
+      "_block": "RIGHT (Comprehensive)",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 3,
+        "column_map": { "remarks": 4, "region": 5 },
+        "rate_columns": [
+          { "column": 6, "rate_type": "Comp_BAC", "segment": "3W GCV EV", "fuel_type": "Electric" }
+        ],
+        "decline_markers": ["NA"]
+      }
+    },
+
+    {
+      "name": "4W GCV EV  ",
+      "name_pattern": "4w[\\s_]*gcv[\\s_]*ev",
+      "layout": "flat_table",
+      "product": "GCV",
+      "_block": "LEFT (STP / ACT)",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": {
+          "region": 0,
+          "fuel_type": 1,
+          "segment": 2,
+          "sub_type": 3
+        },
+        "rate_columns": [
+          { "column": 4, "rate_type": "SATP_ACT" }
+        ],
+        "decline_markers": ["NA"]
+      }
+    },
+    {
+      "name": "4W GCV EV  ",
+      "name_pattern": "4w[\\s_]*gcv[\\s_]*ev",
+      "layout": "flat_table",
+      "product": "GCV",
+      "_block": "RIGHT (Comprehensive / PACKAGE)",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": {
+          "region": 6,
+          "fuel_type": 7,
+          "segment": 8,
+          "sub_type": 9
+        },
+        "rate_columns": [
+          { "column": 10, "rate_type": "Comp_PACKAGE" }
+        ],
+        "decline_markers": ["NA"]
+      }
+    },
+
+    {
+      "name": "TN",
+      "name_pattern": "^tn$|^tamil[\\s_]*nadu$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "key_columns": { "remarks": 0, "region": 1 },
+        "city_blocks": [{ "start_col": 2, "end_col": 35, "channel_row": 1 }],
+        "column_header_field": "segment",
+        "defaults": {
+          "fuel_type": "Petrol / Diesel / CNG"
+        },
+        "force_overrides": {
+          "rate_type": "Comp"
+        },
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "ROI",
+      "name_pattern": "^roi$|^rest[\\s_]*of[\\s_]*india$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "key_columns": { "remarks": 0, "region": 1 },
+        "city_blocks": [{ "start_col": 2, "end_col": 35, "channel_row": 1 }],
+        "column_header_field": "segment",
+        "defaults": {
+          "fuel_type": "Petrol / Diesel / CNG"
+        },
+        "force_overrides": {
+          "rate_type": "Comp"
+        },
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "ROI (2)",
+      "name_pattern": "^roi[\\s_]*\\(2\\)$|^roi[\\s_]*2$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "key_columns": { "remarks": 0, "region": 1 },
+        "city_blocks": [{ "start_col": 2, "end_col": 35, "channel_row": 1 }],
+        "column_header_field": "segment",
+        "defaults": {
+          "fuel_type": "Petrol / Diesel / CNG"
+        },
+        "force_overrides": {
+          "rate_type": "Comp"
+        },
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "MP",
+      "name_pattern": "^mp$|^madhya[\\s_]*pradesh$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "key_columns": { "remarks": 0, "region": 1 },
+        "city_blocks": [{ "start_col": 2, "end_col": 35, "channel_row": 1 }],
+        "column_header_field": "segment",
+        "defaults": {
+          "fuel_type": "Petrol / Diesel / CNG"
+        },
+        "force_overrides": {
+          "rate_type": "Comp"
+        },
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "Punjab",
+      "name_pattern": "^punjab$|^pb$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "key_columns": { "remarks": 0, "region": 1 },
+        "city_blocks": [{ "start_col": 2, "end_col": 35, "channel_row": 1 }],
+        "column_header_field": "segment",
+        "defaults": {
+          "fuel_type": "Petrol / Diesel / CNG"
+        },
+        "force_overrides": {
+          "rate_type": "Comp"
+        },
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "CH & RJ",
+      "name_pattern": "^ch[\\s_]*&[\\s_]*rj$|chhattisgarh.*rajasthan",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "key_columns": { "remarks": 0, "region": 1 },
+        "city_blocks": [{ "start_col": 2, "end_col": 35, "channel_row": 1 }],
+        "column_header_field": "segment",
+        "defaults": {
+          "fuel_type": "Petrol / Diesel / CNG"
+        },
+        "force_overrides": {
+          "rate_type": "Comp"
+        },
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "West UP",
+      "name_pattern": "^west[\\s_]*up$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 3,
+        "data_start_row": 4,
+        "key_columns": { "remarks": 0, "region": 1 },
+        "city_blocks": [{ "start_col": 2, "end_col": 35, "channel_row": 2 }],
+        "column_header_field": "segment",
+        "defaults": {
+          "fuel_type": "Petrol / Diesel / CNG"
+        },
+        "force_overrides": {
+          "rate_type": "Comp"
+        },
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "WB",
+      "name_pattern": "^wb$|^west[\\s_]*bengal$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "key_columns": { "remarks": 0, "region": 1 },
+        "city_blocks": [{ "start_col": 2, "end_col": 35, "channel_row": 1 }],
+        "column_header_field": "segment",
+        "defaults": {
+          "fuel_type": "Petrol / Diesel / CNG"
+        },
+        "force_overrides": {
+          "rate_type": "Comp"
+        },
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "Odisha",
+      "name_pattern": "^odisha$|^orissa$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "key_columns": { "remarks": 0, "region": 1 },
+        "city_blocks": [{ "start_col": 2, "end_col": 35, "channel_row": 1 }],
+        "column_header_field": "segment",
+        "defaults": {
+          "fuel_type": "Petrol / Diesel / CNG"
+        },
+        "force_overrides": {
+          "rate_type": "Comp"
+        },
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "Bihar",
+      "name_pattern": "^bihar$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "key_columns": { "remarks": 0, "region": 1 },
+        "city_blocks": [{ "start_col": 2, "end_col": 35, "channel_row": 1 }],
+        "column_header_field": "segment",
+        "defaults": {
+          "fuel_type": "Petrol / Diesel / CNG"
+        },
+        "force_overrides": {
+          "rate_type": "Comp"
+        },
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "AP",
+      "name_pattern": "^ap$|^andhra[\\s_]*pradesh$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "key_columns": { "remarks": 0, "region": 1 },
+        "city_blocks": [{ "start_col": 2, "end_col": 35, "channel_row": 1 }],
+        "column_header_field": "segment",
+        "defaults": {
+          "fuel_type": "Petrol / Diesel / CNG"
+        },
+        "force_overrides": {
+          "rate_type": "Comp"
+        },
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "TS",
+      "name_pattern": "^ts$|^telangana$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "key_columns": { "remarks": 0, "region": 1 },
+        "city_blocks": [{ "start_col": 2, "end_col": 35, "channel_row": 1 }],
+        "column_header_field": "segment",
+        "defaults": {
+          "fuel_type": "Petrol / Diesel / CNG"
+        },
+        "force_overrides": {
+          "rate_type": "Comp"
+        },
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "East UP",
+      "name_pattern": "^east[\\s_]*up$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 3,
+        "data_start_row": 4,
+        "key_columns": { "remarks": 0, "region": 1 },
+        "city_blocks": [{ "start_col": 2, "end_col": 35, "channel_row": 2 }],
+        "column_header_field": "segment",
+        "defaults": {
+          "fuel_type": "Petrol / Diesel / CNG"
+        },
+        "force_overrides": {
+          "rate_type": "Comp"
+        },
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "JH",
+      "name_pattern": "^jh$|^jharkhand$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "key_columns": { "remarks": 0, "region": 1 },
+        "city_blocks": [{ "start_col": 2, "end_col": 35, "channel_row": 1 }],
+        "column_header_field": "segment",
+        "defaults": {
+          "fuel_type": "Petrol / Diesel / CNG"
+        },
+        "force_overrides": {
+          "rate_type": "Comp"
+        },
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "GJ",
+      "name_pattern": "^gj$|^gujarat$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "key_columns": { "remarks": 0, "region": 1 },
+        "city_blocks": [{ "start_col": 2, "end_col": 35, "channel_row": 1 }],
+        "column_header_field": "segment",
+        "defaults": {
+          "fuel_type": "Petrol / Diesel / CNG"
+        },
+        "force_overrides": {
+          "rate_type": "Comp"
+        },
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "MH",
+      "name_pattern": "^mh$|^maharashtra$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "key_columns": { "remarks": 0, "region": 1 },
+        "city_blocks": [{ "start_col": 2, "end_col": 35, "channel_row": 1 }],
+        "column_header_field": "segment",
+        "defaults": {
+          "fuel_type": "Petrol / Diesel / CNG"
+        },
+        "force_overrides": {
+          "rate_type": "Comp"
+        },
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "KAR",
+      "name_pattern": "^kar$|^karnataka$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "key_columns": { "remarks": 0, "region": 1 },
+        "city_blocks": [{ "start_col": 2, "end_col": 35, "channel_row": 1 }],
+        "column_header_field": "segment",
+        "defaults": {
+          "fuel_type": "Petrol / Diesel / CNG"
+        },
+        "force_overrides": {
+          "rate_type": "Comp"
+        },
+        "decline_markers": ["NA", "D"]
+      }
+    },
+
+    {
+      "name": "Taxi Comp",
+      "name_pattern": "^taxi[\\s_]*comp$",
+      "layout": "flat_table",
+      "product": "TAXI",
+      "_layout_note": "col 1 = RS Zone (North/East/West/South), col 2 = State Name. RS Zone is stashed on `carrier_type` so the export can surface it in the Zone column. State drives the state-grid layout (state-grid blanks city since Taxi rules apply state-wide).",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "column_map": {
+          "remarks": 2,
+          "region": 2,
+          "carrier_type": 1
+        },
+        "rate_columns": [
+          { "column": 3, "rate_type": "Comp", "segment": "Taxi 4-6 Seater" },
+          { "column": 4, "rate_type": "Comp", "segment": "Taxi 7-10 Seater" }
+        ],
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "School Bus",
+      "name_pattern": "^school[\\s_]*bus$",
+      "layout": "flat_table",
+      "product": "PCV",
+      "_layout_note": "Title row 0 col 3 = 'Passenger Carrying Vehicle STP BAC Grid for UW Year 2024-25' → ProductType = TP. Two rates per state: OD = Brokerage cell B4 (fixed 50% across all states), TP = School Bus BAC col 6 (per state). The OD+TP pair-merger combines them onto a single Excel row with both columns filled.",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "column_map": {
+          "remarks": 5,
+          "region": 5,
+          "sub_type": 4
+        },
+        "rate_columns": [
+          { "column": 6, "rate_type": "TP_BAC", "segment": "School Bus" }
+        ],
+        "fixed_rate_columns": [
+          { "rate_type": "SAOD_OD", "value_cell_row": 3, "value_cell_col": 1, "segment": "School Bus" }
+        ],
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "2w Comp",
+      "name_pattern": "^2w[\\s_]*comp$|^tw[\\s_]*comp$",
+      "layout": "flat_table",
+      "product": "TW",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 4,
+        "column_map": { "remarks": 0, "region": 1 },
+        "carry_forward_columns": [0],
+        "rate_columns": [
+          { "column": 2, "rate_type": "Comp", "segment": "Scooter (1+1) Rollover" },
+          { "column": 3, "rate_type": "Comp", "segment": "Bike <150CC Rollover (no EV)" }
+        ],
+        "split_od_tp": true,
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "PCV STP",
+      "name_pattern": "^pcv[\\s_]*stp$",
+      "layout": "flat_table",
+      "product": "PCV",
+      "config": {
+        "header_row": 3,
+        "data_start_row": 4,
+        "column_map": { "remarks": 1, "region": 4 },
+        "rate_columns": [
+          { "column": 5,  "rate_type": "SATP", "segment": "PCV Auto 0-3 Seater" },
+          { "column": 6,  "rate_type": "SATP", "segment": "PCV Maruti 4-6 Seater", "make": "Maruti" },
+          { "column": 7,  "rate_type": "SATP", "segment": "PCV Non-Maruti 4-6 Seater" },
+          { "column": 8,  "rate_type": "SATP", "segment": "PCV 7-10 Seater" },
+          { "column": 9,  "rate_type": "SATP", "segment": "PCV 11-18 Seater" },
+          { "column": 10, "rate_type": "SATP", "segment": "PCV >18 Seater (Institution/Corporate)" },
+          { "column": 11, "rate_type": "SATP", "segment": "School Bus" },
+          { "column": 12, "rate_type": "SATP", "segment": "3 Wheeler >3 Seating Capacity" }
+        ],
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "3W PCV Comp",
+      "name_pattern": "^3w[\\s_]*pcv[\\s_]*comp$",
+      "layout": "flat_table",
+      "product": "PCV",
+      "config": {
+        "header_row": 3,
+        "data_start_row": 4,
+        "column_map": { "remarks": 1, "region": 2, "carrier_type": 0, "volume_tier": 4 },
+        "rate_columns": [
+          { "column": 3, "rate_type": "Comp_BAC", "segment": "3W PCV Auto 0-3 Seater" }
+        ],
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "3W PCV Comp",
+      "name_pattern": "^3w[\\s_]*pcv[\\s_]*comp$",
+      "layout": "flat_table",
+      "product": "PCV",
+      "config": {
+        "header_row": 3,
+        "data_start_row": 4,
+        "column_map": { "remarks": 7, "region": 8, "carrier_type": 6, "volume_tier": 10 },
+        "rate_columns": [
+          { "column": 9, "rate_type": "Comp_BAC", "segment": "3W PCV Auto 0-3 Seater" }
+        ],
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "EV 3w Comp",
+      "name_pattern": "^ev[\\s_]*3w[\\s_]*comp$",
+      "layout": "flat_table",
+      "product": "PCV",
+      "config": {
+        "header_row": 3,
+        "data_start_row": 5,
+        "column_map": { "volume_tier": 1 },
+        "rate_columns": [
+          { "column": 2, "rate_type": "Comp_PACKAGE", "segment": "3W E-Rickshaw Pan India (except Delhi NCR/Tamil Nadu)", "fuel_type": "Electric", "region": "Pan India" }
+        ],
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "EV 3w Comp",
+      "name_pattern": "^ev[\\s_]*3w[\\s_]*comp$",
+      "layout": "flat_table",
+      "product": "PCV",
+      "config": {
+        "header_row": 3,
+        "data_start_row": 5,
+        "column_map": { "volume_tier": 6 },
+        "rate_columns": [
+          { "column": 7, "rate_type": "Comp_PACKAGE", "segment": "3W E-Rickshaw Delhi NCR", "fuel_type": "Electric", "region": "Delhi NCR" }
+        ],
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "EV 3w Comp",
+      "name_pattern": "^ev[\\s_]*3w[\\s_]*comp$",
+      "layout": "flat_table",
+      "product": "PCV",
+      "config": {
+        "header_row": 3,
+        "data_start_row": 5,
+        "column_map": { "volume_tier": 11 },
+        "rate_columns": [
+          { "column": 12, "rate_type": "Comp_PACKAGE", "segment": "3W E-Rickshaw Tamil Nadu", "fuel_type": "Electric", "region": "Tamil Nadu" }
+        ],
+        "decline_markers": ["NA", "D"]
+      }
+    },
+    {
+      "name": "EV STP",
+      "name_pattern": "^ev[\\s_]*stp$",
+      "layout": "flat_table",
+      "product": "GCV",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": { "region": 0, "segment": 1 },
+        "rate_columns": [
+          { "column": 2, "rate_type": "SATP_BAC" }
+        ],
+        "decline_markers": ["NA", "D"]
+      }
+    },
+
+    {
+      "name": "PC Comp1",
+      "name_pattern": "^pc[\\s_]*comp[\\s_]*1?$|^pvt[\\s_]*car[\\s_]*comp[\\s_]*1?$",
+      "layout": "multi_region_blocks",
+      "product": "CAR",
+      "config": {
+        "rate_subtypes": ["Key Cities", "Other Cities", "Rest of State"],
+        "segment_prefix": "Pvt Car",
+        "rate_type": "Comp",
+        "decline_markers": ["NA", "D"],
+        "blocks": [
+          {
+            "data_rows": [7, 8, 9, 10, 11],
+            "regions": [
+              { "col": 1,  "label": "Delhi-NCR" },
+              { "col": 6,  "label": "Punjab" },
+              { "col": 11, "label": "Uttarakhand" },
+              { "col": 16, "label": "Jammu & Kashmir" },
+              { "col": 21, "label": "Uttar Pradesh" },
+              { "col": 26, "label": "Haryana" },
+              { "col": 31, "label": "Himachal Pradesh" },
+              { "col": 36, "label": "Chandigarh" },
+              { "col": 41, "label": "Ludhiana", "state": "Punjab", "rate_subtypes": ["Ludhiana"], "rate_col_offsets": [3] }
+            ]
+          },
+          {
+            "data_rows": [15, 16, 17, 18, 19],
+            "regions": [
+              { "col": 1,  "label": "West Bengal" },
+              { "col": 6,  "label": "Jharkhand" },
+              { "col": 11, "label": "Bihar" },
+              { "col": 16, "label": "Odisha" },
+              { "col": 21, "label": "Chhattisgarh" },
+              { "col": 26, "label": "Assam" }
+            ]
+          },
+          {
+            "data_rows": [23, 24, 25, 26, 27],
+            "regions": [
+              { "col": 1,  "label": "Maharashtra" },
+              { "col": 6,  "label": "Goa" },
+              { "col": 11, "label": "Gujarat" },
+              { "col": 16, "label": "Rajasthan" },
+              { "col": 21, "label": "Madhya Pradesh" },
+              { "col": 26, "label": "Nasik & Nagpur", "state": "Maharashtra", "rate_subtypes": ["Nasik & Nagpur"] }
+            ]
+          },
+          {
+            "data_rows": [31, 32, 33, 34, 35],
+            "regions": [
+              { "col": 1,  "label": "Karnataka" },
+              { "col": 6,  "label": "Tamilnadu & Pondicherry" },
+              { "col": 11, "label": "Andhra Pradesh" },
+              { "col": 16, "label": "Telangana" },
+              { "col": 21, "label": "Kerala" },
+              { "col": 26, "label": "Coimbatore", "state": "Tamil Nadu",     "rate_subtypes": ["Coimbatore"] },
+              { "col": 29, "label": "Vijaywada",  "state": "Andhra Pradesh", "rate_subtypes": ["Vijaywada"]  }
+            ]
+          }
+        ]
+      }
+    },
+
+    {
+      "name": "New Car ",
+      "name_pattern": "^new[\\s_]*car$",
+      "layout": "flat_table",
+      "product": "CAR",
+      "_layout_note": "Geography column (col 3) → city column in Excel via region",
+      "config": {
+        "header_row": 9,
+        "data_start_row": 10,
+        "data_end_row": 15,
+        "carry_forward_columns": [0, 4],
+        "column_map": {
+          "make": 0,
+          "segment": 1,
+          "fuel_type": 2,
+          "region": 3
+        },
+        "rate_columns": [
+          { "column": 4, "rate_type": "Comp_New_Car" }
+        ],
+        "decline_markers": ["NA"]
+      }
+    },
+
+    {
+      "name": "RTO",
+      "name_pattern": "^rto$",
+      "layout": "rto_mapping",
+      "product": "CAR",
+      "config": {
+        "data_start_row": 1,
+        "column_map": {
+          "rto_code": 0,
+          "region": 2,
+          "cluster": 3
+        }
+      }
+    },
+    {
+      "name": "RTO",
+      "name_pattern": "^rto$",
+      "layout": "rto_mapping",
+      "product": "GCV",
+      "config": {
+        "data_start_row": 1,
+        "column_map": {
+          "rto_code": 0,
+          "region": 2,
+          "cluster": 4
+        }
+      }
+    },
+    {
+      "name": "RTO",
+      "name_pattern": "^rto$",
+      "layout": "rto_mapping",
+      "product": "PCV",
+      "config": {
+        "data_start_row": 1,
+        "column_map": {
+          "rto_code": 0,
+          "region": 2,
+          "cluster": 5
+        }
+      }
+    },
+    {
+      "name": "RTO",
+      "name_pattern": "^rto$",
+      "layout": "rto_mapping",
+      "product": "TAXI",
+      "config": {
+        "data_start_row": 1,
+        "column_map": {
+          "rto_code": 0,
+          "region": 2,
+          "cluster": 6
+        }
+      }
+    },
+    {
+      "name": "RTO",
+      "name_pattern": "^rto$",
+      "layout": "rto_mapping",
+      "product": "TW",
+      "config": {
+        "data_start_row": 1,
+        "column_map": {
+          "rto_code": 0,
+          "region": 2,
+          "cluster": 7
+        }
+      }
+    }
+  ]
+}

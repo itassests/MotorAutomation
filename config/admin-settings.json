@@ -1,0 +1,16 @@
+{
+  "tabs": {
+    "upload": true,
+    "search": true,
+    "margins": true,
+    "statements": true,
+    "pr": true,
+    "bulk": true,
+    "payout": true,
+    "calculate": false,
+    "policy": false,
+    "cards": false,
+    "final": false
+  },
+  "updated_at": "2026-04-24T06:31:18.040Z"
+}

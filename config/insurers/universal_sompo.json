@@ -1,0 +1,21 @@
+{
+  "insurer": "universal_sompo",
+  "display_name": "Universal Sompo General Insurance",
+  "file_patterns": ["Universal*", "*Universal*", "*Sompo*"],
+
+  "_layout_notes": [
+    "Six wide-matrix sheets, each sharing the same skeleton: R1 (or R0/R2) = Region row (East/West/North/South spans), R2 (or R1/R3) = State column codes, data rows below carry rate-type / band labels in col 0 and percentage values in cols 1+.",
+    "Sheet engines are dispatched by sheet name inside parsers/engines/universal-sompo.js; layout per sheet differs in row interpretation but not in column layout.",
+    "RTO cluster mappings (UP1/2/3, RJ1/2/3, MP1/2, KA1/2, DL-NCR carve-outs, Tri-City) are embedded in the engine — no separate RTO master sheet exists in this workbook.",
+    "Volume / GWP / Discount cap / Sliding-price logic per sheet is encoded into rule fan-out at parse time (see engine for details)."
+  ],
+
+  "sheets": [
+    { "name": "Pvt Car",         "name_pattern": "^\\s*pvt[\\s_]*car\\s*$",                    "layout": "universal_sompo", "config": { "sheet_kind": "pvt_car",       "header_row": 3, "data_start_row": 4 } },
+    { "name": "CV",              "name_pattern": "^\\s*cv\\s*$",                                "layout": "universal_sompo", "config": { "sheet_kind": "cv",            "header_row": 3, "data_start_row": 4 } },
+    { "name": "Tractor",         "name_pattern": "^\\s*tractor\\s*$",                           "layout": "universal_sompo", "config": { "sheet_kind": "tractor",       "header_row": 2, "data_start_row": 3 } },
+    { "name": "PCV",             "name_pattern": "^\\s*pcv\\s*$",                               "layout": "universal_sompo", "config": { "sheet_kind": "pcv",           "header_row": 2, "data_start_row": 3 } },
+    { "name": "Non Tractor",     "name_pattern": "^\\s*non[\\s_]*tractor\\s*$",                 "layout": "universal_sompo", "config": { "sheet_kind": "non_tractor",   "header_row": 2, "data_start_row": 3 } },
+    { "name": "PCV Short Term",  "name_pattern": "pcv[\\s_]*short[\\s_]*term",                  "layout": "universal_sompo", "config": { "sheet_kind": "pcv_short",     "header_row": 2, "data_start_row": 3 } }
+  ]
+}

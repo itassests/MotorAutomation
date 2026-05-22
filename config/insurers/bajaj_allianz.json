@@ -1,0 +1,389 @@
+{
+  "insurer": "bajaj_allianz",
+  "display_name": "Bajaj Allianz General Insurance",
+  "file_patterns": [
+    "Bajaj*",
+    "For*SATP*",
+    "Robinhood*",
+    "SATP_Business*",
+    "SATP Grid*",
+    "SATP Commission*"
+  ],
+  "sheets": [
+    {
+      "_comment": "Bajaj TW Comp & SAOD.xlsx — Agency 2W Comprehensive grid (1802). State × monthly GWP volume bands (0-50K / 50K-1L / 1-2L / 2-3L / 3L+) + Max Scooter band. Note 2: Bajaj/Vespa/Jawa/RE rollover -5%. Note 9: IRDA = OEM 22.5% / non-OEM 17.5% on OD. Cells like '5% on OD & 0% on TP' split into two rules.",
+      "name": "Agency 2W Grid - 1802",
+      "file_pattern": "Bajaj.*TW.*Comp",
+      "layout": "bajaj_pvt_car",
+      "config": {
+        "sheet_kind": "tw_comp_1802",
+        "data_start_row": 6,
+        "data_end_row": 42
+      }
+    },
+    {
+      "_comment": "Bajaj TW Comp & SAOD.xlsx — RTO-code-level overrides for the 1802 grid. Same 5 volume bands + Max Scooter, but keyed by RTO code (sub_type) instead of state. Region = Commission Grid State (col 2). Comp + SAOD emitted per cell, plus Bajaj/Vespa/Jawa/RE rollover -5%.",
+      "name": "RTO Based Payouts File",
+      "file_pattern": "Bajaj.*TW.*Comp",
+      "layout": "bajaj_pvt_car",
+      "config": {
+        "sheet_kind": "tw_comp_1802_rto",
+        "data_start_row": 3
+      }
+    },
+    {
+      "_comment": "Bajaj TW Comp & SAOD.xlsx — RTO code → state-name mapping.",
+      "name": "RTO State Mapping",
+      "file_pattern": "^Bajaj TW Comp",
+      "layout": "rto_mapping",
+      "product": "ALL",
+      "config": {
+        "header_row": 0,
+        "data_start_row": 1,
+        "column_map": {
+          "rto_code": 0,
+          "region": 2
+        }
+      }
+    },
+
+    {
+      "_comment": "For Dec'25_SATP Grid ... Final.xlsx — Pvt Car SATP rates by state with Petrol/Diesel/CNG split.",
+      "name": "Private Car SATP",
+      "file_pattern": "^For.*SATP",
+      "layout": "flat_table",
+      "product": "CAR",
+      "config": {
+        "header_row": 3,
+        "data_start_row": 4,
+        "column_map": {
+          "region": 0,
+          "sub_type": 1
+        },
+        "rate_columns": [
+          { "column": 2, "rate_type": "SATP", "fuel_type": "Petrol" },
+          { "column": 4, "rate_type": "SATP", "fuel_type": "Diesel" },
+          { "column": 6, "rate_type": "SATP", "fuel_type": "CNG" }
+        ],
+        "decline_markers": ["IRDA", "Declined", "D"]
+      }
+    },
+    {
+      "_comment": "For Dec'25_SATP Grid — TW Motorcycle/Bike SATP rates by state + district.",
+      "name": "TW_Bike",
+      "file_pattern": "^For.*SATP",
+      "layout": "flat_table",
+      "product": "TW",
+      "config": {
+        "header_row": 3,
+        "data_start_row": 4,
+        "column_map": {
+          "region": 0,
+          "sub_type": 1,
+          "remarks": 3,
+          "rate_value": 2
+        },
+        "rate_type": "SATP_BIKE",
+        "decline_markers": ["IRDA", "Declined", "D"]
+      }
+    },
+    {
+      "_comment": "For Dec'25_SATP Grid — TW Scooter SATP rates by state.",
+      "name": "TW- Scooter",
+      "file_pattern": "^For.*SATP",
+      "layout": "flat_table",
+      "product": "TW",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "column_map": {
+          "region": 0,
+          "remarks": 2,
+          "rate_value": 1
+        },
+        "rate_type": "SATP_SCOOTER",
+        "decline_markers": ["IRDA", "Declined", "D"]
+      }
+    },
+    {
+      "_comment": "For Dec'25_SATP Grid — CV SATP rates keyed by state/district + segment (GCV/PCV/Taxi/etc).",
+      "name": "SATP - CV",
+      "file_pattern": "^For.*SATP",
+      "layout": "flat_table",
+      "product": "CV",
+      "config": {
+        "header_row": 3,
+        "data_start_row": 4,
+        "column_map": {
+          "region": 0,
+          "sub_type": 1,
+          "segment": 2,
+          "remarks": 4,
+          "rate_value": 3
+        },
+        "rate_type": "SATP",
+        "decline_markers": ["IRDA", "Declined", "D"]
+      }
+    },
+
+    {
+      "_comment": "LEGACY (disabled): Robinhood CV — replaced by bajaj_robinhood sheet_kind 'cv' which parses Comp + SAOD remarks per row and handles IRDA defaults."
+    },
+    {
+      "_comment": "Robinhood — Non Motor LOB-wise country-head payouts.",
+      "name": "Non Motor",
+      "file_pattern": "^Robinhood",
+      "layout": "flat_table",
+      "product": "NON_MOTOR",
+      "config": {
+        "header_row": 0,
+        "data_start_row": 1,
+        "data_end_row": 14,
+        "column_map": {
+          "segment": 0,
+          "rate_value": 1
+        },
+        "rate_type": "COUNTRY_HEAD",
+        "decline_markers": ["Declined", "D"]
+      }
+    },
+    {
+      "_comment": "Robinhood — Retail Health FRH payout slabs.",
+      "name": "Health-FRH & Ren",
+      "file_pattern": "^Robinhood",
+      "layout": "flat_table",
+      "product": "HEALTH",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "data_end_row": 11,
+        "column_map": {
+          "segment": 0,
+          "volume_tier": 0,
+          "remarks": 2,
+          "rate_value": 1
+        },
+        "rate_type": "FRESH",
+        "decline_markers": ["Declined"]
+      }
+    },
+    {
+      "_comment": "LEGACY (disabled): Robinhood TW NEW(1826) / PVT car New (1825) — replaced by bajaj_robinhood engine (sheet_kinds 'tw_new' / 'pvt_car_new') which parses district matrices, HEV Treaty makes, compound model lists, and \"Doable @N%\" rate cells correctly.  These flat_table entries used to emit malformed duplicate rules (region/sub_type inverted, no segment/make) and have been removed."
+    },
+
+    {
+      "_comment": "SATP_Business Corrections ... March 2026.xlsb — PC corrections by district with RTA codes and fuel-type columns.",
+      "name": "PC",
+      "file_pattern": "^SATP.Business",
+      "layout": "flat_table",
+      "product": "CAR",
+      "config": {
+        "header_row": 0,
+        "data_start_row": 1,
+        "column_map": {
+          "region": 1,
+          "sub_type": 3,
+          "remarks": 2
+        },
+        "rate_columns": [
+          { "column": 4, "rate_type": "SATP_CORRECTION", "fuel_type": "Petrol" },
+          { "column": 6, "rate_type": "SATP_CORRECTION", "fuel_type": "Diesel" },
+          { "column": 8, "rate_type": "SATP_CORRECTION", "fuel_type": "CNG" }
+        ],
+        "decline_markers": ["IRDA", "IRDA PO", "No change", "Declined", "D"]
+      }
+    },
+    {
+      "_comment": "SATP_Business Corrections — TW corrections (Bike/Scooter) by district with RTA codes.",
+      "name": "TW",
+      "file_pattern": "^SATP.Business",
+      "layout": "flat_table",
+      "product": "TW",
+      "config": {
+        "header_row": 0,
+        "data_start_row": 1,
+        "column_map": {
+          "segment": 0,
+          "region": 1,
+          "sub_type": 3,
+          "remarks": 2,
+          "remarks_2": 5,
+          "rate_value": 4
+        },
+        "rate_type": "SATP_CORRECTION",
+        "decline_markers": ["IRDA PO", "IRDA", "No change", "Declined"]
+      }
+    },
+    {
+      "_comment": "SATP_Business Corrections — CV corrections by district with RTA codes + segment.",
+      "name": "CV",
+      "file_pattern": "^SATP.Business",
+      "layout": "flat_table",
+      "product": "CV",
+      "config": {
+        "header_row": 0,
+        "data_start_row": 1,
+        "column_map": {
+          "region": 1,
+          "sub_type": 3,
+          "segment": 4,
+          "remarks": 2,
+          "remarks_2": 6,
+          "rate_value": 5
+        },
+        "rate_type": "SATP_CORRECTION",
+        "decline_markers": ["IRDA PO", "IRDA", "No change", "Declined"]
+      }
+    },
+
+    {
+      "_comment": "Bajaj TW 1+5 xlsb — Non Motor single-row grid (LOB columns 14-43) for Robinhood RSME Mumbai I.",
+      "name": "NON MOTOR",
+      "file_pattern": "^Bajaj TW 1.5",
+      "layout": "flat_table",
+      "product": "NON_MOTOR",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "data_end_row": 4,
+        "column_map": {
+          "region": 2,
+          "sub_type": 13
+        },
+        "rate_columns": [
+          { "column": 14, "rate_type": "PA_FRESH" },
+          { "column": 15, "rate_type": "PA_RENEWAL" },
+          { "column": 16, "rate_type": "PA_ROLLOVER" },
+          { "column": 17, "rate_type": "HEALTH_FRESH" },
+          { "column": 18, "rate_type": "HEALTH_RENEWAL" },
+          { "column": 19, "rate_type": "HEALTH_ROLLOVER" },
+          { "column": 20, "rate_type": "ENGINEERING_SA_LT_25CR" },
+          { "column": 21, "rate_type": "ENGINEERING_SA_GT_25CR" },
+          { "column": 22, "rate_type": "WC" },
+          { "column": 23, "rate_type": "MARINE" },
+          { "column": 24, "rate_type": "LIABILITY_UPTO_15CR" },
+          { "column": 25, "rate_type": "LIABILITY_15_50CR" },
+          { "column": 26, "rate_type": "LIABILITY_ABOVE_50CR" },
+          { "column": 27, "rate_type": "TRAVEL" },
+          { "column": 28, "rate_type": "MISC" },
+          { "column": 29, "rate_type": "AVIATION" },
+          { "column": 30, "rate_type": "CROP" },
+          { "column": 31, "rate_type": "RURAL" },
+          { "column": 32, "rate_type": "PROPERTY1_PREFERRED_LT25CR" },
+          { "column": 33, "rate_type": "PROPERTY1_REFERRED_LT25CR" },
+          { "column": 34, "rate_type": "PROPERTY1_PREFERRED_25_100CR" },
+          { "column": 35, "rate_type": "PROPERTY1_REFERRED_25_100CR" },
+          { "column": 36, "rate_type": "PROPERTY1_PREFERRED_GT100CR" },
+          { "column": 37, "rate_type": "PROPERTY1_REFERRED_GT100CR" },
+          { "column": 38, "rate_type": "PROPERTY2_PREFERRED_LT25CR" },
+          { "column": 39, "rate_type": "PROPERTY2_REFERRED_LT25CR" },
+          { "column": 40, "rate_type": "PROPERTY2_PREFERRED_25_100CR" },
+          { "column": 41, "rate_type": "PROPERTY2_REFERRED_25_100CR" },
+          { "column": 42, "rate_type": "PROPERTY2_PREFERRED_GT100CR" },
+          { "column": 43, "rate_type": "PROPERTY2_REFERRED_GT100CR" }
+        ],
+        "decline_markers": ["Declined", "D", "NA"]
+      }
+    },
+    {
+      "_comment": "LEGACY (disabled): 2W 1+5 flat_table — replaced by bajaj_pvt_car engine sheet_kind 'tw_1plus5'. Do not re-enable; produces malformed rules (empty segment/make, wrong region/sub_type swap)."
+    },
+    {
+      "_comment": "LEGACY (disabled): PC flat_table — replaced by bajaj_pvt_car engine sheet_kind 'pc'. Do not re-enable."
+    },
+
+    {
+      "_comment": "File 5 (SATP Grid _27.10.2025.xlsx) — Pvt Car SATP per state × fuel.",
+      "name": "Private Car SATP",
+      "file_pattern": "SATP Grid",
+      "layout": "bajaj_satp",
+      "config": { "sheet_kind": "satp_pc" }
+    },
+    {
+      "_comment": "File 5 — TW Bike SATP per state.",
+      "name": "TW_Bike",
+      "file_pattern": "SATP Grid",
+      "layout": "bajaj_satp",
+      "config": { "sheet_kind": "satp_bike" }
+    },
+    {
+      "_comment": "File 5 — TW Scooter SATP per state.",
+      "name": "TW- Scooter",
+      "file_pattern": "SATP Grid",
+      "layout": "bajaj_satp",
+      "config": { "sheet_kind": "satp_scoot" }
+    },
+    {
+      "_comment": "File 5 — CV SATP per state × district × segment (weight bands).",
+      "name": "SATP - CV",
+      "file_pattern": "SATP Grid",
+      "layout": "bajaj_satp",
+      "config": { "sheet_kind": "satp_cv" }
+    },
+    {
+      "_comment": "File 4 (SATP Commission_Effective 6th April 2026.xlsx) — overlay rows.",
+      "name": "Additional Cohorts",
+      "file_pattern": "SATP Commission",
+      "layout": "bajaj_satp",
+      "config": { "sheet_kind": "satp_overlay" }
+    },
+
+    {
+      "_comment": "File 1 (Bajaj TW 1+5 & Pvt car comp & Non Motor.xlsb) — PC sheet (Pvt Car 1801).",
+      "name": "PC",
+      "file_pattern": "Pvt car comp|TW 1\\+5.*Pvt",
+      "layout": "bajaj_pvt_car",
+      "config": { "sheet_kind": "pc" }
+    },
+    {
+      "_comment": "File 1 — 2W New Vehicle 1+5 (OD 1yr, TP 5yr) per make. Doable-Loc only.",
+      "name": "2W 1+5",
+      "file_pattern": "TW 1\\+5.*Pvt",
+      "layout": "bajaj_pvt_car",
+      "config": { "sheet_kind": "tw_1plus5" }
+    },
+    {
+      "_comment": "File 1 — Hero MotoCorp & TVS state × CD-band grid (1+5 product).",
+      "name": "2W 1+5 HMC & TVS",
+      "file_pattern": "TW 1\\+5.*Pvt",
+      "layout": "bajaj_pvt_car",
+      "config": { "sheet_kind": "tw_hmc_tvs" }
+    },
+
+    {
+      "_comment": "File 3 (Robinhood Insurance Broker.xlsx) — CV (segment × state × Comp%).",
+      "name": "CV",
+      "file_pattern": "Robinhood",
+      "layout": "bajaj_robinhood",
+      "config": { "sheet_kind": "cv" }
+    },
+    {
+      "_comment": "File 3 — Pvt Car Comp & STOD with multi-line NCB / fuel rules per state.",
+      "name": "PVT car Comprehensive & STOD",
+      "file_pattern": "Robinhood",
+      "layout": "bajaj_robinhood",
+      "config": { "sheet_kind": "pvt_car_comp" }
+    },
+    {
+      "_comment": "File 3 — TW New(1826) district × make-bucket Doable/Declined matrix.",
+      "name": "TW NEW(1826)",
+      "file_pattern": "Robinhood",
+      "layout": "bajaj_robinhood",
+      "config": { "sheet_kind": "tw_new" }
+    },
+    {
+      "_comment": "File 3 — Pvt Car New (1825) district × Doable/Declined matrix.",
+      "name": "PVT car New (1825)",
+      "file_pattern": "Robinhood",
+      "layout": "bajaj_robinhood",
+      "config": { "sheet_kind": "pvt_car_new" }
+    },
+    {
+      "_comment": "File 3 — Sheet5: Hero/TVS state × CD-band grid (mirror of File 1 HMC&TVS).",
+      "name": "Sheet5",
+      "file_pattern": "Robinhood",
+      "layout": "bajaj_robinhood",
+      "config": { "sheet_kind": "sheet5_cd_grid" }
+    }
+  ]
+}

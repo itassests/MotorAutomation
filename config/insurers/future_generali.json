@@ -1,0 +1,35 @@
+{
+  "insurer": "future_generali",
+  "label": "Future Generali",
+  "sheets": [
+    {
+      "_comment": "CV IMD payout grid — Weight × State × Zone with OD + 3 TP premium bands (uses wef 10thFeb2026 columns as current).",
+      "name": "IMD Sheet ",
+      "name_pattern": "^IMD Sheet\\s*$",
+      "file_pattern": "CV[ _]payout|IMD",
+      "layout": "future_generali",
+      "config": { "sheet_kind": "fg_cv_imd" }
+    },
+    {
+      "_comment": "RTO blocked — per (Category × RTA × District) Doable/Blocked. Only Blocked rows emitted (Doable is implied by IMD base rule).",
+      "name": "RTO Blocked",
+      "file_pattern": "CV[ _]payout|IMD",
+      "layout": "future_generali",
+      "config": { "sheet_kind": "fg_cv_rto" }
+    },
+    {
+      "_comment": "Auto Kerala — per Kerala RTO slab rate (overrides Auto rate).",
+      "name": "Auto Kerala RTO codes",
+      "file_pattern": "CV[ _]payout|IMD",
+      "layout": "future_generali",
+      "config": { "sheet_kind": "fg_auto_kerala" }
+    },
+    {
+      "_comment": "PDF grid — Pvt Car Comp (6-tier slab) + Pvt Car TP only (state × fuel). Handled via PDF parser, not xlsx sheet.",
+      "name": "_pdf_grid",
+      "file_pattern": "\\.pdf$",
+      "layout": "future_generali_pdf",
+      "config": { "engine": "fg-pdf" }
+    }
+  ]
+}

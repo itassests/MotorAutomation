@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QC — OneInsure RateExtract</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --oi-blue:       #00B0FF;
+      --oi-blue-dark:  #0082C8;
+      --oi-blue-deep:  #00243E;
+      --oi-blue-light: #EBF8FF;
+      --oi-orange:     #F5A011;
+      --oi-orange-lt:  #FFFAEE;
+      --oi-g100:       #F1F3F5;
+      --oi-g300:       #C8CDD5;
+      --oi-g500:       #6B7585;
+      --oi-g700:       #2D3748;
+      --oi-g800:       #1A202C;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Montserrat', system-ui, sans-serif; background: #f0f2f5; color: var(--oi-g800); -webkit-font-smoothing: antialiased; }
+    h1, h2, h3, .hdg { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; letter-spacing: -0.2px; }
+
+    .header {
+      background: linear-gradient(135deg, #00243E, #0082C8);
+      color: #fff; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center;
+      box-shadow: 0 2px 8px rgba(0,36,62,0.2); position: relative;
+    }
+    .header::after { content:''; position:absolute; left:0; right:0; bottom:0; height:2px;
+      background: linear-gradient(90deg, transparent, var(--oi-orange) 30%, var(--oi-orange) 70%, transparent); }
+    .header .brand { font-size:10px; font-weight:700; letter-spacing:2.5px; text-transform:uppercase; color: var(--oi-orange); }
+    .header h1 { font-size: 20px; font-weight: 700; }
+    .header .meta { font-size: 12px; opacity: 0.8; }
+    .close-btn { background: rgba(255,255,255,0.12); color:#fff; border:none; padding: 6px 14px; border-radius: 4px; cursor:pointer; font-size:12px; font-weight:600; }
+    .close-btn:hover { background: rgba(255,255,255,0.2); }
+
+    /* Two panels (PR | Prarambh) + PDF reviewer pane on the right. The
+       two side panels are kept separate but their rows are rendered in
+       the same canonical field sequence so a row in PR aligns visually
+       with the same row in Prarambh. */
+    .container { padding: 20px; display: grid; grid-template-columns: 320px 320px 1fr; gap: 14px; height: calc(100vh - 70px); }
+    .pane { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); display: flex; flex-direction: column; overflow: hidden; }
+    .pane-head { padding: 12px 16px; border-bottom: 1px solid var(--oi-g100); display: flex; justify-content: space-between; align-items: center; }
+    .pane-head h2 { font-size: 14px; color: var(--oi-blue-deep); font-weight: 700; }
+    .pane-head .sub { font-size: 11px; color: var(--oi-g500); }
+    .pane-body { flex: 1; overflow: auto; }
+
+    table.kv { width: 100%; font-size: 11px; border-collapse: collapse; }
+    table.kv th { background: var(--oi-g100); padding: 6px 8px; text-align: left; color: var(--oi-g500); font-size: 9px; letter-spacing: 0.4px; text-transform: uppercase; position: sticky; top: 0; }
+    table.kv td { padding: 4px 8px; border-bottom: 1px solid #f5f5f5; vertical-align: top; }
+    table.kv td.key { color: var(--oi-g500); font-weight: 600; width: 36%; font-size: 10px; }
+    table.kv td.val { font-family: 'Consolas', monospace; color: var(--oi-g800); word-break: break-word; font-size: 11px; }
+    table.kv td.actions { white-space: nowrap; width: 0; padding: 4px 6px; }
+    table.kv tr.mismatch td { background: #fff5f5; }
+    table.kv tr.mismatch td.val { color: #c62828; font-weight: 600; }
+    table.kv tr.match td    { background: #f1fff3; }
+    table.kv tr.incomp td   { background: #fafafa; color: var(--oi-g500); }
+    table.kv tr.section-hdr td {
+      background: #f5f7fa; color: var(--oi-g500); font-size: 9px; letter-spacing: 0.6px;
+      text-transform: uppercase; padding: 7px 8px; font-weight: 700;
+    }
+
+    /* Per-row action buttons — pure icon to save horizontal space; the
+       button title attribute carries the long-form description for
+       hovering. Bold, larger glyph so it's still legible at icon size. */
+    .row-btn {
+      padding: 2px 7px; font-size: 14px; line-height: 1; border-radius: 3px; cursor: pointer;
+      border: 1px solid transparent; font-weight: 700; white-space: nowrap;
+    }
+    .row-btn.pr  { background: #e3f2fd; color: #1565c0; border-color: #90caf9; }
+    .row-btn.prb { background: #f3e5f5; color: #6a1b9a; border-color: #ce93d8; }
+    .row-btn:hover { filter: brightness(0.92); transform: translateY(-1px); transition: 0.1s; }
+    .row-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    /* Actions column should never wrap — pin width to icon size. */
+    table.kv td.actions { white-space: nowrap; width: 1%; padding: 4px 6px; text-align: right; }
+
+    .summary-bar {
+      padding: 10px 16px; border-bottom: 1px solid var(--oi-g100);
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      background: var(--oi-orange-lt);
+    }
+    .summary-bar .lbl { font-size: 11px; color: var(--oi-g500); font-weight: 600; text-transform: uppercase; margin-right: 4px; }
+    .summary-bar .field-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: #fff; border: 1px solid #ef9a9a; border-radius: 4px; font-size: 12px; }
+    .summary-bar .field-pill .name { color: #c62828; font-weight: 600; }
+    .summary-bar .field-pill button { padding: 2px 6px; font-size: 10px; border-radius: 3px; cursor: pointer; border: 1px solid transparent; }
+    .summary-bar .field-pill .btn-pr  { background: #e3f2fd; color: #1565c0; border-color: #90caf9; }
+    .summary-bar .field-pill .btn-prb { background: #f3e5f5; color: #6a1b9a; border-color: #ce93d8; }
+
+    .pdf-frame { border: 0; width: 100%; height: 100%; background: #333; }
+    .pdf-tools { padding: 8px 12px; border-bottom: 1px solid var(--oi-g100); display: flex; gap: 8px; font-size: 12px; align-items: center; }
+    .pdf-tools a { color: var(--oi-blue-dark); font-weight: 600; text-decoration: none; }
+    .pdf-tools .tracker-code { font-family: monospace; background: #eee; padding: 2px 6px; border-radius: 3px; }
+
+    .toast-container { position: fixed; top: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; }
+    .toast { padding: 10px 16px; border-radius: 6px; color: #fff; font-size: 13px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 260px; }
+    .toast.success { background: #2e7d32; }
+    .toast.error   { background: #c62828; }
+    .toast.info    { background: #1565c0; }
+
+    .loading { padding: 40px; text-align: center; color: var(--oi-g500); font-size: 13px; }
+
+    @media (max-width: 1100px) {
+      .container { grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; height: auto; }
+      .pane.pdf { grid-column: 1 / -1; height: 70vh; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div>
+      <span class="brand">OneInsure</span>
+      <h1>QC — <span id="qcPolicyNo" style="font-family:'Consolas',monospace;">…</span></h1>
+      <div class="meta" id="qcMeta">Loading…</div>
+    </div>
+    <button class="close-btn" onclick="window.close()">Close tab</button>
+  </div>
+
+  <div id="summaryBarWrap"></div>
+
+  <div class="container">
+    <!-- PR pane -->
+    <div class="pane">
+      <div class="pane-head">
+        <h2>&#128196; Data from PR</h2>
+        <span class="sub" id="prSub">—</span>
+      </div>
+      <div class="pane-body">
+        <table class="kv" id="prTable">
+          <thead><tr><th>Field</th><th>Value</th><th>Action</th></tr></thead>
+          <tbody><tr><td colspan="3" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Prarambh pane -->
+    <div class="pane">
+      <div class="pane-head">
+        <h2>&#127959; Data from Prarambh</h2>
+        <span class="sub" id="dbSub">—</span>
+      </div>
+      <div class="pane-body">
+        <table class="kv" id="dbTable">
+          <thead><tr><th>Field</th><th>Value</th><th>Action</th></tr></thead>
+          <tbody><tr><td colspan="3" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PDF pane -->
+    <div class="pane pdf">
+      <div class="pane-head">
+        <h2>&#128462; Policy Copy PDF</h2>
+        <span class="sub" id="pdfSub">—</span>
+      </div>
+      <div class="pdf-tools" id="pdfTools"></div>
+      <div style="flex:1; position:relative;">
+        <iframe id="pdfFrame" class="pdf-frame" title="Policy PDF"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    const params  = new URLSearchParams(location.search);
+    const UPLOAD  = Number(params.get('upload')) || null;
+    const POLICY  = params.get('policy') || '';
+    const API     = location.origin + '/api';
+
+    // Canonical field set — mirrors routes/pr.js. Used to decide which fields
+    // drive the mismatch summary + per-field resolve actions.
+    const FIELDS = [
+      { field: 'Vehicle No',    type: 'str',  prCol: 'vehicle_no',    dbCols: ['VEHICLE_REGISTRATION_NO'] },
+      { field: 'Make',          type: 'str',  prCol: 'vehicle_make',  dbCols: ['VEHICAL_MAKE'] },
+      { field: 'Model',         type: 'str',  prCol: 'vehicle_model', dbCols: ['VEHICAL_MODEL'] },
+      { field: 'Sub Model',     type: 'str',  prCol: 'sub_model',     dbCols: ['Vehicle_Sub_Model'] },
+      { field: 'CC',            type: 'int',  prCol: 'cc',            dbCols: ['CC'] },
+      { field: 'Tonnage',       type: 'num',  prCol: 'tonnage',       dbCols: ['Tonnes', 'GROSS_VEHICLE_WEIGHT'] },
+      { field: 'Seating',       type: 'int',  prCol: 'seating',       dbCols: ['SEATING_CAPACITY'] },
+      { field: 'Fuel Type',     type: 'str',  prCol: 'fuel_type',     dbCols: ['FUELTYPE'] },
+      { field: 'MFG Year',      type: 'str',  prCol: 'mfg_year',      dbCols: ['MFG_YEAR'] },
+      // Sum Insured: PR.sum_insured ↔ Prarambh.TOTAL_IDV (all-coverage IDV).
+      // VEHICLE_IDV is OD-only and consistently differs when addons exist.
+      { field: 'Sum Insured',   type: 'num',  prCol: 'sum_insured',   dbCols: ['TOTAL_IDV', 'VEHICLE_IDV'] },
+      { field: 'NCB %',         type: 'num',  prCol: 'ncb',           dbCols: ['NCB'] },
+      // OD Premium: PR.od_premium aligns with Prarambh.NET_OD_PREMIUM (the
+       // post-discount net OD figure) — that's the "what the customer paid for
+       // OD" number both systems track. BASE_OD_PREMIUM is gross-of-discount
+       // and consistently differs by the dealer/agent discount, so using it as
+       // primary surfaces a phantom mismatch on every policy.
+      { field: 'OD Premium',    type: 'num',  prCol: 'od_premium',    dbCols: ['NET_OD_PREMIUM', 'BASE_OD_PREMIUM'] },
+      { field: 'Addon Premium', type: 'num',  prCol: 'addon_premium', dbCols: ['ADD_ON_PREMIUM', 'Addon_Premium'] },
+      // TP Premium: PR.tp_premium aligns with Prarambh.NET_LIABILITY_PREMIUM
+      // (post-discount net TP). Same reasoning as OD — gross LIABILITY_PREMIUM
+      // differs by the discount, so NET stays primary; gross is fallback.
+      { field: 'TP Premium',    type: 'num',  prCol: 'tp_premium',    dbCols: ['NET_LIABILITY_PREMIUM', 'LIABILITY_PREMIUM'] },
+      { field: 'Net Amount',    type: 'num',  prCol: 'net_amount',    dbCols: ['PREMIUM_WITHOUT_GST'] },
+      { field: 'Gross Amount',  type: 'num',  prCol: 'gross_amount',  dbCols: ['ANNUAL_PREMIUM', 'ANNUALPREMIUM'] },
+      { field: 'State',         type: 'str',  prCol: 'state',         dbCols: ['StateName'] },
+    ];
+    const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const escAttr = s => String(s == null ? '' : s).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    /** Excel stores dates as "days since 1900-01-00" (off-by-one from Unix).
+     *  Values in the 10 000–80 000 range correspond to years 1927–2119, so
+     *  it's safe to treat them as Excel serial dates when they appear inside
+     *  a column whose name ends in _date (or similar). Fractional part is the
+     *  intraday fraction — discarded for display. */
+    const DATE_COL_RE = /(_date|_dt|_on|date$|_from$|_to$)/i;
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function excelSerialToDate(serial) {
+      const n = Number(serial);
+      if (!Number.isFinite(n) || n < 10000 || n > 80000) return null;
+      // Excel's 1900-leap-year bug: subtract 25 569 to align with Unix epoch.
+      const ms = Math.round((n - 25569) * 86400 * 1000);
+      const d = new Date(ms);
+      if (isNaN(d.getTime())) return null;
+      return `${String(d.getUTCDate()).padStart(2, '0')}-${MONTHS[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
+    }
+
+    const fmtVal = (v, key) => {
+      if (v == null || v === '') return '<span style="color:#bbb;">—</span>';
+      // Date columns first — convert Excel serials → dd-MMM-yyyy.
+      if (key && DATE_COL_RE.test(key)) {
+        const n = typeof v === 'number' ? v : parseFloat(String(v).trim());
+        const d = excelSerialToDate(n);
+        if (d) return esc(d);
+      }
+      return typeof v === 'number'
+        ? v.toLocaleString('en-IN', { minimumFractionDigits: v % 1 === 0 ? 0 : 2 })
+        : esc(String(v));
+    };
+    function toast(msg, type = 'info') {
+      const t = document.createElement('div'); t.className = 'toast ' + type; t.textContent = msg;
+      document.getElementById('toastContainer').appendChild(t);
+      setTimeout(() => t.remove(), 3800);
+    }
+
+    /** Build the PDF URL from the tracker number — strip every non-alphanumeric
+     *  character, then plug into the OneInsure documents URL template. */
+    function pdfUrlFor(tracker) {
+      const clean = String(tracker || '').replace(/[^A-Za-z0-9]/g, '');
+      if (!clean) return null;
+      return `https://documents.oneinsure.com/${clean}/policycopy.pdf`;
+    }
+
+    let _data = null;   // latest side-by-side payload
+    async function loadQc() {
+      if (!UPLOAD || !POLICY) { toast('Missing upload or policy in URL', 'error'); return; }
+      document.getElementById('qcPolicyNo').textContent = POLICY;
+      try {
+        const res = await fetch(API + '/pr/' + UPLOAD + '/policy/' + encodeURIComponent(POLICY));
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'load failed');
+        _data = data;
+        render();
+      } catch (e) {
+        toast('Load failed: ' + e.message, 'error');
+        document.getElementById('qcMeta').textContent = 'Load failed: ' + e.message;
+      }
+    }
+
+    function render() {
+      try {
+        // Meta line — pr/db flags + any duplicate notice.
+        const meta = [
+          _data.pr_found ? '<span style="color:#a5d6a7;">✓ PR row</span>' : '<span style="color:#ef9a9a;">✗ no PR row</span>',
+          _data.db_found ? '<span style="color:#a5d6a7;">✓ Prarambh row</span>' : '<span style="color:#ef9a9a;">✗ no Prarambh row</span>',
+        ];
+        if (_data.db_row_count > 1) meta.push(`<span style="color:#ffd54f;">${_data.db_row_count} Prarambh rows — showing latest</span>`);
+        document.getElementById('qcMeta').innerHTML = meta.join(' · ');
+
+        // Mismatch summary bar — surface ALL discrepancies, not just hard
+        // mismatches. Three buckets:
+        //   1. Hard mismatch (match === false) — both sides have a value
+        //      and they differ. Shown with red pill + Update buttons.
+        //   2. Missing on one side (match === null AND exactly one of pr/db
+        //      has a value) — usually still actionable; shown with amber
+        //      pill + a "fill the missing side" button.
+        //   3. Both empty — skipped (nothing to do).
+        const isEmpty = (v) => v == null || v === '';
+        const allFields = _data.fields || [];
+        const hardMismatches = allFields.filter(f => f.match === false);
+        const oneSidedMissing = allFields.filter(f =>
+          f.match !== false && (isEmpty(f.pr) !== isEmpty(f.db))
+        );
+        renderSummaryBar(hardMismatches, oneSidedMissing);
+
+        // Render the two panes in canonical field order — same row index in
+        // PR and Prarambh tables corresponds to the same canonical field, so
+        // the user can scan horizontally and the rows align visually.
+        renderAlignedPanes();
+
+        // Subtitles (column counts).
+        document.getElementById('prSub').textContent = _data.pr_row ? Object.keys(_data.pr_row).length + ' fields' : 'not found';
+        document.getElementById('dbSub').textContent = _data.db_row ? Object.keys(_data.db_row).length + ' fields' : 'not found';
+
+        // PDF pane — tracker comes from db_row.TrackerNo (or pr_row.tracker_no if we ever add it).
+        const tracker = (_data.db_row && (_data.db_row.TrackerNo || _data.db_row.tracker_no)) || '';
+        const url = pdfUrlFor(tracker);
+        const tools = document.getElementById('pdfTools');
+        if (url) {
+          tools.innerHTML = `
+            <span>Tracker: <span class="tracker-code">${esc(tracker)}</span></span>
+            <a href="${esc(url)}" target="_blank" rel="noopener">Open in new tab ↗</a>
+            <a href="${esc(url)}" download>Download</a>
+          `;
+          document.getElementById('pdfFrame').src = url;
+          document.getElementById('pdfSub').textContent = tracker;
+        } else {
+          tools.innerHTML = '<span style="color:#c62828;">No tracker number found for this policy — PDF unavailable.</span>';
+          document.getElementById('pdfFrame').removeAttribute('src');
+          document.getElementById('pdfSub').textContent = '—';
+        }
+      } catch (err) {
+        console.error('[qc] render failed', err);
+        toast('Render error: ' + err.message, 'error');
+      }
+    }
+
+    /** Build the top summary ribbon. Shows two pill rows:
+     *    - Hard mismatches (red, both sides have values that differ) with
+     *      both Update directions.
+     *    - One-sided missing (amber, value exists on only one side) with
+     *      a single "Fill the empty side" button — directionally implied
+     *      by which side has the data.
+     */
+    function renderSummaryBar(hardMismatches, oneSidedMissing) {
+      const wrap = document.getElementById('summaryBarWrap');
+      const total = hardMismatches.length + oneSidedMissing.length;
+      if (total === 0) {
+        wrap.innerHTML = `<div class="summary-bar" style="background:#e8f5e9; border-bottom:1px solid #c8e6c9;">
+          <span class="lbl" style="color:#2e7d32;">✓ All fields match — no action needed</span>
+        </div>`;
+        return;
+      }
+      const hardHtml = hardMismatches.map(f => `
+        <span class="field-pill" title="Both sides have values — they differ">
+          <span class="name">${esc(f.field)}</span>
+          <span style="color:#888; font-size:11px;">PR: <b>${esc(formatVal(f.pr))}</b> · P: <b>${esc(formatVal(f.db))}</b></span>
+          <button class="btn-pr"  onclick="resolveField('${escAttr(f.field)}', 'pr',       this)" title="Update as PR — copy PR value into Prarambh">&#8680;</button>
+          <button class="btn-prb" onclick="resolveField('${escAttr(f.field)}', 'prarambh', this)" title="Update as Prarambh — copy Prarambh value into PR">&#8678;</button>
+        </span>`).join('');
+      const isEmpty = (v) => v == null || v === '';
+      const missHtml = oneSidedMissing.map(f => {
+        const prHas = !isEmpty(f.pr);
+        const dbHas = !isEmpty(f.db);
+        // Direction is implied: copy from the side that has data into the
+        // empty side. Show the populated value and a single button.
+        const valStr = prHas ? formatVal(f.pr) : formatVal(f.db);
+        const fromLbl = prHas ? 'PR' : 'P';
+        const dir = prHas ? 'pr' : 'prarambh';
+        const arrow = prHas ? '&#8680;' : '&#8678;';
+        const btnCls = prHas ? 'btn-pr' : 'btn-prb';
+        const btnTitle = prHas
+          ? 'Update as PR — copy PR value into Prarambh (Prarambh side empty)'
+          : 'Update as Prarambh — copy Prarambh value into PR (PR side empty)';
+        return `<span class="field-pill" style="border-color:#ffd54f; background:#fffaf0;" title="One-sided value (${fromLbl} only)">
+          <span class="name" style="color:#a04a00;">${esc(f.field)}</span>
+          <span style="color:#888; font-size:11px;">${fromLbl}: <b>${esc(valStr)}</b> · other: <b style="color:#bbb;">—</b></span>
+          <button class="${btnCls}" onclick="resolveField('${escAttr(f.field)}', '${dir}', this)" title="${btnTitle}">${arrow}</button>
+        </span>`;
+      }).join('');
+      wrap.innerHTML = `<div class="summary-bar">
+        ${hardMismatches.length ? `<span class="lbl">Mismatches (${hardMismatches.length}):</span>${hardHtml}` : ''}
+        ${oneSidedMissing.length ? `<span class="lbl" style="color:#a04a00;">Missing on one side (${oneSidedMissing.length}):</span>${missHtml}` : ''}
+      </div>`;
+    }
+
+    function formatVal(v) {
+      if (v == null || v === '') return '—';
+      if (typeof v === 'number') return v.toLocaleString('en-IN', { minimumFractionDigits: v % 1 === 0 ? 0 : 2 });
+      return String(v);
+    }
+
+    /** Render PR + Prarambh panes in CANONICAL FIELD ORDER so the same row
+     *  index lines up across both tables (the user can read horizontally
+     *  and the row in PR matches the same row in Prarambh). Layout is:
+     *
+     *    1) Canonical fields (one row per FIELDS entry) — even if the value
+     *       is missing on one side. Mismatched rows show a per-row Update
+     *       button next to the value.
+     *    2) Section divider "Other PR fields" with PR-only columns.
+     *    3) Section divider "Other Prarambh fields" with DB-only columns
+     *       (those don't have a matching slot on the PR side and vice
+     *       versa, so they appear only in their own pane).
+     *
+     *  Row alignment is by counting non-canonical PR-only / DB-only rows —
+     *  the panes use the SAME number of section-header markers, only the
+     *  body rows under them differ per pane.
+     */
+    function renderAlignedPanes() {
+      const HIDE = new Set(['raw_json', 'id', 'upload_id', 'created_at']);
+      const prRow = _data.pr_row || {};
+      const dbRow = _data.db_row || {};
+      const fieldStatus = new Map((_data.fields || []).map(f => [f.field, f]));
+
+      // Build the canonical rows, preserving FIELDS order.
+      const canonRows = FIELDS.map(spec => {
+        const fld = fieldStatus.get(spec.field) || {};
+        const status = fld.match;  // true | false | null | undefined
+        const prVal  = spec.prCol in prRow ? prRow[spec.prCol] : null;
+        // For Prarambh: pick the FIRST dbCol that exists in dbRow (the one
+        // the server used for the comparison — which is now NET_OD_PREMIUM
+        // for OD Premium thanks to the swapped order in pr.js).
+        let dbCol = null, dbVal = null;
+        for (const c of spec.dbCols) {
+          if (c in dbRow) { dbCol = c; dbVal = dbRow[c]; break; }
+        }
+        return { spec, status, prCol: spec.prCol, prVal, dbCol, dbVal };
+      });
+
+      // Track which raw columns are already shown via the canonical mapping
+      // so we don't repeat them in the "Other …" section below.
+      const usedPrCols = new Set(canonRows.map(r => r.prCol).filter(Boolean));
+      const usedDbCols = new Set(canonRows.map(r => r.dbCol).filter(Boolean));
+      const extraPrCols = Object.keys(prRow).filter(k => !HIDE.has(k) && !usedPrCols.has(k));
+      const extraDbCols = Object.keys(dbRow).filter(k => !HIDE.has(k) && !usedDbCols.has(k));
+
+      const prTbody = document.querySelector('#prTable tbody');
+      const dbTbody = document.querySelector('#dbTable tbody');
+      if (!_data.pr_found && !_data.db_found) {
+        prTbody.innerHTML = '<tr><td colspan="3" class="loading">No PR row found.</td></tr>';
+        dbTbody.innerHTML = '<tr><td colspan="3" class="loading">No Prarambh row found.</td></tr>';
+        return;
+      }
+
+      const prRowsHtml = canonRows.map(r => renderCanonRow(r, 'pr')).join('');
+      const dbRowsHtml = canonRows.map(r => renderCanonRow(r, 'db')).join('');
+
+      // "Other …" section — show under each pane independently.
+      const prExtraHtml = extraPrCols.length ? (
+        `<tr class="section-hdr"><td colspan="3">Other PR fields (${extraPrCols.length})</td></tr>` +
+        extraPrCols.map(k => `<tr class="incomp">
+            <td class="key">${esc(k)}</td>
+            <td class="val">${fmtVal(prRow[k], k)}</td>
+            <td class="actions"></td>
+          </tr>`).join('')
+      ) : '';
+      const dbExtraHtml = extraDbCols.length ? (
+        `<tr class="section-hdr"><td colspan="3">Other Prarambh fields (${extraDbCols.length})</td></tr>` +
+        extraDbCols.map(k => `<tr class="incomp">
+            <td class="key">${esc(k)}</td>
+            <td class="val">${fmtVal(dbRow[k], k)}</td>
+            <td class="actions"></td>
+          </tr>`).join('')
+      ) : '';
+
+      prTbody.innerHTML = prRowsHtml + prExtraHtml;
+      dbTbody.innerHTML = dbRowsHtml + dbExtraHtml;
+    }
+
+    /** Render one canonical-field row in either pane. `side` = 'pr' | 'db'.
+     *  Mismatched rows carry a per-row Update button on the OPPOSITE side
+     *  (so on the PR pane the button copies PR → Prarambh, and on the
+     *  Prarambh pane the button copies Prarambh → PR). The Field cell
+     *  shows the raw column name on each side so reviewers can see which
+     *  column was used for the comparison. */
+    function renderCanonRow(row, side) {
+      const isEmpty = (v) => v == null || v === '';
+      const prHas = !isEmpty(row.prVal);
+      const dbHas = !isEmpty(row.dbVal);
+      // One-sided missing → reviewer should see this as actionable too
+      // (server returns null match in that case, but it's not "incomparable
+      // — both empty" any more).
+      const oneSided = row.status !== false && (prHas !== dbHas);
+      // CSS class — both hard mismatch and one-sided rows get the
+      // "mismatch" amber/red styling so the reviewer sees them as
+      // actionable rows.
+      let cls;
+      if (row.status === false)      cls = 'mismatch';
+      else if (oneSided)             cls = 'mismatch';
+      else if (row.status === true)  cls = 'match';
+      else                           cls = 'incomp';
+
+      const isPr = side === 'pr';
+      const colName = isPr ? row.prCol : (row.dbCol || row.spec.dbCols[0]);
+      const value   = isPr ? row.prVal : row.dbVal;
+      // Show a button on:
+      //   - hard mismatches (both sides have values that differ): both panes
+      //   - one-sided rows: ONLY on the side that HAS the value (clicking
+      //     the empty side does nothing useful — copy the populated value
+      //     into the empty side instead).
+      let showBtn = false;
+      if (row.status === false)      showBtn = true;
+      else if (oneSided)             showBtn = isPr ? prHas : dbHas;
+      // Icon-only buttons keep the actions column slim. The title carries
+      // the long-form action so hovering still gives the reviewer context.
+      // Symbols chosen to mirror the direction of the data flow:
+      //   PR pane uses "⇒"  (push PR value rightward into Prarambh)
+      //   Prarambh pane uses "⇐"  (pull Prarambh value leftward into PR)
+      let btn = '';
+      if (showBtn) {
+        if (isPr) {
+          btn = `<button class="row-btn pr"  onclick="resolveField('${escAttr(row.spec.field)}', 'pr', this)" title="Update as PR — copy PR value into Prarambh">&#8680;</button>`;
+        } else {
+          btn = `<button class="row-btn prb" onclick="resolveField('${escAttr(row.spec.field)}', 'prarambh', this)" title="Update as Prarambh — copy Prarambh value into PR">&#8678;</button>`;
+        }
+      }
+      return `<tr class="${cls}">
+        <td class="key" title="${esc(row.spec.field)}">${esc(colName || row.spec.field)}</td>
+        <td class="val">${fmtVal(value, colName)}</td>
+        <td class="actions">${btn}</td>
+      </tr>`;
+    }
+
+    /** Resolve one mismatched field via PUT /api/pr/:id/policy/:pn/resolve, then
+     *  refresh the whole QC page. */
+    async function resolveField(field, direction, btn) {
+      const msg = direction === 'pr'
+        ? `Copy PR value for "${field}" into Prarambh (tmp_PrarambhData)?\n\nThis writes to the source system.`
+        : `Copy Prarambh value for "${field}" into the Premium Register (pr_rows)?\n\nThis updates the local PR record.`;
+      if (!confirm(msg)) return;
+      btn.disabled = true; const orig = btn.textContent; btn.textContent = '…';
+      try {
+        const res = await fetch(API + '/pr/' + UPLOAD + '/policy/' + encodeURIComponent(POLICY) + '/resolve', {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ field, direction }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'resolve failed');
+        _data = data;
+        render();
+        toast(`Resolved ${field} — used ${direction === 'pr' ? 'PR' : 'Prarambh'} value`, 'success');
+      } catch (e) {
+        btn.textContent = orig; btn.disabled = false;
+        toast('Resolve failed: ' + e.message, 'error');
+      }
+    }
+
+    loadQc();
+  </script>
+</body>
+</html>

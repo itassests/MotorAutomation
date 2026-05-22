@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+server.log
+server.err.log
+iisnode/
+npm-debug.log*
+
+# Runtime / generated content
+uploads/
+exports/
+tmp/
+_tmp/
+tmp_*.xlsx
+tmp_*.json
+
+# Secrets / env
+.env
+.env.local
+.env.*.local
+iisnode.env
+
+# Editor / OS
+.vscode/
+.idea/
+.claude/
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Build / lock noise (keep package-lock.json — it pins prod deps)
+*.tgz
+.npm/
+
+# Sample / scratch deliverables created during dev
+*.tmpchola11.json
+CodeRateExtract_tmpchola11.json
+tmp_ROBINHOOD_*.xlsx
+tmp_Revised_*.xlsx
+tmp_rates_all.xlsx
+tmp_result.json
+tmp_rules*.json
+
+# Misc temp Excel locks
+~$*.xlsx

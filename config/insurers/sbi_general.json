@@ -1,0 +1,45 @@
+{
+  "insurer": "sbi_general",
+  "display_name": "SBI General Insurance",
+  "file_patterns": ["SBI*", "*SBI*"],
+
+  "_layout_notes": [
+    "A&B Cat Broker_Apr26 — main grid, 4-row header (R0 segment / R1 make sub-bucket / R2 age tier / R3 rate type), 8 broker zones (East 1..West 2) × ~50 state/city rows × 80 rate columns. Engine: sbi_grouped (column spec hardcoded in parsers/engines/sbi-grouped.js).",
+    "PVT car SATP-Apr26 — wide-matrix State+Cluster×Fuel×CC, sheet 1. Engine: sbi_pvt_satp.",
+    "Cluster Master — RTO→cluster lookup (older, eff 2 Apr). Engine: rto_mapping.",
+    "RTO Master 27th April file — newer cluster master, uploaded as a separate rate card with effective_from=27 Apr so resolveRTO picks by date."
+  ],
+
+  "sheets": [
+    {
+      "name": "A&B Cat Broker_Apr26",
+      "name_pattern": "a\\s*&?\\s*b[\\s_]*cat[\\s_]*broker|broker[\\s_]*grid",
+      "layout": "sbi_grouped",
+      "config": {
+        "data_start_row": 4
+      }
+    },
+    {
+      "name": "PVT car SATP-Apr26",
+      "name_pattern": "pvt[\\s_]*car[\\s_]*satp|pvtcar[\\s_]*satp",
+      "layout": "sbi_pvt_satp",
+      "product": "CAR",
+      "config": {
+        "data_start_row": 2
+      }
+    },
+    {
+      "name": "Cluster Master",
+      "name_pattern": "^\\s*cluster[\\s_]*master\\s*$",
+      "layout": "rto_mapping",
+      "config": {
+        "data_start_row": 1,
+        "column_map": {
+          "rto_code": 2,
+          "region": 0,
+          "cluster": 3
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,319 @@
+{
+  "insurer": "digit",
+  "display_name": "Digit Insurance",
+  "file_patterns": ["Effective From*", "Digit*", "Large Insurance*"],
+  "sheets": [
+    {
+      "name": "CV Grid (excl. HCV)",
+      "layout": "flat_table",
+      "product": "CV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "column_map": {
+          "region": 0,
+          "segment": 1,
+          "make": 2,
+          "remarks": 6,
+          "remarks_2": 7
+        },
+        "rate_columns": [
+          { "column": 3, "rate_type": "COMP_CD1" },
+          { "column": 4, "rate_type": "COMP_MAX_CD2" },
+          { "column": 5, "rate_type": "SATP_MAX_CD2" }
+        ],
+        "decline_markers": ["D", "NA"]
+      }
+    },
+    {
+      "name": "HCV GRID",
+      "layout": "flat_table",
+      "product": "CV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "column_map": {
+          "region": 0,
+          "segment": 1,
+          "make": 2,
+          "age_from": 3,
+          "age_to": 4
+        },
+        "rate_columns": [
+          { "column": 5, "rate_type": "COMP_CD1" },
+          { "column": 6, "rate_type": "COMP_AVG_CD2" },
+          { "column": 7, "rate_type": "COMP_MAX_CD2" },
+          { "column": 8, "rate_type": "SATP_AVG_CD2" },
+          { "column": 9, "rate_type": "SATP_MAX_CD2" },
+          { "column": 10, "rate_type": "DUMPER_COMP_CD1" },
+          { "column": 11, "rate_type": "DUMPER_COMP_AVG_CD2" },
+          { "column": 12, "rate_type": "DUMPER_COMP_MAX_CD2" },
+          { "column": 13, "rate_type": "DUMPER_SATP_AVG_CD2" },
+          { "column": 14, "rate_type": "DUMPER_SATP_MAX_CD2" },
+          { "column": 15, "rate_type": "PORT_TRAILER_COMP_CD1" },
+          { "column": 16, "rate_type": "PORT_TRAILER_COMP_AVG_CD2" },
+          { "column": 17, "rate_type": "PORT_TRAILER_COMP_MAX_CD2" },
+          { "column": 18, "rate_type": "PORT_TRAILER_SATP_AVG_CD2" },
+          { "column": 19, "rate_type": "PORT_TRAILER_SATP_MAX_CD2" },
+          { "column": 20, "rate_type": "OIL_TANKER_COMP_CD1" },
+          { "column": 21, "rate_type": "OIL_TANKER_COMP_AVG_CD2" },
+          { "column": 22, "rate_type": "OIL_TANKER_COMP_MAX_CD2" },
+          { "column": 23, "rate_type": "OIL_TANKER_SATP_AVG_CD2" },
+          { "column": 24, "rate_type": "OIL_TANKER_SATP_MAX_CD2" },
+          { "column": 25, "rate_type": "GAS_TANKER_COMP_CD1" },
+          { "column": 26, "rate_type": "GAS_TANKER_COMP_AVG_CD2" },
+          { "column": 27, "rate_type": "GAS_TANKER_COMP_MAX_CD2" },
+          { "column": 28, "rate_type": "GAS_TANKER_SATP_AVG_CD2" },
+          { "column": 29, "rate_type": "GAS_TANKER_SATP_MAX_CD2" }
+        ],
+        "decline_markers": ["D", "NA"],
+        "skip_header_rows": true,
+        "additional_sections": true
+      }
+    },
+    {
+      "name": "TAXI Segments and Location wise",
+      "layout": "flat_table",
+      "product": "TAXI",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "column_map": {
+          "region": 0,
+          "segment": 1,
+          "make": 2,
+          "addon": 3
+        },
+        "rate_columns": [
+          { "column": 4, "rate_type": "COMP_CD1" },
+          { "column": 5, "rate_type": "COMP_MAX_CD2" },
+          { "column": 6, "rate_type": "SATP_MAX_CD2" }
+        ],
+        "decline_markers": ["D", "NA"],
+        "skip_header_rows": true
+      }
+    },
+    {
+      "name": "4W SATP",
+      "layout": "flat_table",
+      "product": "4W",
+      "config": {
+        "header_row": 0,
+        "data_start_row": 1,
+        "column_map": {
+          "region": 0,
+          "segment": 1,
+          "sub_type": 2,
+          "rate_value": 3
+        },
+        "rate_type": "MAX_CD2",
+        "decline_markers": ["D", "NA"]
+      }
+    },
+    {
+      "name": "4W New Business 1+3",
+      "layout": "flat_table",
+      "product": "4W",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 3,
+        "column_map": {
+          "region": 0
+        },
+        "rate_columns": [
+          { "column": 1, "rate_type": "1+3_CD2", "make": "Tata" },
+          { "column": 2, "rate_type": "1+3_CD2", "make": "Kia" },
+          { "column": 3, "rate_type": "1+3_CD2", "make": "Mahindra" },
+          { "column": 4, "rate_type": "1+3_CD2", "make": "Hyundai" },
+          { "column": 5, "rate_type": "1+3_CD2", "make": "Toyota" },
+          { "column": 6, "rate_type": "1+3_CD2", "make": "HEV-Mercedes Benz, Ford, BMW, Jeep, Ferrari, Bentley, Rolls Royce, Chevrolet, Datsun, Nissan, Renault, Jaguar, Land Rover, BYD, Citrone, Tesla, Audi, Volvo, Porsche" },
+          { "column": 7, "rate_type": "1+3_CD2", "make": "Maruti, MG, Skoda, Volks, Honda, Renault, Others" },
+          { "column": 8, "rate_type": "3+3_CD2", "make": "Maruti, MG, Skoda, Volks, Honda, Renault, Others" }
+        ],
+        "decline_markers": ["D", "NA"]
+      }
+    },
+    {
+      "name": "TW 1+1 & SATP",
+      "layout": "flat_table",
+      "product": "TW",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": {
+          "region": 0,
+          "segment": 1
+        },
+        "rate_columns": [
+          { "column": 2, "rate_type": "1+1_CD1" },
+          { "column": 3, "rate_type": "1+1_MAX_CD2" },
+          { "column": 4, "rate_type": "SATP_MAX_CD2" }
+        ],
+        "decline_markers": ["D", "NA"]
+      }
+    },
+    {
+      "name": "TW 1+5",
+      "layout": "flat_table",
+      "product": "TW",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": {
+          "region": 1,
+          "make": 2,
+          "segment": 3,
+          "remarks": 6
+        },
+        "rate_columns": [
+          { "column": 4, "rate_type": "1+5_CD1" },
+          { "column": 5, "rate_type": "1+5_MAX_CD2" }
+        ],
+        "decline_markers": ["D", "NA"]
+      }
+    },
+    {
+      "name": "2W Grid 5+5",
+      "layout": "flat_table",
+      "product": "TW",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": {
+          "region": 1,
+          "make": 2,
+          "segment": 3,
+          "remarks": 6,
+          "remarks_2": 9,
+          "addon": 9
+        },
+        "rate_columns": [
+          { "column": 4, "rate_type": "5+5_CD1" },
+          { "column": 5, "rate_type": "5+5_MAX_CD2" }
+        ],
+        "decline_markers": ["D", "NA"]
+      }
+    },
+    {
+      "name": "TW SAOD with Flexi Options",
+      "layout": "flat_table",
+      "product": "TW",
+      "config": {
+        "header_row": 0,
+        "data_start_row": 1,
+        "column_map": {
+          "region": 0,
+          "segment": 1
+        },
+        "rate_columns": [
+          { "column": 2, "rate_type": "MIN_CD1" },
+          { "column": 3, "rate_type": "MAX_CD1_NO_BREAKIN" },
+          { "column": 4, "rate_type": "MAX_CD1_BREAKIN" },
+          { "column": 5, "rate_type": "CD2" },
+          { "column": 6, "rate_type": "MAX_1YR_CD2" },
+          { "column": 7, "rate_type": "MAX_2YR_CD2" },
+          { "column": 8, "rate_type": "MAX_3YR_CD2" },
+          { "column": 9, "rate_type": "MAX_4YR_CD2" }
+        ],
+        "decline_markers": ["D", "NA"]
+      }
+    },
+    {
+      "name": "School & Staff Bus ",
+      "layout": "flat_table",
+      "product": "PCV",
+      "config": {
+        "header_row": 2,
+        "data_start_row": 4,
+        "column_map": {
+          "segment": 1,
+          "region": 2,
+          "sub_type": 3
+        },
+        "rate_columns": [
+          { "column": 4, "rate_type": "MAX_CD2" },
+          { "column": 5, "rate_type": "On Contract (Transporter)" },
+          { "column": 6, "rate_type": "On Contract (Individual)" }
+        ],
+        "decline_markers": ["D", "NA"]
+      }
+    },
+    {
+      "name": "Pvt Car Comp+SAOD Grid",
+      "layout": "flat_table",
+      "product": "CAR",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": {
+          "region": 0
+        },
+        "rate_columns": [
+          { "column": 1, "rate_type": "SAOD" },
+          { "column": 2, "rate_type": "Comp" },
+          { "column": 3, "rate_type": "SAOD_NON_NCB" },
+          { "column": 4, "rate_type": "SAOD_NCB" },
+          { "column": 5, "rate_type": "COMP_NON_NCB" },
+          { "column": 6, "rate_type": "COMP_NCB" },
+          { "column": 7, "rate_type": "SAOD_NON_NCB_2" },
+          { "column": 8, "rate_type": "SAOD_NCB_2" },
+          { "column": 9, "rate_type": "COMP_ALL" },
+          { "column": 10, "rate_type": "HEV" }
+        ],
+        "decline_markers": ["D", "NA"]
+      }
+    },
+    {
+      "name": "CV RTO Mapping",
+      "layout": "rto_mapping",
+      "product": "CV",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": {
+          "rto_code": 0,
+          "region": 3
+        }
+      }
+    },
+    {
+      "name": "2W RTO's",
+      "layout": "rto_mapping",
+      "product": "TW",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": {
+          "rto_code": 0,
+          "region": 1
+        }
+      }
+    },
+    {
+      "name": "4W  RTO",
+      "layout": "rto_mapping",
+      "product": "4W",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": {
+          "rto_code": 0,
+          "region": 1
+        }
+      }
+    },
+    {
+      "name": "School & Staff Bus RTO",
+      "layout": "rto_mapping",
+      "product": "PCV",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": {
+          "rto_code": 0,
+          "region": 3
+        }
+      }
+    }
+  ]
+}

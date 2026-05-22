@@ -1,0 +1,268 @@
+{
+  "insurer": "tata_aig",
+  "display_name": "TATA AIG General Insurance",
+  "file_patterns": ["Grid_Communication*", "CV Grid_Communication*", "TATA*", "Latest RTO Master*"],
+  "sheets": [
+    {
+      "name": "cv checks",
+      "name_pattern": "^cv[\\s_]*checks?$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 0,
+        "data_start_row": 1,
+        "key_columns": {
+          "segment": 0,
+          "section_text": 1,
+          "vehicle_age": 2,
+          "slab": 3
+        },
+        "city_blocks": [
+          { "start_col": 4,  "end_col": 59,  "channel": "DM"  },
+          { "start_col": 61, "end_col": 116, "channel": "HOM" }
+        ],
+        "decline_markers": ["D", "NA", "Decline"],
+        "skip_zero_rates": false
+      }
+    },
+    {
+      "name": "pci checks",
+      "name_pattern": "^pci[\\s_]*checks?$",
+      "layout": "pivot_by_city",
+      "product": "CAR",
+      "config": {
+        "header_row": 0,
+        "data_start_row": 1,
+        "key_columns": {
+          "vehicle_type": 0,
+          "business_type": 1,
+          "fuel_type": 2,
+          "section_text": 3,
+          "ncb": 4,
+          "slab": 5
+        },
+        "city_blocks": [
+          { "start_col": 6,  "end_col": 58,  "channel": "DM"  },
+          { "start_col": 63, "end_col": 115, "channel": "HOM" }
+        ],
+        "decline_markers": ["D", "NA", "Decline"],
+        "skip_zero_rates": false
+      }
+    },
+    {
+      "name": "Pvtcar",
+      "name_pattern": "^pvt[\\s_]*car$",
+      "layout": "pivot_by_city",
+      "product": "CAR",
+      "config": {
+        "header_row": 4,
+        "data_start_row": 5,
+        "key_columns": {
+          "vehicle_type": 6,
+          "business_type": 7,
+          "fuel_type": 8,
+          "section_text": 9,
+          "ncb": 10,
+          "addon": 11
+        },
+        "city_blocks": [
+          { "start_col": 12, "end_col": 66, "channel_row": 3 }
+        ],
+        "decline_markers": ["D", "NA", "Decline"]
+      }
+    },
+    {
+      "name": "CV",
+      "name_pattern": "^cv$",
+      "layout": "pivot_by_city",
+      "product": "GCV",
+      "config": {
+        "header_row": 4,
+        "data_start_row": 5,
+        "key_columns": {
+          "segment": 1,
+          "fuel_type": 2,
+          "section_text": 3,
+          "vehicle_age": 4
+        },
+        "city_blocks": [
+          { "start_col": 5, "end_col": 63, "channel_row": 3 }
+        ],
+        "decline_markers": ["D", "NA", "Decline"]
+      }
+    },
+    {
+      "name": "TW.",
+      "name_pattern": "^tw\\.?$",
+      "layout": "pivot_by_city",
+      "product": "TW",
+      "config": {
+        "header_row": 4,
+        "data_start_row": 5,
+        "key_columns": {
+          "segment": 1,
+          "business_type": 2,
+          "section_text": 3
+        },
+        "city_blocks": [
+          { "start_col": 4, "end_col": 73, "channel_row": 3 }
+        ],
+        "decline_markers": ["D", "NA", "Decline"]
+      }
+    },
+    {
+      "name": "PVT TP",
+      "name_pattern": "^pvt[\\s_]*tp$",
+      "layout": "pivot_by_city",
+      "product": "CAR",
+      "config": {
+        "header_row": 4,
+        "data_start_row": 5,
+        "key_columns": {
+          "vehicle_type": 0,
+          "business_type": 1,
+          "fuel_type": 2,
+          "section_text": 3,
+          "ncb": 4,
+          "addon": 5
+        },
+        "city_blocks": [
+          { "start_col": 6, "end_col": 60, "channel_row": 3 }
+        ],
+        "decline_markers": ["D", "NA", "Decline"]
+      }
+    },
+    {
+      "name": "Pvtcar_Extended Warranty",
+      "name_pattern": "extended[\\s_]*warranty",
+      "layout": "pivot_by_city",
+      "product": "CAR",
+      "config": {
+        "header_row": 4,
+        "data_start_row": 5,
+        "key_columns": {
+          "vehicle_type": 0,
+          "business_type": 1,
+          "section_text": 2,
+          "ncb": 3,
+          "fuel_type": 4
+        },
+        "city_blocks": [
+          { "start_col": 6, "end_col": 60, "channel_row": 3 }
+        ],
+        "decline_markers": ["D", "NA", "Decline"]
+      }
+    },
+    {
+      "name": "School Bus",
+      "name_pattern": "^school[\\s_]*bus$",
+      "layout": "flat_table",
+      "product": "PCV",
+      "config": {
+        "header_row": 5,
+        "data_start_row": 6,
+        "column_map": {
+          "segment": 0,
+          "sub_type": 1,
+          "region": 2,
+          "remarks": 3
+        },
+        "rate_columns": [
+          { "column": 5, "rate_type": "Comp_MAX_COA" }
+        ],
+        "decline_markers": ["D", "NA", "Decline"]
+      }
+    },
+    {
+      "name": "Pvt Pkg",
+      "name_pattern": "^pvt[\\s_]*pkg$",
+      "layout": "flat_table",
+      "product": "CAR",
+      "config": {
+        "header_row": 0,
+        "data_start_row": 1,
+        "column_map": {
+          "make": 0,
+          "sub_type": 2,
+          "fuel_type": 4,
+          "region": 5
+        },
+        "rate_type_prefix_column": 3,
+        "ncb_column": 6,
+        "rate_columns": [
+          { "column": 7, "rate_type": "OD" },
+          { "column": 8, "rate_type": "TP" }
+        ],
+        "decline_markers": ["D", "NA", "Decline"],
+        "skip_zero_rates": true
+      }
+    },
+    {
+      "name": "Sheet1",
+      "name_pattern": "^sheet[\\s_]*1$",
+      "layout": "flat_table",
+      "product": "CAR",
+      "file_pattern": "ROBINHOOD",
+      "config": {
+        "header_row": 0,
+        "data_start_row": 1,
+        "column_map": {
+          "make": 0,
+          "sub_type": 2,
+          "fuel_type": 4,
+          "region": 5
+        },
+        "rate_type_prefix_column": 3,
+        "ncb_column": 6,
+        "rate_columns": [
+          { "column": 7, "rate_type": "OD" },
+          { "column": 8, "rate_type": "TP" }
+        ],
+        "decline_markers": ["D", "NA", "Decline"],
+        "skip_zero_rates": true
+      }
+    },
+    {
+      "name": "RTO-CV Mapper",
+      "name_pattern": "rto[\\s_-]*cv[\\s_-]*mapper",
+      "layout": "rto_mapping",
+      "product": "GCV",
+      "config": {
+        "data_start_row": 2,
+        "column_map": {
+          "rto_code": 0,
+          "region": 2,
+          "cluster": 3
+        }
+      }
+    },
+    {
+      "name": "RTO-PvtCar Mapper",
+      "name_pattern": "rto[\\s_-]*pvt[\\s_-]*car[\\s_-]*mapper",
+      "layout": "rto_mapping",
+      "product": "CAR",
+      "config": {
+        "data_start_row": 2,
+        "column_map": {
+          "rto_code": 0,
+          "region": 2,
+          "cluster": 3
+        }
+      }
+    },
+    {
+      "name": "RTO-TW Mapper",
+      "name_pattern": "rto[\\s_-]*tw[\\s_-]*mapper",
+      "layout": "rto_mapping",
+      "product": "TW",
+      "config": {
+        "data_start_row": 2,
+        "column_map": {
+          "rto_code": 0,
+          "region": 2,
+          "cluster": 3
+        }
+      }
+    }
+  ]
+}

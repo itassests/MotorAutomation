@@ -1,0 +1,328 @@
+﻿
+========== royal_cv.xlsx ==========
+
+--- [TN] notes (lastData=r15) ---
+  r18c0: Pls Note
+  r19c0: IRDA - 19.5% on OD and 2.5 % on TP ( > 4yrs )
+
+--- [ROI] notes (lastData=r40) ---
+  r43c0: Pls Note
+  r44c0: IRDA - 19.5% on OD and 2.5 % on TP ( > 4yrs )
+
+--- [ROI (2)] notes (lastData=r5) ---
+  r2c5: 7.5 to 12 @ discount upto 55%
+  r2c6: 7.5 to 12 @ discount upto 85%
+  r2c10: 40 to 45 @ 50% discount for Tata & AL Only
+  r2c11: Above 45 @ 50% discount for Tata & AL Only
+  r7c0: Pls Note
+  r8c0: IRDA - 19.5% on OD and 2.5 % on TP ( > 4yrs )
+
+--- [MP] notes (lastData=r13) ---
+  r2c8: 12 to 20 @ 80% Discount Tata & AL Only
+  r2c11: 20 to 40 @ 85% Discount Tata & AL Only
+  r4c8: IRDA ( @ 70% Discount Only)
+  r4c11: IRDA ( @ 70% Discount Only)
+  r5c8: IRDA ( @ 70% Discount Only)
+  r5c11: IRDA ( @ 70% Discount Only)
+  r7c8: 15% ( @ 70% Discount only )
+  r7c11: 15% ( @ 70% Discount only )
+  r15c2: Pls Note
+  r16c2: IRDA - 19.5% on OD and 2.5 % on TP ( > 4years )
+
+--- [Punjab] notes (lastData=r3) ---
+  r1c9: 5 Years & Above
+ ( all Makes) @ Upto 85% Discount
+  r6c0: Pls Note
+  r7c0: IRDA - 19.5% on OD and 2.5 % on TP ( > 4yrs )
+
+--- [CH & RJ] notes (lastData=r12) ---
+  r7c19: 8% (discount upto 75%)
+  r7c20: 10% (discount upto 80%)
+  r7c21: 8% (discount upto 75%)
+  r7c22: 6% (discount upto 75%)
+  r7c23: 8% (discount upto 75%)
+  r7c24: 6% (discount upto 75%)
+  r7c25: 8% (discount upto 80%)
+  r7c26: 10% (discount upto 80%)
+  r7c27: 8% (discount upto 80%)
+  r7c28: 8% (discount upto 75%)
+  r7c29: 10% (discount upto 75%)
+  r7c30: 8% (discount upto 75%)
+  r9c19: 8% (discount upto 80%)
+  r9c20: 10% (discount upto 80%)
+  r9c21: 8% (discount upto 80%)
+  r9c22: 6% (discount upto 80%)
+  r9c23: 8% (discount upto 80%)
+  r9c24: 6% (discount upto 80%)
+  r9c25: 8% (discount upto 80%)
+  r9c26: 10% (discount upto 80%)
+  r9c27: 8% (discount upto 80%)
+  r9c28: 8% (discount upto 80%)
+  r9c29: 10% (discount upto 80%)
+  r9c30: 8% (discount upto 80%)
+  r11c19: 8% (discount upto 80%)
+  r11c20: 10% (discount upto 80%)
+  r11c21: 8% (discount upto 80%)
+  r11c22: 6% (discount upto 80%)
+  r11c23: 8% (discount upto 80%)
+  r11c24: 6% (discount upto 80%)
+  r11c25: 8% (discount upto 75%)
+  r11c26: 10% (discount upto 80%)
+  r11c27: 8% (discount upto 70%)
+  r11c28: 8% (discount upto 65%)
+  r11c29: 10% (discount upto 70%)
+  r11c30: 8% (discount upto 70%)
+  r15c0: Pls Note
+  r16c0: IRDA - 19.5% on OD and 2.5 % on TP ( > 4yrs )
+
+--- [West UP] notes (lastData=r4) ---
+  r7c0: Pls Note
+  r8c0: IRDA - 19.5% on OD and 2.5 % on TP ( > 4yrs )
+
+--- [WB] notes (lastData=r4) ---
+  r2c8: 12 to 20 upto 85 % disc with Nil dep other than Tata & AL
+  r2c9: 12 to 20 upto 90% disc with Nil dep
+(TATA & AL Only)
+  r2c10: 12 to 20 upto 90% disc w/o Nil dep 
+(TATA & AL Only)
+  r2c11: 12 to 20 upto 90% disc without Nil dep
+(TATA & AL Only)
+  r2c12: 20 to 40 upto 85% disc with or without Nil dep other than Tata & AL
+  r2c13: 20 to 40 upto 90% disc with Nil Dep
+(TATA & AL Only)
+  r2c14: 20 to 40 upto 90% disc w/o Nil dep 
+(TATA & AL Only)
+  r2c15: 20 to 40 upto 90% disc without Nil dep
+(TATA & AL Only)
+  r7c0: Pls Note
+  r8c0: IRDA - 19.5% on OD and 2.5 % on TP ( > 4yrs )
+
+--- [Odisha] notes (lastData=r11) ---
+  r14c0: Pls Note
+  r15c0: IRDA - 19.5% on OD and 2.5 % on TP ( > 4yrs )
+
+--- [Bihar] notes (lastData=r8) ---
+  r2c6: 12 to 20 upto 85 % disc with Nil dep other than Tata & AL
+  r2c7: 12 to 20 upto 85% OD disc WO nil dep other than Tata & AL
+  r2c8: 12 to 20 upto 90% disc with Nil dep
+(TATA & AL Only)
+  r2c9: 12 to 20 upto 90% disc w/o Nil dep 
+(TATA & AL Only)
+  r2c10: 20 to 40 upto 85% disc with Nil dep other than Tata & AL
+  r2c11: 20 to 40 upto 85% OD disc WO nil dep other than Tata & AL
+  r2c12: 20 to 40 upto 90% disc with Nil Dep
+(TATA & AL Only)
+  r2c13: 20 to 40 upto 90% disc w/o Nil dep 
+(TATA & AL Only)
+  r2c14: 20 to 40 upto 90% disc w/o Nil dep 
+(TATA & AL Only)
+  r11c0: Pls Note
+  r12c0: IRDA - 19.5% on OD and 2.5 % on TP ( > 4yrs )
+
+--- [AP] notes (lastData=r13) ---
+  r15c0: Pls Note
+  r16c0: IRDA - 19.5% on OD and 2.5 % on TP ( > 4yrs )
+  r17c0: Vijayawada RTO’s - AP16, AP17, AP18, AP19, AP39, AP40 (Pls note that as AP 39 and 40 are common RTO codes  for the entire state, the RTO location need to be Vijayawada)
+
+--- [TS] notes (lastData=r7) ---
+  r2c21: 20 to 40 w/o Nil dep ( Eicher Only) upto 80% Discount
+
+--- [East UP] notes (lastData=r11) ---
+  r2c8: 5 Years & Above @ 85% Discount
+  r2c11: 5 Years & Above @ 85% Discount
+  r14c0: Pls Note
+  r15c0: IRDA - 19.5% on OD and 2.5 % on TP ( > 4yrs )
+
+--- [JH] notes (lastData=r8) ---
+  r2c3: 2.3 to 3.5 @ 80% discount
+  r2c4: 2.3 to 3.5 @ 80% discount
+  r2c6: 7.5 to 12 @ 85% Discount
+  r2c7: 7.5 to 12 @ 85% Discount
+  r2c8: 12 to 20 upto 85 % Disc with Nil dep other than Tata & AL
+  r2c9: 12 to 20 upto 85% OD disc WO nil dep , other than Tata & AL
+  r2c10: 12 to 20 upto 90% disc with Nil dep
+(TATA & AL Only)
+  r2c11: 12 to 20 upto 90% disc w/o Nil dep 
+(TATA & AL Only)
+  r2c12: 12 to 20 upto 90% disc w/o Nil dep 
+(TATA & AL Only)
+  r2c13: 20 to 40 upto 85 % od disc with Nil dep other than Tata & AL
+  r2c14: 20 to 40 upto 85% OD disc WO nil dep other than Tata & AL
+  r2c15: 20 to 40 upto 90% disc with Nil dep
+(TATA & AL Only)
+  r2c16: 20 to 40 upto 90% disc w/o Nil dep 
+(TATA & AL Only)
+  r2c17: 20 to 40 upto 90% disc w/o Nil dep 
+(TATA & AL Only)
+  r2c18: 40 to 45 w/o Nil dep ( Tata & AL Only) @ 80% discount
+  r2c19: 40 to 45 w/o Nil dep ( Tata & AL Only) @ 90% discount
+  r11c0: Pls Note
+  r12c0: IRDA - 19.5% on OD and 2.5 % on TP ( > 4yrs )
+
+--- [GJ] notes (lastData=r13) ---
+  r2c11: 12 to 20 upto 85% OD disc With nil dep
+Other Than Tata & AL
+  r2c12: 12 to 20 upto 85% OD disc WO nil dep
+Other Than Tata & AL
+  r2c13: 12 to 20 Upto 90% disc with Nil Dep
+(TATA & AL Only)
+  r2c14: 12 to 20 Upto 90% disc w/o Nil dep 
+(TATA & AL Only)
+  r2c15: 20 to 40 upto 85% OD disc With nil dep other than Tata & AL
+  r2c16: 20 to 40 upto 85% OD disc WO nil dep other than Tata & AL
+  r2c17: 20 to 40 @ 90% disc with Nil Dep
+(TATA & AL Only)
+  r2c18: 20 to 40 upto 90% disc w/o Nil dep 
+(TATA & AL Only)
+  r2c19: 20 to 40 upto 90% disc w/o Nil dep 
+(TATA & AL Only)
+  r2c21: 40 to 45
+Upto 80% Disc without Nil Dep
+  r2c22: 40 to 45
+Upto 90% Disc without Nil Dep
+  r3c24: IRDA with discount upto 50% only
+  r4c24: IRDA with discount upto 70% only
+  r5c24: IRDA with discount upto 70% only
+  r6c24: IRDA with discount upto 75% only
+  r8c24: IRDA with discount upto 70% only
+  r9c24: IRDA with discount upto 75% only
+  r10c24: IRDA with discount upto 75% only
+  r11c9: 25% (with discount of 75% only)
+  r11c24: IRDA with discount upto 70% only
+  r12c6: 15% (with discount of 55% only)
+  r12c9: 25% (with discount of 60% only)
+  r12c21: 15% ( discount upto 60% only
+  r12c24: IRDA with discount upto 75% only
+  r13c9: 25% (with discount of 80% only)
+  r13c24: IRDA with discount upto 75% only
+  r15c0: Pls Note
+  r16c0: IRDA - 19.5% on OD and 2.5 % on TP ( > 4yrs )
+
+--- [MH] notes (lastData=r10) ---
+  r2c5: 3.5 to 7.5 upto 90% Discount
+  r2c13: 12 to 20 upto 85% OD disc With nil dep
+Other Than Tata & AL
+  r2c14: 12 to 20 upto 85% OD disc WO nil dep
+Other Than Tata & AL
+  r2c15: 12 to 20 Upto 90% disc with Nil Dep
+(TATA & AL Only)
+  r2c16: 12 to 20 Upto 90% disc w/o Nil dep 
+(TATA & AL Only)
+  r2c17: 12 to 20 Upto 90% disc w/o Nil dep 
+(TATA & AL Only)
+  r2c18: 20 to 40 upto 85% OD disc With nil dep other than Tata & AL
+  r2c19: 20 to 40 upto 85% OD disc WO nil dep other than Tata & AL
+  r2c20: 20 to 40 upto  90% disc with Nil Dep
+(TATA & AL Only)
+  r2c21: 20 to 40 upto  90% disc without Nil Dep
+(TATA & AL Only)
+  r2c22: 20 to 40 upto 90% disc w/o Nil dep 
+(TATA & AL Only)
+  r12c0: Pls Note
+  r13c0: IRDA - 19.5% on OD and 2.5 % on TP ( > 4yrs )
+
+--- [KAR] notes (lastData=r8) ---
+  r11c0: Pls Note
+  r12c0: IRDA - 19.5% on OD and 2.5 % on TP ( > 4yrs )
+
+--- [Pan India -CV STP] notes (lastData=r149) ---
+  r152c0: Vijayawada RTO’s - AP16, AP17, AP18, AP19, AP39, AP40 (Pls note that as AP 39 and 40 are common RTO codes  for the entire state, the RTO location need to be Vijayawada)
+
+--- [3W GCV Non EV ] notes (lastData=r146) ---
+  r147c0: MIZORAM
+  r147c4: MIZORAM
+  r148c0: NAGALAND
+  r148c4: NAGALAND
+  r149c0: SIKKIM
+  r149c4: SIKKIM
+  r150c0: TRIPURA
+  r150c4: TRIPURA
+
+========== royal_other.xlsx ==========
+
+--- [On Mail] notes (lastData=r-1) ---
+  r0c0: Dear Partner,
+  r1c0: Please find attached March Pay-out Grid.
+  r3c0: We are glad to inform you that
+  r5c0: ü  Existing 2 Pvt Car Schemes ( one for Delhi NCR and another for 17 Models with NCB ) will continue for March also
+  r6c0: ü  The enhancement in pay-out made on 23rd Feb in GCV Comp at MH under 40 to 45 ton will continue
+  r7c0: ü  We have improved our grid at Chhattisgarh TATA & AL – 12 to 20 and 20 to 40 ton
+  r9c0: Below are the changes in various segments :-
+  r11c0: ü  GCV COMP / STP 0 to 2.3 TON – Reduced 5% pay-out from current level , Max 35%
+  r12c0: ü  GCV COMP 3.5 to 7.5 TON – Max pay-out restricted to 23%
+  r13c0: ü  GCV COMP 7.5 to 12 TON –Max pay-out restricted to 25%
+  r14c0: ü  Private car STP : 1% drop across all RTOs
+  r15c0: ü  Taxi 3W EV- 5% drop across all RTOs
+  r16c0: ü  School Bus – Max Payout 50%
+  r18c0: Above positive / negative changes highlighted in Green /Red. This grid is effective 6th March.
+  r20c0: Other than the above-mentioned segments, the existing Feb grid will continue for march for all other segments.
+  r22c0: If you have any further clarifications, please do contact us.
+  r25c0: Thanks & Regards,
+  r26c0: Pooja Somaiya
+  r27c0: Team Key Broker Relationships
+  r28c0: Cell - +91-75068-65303
+  r30c0: Hold Fast Your Dreams!!!!
+
+--- [PC Comp1] notes (lastData=r35) ---
+  r6c1: Discount Band %
+  r6c6: Discount Band %
+  r6c11: Discount Band %
+  r6c16: Discount Band %
+  r6c21: Discount Band %
+  r6c26: Discount Band %
+  r6c31: Discount Band %
+  r6c36: Discount Band %
+  r6c41: Discount Band %
+  r14c1: Discount Band %
+  r14c6: Discount Band %
+  r14c11: Discount Band %
+  r14c16: Discount Band %
+  r14c21: Discount Band %
+  r14c26: Discount Band %
+  r22c1: Discount Band %
+  r22c6: Discount Band %
+  r22c11: Discount Band %
+  r22c16: Discount Band %
+  r22c21: Discount Band %
+  r22c26: Discount Band %
+  r30c1: Discount Band %
+  r30c6: Discount Band %
+  r30c11: Discount Band %
+  r30c16: Discount Band %
+  r30c21: Discount Band %
+  r30c26: Discount Band %
+  r30c29: Discount Band %
+
+--- [New Car ] notes (lastData=r14) ---
+  r2c0: Incentive of 28% (in all), will apply at New Car cases sourced by IMD at Technical Discount.
+  r3c0: Cases sourced at discount exceeding Technical Discount, will not be eligible for scheme. Proportionate reduction of BAC on IRDA will apply, over the increase in Disc.
+  r15c0: *Includes EV - New cars, of all Makes ( Non H.E)
+  r16c0: * Cases sourced at discount exceeding Technical Discount, will not be eligible for scheme. Proportionate reduction of BAC on IRDA will apply, over the increase in Disc.
+  r17c0: *Incentive includes IRDA
+
+--- [School Bus] notes (lastData=r38) ---
+  r2c0: OD Disc: As prevailing
+
+--- [Tractor] notes (lastData=r9) ---
+  r1c1: OD Disc
+  r11c0: Pls note for Comprehensive
+  r12c0: Both for New and Old , without Nil dep
+  r13c0: IMT23 has to be covered
+  r14c0: Trolleys / Trailers  to be excluded
+  r15c0: For AP and Telangana , IMT 34 has to be included
+
+--- [2w Comp] notes (lastData=r27) ---
+  r30c0: Ø  While the Grid indicated below is for Rollovers, Any new vehicle done by the above channels, Payout  will be paid on 1+1 (first year OD and first year TP premium) at the Payout % indicated for roll
+  r32c0: Ø  Any new vehicle done by the above channels, Payout will be paid on 1+1 (first year OD and first year TP premium) at the Payout % indicated for roll over
+  r34c0: Ø  Bikes Restricted to 150 CC.
+  r35c0: Ø  EV 2 Wh not part of the scheme.
+
+--- [3W PCV Comp] notes (lastData=r36) ---
+  r0c0: 3 W PCV ( Comp )-  BAC & Discount grid  - 2025-26
+  r3c4: Od Disc
+  r3c10: Od Disc
+
+--- [EV 3w Comp] notes (lastData=r10) ---
+  r3c1: OD Disc
+  r3c6: OD Disc
+  r3c11: OD Disc

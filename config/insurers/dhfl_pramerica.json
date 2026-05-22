@@ -1,0 +1,643 @@
+{
+  "insurer": "dhfl_pramerica",
+  "display_name": "Dhfl Pramerica",
+  "auto_generated": true,
+  "sheets": [
+    {
+      "name": "CV Grid (excl. HCV)",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 3,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 0,
+            "name": "Cluster"
+          },
+          {
+            "col": 1,
+            "name": "Segment"
+          },
+          {
+            "col": 2,
+            "name": "Make"
+          },
+          {
+            "col": 3,
+            "name": "CD1"
+          },
+          {
+            "col": 4,
+            "name": "Max CD2"
+          },
+          {
+            "col": 5,
+            "name": "Max CD2"
+          },
+          {
+            "col": 6,
+            "name": "Note"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    },
+    {
+      "name": "HCV GRID",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 1,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 0,
+            "name": "Refer Addition Notes mentioned below the grid"
+          },
+          {
+            "col": 5,
+            "name": "Non-Dumper/Tipper"
+          },
+          {
+            "col": 10,
+            "name": "Dumper/Tipper"
+          },
+          {
+            "col": 15,
+            "name": "Port Trailer"
+          },
+          {
+            "col": 20,
+            "name": "Oil Tanker"
+          },
+          {
+            "col": 25,
+            "name": "Gas Tanker"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    },
+    {
+      "name": "TAXI Segments and Location wise",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 3,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 0,
+            "name": "Cluster"
+          },
+          {
+            "col": 1,
+            "name": "Segment"
+          },
+          {
+            "col": 2,
+            "name": "Make"
+          },
+          {
+            "col": 3,
+            "name": "Addon/without Addon"
+          },
+          {
+            "col": 4,
+            "name": "CD1"
+          },
+          {
+            "col": 5,
+            "name": "Max CD2"
+          },
+          {
+            "col": 6,
+            "name": "Max CD2"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    },
+    {
+      "name": "4W SATP",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 1,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 0,
+            "name": "Cluster"
+          },
+          {
+            "col": 1,
+            "name": "Segment"
+          },
+          {
+            "col": 2,
+            "name": "Age"
+          },
+          {
+            "col": 3,
+            "name": "Max CD2"
+          },
+          {
+            "col": 4,
+            "name": "Note"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    },
+    {
+      "name": "4W New Business 1+3",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 3,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 0,
+            "name": "Cluster"
+          },
+          {
+            "col": 1,
+            "name": "Tata"
+          },
+          {
+            "col": 2,
+            "name": "Kia"
+          },
+          {
+            "col": 3,
+            "name": "Mahindra"
+          },
+          {
+            "col": 4,
+            "name": "Hyundai"
+          },
+          {
+            "col": 5,
+            "name": "Toyota"
+          },
+          {
+            "col": 6,
+            "name": "HEV-Mercedes Benz, Ford, BMW, Jeep, Ferrari, Bentley, Rolls Royce, Chevrolet, Datsun, Nissan, Renault, Jaguar, Land Rover, BYD, Citrone, Tesla, Audi, Volvo, Porsche"
+          },
+          {
+            "col": 7,
+            "name": "Maruti, MG, Skoda, Volks, Honda, Renault, Others"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    },
+    {
+      "name": "TW 1+1 & SATP",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 2,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 0,
+            "name": "Agency/PB Clusters"
+          },
+          {
+            "col": 1,
+            "name": "Agency/PB Seg"
+          },
+          {
+            "col": 2,
+            "name": "CD1"
+          },
+          {
+            "col": 3,
+            "name": "Max CD2"
+          },
+          {
+            "col": 4,
+            "name": "Max CD2"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    },
+    {
+      "name": "TW 1+5",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 2,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 1,
+            "name": "Agency/PB Clusters"
+          },
+          {
+            "col": 2,
+            "name": "Make"
+          },
+          {
+            "col": 3,
+            "name": "Agency/PB Seg"
+          },
+          {
+            "col": 4,
+            "name": "CD1"
+          },
+          {
+            "col": 5,
+            "name": "Max CD2"
+          },
+          {
+            "col": 6,
+            "name": "Formula Type"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    },
+    {
+      "name": "2W Grid 5+5",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 2,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 1,
+            "name": "PB_Cluster"
+          },
+          {
+            "col": 2,
+            "name": "Make"
+          },
+          {
+            "col": 3,
+            "name": "Segement"
+          },
+          {
+            "col": 4,
+            "name": "Max CD1"
+          },
+          {
+            "col": 5,
+            "name": "Max CD2"
+          },
+          {
+            "col": 6,
+            "name": "Formula Type"
+          },
+          {
+            "col": 7,
+            "name": "Note"
+          },
+          {
+            "col": 9,
+            "name": "Remarks"
+          },
+          {
+            "col": 10,
+            "name": "CD2 Reductions"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    },
+    {
+      "name": "TW SAOD with Flexi Options",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 1,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 0,
+            "name": "Cluster"
+          },
+          {
+            "col": 1,
+            "name": "Segment"
+          },
+          {
+            "col": 2,
+            "name": "Min CD1"
+          },
+          {
+            "col": 3,
+            "name": "Max CD1 for NoBreakIn"
+          },
+          {
+            "col": 4,
+            "name": "Max CD1 for BreakIn"
+          },
+          {
+            "col": 5,
+            "name": "CD2"
+          },
+          {
+            "col": 6,
+            "name": "Max 1 year CD2"
+          },
+          {
+            "col": 7,
+            "name": "Max 2 year CD2"
+          },
+          {
+            "col": 8,
+            "name": "Max 3rd year CD2"
+          },
+          {
+            "col": 9,
+            "name": "Max 4th year CD2"
+          },
+          {
+            "col": 10,
+            "name": "Note"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    },
+    {
+      "name": "School & Staff Bus ",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 3,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 1,
+            "name": "State_1"
+          },
+          {
+            "col": 2,
+            "name": "RTO Cluster"
+          },
+          {
+            "col": 3,
+            "name": "Seating Capacity"
+          },
+          {
+            "col": 4,
+            "name": "In the name of School"
+          },
+          {
+            "col": 5,
+            "name": "On Contract (Transporter)"
+          },
+          {
+            "col": 6,
+            "name": "On Contract (Individual)"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    },
+    {
+      "name": "School & Staff Bus RTO",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 2,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 0,
+            "name": "RTO Code"
+          },
+          {
+            "col": 1,
+            "name": "State"
+          },
+          {
+            "col": 2,
+            "name": "State_1"
+          },
+          {
+            "col": 3,
+            "name": "CV_PCV_6+Seating"
+          },
+          {
+            "col": 7,
+            "name": "RTO Code"
+          },
+          {
+            "col": 8,
+            "name": "State"
+          },
+          {
+            "col": 9,
+            "name": "State_1"
+          },
+          {
+            "col": 10,
+            "name": "CV_PCV_6+Seating"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    },
+    {
+      "name": "CV RTO Mapping",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 1,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 3,
+            "name": "CV"
+          },
+          {
+            "col": 4,
+            "name": "CV"
+          },
+          {
+            "col": 5,
+            "name": "CV"
+          },
+          {
+            "col": 6,
+            "name": "CV"
+          },
+          {
+            "col": 7,
+            "name": "CV"
+          },
+          {
+            "col": 8,
+            "name": "CV"
+          },
+          {
+            "col": 9,
+            "name": "CV"
+          },
+          {
+            "col": 10,
+            "name": "CV"
+          },
+          {
+            "col": 11,
+            "name": "CV"
+          },
+          {
+            "col": 12,
+            "name": "Misc. D + Tractor"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    },
+    {
+      "name": "2W RTO's",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 1,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 1,
+            "name": "2W_1+1 & SATP"
+          },
+          {
+            "col": 2,
+            "name": "2W 1+5 & 5+5"
+          },
+          {
+            "col": 3,
+            "name": "2W_SAOD"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    },
+    {
+      "name": "4W  RTO",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 2,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 0,
+            "name": "RTO Code"
+          },
+          {
+            "col": 1,
+            "name": "4WTP"
+          },
+          {
+            "col": 2,
+            "name": "4W Package"
+          },
+          {
+            "col": 3,
+            "name": "4WSAOD"
+          },
+          {
+            "col": 4,
+            "name": "PLR Cluster"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    }
+  ]
+}
