@@ -2,9 +2,12 @@ const sql = require('mssql');
 
 // Remote DB on WAN → bump timeouts; retry once after a fresh pool when a
 // previously-cached pool goes stale (network hiccup, DB restart, etc.).
+// Build connection config. `port` is OPTIONAL — when DB_PORT is unset, we
+// let mssql talk to SQL Browser to discover the (named) instance, OR rely
+// on the default 1433 if a default instance is configured.  Required for
+// servers like localhost\SQLEXPRESS using dynamic ports.
 const config = {
   server: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT, 10) || 1433,
   database: process.env.DB_NAME || 'RateExtract',
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
@@ -25,6 +28,22 @@ const config = {
     enableArithAbort: true,
   },
 };
+
+// Append port only when explicitly set — avoids forcing 1433 on a server
+// using dynamic ports / named instance.
+if (process.env.DB_PORT) {
+  const p = parseInt(process.env.DB_PORT, 10);
+  if (Number.isFinite(p)) config.port = p;
+}
+
+// Server like "localhost\SQLEXPRESS" → split into server + instanceName
+// (the mssql driver does NOT parse the backslash on its own).
+if (typeof config.server === 'string' && config.server.includes('\\')) {
+  const [host, instance] = config.server.split('\\');
+  config.server = host;
+  config.options = config.options || {};
+  config.options.instanceName = instance;
+}
 
 let pool = null;
 let pending = null;   // guards concurrent getPool() calls while a connect is in flight
