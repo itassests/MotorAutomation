@@ -1,0 +1,27 @@
+{
+  "insurer": "united_india_insurance",
+  "label": "United India Insurance",
+  "sheets": [
+    {
+      "_comment": "RTO Master xlsx — Sub-Annexure 2 (GCV preferred RTOs in excluded states, override low-rate-state base with high commission)",
+      "name": "RTO GCV",
+      "file_pattern": "United[ _]RTO[ _]Master|RTO[ _]Master",
+      "layout": "united_india",
+      "config": { "sheet_kind": "uii_rto_gcv" }
+    },
+    {
+      "_comment": "RTO Master xlsx — Sub-Annexure 3 (Pvt Car preferred city RTOs eligible for 40% commission)",
+      "name": "RTO FOR PVT CAR",
+      "file_pattern": "United[ _]RTO[ _]Master|RTO[ _]Master",
+      "layout": "united_india",
+      "config": { "sheet_kind": "uii_rto_pvt_car" }
+    },
+    {
+      "_comment": "PDF — Commission Structure (Annexure A2 Motor Department). Base rate grid for TW / Pvt Car / PCV / GCV / Misc by state-group. Rates hard-coded in united-india.js (w.e.f. 01/04/2026).",
+      "name": "_pdf_grid",
+      "file_pattern": "\\.pdf$|United[ _]Commission|Commission[ _]structure",
+      "layout": "united_india_pdf",
+      "config": { "engine": "united-india" }
+    }
+  ]
+}

@@ -29,6 +29,7 @@ const engines = {
   shriram_grid:        require('./engines/shriram-grid'),
   liberty_grid:        require('./engines/liberty-grid'),
   future_generali:     require('./engines/future-generali'),
+  united_india:        require('./engines/united-india'),
 };
 
 /**
