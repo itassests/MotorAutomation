@@ -594,6 +594,25 @@ function rateRuleConsolidationKey(r) {
  *  export uses to collapse tenure-variant rows) so the number matches the
  *  .xlsx row count. Returns overall totals plus per-insurer and per-product
  *  breakdowns so the UI can render a small summary table. */
+
+// Coverage cache — the /coverage endpoint can scan tens of thousands of rate
+// rules; cache the response per query-string for 5 minutes so the dashboard
+// load doesn't block on it.
+const _coverageCache = new Map();
+const _COV_TTL = 5 * 60 * 1000;
+router.use('/coverage', (req, res, next) => {
+  if (req.method !== 'GET') return next();
+  const ck = req.url;
+  const cv = _coverageCache.get(ck);
+  if (cv && (Date.now() - cv.at) < _COV_TTL) return res.json(cv.payload);
+  const orig = res.json.bind(res);
+  res.json = (payload) => {
+    _coverageCache.set(ck, { at: Date.now(), payload });
+    return orig(payload);
+  };
+  next();
+});
+
 router.get('/coverage', async (req, res, next) => {
   try {
     const insurerFilter = String(req.query.insurer || '').split(',').map(s => s.trim()).filter(Boolean);

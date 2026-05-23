@@ -962,7 +962,7 @@
         <div class="actions" style="margin-top:0; margin-bottom: 16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
           <button class="btn btn-outline btn-sm" onclick="loadRateCards()">Refresh</button>
           <span style="color:#888; font-size:12px; margin-left:6px;">Filter:</span>
-          <select id="exportInsurerFilter" class="form-control" onchange="renderRateCards()" style="height:32px; font-size:13px; min-width:160px;">
+          <select id="exportInsurerFilter" class="form-control" onchange="renderRateCardsList()" style="height:32px; font-size:13px; min-width:160px;">
             <option value="">All insurers</option>
           </select>
           <select id="exportProductFilter" class="form-control" style="height:32px; font-size:13px; min-width:140px;">
@@ -3026,20 +3026,36 @@
      *  passes through unchanged. */
     (function patchFetch() {
       const orig = window.fetch.bind(window);
+      // Coalesce concurrent GETs to the same URL — when multiple init-time
+      // helpers all call /api/bulk/filters, we issue one HTTP request and
+      // hand the same Response to all callers (clone()d so each can .json()).
+      const _inflight = new Map();
       window.fetch = function (url, init = {}) {
-        if (typeof url === 'string' && url.indexOf('/api/') !== -1 && _authToken) {
+        const isApi = typeof url === 'string' && url.indexOf('/api/') !== -1;
+        if (isApi && _authToken) {
           init.headers = Object.assign({}, init.headers || {}, { Authorization: 'Bearer ' + _authToken });
         }
-        return orig(url, init).then(r => {
+        const method = (init.method || 'GET').toUpperCase();
+        const canDedupe = isApi && method === 'GET' && !init.body;
+        if (canDedupe && _inflight.has(url)) {
+          return _inflight.get(url).then(r => r.clone());
+        }
+        const p = orig(url, init).then(r => {
           if (r.status === 401 && _authToken) {
-            // Token expired or revoked — kick to login.
             console.warn('[auth] 401 — clearing session');
             _authToken = null; _currentUser = null;
             localStorage.removeItem('rx_token');
             showLoginOverlay();
           }
           return r;
+        }).finally(() => {
+          if (canDedupe) _inflight.delete(url);
         });
+        if (canDedupe) {
+          _inflight.set(url, p);
+          return p.then(r => r.clone());
+        }
+        return p;
       };
     })();
 
@@ -6831,11 +6847,11 @@
         const res = await fetch(API + '/upload/rate-cards');
         const data = await res.json();
         _allRateCards = data.rate_cards || [];
-        renderRateCards();
+        renderRateCardsList();
       } catch (e) { showToast('Failed to load rate cards', 'error'); }
     }
 
-    function renderRateCards() {
+    function renderRateCardsList() {
       const container = document.getElementById('rateCardsList');
       const sel = document.getElementById('exportInsurerFilter');
       const filterIns = sel ? String(sel.value || '').toLowerCase().trim() : '';
