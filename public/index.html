@@ -3225,6 +3225,11 @@
         if (tab.dataset.tab === 'margin-exceptions') loadMarginExceptions();
         if (tab.dataset.tab === 'recon' && !window._reconInited) reconInit();
         if (tab.dataset.tab === 'pr' && !window._prDashInited) prDashInit();
+        // Margin coverage scan is expensive — defer until tab first opened.
+        if (tab.dataset.tab === 'margins' && !window._marginCoverageInited) {
+          window._marginCoverageInited = true;
+          loadMarginCoverage();
+        }
       });
     });
 
@@ -11396,7 +11401,9 @@
       loadSavedMargins();
       populateMarginDefineInsurerDropdown();
       populateMarginCoverageInsurerDropdown();
-      loadMarginCoverage();
+      // loadMarginCoverage is deferred — it scans tens of thousands of
+      // rate rules and would block the initial page load.  We fire it
+      // the first time the Margins tab becomes active (see tab handler).
       loadBulkFilters();
       loadStatementInsurers();
       loadStatementsList();
