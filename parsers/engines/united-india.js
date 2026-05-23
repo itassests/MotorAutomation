@@ -237,46 +237,61 @@ async function parsePdfFile(filePath) {
   return rules;
 }
 
+// Non-Electric fuel set — the PDF treats Petrol / Diesel / CNG together
+// under "Non-Electric"; we fan out into one rule per fuel for precise
+// matching downstream.
+const NON_ELECTRIC_FUELS = ['Petrol', 'Diesel', 'CNG'];
+function fuelsFor(fuel) {
+  if (!fuel || fuel === 'All') return [null];        // null = any fuel
+  if (fuel === 'Non-Electric') return NON_ELECTRIC_FUELS;
+  return [fuel];                                     // 'Electric' etc.
+}
+
 function emitTwoWheeler(meta) {
   const rules = [];
   for (const r of TW_RATES) {
-    // One rule per state in the low-rate group
+    const fuels = fuelsFor(r.fuel);
+    // One rule per (state × fuel) in the low-rate group
     for (const state of r.low_states) {
+      for (const fuel of fuels) {
+        rules.push({
+          product: 'TW',
+          sheet_name: meta.sheetName,
+          segment: 'TW',
+          state: state, region: state,
+          make: 'All',
+          cc_band_min: r.cc_min,
+          cc_band_max: r.cc_max,
+          fuel_type: fuel,
+          rate_type: 'COMP',
+          rate_value: r.low_rate,
+          applied_on: 'NET',
+          is_declined: false,
+          remarks: `${r.cc_label} | Low-rate state${fuel ? ' (' + fuel + ')' : ''}`,
+          rate_text: `TW ${r.cc_label} | ${state}${fuel ? ' ' + fuel : ''} | ${(r.low_rate*100).toFixed(2)}%`,
+        });
+      }
+    }
+    // Catch-all "Other states" rules — one per fuel
+    for (const fuel of fuels) {
       rules.push({
         product: 'TW',
         sheet_name: meta.sheetName,
         segment: 'TW',
-        state: state, region: state,
-        make: 'All',
+        make: 'Others',
         cc_band_min: r.cc_min,
         cc_band_max: r.cc_max,
-        fuel_type: r.fuel,
+        fuel_type: fuel,
         rate_type: 'COMP',
-        rate_value: r.low_rate,
+        rate_value: r.other_rate,
         applied_on: 'NET',
         is_declined: false,
-        remarks: `${r.cc_label} | Low-rate state`,
-        rate_text: `TW ${r.cc_label} | ${state} | ${(r.low_rate*100).toFixed(2)}%`,
+        remarks: `${r.cc_label} | Other states${fuel ? ' (' + fuel + ')' : ''} (excluding ${r.low_states.join(', ')})`,
+        rate_text: `TW ${r.cc_label} | Other states${fuel ? ' ' + fuel : ''} | ${(r.other_rate*100).toFixed(2)}%`,
       });
     }
-    // Catch-all rule for every other state
-    rules.push({
-      product: 'TW',
-      sheet_name: meta.sheetName,
-      segment: 'TW',
-      make: 'Others',
-      cc_band_min: r.cc_min,
-      cc_band_max: r.cc_max,
-      fuel_type: r.fuel,
-      rate_type: 'COMP',
-      rate_value: r.other_rate,
-      applied_on: 'NET',
-      is_declined: false,
-      remarks: `${r.cc_label} | Other states (excluding ${r.low_states.join(', ')})`,
-      rate_text: `TW ${r.cc_label} | Other states | ${(r.other_rate*100).toFixed(2)}%`,
-    });
   }
-  // TW SAOD — 20% all states all bands
+  // TW SAOD — 20% all states all bands (no fuel split)
   rules.push({
     product: 'TW', sheet_name: meta.sheetName, segment: 'TW',
     make: 'All', rate_type: 'SAOD', rate_value: TW_SAOD_RATE,
@@ -361,21 +376,31 @@ function emitGCV(meta) {
 function emitPvtCar(meta) {
   const rules = [];
   for (const r of PVT_CAR_RATES) {
-    rules.push({
-      product: 'CAR',
-      sheet_name: meta.sheetName,
-      segment: 'Pvt Car',
-      make: 'All',
-      fuel_type: r.fuel === 'All' ? null : r.fuel,
-      rate_type: r.policy === 'SAOD' ? 'SAOD'
-                : r.policy === 'SATP' ? 'TP'
-                : 'COMP',
-      rate_value: r.rate,
-      applied_on: r.policy === 'SAOD' ? 'OD' : r.policy === 'SATP' ? 'TP' : 'NET',
-      is_declined: false,
-      remarks: `${r.policy} | ${r.business} | ${r.rule}`,
-      rate_text: `Pvt Car ${r.policy} ${r.business} | ${r.rule} | ${(r.rate*100).toFixed(2)}%`,
-    });
+    // Rule-specific fuel narrowing: when the carve-out text mentions "Diesel"
+    // explicitly we honour it; otherwise fan out per fuel from r.fuel.
+    let fuelList;
+    if (/^Diesel/i.test(r.rule)) {
+      fuelList = ['Diesel'];
+    } else {
+      fuelList = fuelsFor(r.fuel);
+    }
+    for (const fuel of fuelList) {
+      rules.push({
+        product: 'CAR',
+        sheet_name: meta.sheetName,
+        segment: 'Pvt Car',
+        make: 'All',
+        fuel_type: fuel,
+        rate_type: r.policy === 'SAOD' ? 'SAOD'
+                  : r.policy === 'SATP' ? 'TP'
+                  : 'COMP',
+        rate_value: r.rate,
+        applied_on: r.policy === 'SAOD' ? 'OD' : r.policy === 'SATP' ? 'TP' : 'NET',
+        is_declined: false,
+        remarks: `${r.policy} | ${r.business} | ${r.rule}${fuel && fuel !== 'Diesel' ? ' (' + fuel + ')' : ''}`,
+        rate_text: `Pvt Car ${r.policy} ${r.business} | ${r.rule} | ${fuel || 'All Fuels'} | ${(r.rate*100).toFixed(2)}%`,
+      });
+    }
   }
   return rules;
 }
