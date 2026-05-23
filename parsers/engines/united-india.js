@@ -376,14 +376,32 @@ function emitGCV(meta) {
 function emitPvtCar(meta) {
   const rules = [];
   for (const r of PVT_CAR_RATES) {
-    // Rule-specific fuel narrowing: when the carve-out text mentions "Diesel"
-    // explicitly we honour it; otherwise fan out per fuel from r.fuel.
+    // Fuel narrowing — Diesel-specific rule honours Diesel only; else fan out.
     let fuelList;
     if (/^Diesel/i.test(r.rule)) {
       fuelList = ['Diesel'];
     } else {
       fuelList = fuelsFor(r.fuel);
     }
+
+    // Tenure encoding — embed "1+3" in rate_type so the export's
+    // inferTenure() reads OD_Tenure=1 and TP_Tenure=3 automatically.
+    //   Bundled 1+3 → COMP_1+3 (or SAOD_1+3 / TP_1+3 as policy demands)
+    //   Package    → COMP (1+1 by default, no special suffix needed)
+    //   SAOD       → SAOD
+    //   SATP       → SATP
+    let rateTypeBase;
+    if (r.policy === 'SAOD')       rateTypeBase = 'SAOD';
+    else if (r.policy === 'SATP')  rateTypeBase = 'SATP';
+    else                            rateTypeBase = 'COMP';
+    const isBundled = r.policy === 'Bundled 1+3';
+    const rateType = isBundled ? rateTypeBase + '_1+3' : rateTypeBase;
+
+    // New business → vehicle age 0-0; Renewal/All → unset (any age)
+    const isNew = /^New$/i.test(r.business);
+    const vehAgeMin = isNew ? 0 : null;
+    const vehAgeMax = isNew ? 0 : null;
+
     for (const fuel of fuelList) {
       rules.push({
         product: 'CAR',
@@ -391,13 +409,13 @@ function emitPvtCar(meta) {
         segment: 'Pvt Car',
         make: 'All',
         fuel_type: fuel,
-        rate_type: r.policy === 'SAOD' ? 'SAOD'
-                  : r.policy === 'SATP' ? 'TP'
-                  : 'COMP',
+        vehicle_age_min: vehAgeMin,
+        vehicle_age_max: vehAgeMax,
+        rate_type: rateType,
         rate_value: r.rate,
         applied_on: r.policy === 'SAOD' ? 'OD' : r.policy === 'SATP' ? 'TP' : 'NET',
         is_declined: false,
-        remarks: `${r.policy} | ${r.business} | ${r.rule}${fuel && fuel !== 'Diesel' ? ' (' + fuel + ')' : ''}`,
+        remarks: `${r.policy} | ${r.business}${isNew ? ' (Vehicle age 0)' : ''} | ${r.rule}${fuel && fuel !== 'Diesel' ? ' (' + fuel + ')' : ''}`,
         rate_text: `Pvt Car ${r.policy} ${r.business} | ${r.rule} | ${fuel || 'All Fuels'} | ${(r.rate*100).toFixed(2)}%`,
       });
     }
