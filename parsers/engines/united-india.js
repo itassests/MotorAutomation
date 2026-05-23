@@ -240,24 +240,26 @@ async function parsePdfFile(filePath) {
 function emitTwoWheeler(meta) {
   const rules = [];
   for (const r of TW_RATES) {
-    // Low-rate states rule
-    rules.push({
-      product: 'TW',
-      sheet_name: meta.sheetName,
-      segment: 'TW',
-      make: 'All',
-      cc_band_min: r.cc_min,
-      cc_band_max: r.cc_max,
-      fuel_type: r.fuel,
-      rate_type: 'COMP',
-      rate_value: r.low_rate,
-      applied_on: 'NET',
-      is_declined: false,
-      sub_type: r.low_states.join(', '),
-      remarks: `${r.cc_label} | Low-rate states`,
-      rate_text: `TW ${r.cc_label} | ${r.low_states.join('/')} | ${(r.low_rate*100).toFixed(2)}%`,
-    });
-    // Other states rule (no sub_type — applies to everything not in the low list)
+    // One rule per state in the low-rate group
+    for (const state of r.low_states) {
+      rules.push({
+        product: 'TW',
+        sheet_name: meta.sheetName,
+        segment: 'TW',
+        state: state, region: state,
+        make: 'All',
+        cc_band_min: r.cc_min,
+        cc_band_max: r.cc_max,
+        fuel_type: r.fuel,
+        rate_type: 'COMP',
+        rate_value: r.low_rate,
+        applied_on: 'NET',
+        is_declined: false,
+        remarks: `${r.cc_label} | Low-rate state`,
+        rate_text: `TW ${r.cc_label} | ${state} | ${(r.low_rate*100).toFixed(2)}%`,
+      });
+    }
+    // Catch-all rule for every other state
     rules.push({
       product: 'TW',
       sheet_name: meta.sheetName,
@@ -270,7 +272,7 @@ function emitTwoWheeler(meta) {
       rate_value: r.other_rate,
       applied_on: 'NET',
       is_declined: false,
-      remarks: `${r.cc_label} | Other states`,
+      remarks: `${r.cc_label} | Other states (excluding ${r.low_states.join(', ')})`,
       rate_text: `TW ${r.cc_label} | Other states | ${(r.other_rate*100).toFixed(2)}%`,
     });
   }
@@ -304,14 +306,17 @@ function emitPCV(meta) {
     if (r.applies_to === 'all') {
       rules.push({ ...baseRule, rate_value: r.rate, remarks: `${r.band_label} (all states)` });
     } else {
-      rules.push({
-        ...baseRule, rate_value: r.low_rate,
-        sub_type: r.low_states.join(', '),
-        remarks: `${r.band_label} | Low-rate states`,
-      });
+      // One rule per low-rate state
+      for (const state of r.low_states) {
+        rules.push({
+          ...baseRule, state: state, region: state, rate_value: r.low_rate,
+          remarks: `${r.band_label} | ${state}`,
+        });
+      }
+      // Catch-all "Others"
       rules.push({
         ...baseRule, make: 'Others', rate_value: r.other_rate,
-        remarks: `${r.band_label} | Other states`,
+        remarks: `${r.band_label} | Other states (excluding ${r.low_states.join(', ')})`,
       });
     }
   }
@@ -337,14 +342,16 @@ function emitGCV(meta) {
     if (r.applies_to === 'all') {
       rules.push({ ...baseRule, rate_value: r.rate, remarks: `${r.band_label} (all states)` });
     } else {
-      rules.push({
-        ...baseRule, rate_value: r.low_rate,
-        sub_type: r.low_states.join(', '),
-        remarks: `${r.band_label} | Low-rate (excluded) states`,
-      });
+      // One rule per low-rate / excluded state
+      for (const state of r.low_states) {
+        rules.push({
+          ...baseRule, state: state, region: state, rate_value: r.low_rate,
+          remarks: `${r.band_label} | ${state} (excluded — Sub-Annexure 2 RTOs override)`,
+        });
+      }
       rules.push({
         ...baseRule, make: 'Others', rate_value: r.other_rate,
-        remarks: `${r.band_label} | Other states`,
+        remarks: `${r.band_label} | Other states (excluding ${r.low_states.join(', ')})`,
       });
     }
   }
