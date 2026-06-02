@@ -4160,8 +4160,9 @@
         _empState.employees = r.by_employee || [];
         empRenderEmployeeCharts(_empState.empMetric || 'nop');
         // By employee (click a row → drill into their cases)
-        document.getElementById('empEmpBody').innerHTML = (r.by_employee || []).length
-          ? r.by_employee.map(e => `<tr style="cursor:pointer;" title="Click to view cases" onclick="empDrill('emp', this.dataset.c)" data-c="${escapeHtml(e.code)}"><td>${escapeHtml(e.name)} <span style="color:#999;font-size:11px;">${escapeHtml(e.code)}</span></td><td style="text-align:right;">${e.nop}</td><td style="text-align:right;">${_empInr(e.premium)}</td></tr>`).join('')
+        const empContribs = (r.by_employee || []).filter(e => (e.nop || 0) > 0);
+        document.getElementById('empEmpBody').innerHTML = empContribs.length
+          ? empContribs.map(e => `<tr style="cursor:pointer;" title="Click to view cases" onclick="empDrill('emp', this.dataset.c)" data-c="${escapeHtml(e.code)}"><td>${escapeHtml(e.name)} <span style="color:#999;font-size:11px;">${escapeHtml(e.code)}</span></td><td style="text-align:right;">${e.nop}</td><td style="text-align:right;">${_empInr(e.premium)}</td></tr>`).join('')
           : '<tr><td colspan="3" class="no-data">No data.</td></tr>';
         // Cases
         _empState.cases = r.cases || [];
@@ -4277,10 +4278,11 @@
       const act = (b) => { b.style.background = '#43a047'; b.style.color = '#fff'; };
       const inact = (b) => { b.style.background = '#e8f5e9'; b.style.color = '#2e7d32'; };
       if (metric === 'nop') { act(onB); inact(prB); } else { act(prB); inact(onB); }
-      const all = (_empState.employees || []).filter(e => (e[metric] || 0) > 0)
-        .sort((a, b) => (b[metric] || 0) - (a[metric] || 0));
-      const top = all.slice(0, 5);
-      const bottom = all.slice(-5).reverse();   // lowest 5, ascending
+      // Top 5: among employees who did business. Bottom 5: across the WHOLE
+      // hierarchy roster (includes employees with zero business — the real bottom).
+      const roster = (_empState.employees || []).slice().sort((a, b) => (b[metric] || 0) - (a[metric] || 0));
+      const top = roster.filter(e => (e[metric] || 0) > 0).slice(0, 5);
+      const bottom = roster.slice(-5).reverse();   // lowest 5 (incl zeros), ascending
       document.getElementById('empTopEmps').innerHTML = empBarList(top, metric, 'linear-gradient(90deg,#66bb6a,#2e7d32)');
       document.getElementById('empBotEmps').innerHTML = empBarList(bottom, metric, 'linear-gradient(90deg,#ef9a9a,#c62828)');
     }

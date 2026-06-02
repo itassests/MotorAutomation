@@ -83,6 +83,22 @@ const BASE_WHERE = `m.InsuranceType = 16 AND m.IsActive = 1
       AND m.LogStatusId IS NOT NULL AND m.LogStatusId NOT IN (15, 16)   -- 15=dup, 16=Hold, NULL=in-process
       AND CAST(m.CREATED_DATE AS date) BETWEEN @fy AND @today`;
 
+// Full hierarchy employee roster (with names) → #hemp. Lets the employee
+// leaderboard rank EVERY employee in the subtree, including those with zero
+// business (the genuine bottom performers), not just those who have cases.
+const HEMP_SQL = `
+  ;WITH hier AS (
+    SELECT EmployeeCode, reportingmgremployeecode, DisplayName, CAST('|' + EmployeeCode + '|' AS VARCHAR(8000)) AS path
+    FROM BugNet_UserProfiles WITH (NOLOCK)
+    WHERE EmployeeCode = @emp AND IsActive = 1 AND IsValid = 1
+    UNION ALL
+    SELECT c.EmployeeCode, c.reportingmgremployeecode, c.DisplayName, CAST(h.path + c.EmployeeCode + '|' AS VARCHAR(8000))
+    FROM BugNet_UserProfiles c WITH (NOLOCK)
+    INNER JOIN hier h ON c.reportingmgremployeecode = h.EmployeeCode
+    WHERE c.IsActive = 1 AND c.IsValid = 1 AND CHARINDEX('|' + c.EmployeeCode + '|', h.path) = 0
+  )
+  SELECT EmployeeCode AS code, MAX(DisplayName) AS name INTO #hemp FROM hier GROUP BY EmployeeCode OPTION (MAXRECURSION 1000);`;
+
 // hier (reporting tree) + base (one deduped row per TrackerNo). Attribution is
 // a UNION: offline cases match on m.ReportingEmployeeCode (fast, indexed); online
 // cases (no ReportingEmployeeCode) fall back to tmp_poscodes.referal_code keyed
@@ -170,6 +186,8 @@ router.get('/dashboard', async (req, res, next) => {
     const batch = `
       ${DECLARES}
       IF OBJECT_ID('tempdb..#base') IS NOT NULL DROP TABLE #base;
+      IF OBJECT_ID('tempdb..#hemp') IS NOT NULL DROP TABLE #hemp;
+      ${HEMP_SQL}
       ${CTES}
       SELECT * INTO #base FROM base WHERE rn = 1${OPT};
 
@@ -185,9 +203,12 @@ router.get('/dashboard', async (req, res, next) => {
       SELECT ISNULL(b.vehicle_type,'—') AS vehicle_type, COUNT(*) AS nop, ISNULL(SUM(b.premium),0) AS premium
       FROM #base b WHERE 1=1${DATE_SEL}${cl.full} GROUP BY b.vehicle_type ORDER BY COUNT(*) DESC;
 
-      -- 3) By employee
-      SELECT b.employee_code AS code, MAX(b.employee_name) AS name, COUNT(*) AS nop, ISNULL(SUM(b.premium),0) AS premium
-      FROM #base b WHERE 1=1${DATE_SEL}${cl.full} GROUP BY b.employee_code ORDER BY COUNT(*) DESC;
+      -- 3) By employee — full hierarchy roster (0 for those with no business)
+      SELECT he.code, he.name,
+        COUNT(b.TrackerNo) AS nop, ISNULL(SUM(b.premium),0) AS premium
+      FROM #hemp he
+      LEFT JOIN #base b ON b.employee_code = he.code${DATE_SEL}${cl.full}
+      GROUP BY he.code, he.name ORDER BY COUNT(b.TrackerNo) DESC;
 
       -- 4) Filter options (whole hierarchy, no optional filters)
       SELECT DISTINCT b.vertical, b.branch, b.sub_branch, b.agent_code, b.vehicle_type, b.employee_code, b.employee_name
@@ -257,7 +278,7 @@ router.get('/dashboard', async (req, res, next) => {
       WHERE 1=1${DATE_SEL}${cl.full} AND b.agent_code IS NOT NULL AND b.agent_code <> ''
       GROUP BY b.agent_code;
 
-      DROP TABLE #base;`;
+      DROP TABLE #base; DROP TABLE #hemp;`;
 
     const result = await rq.query(batch);
     const recs = result.recordsets;
