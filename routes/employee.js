@@ -250,6 +250,13 @@ router.get('/dashboard', async (req, res, next) => {
       SELECT ISNULL(b.branch,'—') AS branch, COUNT(*) AS nop, ISNULL(SUM(b.premium),0) AS premium
       FROM #base b WHERE 1=1${DATE_SEL}${cl.full} GROUP BY b.branch ORDER BY COUNT(*) DESC;
 
+      -- 8) By agent (POS) — for Top 10 / Bottom 10 agent charts; name from tmp_poscodes
+      SELECT b.agent_code AS code, MAX(pc.posfullname) AS name, COUNT(*) AS nop, ISNULL(SUM(b.premium),0) AS premium
+      FROM #base b
+      LEFT JOIN Beeinsured_v3_2.dbo.tmp_poscodes pc WITH (NOLOCK) ON pc.upincode = b.agent_code
+      WHERE 1=1${DATE_SEL}${cl.full} AND b.agent_code IS NOT NULL AND b.agent_code <> ''
+      GROUP BY b.agent_code;
+
       DROP TABLE #base;`;
 
     const result = await rq.query(batch);
@@ -261,6 +268,7 @@ router.get('/dashboard', async (req, res, next) => {
     const listRows = recs[4] || [];
     const pr = (recs[5] && recs[5][0]) || {};
     const branchRows = recs[6] || [];
+    const agentRows = recs[7] || [];
 
     const uniq = (arr) => [...new Set(arr.filter(v => v != null && v !== ''))].sort();
     const empMap = new Map();
@@ -297,6 +305,7 @@ router.get('/dashboard', async (req, res, next) => {
       by_vehicle_type: vtRows.map(r => ({ vehicle_type: r.vehicle_type, nop: Number(r.nop) || 0, premium: round(r.premium) })),
       by_employee: empRows.map(r => ({ code: r.code, name: r.name || r.code, nop: Number(r.nop) || 0, premium: round(r.premium) })),
       by_branch: branchRows.map(r => ({ branch: r.branch, nop: Number(r.nop) || 0, premium: round(r.premium) })),
+      by_agent: agentRows.map(r => ({ code: r.code, name: r.name || r.code, nop: Number(r.nop) || 0, premium: round(r.premium) })),
       options: {
         verticals: uniq(oRows.map(r => r.vertical)),
         branches: uniq(oRows.map(r => r.branch)),
