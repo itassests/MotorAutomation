@@ -3321,90 +3321,79 @@
         <button class="btn btn-primary btn-sm" onclick="empDownload()">&#128229; Download</button>
       </div>
 
-      <!-- Filters -->
-      <div class="card" style="margin-top:14px; display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap;">
-        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">From</label>
+      <!-- Filters (collapsible, colourful header) -->
+      <div class="card" style="margin-top:14px; padding:0; overflow:hidden;">
+        <div onclick="empToggleFilters()" title="Show / hide filters"
+             style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; padding:9px 14px; background:linear-gradient(135deg,#5c6bc0,#3949ab); color:#fff;">
+          <span style="font-weight:700;font-size:13px;letter-spacing:.3px;">&#128269; Filters</span>
+          <span id="empFilterChevron" style="font-size:13px;">&#9652;</span>
+        </div>
+        <div id="empFilterBody" style="display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; padding:14px; background:#f5f6fc;">
+        <div><label style="font-size:11px;color:#5c6bc0;font-weight:600;display:block;text-transform:uppercase;">From</label>
           <input type="date" id="empFrom" style="height:30px;font-size:13px;padding:0 6px;border:1px solid #cfe6f5;border-radius:4px;"></div>
-        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">To</label>
+        <div><label style="font-size:11px;color:#5c6bc0;font-weight:600;display:block;text-transform:uppercase;">To</label>
           <input type="date" id="empTo" style="height:30px;font-size:13px;padding:0 6px;border:1px solid #cfe6f5;border-radius:4px;"></div>
-        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">Vertical</label>
+        <div><label style="font-size:11px;color:#5c6bc0;font-weight:600;display:block;text-transform:uppercase;">Vertical</label>
           <select id="empVertical" style="height:30px;font-size:13px;"><option value="">All</option></select></div>
-        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">Branch</label>
+        <div><label style="font-size:11px;color:#5c6bc0;font-weight:600;display:block;text-transform:uppercase;">Branch</label>
           <select id="empBranch" style="height:30px;font-size:13px;"><option value="">All</option></select></div>
-        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">Sub Branch</label>
+        <div><label style="font-size:11px;color:#5c6bc0;font-weight:600;display:block;text-transform:uppercase;">Sub Branch</label>
           <select id="empSubBranch" style="height:30px;font-size:13px;"><option value="">All</option></select></div>
-        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">Employee</label>
+        <div><label style="font-size:11px;color:#5c6bc0;font-weight:600;display:block;text-transform:uppercase;">Employee</label>
           <select id="empEmployee" style="height:30px;font-size:13px;"><option value="">All</option></select></div>
-        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">Agent</label>
+        <div><label style="font-size:11px;color:#5c6bc0;font-weight:600;display:block;text-transform:uppercase;">Agent</label>
           <select id="empAgent" style="height:30px;font-size:13px;"><option value="">All</option></select></div>
-        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">Vehicle Type</label>
+        <div><label style="font-size:11px;color:#5c6bc0;font-weight:600;display:block;text-transform:uppercase;">Vehicle Type</label>
           <select id="empVt" style="height:30px;font-size:13px;"><option value="">All</option></select></div>
-        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">Channel</label>
+        <div><label style="font-size:11px;color:#5c6bc0;font-weight:600;display:block;text-transform:uppercase;">Channel</label>
           <select id="empChannel" style="height:30px;font-size:13px;"><option value="">All</option><option value="online">Online</option><option value="offline">Offline</option></select></div>
         <button class="btn btn-sm" onclick="empClear()" style="background:#fff;border:1px solid #e0a800;color:#b8860b;">Clear</button>
         <button class="btn btn-primary btn-sm" onclick="empSearch()">Search</button>
+        </div>
       </div>
 
-      <!-- Period sections (YTD / MTD / FTD), each a horizontal band of metric
-           cards (Total, Ok to Log, … more to come) that wraps as cards are
-           added. All amounts in ₹ Lakhs. -->
-      <div style="display:flex; flex-direction:column; gap:14px; margin-top:18px;">
+      <!-- Period sections (YTD / MTD / FTD): each a band of compact, colourful
+           single-stat cards (Total NOP/Premium, Ok-to-Log NOP/Premium, … more
+           to come). Cards wrap; click to drill. Amounts in ₹ Lakhs. -->
+      <div style="display:flex; flex-direction:column; gap:10px; margin-top:16px;">
 
         <!-- YTD -->
-        <div style="border:1px solid #e6eef5; border-radius:12px; padding:12px 14px; background:#f7fafd;">
-          <div style="font-weight:700;color:#1565c0;font-size:13px;margin-bottom:10px;">&#128197; YTD <span style="font-weight:400;color:#999;font-size:11px;">· Full FY (<span id="ytdRange">—</span>)</span></div>
-          <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:stretch;">
-            <div class="empPeriodCard" onclick="empDrillPeriod('ytd','total')" title="Click to view YTD cases"
-                 style="cursor:pointer; min-width:230px; border-radius:12px; padding:14px 18px; color:#fff; box-shadow:0 4px 14px rgba(0,40,80,0.18); background:linear-gradient(135deg,#1e88e5,#00243e); display:flex; gap:20px; justify-content:space-around; align-items:center;">
-              <div style="text-align:center;"><div style="font-size:11px;opacity:.85;text-transform:uppercase;">Total NOP</div><div id="ytdNop" style="font-size:26px;font-weight:800;">—</div></div>
-              <div style="width:1px;height:38px;background:rgba(255,255,255,.25);"></div>
-              <div style="text-align:center;"><div style="font-size:11px;opacity:.85;text-transform:uppercase;">Premium</div><div id="ytdPrem" style="font-size:22px;font-weight:800;">—</div></div>
-            </div>
-            <div class="empOkCard" onclick="empDrillPeriod('ytd','oklog')" title="Click to view YTD Ok-to-Log cases"
-                 style="cursor:pointer; min-width:200px; border-radius:12px; padding:14px 18px; background:#fff; border:1px solid #bbdefb; border-left:4px solid #1e88e5; display:flex; gap:18px; justify-content:space-around; align-items:center; color:#1565c0;">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;">&#9989; Ok to<br>Log</div>
-              <div style="text-align:center;"><div style="font-size:10px;color:#888;">NOP</div><div id="ytdOkNop" style="font-size:20px;font-weight:800;">—</div></div>
-              <div style="text-align:center;"><div style="font-size:10px;color:#888;">PREM</div><div id="ytdOkPrem" style="font-size:16px;font-weight:800;">—</div></div>
-            </div>
-          </div>
+        <div style="border:1px solid #e6eef5; border-radius:10px; padding:9px 12px; background:#f7fafd; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <div style="min-width:118px;font-weight:700;color:#1565c0;font-size:13px;">&#128197; YTD<br><span style="font-weight:400;color:#999;font-size:10px;">FY · <span id="ytdRange">—</span></span></div>
+          <div onclick="empDrillPeriod('ytd','total')" title="Click to view YTD cases" style="cursor:pointer;min-width:110px;border-radius:9px;padding:7px 13px;color:#fff;background:#42a5f5;box-shadow:0 2px 6px rgba(0,0,0,.08);">
+            <div style="font-size:9px;opacity:.92;text-transform:uppercase;letter-spacing:.4px;">Total NOP</div><div id="ytdNop" style="font-size:20px;font-weight:800;line-height:1.15;">—</div></div>
+          <div onclick="empDrillPeriod('ytd','total')" title="Click to view YTD cases" style="cursor:pointer;min-width:110px;border-radius:9px;padding:7px 13px;color:#fff;background:#26a69a;box-shadow:0 2px 6px rgba(0,0,0,.08);">
+            <div style="font-size:9px;opacity:.92;text-transform:uppercase;letter-spacing:.4px;">Premium</div><div id="ytdPrem" style="font-size:17px;font-weight:800;line-height:1.15;">—</div></div>
+          <div onclick="empDrillPeriod('ytd','oklog')" title="Click to view YTD Ok-to-Log cases" style="cursor:pointer;min-width:100px;border-radius:9px;padding:7px 13px;color:#fff;background:#ffa726;box-shadow:0 2px 6px rgba(0,0,0,.08);">
+            <div style="font-size:9px;opacity:.95;text-transform:uppercase;letter-spacing:.4px;">&#9989; OkLog NOP</div><div id="ytdOkNop" style="font-size:18px;font-weight:800;line-height:1.15;">—</div></div>
+          <div onclick="empDrillPeriod('ytd','oklog')" title="Click to view YTD Ok-to-Log cases" style="cursor:pointer;min-width:100px;border-radius:9px;padding:7px 13px;color:#fff;background:#ec407a;box-shadow:0 2px 6px rgba(0,0,0,.08);">
+            <div style="font-size:9px;opacity:.95;text-transform:uppercase;letter-spacing:.4px;">OkLog Prem</div><div id="ytdOkPrem" style="font-size:15px;font-weight:800;line-height:1.15;">—</div></div>
         </div>
 
         <!-- MTD -->
-        <div style="border:1px solid #e6f0e7; border-radius:12px; padding:12px 14px; background:#f6fbf6;">
-          <div style="font-weight:700;color:#2e7d32;font-size:13px;margin-bottom:10px;">&#128198; MTD <span style="font-weight:400;color:#999;font-size:11px;">· Business month (<span id="mtdRange">—</span>)</span></div>
-          <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:stretch;">
-            <div class="empPeriodCard" onclick="empDrillPeriod('mtd','total')" title="Click to view MTD cases"
-                 style="cursor:pointer; min-width:230px; border-radius:12px; padding:14px 18px; color:#fff; box-shadow:0 4px 14px rgba(27,94,32,0.2); background:linear-gradient(135deg,#43a047,#1b5e20); display:flex; gap:20px; justify-content:space-around; align-items:center;">
-              <div style="text-align:center;"><div style="font-size:11px;opacity:.85;text-transform:uppercase;">Total NOP</div><div id="mtdNop" style="font-size:26px;font-weight:800;">—</div></div>
-              <div style="width:1px;height:38px;background:rgba(255,255,255,.25);"></div>
-              <div style="text-align:center;"><div style="font-size:11px;opacity:.85;text-transform:uppercase;">Premium</div><div id="mtdPrem" style="font-size:22px;font-weight:800;">—</div></div>
-            </div>
-            <div class="empOkCard" onclick="empDrillPeriod('mtd','oklog')" title="Click to view MTD Ok-to-Log cases"
-                 style="cursor:pointer; min-width:200px; border-radius:12px; padding:14px 18px; background:#fff; border:1px solid #c8e6c9; border-left:4px solid #43a047; display:flex; gap:18px; justify-content:space-around; align-items:center; color:#2e7d32;">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;">&#9989; Ok to<br>Log</div>
-              <div style="text-align:center;"><div style="font-size:10px;color:#888;">NOP</div><div id="mtdOkNop" style="font-size:20px;font-weight:800;">—</div></div>
-              <div style="text-align:center;"><div style="font-size:10px;color:#888;">PREM</div><div id="mtdOkPrem" style="font-size:16px;font-weight:800;">—</div></div>
-            </div>
-          </div>
+        <div style="border:1px solid #e6f0e7; border-radius:10px; padding:9px 12px; background:#f6fbf6; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <div style="min-width:118px;font-weight:700;color:#2e7d32;font-size:13px;">&#128198; MTD<br><span style="font-weight:400;color:#999;font-size:10px;">Month · <span id="mtdRange">—</span></span></div>
+          <div onclick="empDrillPeriod('mtd','total')" title="Click to view MTD cases" style="cursor:pointer;min-width:110px;border-radius:9px;padding:7px 13px;color:#fff;background:#42a5f5;box-shadow:0 2px 6px rgba(0,0,0,.08);">
+            <div style="font-size:9px;opacity:.92;text-transform:uppercase;letter-spacing:.4px;">Total NOP</div><div id="mtdNop" style="font-size:20px;font-weight:800;line-height:1.15;">—</div></div>
+          <div onclick="empDrillPeriod('mtd','total')" title="Click to view MTD cases" style="cursor:pointer;min-width:110px;border-radius:9px;padding:7px 13px;color:#fff;background:#26a69a;box-shadow:0 2px 6px rgba(0,0,0,.08);">
+            <div style="font-size:9px;opacity:.92;text-transform:uppercase;letter-spacing:.4px;">Premium</div><div id="mtdPrem" style="font-size:17px;font-weight:800;line-height:1.15;">—</div></div>
+          <div onclick="empDrillPeriod('mtd','oklog')" title="Click to view MTD Ok-to-Log cases" style="cursor:pointer;min-width:100px;border-radius:9px;padding:7px 13px;color:#fff;background:#ffa726;box-shadow:0 2px 6px rgba(0,0,0,.08);">
+            <div style="font-size:9px;opacity:.95;text-transform:uppercase;letter-spacing:.4px;">&#9989; OkLog NOP</div><div id="mtdOkNop" style="font-size:18px;font-weight:800;line-height:1.15;">—</div></div>
+          <div onclick="empDrillPeriod('mtd','oklog')" title="Click to view MTD Ok-to-Log cases" style="cursor:pointer;min-width:100px;border-radius:9px;padding:7px 13px;color:#fff;background:#ec407a;box-shadow:0 2px 6px rgba(0,0,0,.08);">
+            <div style="font-size:9px;opacity:.95;text-transform:uppercase;letter-spacing:.4px;">OkLog Prem</div><div id="mtdOkPrem" style="font-size:15px;font-weight:800;line-height:1.15;">—</div></div>
         </div>
 
         <!-- FTD -->
-        <div style="border:1px solid #f6e6d6; border-radius:12px; padding:12px 14px; background:#fffaf4;">
-          <div style="font-weight:700;color:#e65100;font-size:13px;margin-bottom:10px;">&#128338; FTD <span style="font-weight:400;color:#999;font-size:11px;">· Today (<span id="ftdRange">—</span>)</span></div>
-          <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:stretch;">
-            <div class="empPeriodCard" onclick="empDrillPeriod('ftd','total')" title="Click to view today's cases"
-                 style="cursor:pointer; min-width:230px; border-radius:12px; padding:14px 18px; color:#fff; box-shadow:0 4px 14px rgba(230,108,0,0.22); background:linear-gradient(135deg,#fb8c00,#e65100); display:flex; gap:20px; justify-content:space-around; align-items:center;">
-              <div style="text-align:center;"><div style="font-size:11px;opacity:.85;text-transform:uppercase;">Total NOP</div><div id="ftdNop" style="font-size:26px;font-weight:800;">—</div></div>
-              <div style="width:1px;height:38px;background:rgba(255,255,255,.25);"></div>
-              <div style="text-align:center;"><div style="font-size:11px;opacity:.85;text-transform:uppercase;">Premium</div><div id="ftdPrem" style="font-size:22px;font-weight:800;">—</div></div>
-            </div>
-            <div class="empOkCard" onclick="empDrillPeriod('ftd','oklog')" title="Click to view today's Ok-to-Log cases"
-                 style="cursor:pointer; min-width:200px; border-radius:12px; padding:14px 18px; background:#fff; border:1px solid #ffe0b2; border-left:4px solid #fb8c00; display:flex; gap:18px; justify-content:space-around; align-items:center; color:#e65100;">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;">&#9989; Ok to<br>Log</div>
-              <div style="text-align:center;"><div style="font-size:10px;color:#888;">NOP</div><div id="ftdOkNop" style="font-size:20px;font-weight:800;">—</div></div>
-              <div style="text-align:center;"><div style="font-size:10px;color:#888;">PREM</div><div id="ftdOkPrem" style="font-size:16px;font-weight:800;">—</div></div>
-            </div>
-          </div>
+        <div style="border:1px solid #f6e6d6; border-radius:10px; padding:9px 12px; background:#fffaf4; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <div style="min-width:118px;font-weight:700;color:#e65100;font-size:13px;">&#128338; FTD<br><span style="font-weight:400;color:#999;font-size:10px;">Today · <span id="ftdRange">—</span></span></div>
+          <div onclick="empDrillPeriod('ftd','total')" title="Click to view today's cases" style="cursor:pointer;min-width:110px;border-radius:9px;padding:7px 13px;color:#fff;background:#42a5f5;box-shadow:0 2px 6px rgba(0,0,0,.08);">
+            <div style="font-size:9px;opacity:.92;text-transform:uppercase;letter-spacing:.4px;">Total NOP</div><div id="ftdNop" style="font-size:20px;font-weight:800;line-height:1.15;">—</div></div>
+          <div onclick="empDrillPeriod('ftd','total')" title="Click to view today's cases" style="cursor:pointer;min-width:110px;border-radius:9px;padding:7px 13px;color:#fff;background:#26a69a;box-shadow:0 2px 6px rgba(0,0,0,.08);">
+            <div style="font-size:9px;opacity:.92;text-transform:uppercase;letter-spacing:.4px;">Premium</div><div id="ftdPrem" style="font-size:17px;font-weight:800;line-height:1.15;">—</div></div>
+          <div onclick="empDrillPeriod('ftd','oklog')" title="Click to view today's Ok-to-Log cases" style="cursor:pointer;min-width:100px;border-radius:9px;padding:7px 13px;color:#fff;background:#ffa726;box-shadow:0 2px 6px rgba(0,0,0,.08);">
+            <div style="font-size:9px;opacity:.95;text-transform:uppercase;letter-spacing:.4px;">&#9989; OkLog NOP</div><div id="ftdOkNop" style="font-size:18px;font-weight:800;line-height:1.15;">—</div></div>
+          <div onclick="empDrillPeriod('ftd','oklog')" title="Click to view today's Ok-to-Log cases" style="cursor:pointer;min-width:100px;border-radius:9px;padding:7px 13px;color:#fff;background:#ec407a;box-shadow:0 2px 6px rgba(0,0,0,.08);">
+            <div style="font-size:9px;opacity:.95;text-transform:uppercase;letter-spacing:.4px;">OkLog Prem</div><div id="ftdOkPrem" style="font-size:15px;font-weight:800;line-height:1.15;">—</div></div>
         </div>
 
       </div>
@@ -4000,6 +3989,16 @@
     let _empState = { optsLoaded: false, cases: [] };
     // All amounts shown in Lakhs (₹ value / 100,000).
     const _empInr = (n) => '₹' + (Number(n || 0) / 100000).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'L';
+
+    // Collapse / expand the filter panel.
+    function empToggleFilters() {
+      const body = document.getElementById('empFilterBody');
+      const chev = document.getElementById('empFilterChevron');
+      if (!body) return;
+      const open = body.style.display !== 'none';
+      body.style.display = open ? 'none' : 'flex';
+      if (chev) chev.innerHTML = open ? '&#9656;' : '&#9652;';   // ▸ collapsed / ▾ expanded
+    }
 
     function empClear() {
       _empState.logStatus = null;
