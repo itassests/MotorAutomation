@@ -3453,6 +3453,27 @@
         </div>
       </div>
 
+      <!-- Top 5 / Bottom 5 employees -->
+      <div class="card" style="margin-top:16px; border-top:4px solid #43a047;">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+          <h3 style="font-size:14px;color:#2e7d32;margin:0;">&#128104;&#8205;&#128188; Employee Performance <span style="font-size:11px;color:#999;font-weight:400;">(Top &amp; Bottom 5)</span></h3>
+          <div style="display:flex; gap:6px;">
+            <button id="empEmpNop" class="btn btn-sm" onclick="empRenderEmployeeCharts('nop')" style="background:#43a047;color:#fff;padding:3px 10px;">NOP</button>
+            <button id="empEmpPrem" class="btn btn-sm" onclick="empRenderEmployeeCharts('premium')" style="background:#e8f5e9;color:#2e7d32;padding:3px 10px;">Premium</button>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:12px;">
+          <div>
+            <div style="font-size:12px; font-weight:700; color:#2e7d32; margin-bottom:6px;">&#9650; Top 5</div>
+            <div id="empTopEmps"><div class="no-data">—</div></div>
+          </div>
+          <div>
+            <div style="font-size:12px; font-weight:700; color:#c62828; margin-bottom:6px;">&#9660; Bottom 5</div>
+            <div id="empBotEmps"><div class="no-data">—</div></div>
+          </div>
+        </div>
+      </div>
+
       <div class="card" id="empCasesCard" style="margin-top:16px; border-top:4px solid #ef6c00; display:none;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <h3 style="font-size:14px;color:#e65100;margin:0;">&#128203; Cases <span id="empCasesScope" style="font-size:11px;color:#999;font-weight:400;">(premium in ₹ Lakhs)</span></h3>
@@ -4135,6 +4156,9 @@
         // Top / Bottom 10 agents
         _empState.agents = r.by_agent || [];
         empRenderAgentCharts(_empState.agentMetric || 'nop');
+        // Top / Bottom 5 employees
+        _empState.employees = r.by_employee || [];
+        empRenderEmployeeCharts(_empState.empMetric || 'nop');
         // By employee (click a row → drill into their cases)
         document.getElementById('empEmpBody').innerHTML = (r.by_employee || []).length
           ? r.by_employee.map(e => `<tr style="cursor:pointer;" title="Click to view cases" onclick="empDrill('emp', this.dataset.c)" data-c="${escapeHtml(e.code)}"><td>${escapeHtml(e.name)} <span style="color:#999;font-size:11px;">${escapeHtml(e.code)}</span></td><td style="text-align:right;">${e.nop}</td><td style="text-align:right;">${_empInr(e.premium)}</td></tr>`).join('')
@@ -4243,6 +4267,22 @@
       const bottom = all.slice(-10).reverse();   // lowest 10, ascending
       document.getElementById('empTopAgents').innerHTML = empBarList(top, metric, 'linear-gradient(90deg,#66bb6a,#2e7d32)');
       document.getElementById('empBotAgents').innerHTML = empBarList(bottom, metric, 'linear-gradient(90deg,#ef9a9a,#c62828)');
+    }
+
+    // Top 5 / Bottom 5 employees (by NOP or Premium).
+    function empRenderEmployeeCharts(metric) {
+      metric = (metric === 'premium') ? 'premium' : 'nop';
+      _empState.empMetric = metric;
+      const onB = document.getElementById('empEmpNop'), prB = document.getElementById('empEmpPrem');
+      const act = (b) => { b.style.background = '#43a047'; b.style.color = '#fff'; };
+      const inact = (b) => { b.style.background = '#e8f5e9'; b.style.color = '#2e7d32'; };
+      if (metric === 'nop') { act(onB); inact(prB); } else { act(prB); inact(onB); }
+      const all = (_empState.employees || []).filter(e => (e[metric] || 0) > 0)
+        .sort((a, b) => (b[metric] || 0) - (a[metric] || 0));
+      const top = all.slice(0, 5);
+      const bottom = all.slice(-5).reverse();   // lowest 5, ascending
+      document.getElementById('empTopEmps').innerHTML = empBarList(top, metric, 'linear-gradient(90deg,#66bb6a,#2e7d32)');
+      document.getElementById('empBotEmps').innerHTML = empBarList(bottom, metric, 'linear-gradient(90deg,#ef9a9a,#c62828)');
     }
 
     // Reveal / hide the case-detail table. show=true forces open, false closes,
