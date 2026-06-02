@@ -3420,6 +3420,18 @@
         </div>
       </div>
 
+      <!-- Branch-wise comparison chart -->
+      <div class="card" style="margin-top:16px; border-top:4px solid #5c6bc0;">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+          <h3 style="font-size:14px;color:#3949ab;margin:0;">&#128202; Branch-wise Business</h3>
+          <div style="display:flex; gap:6px;">
+            <button id="empChartByNop" class="btn btn-sm" onclick="empRenderBranchChart('nop')" style="background:#3949ab;color:#fff;padding:3px 10px;">NOP</button>
+            <button id="empChartByPrem" class="btn btn-sm" onclick="empRenderBranchChart('premium')" style="background:#eef1fb;color:#3949ab;padding:3px 10px;">Premium</button>
+          </div>
+        </div>
+        <div id="empBranchChart" style="margin-top:12px;"><div class="no-data">—</div></div>
+      </div>
+
       <div class="card" id="empCasesCard" style="margin-top:16px; border-top:4px solid #ef6c00; display:none;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <h3 style="font-size:14px;color:#e65100;margin:0;">&#128203; Cases <span id="empCasesScope" style="font-size:11px;color:#999;font-weight:400;">(premium in ₹ Lakhs)</span></h3>
@@ -4096,6 +4108,9 @@
         document.getElementById('empVtBody').innerHTML = (r.by_vehicle_type || []).length
           ? r.by_vehicle_type.map(v => `<tr style="cursor:pointer;" title="Click to view cases" onclick="empDrill('vt', this.dataset.v)" data-v="${escapeHtml(v.vehicle_type)}"><td>${escapeHtml(v.vehicle_type)}</td><td style="text-align:right;">${v.nop}</td><td style="text-align:right;">${_empInr(v.premium)}</td></tr>`).join('')
           : '<tr><td colspan="3" class="no-data">No data.</td></tr>';
+        // Branch-wise comparison chart
+        _empState.branches = r.by_branch || [];
+        empRenderBranchChart(_empState.chartMetric || 'nop');
         // By employee (click a row → drill into their cases)
         document.getElementById('empEmpBody').innerHTML = (r.by_employee || []).length
           ? r.by_employee.map(e => `<tr style="cursor:pointer;" title="Click to view cases" onclick="empDrill('emp', this.dataset.c)" data-c="${escapeHtml(e.code)}"><td>${escapeHtml(e.name)} <span style="color:#999;font-size:11px;">${escapeHtml(e.code)}</span></td><td style="text-align:right;">${e.nop}</td><td style="text-align:right;">${_empInr(e.premium)}</td></tr>`).join('')
@@ -4131,6 +4146,30 @@
         if (meta) meta.textContent = 'Failed: ' + (e && e.message ? e.message : e);
         document.getElementById('empCaseBody').innerHTML = '<tr><td colspan="12" class="no-data" style="color:#c62828;">Load failed.</td></tr>';
       }
+    }
+
+    // Horizontal bar chart comparing branches by NOP or Premium (no library).
+    function empRenderBranchChart(metric) {
+      metric = (metric === 'premium') ? 'premium' : 'nop';
+      _empState.chartMetric = metric;
+      const onB = document.getElementById('empChartByNop'), prB = document.getElementById('empChartByPrem');
+      const act = (b) => { b.style.background = '#3949ab'; b.style.color = '#fff'; };
+      const inact = (b) => { b.style.background = '#eef1fb'; b.style.color = '#3949ab'; };
+      if (metric === 'nop') { act(onB); inact(prB); } else { act(prB); inact(onB); }
+      const el = document.getElementById('empBranchChart');
+      const rows = (_empState.branches || []).slice().sort((a, b) => (b[metric] || 0) - (a[metric] || 0));
+      if (!rows.length) { el.innerHTML = '<div class="no-data">No data.</div>'; return; }
+      const max = Math.max(...rows.map(r => r[metric] || 0), 1);
+      const val = (r) => metric === 'premium' ? _empInr(r.premium) : (r.nop || 0).toLocaleString('en-IN');
+      el.innerHTML = rows.map(r => {
+        const pct = Math.max(2, Math.round((r[metric] || 0) / max * 100));
+        return `<div style="display:flex; align-items:center; gap:10px; margin:5px 0;">
+          <div style="width:150px; font-size:12px; color:#333; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(r.branch)}">${escapeHtml(r.branch)}</div>
+          <div style="flex:1; background:#f0f1f8; border-radius:5px; overflow:hidden;">
+            <div style="width:${pct}%; background:linear-gradient(90deg,#5c6bc0,#3949ab); padding:4px 8px; border-radius:5px; color:#fff; font-size:11px; font-weight:700; text-align:right; min-width:40px; white-space:nowrap;">${val(r)}</div>
+          </div>
+        </div>`;
+      }).join('');
     }
 
     // Reveal / hide the case-detail table. show=true forces open, false closes,
