@@ -3132,6 +3132,8 @@
                 style="background:#0082C8; color:#fff;">&#128181; My Payout</button>
         <button class="btn btn-sm" id="agentSubRenewal" onclick="agentSwitchView('renewal')"
                 style="background:#eef4fa; color:#00243E;">&#128260; Motor Renewals</button>
+        <button class="btn btn-sm" id="agentSubRate" onclick="agentSwitchView('rate')"
+                style="background:#eef4fa; color:#00243E;">&#128269; Search Rate</button>
       </div>
 
       <div id="agentPayoutView">
@@ -3263,6 +3265,49 @@
           </div>
         </div>
       </div><!-- /agentRenewalView -->
+
+      <!-- ===== Search Rate view ===== -->
+      <div id="agentRateView" style="display:none;">
+        <div class="card" style="margin-top:16px; display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap;">
+          <div>
+            <label style="font-size:11px; color:#888; display:block; text-transform:uppercase; letter-spacing:0.5px;">Insurer *</label>
+            <select id="rateInsurer" style="height:32px; font-size:13px; min-width:180px;"><option value="">Select…</option></select>
+          </div>
+          <div>
+            <label style="font-size:11px; color:#888; display:block; text-transform:uppercase; letter-spacing:0.5px;">Vehicle Type *</label>
+            <select id="rateVehicleType" style="height:32px; font-size:13px;"><option value="">Select…</option></select>
+          </div>
+          <div>
+            <label style="font-size:11px; color:#888; display:block; text-transform:uppercase; letter-spacing:0.5px;">State</label>
+            <input id="rateState" placeholder="e.g. Gujarat" style="height:32px; font-size:13px; padding:0 8px; border:1px solid #cfe6f5; border-radius:4px;">
+          </div>
+          <div>
+            <label style="font-size:11px; color:#888; display:block; text-transform:uppercase; letter-spacing:0.5px;">City</label>
+            <input id="rateCity" placeholder="e.g. Mumbai" style="height:32px; font-size:13px; padding:0 8px; border:1px solid #cfe6f5; border-radius:4px;">
+          </div>
+          <div>
+            <label style="font-size:11px; color:#888; display:block; text-transform:uppercase; letter-spacing:0.5px;">RTO</label>
+            <input id="rateRto" placeholder="e.g. MH01" style="height:32px; font-size:13px; padding:0 8px; border:1px solid #cfe6f5; border-radius:4px; width:90px;">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="agentSearchRate()">Search Rate</button>
+          <span id="rateResolved" style="font-size:12px; color:#888; margin-left:auto;"></span>
+        </div>
+        <div class="card" style="margin-top:16px;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <h3 style="font-size:14px; color:#00243E; margin:0;">Outgoing Rates <span style="font-size:11px; color:#999; font-weight:400;">(your payout rate for matching conditions)</span></h3>
+            <span id="rateCount" style="font-size:12px; color:#888;"></span>
+          </div>
+          <div class="table-wrap" style="margin-top:10px;">
+            <table>
+              <thead><tr>
+                <th>Cover</th><th>Region</th><th>Segment</th><th>Sub Type</th><th>Fuel</th><th>Conditions</th>
+                <th style="text-align:right;">Outgoing %</th>
+              </tr></thead>
+              <tbody id="rateBody"><tr><td colspan="7" class="no-data">Select insurer + vehicle type, then Search Rate.</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div><!-- /agentRateView -->
     </div>
 
   </div>
@@ -3630,27 +3675,89 @@
     const _ymd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 
     function agentSwitchView(which) {
-      const pay = document.getElementById('agentPayoutView');
-      const ren = document.getElementById('agentRenewalView');
-      const bP = document.getElementById('agentSubPayout');
-      const bR = document.getElementById('agentSubRenewal');
-      const stBtn = document.getElementById('agentStatementBtn');
+      const views = {
+        payout:  { el: 'agentPayoutView',  btn: 'agentSubPayout' },
+        renewal: { el: 'agentRenewalView', btn: 'agentSubRenewal' },
+        rate:    { el: 'agentRateView',    btn: 'agentSubRate' },
+      };
       const on = (b) => { b.style.background = '#0082C8'; b.style.color = '#fff'; };
       const off = (b) => { b.style.background = '#eef4fa'; b.style.color = '#00243E'; };
-      if (which === 'renewal') {
-        pay.style.display = 'none'; ren.style.display = ''; on(bR); off(bP);
-        if (stBtn) stBtn.style.display = 'none';
-        // Default the date range to this month, then load once.
-        if (!_renState.loaded) {
-          const today = new Date();
-          const eom = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-          document.getElementById('renFrom').value = _ymd(today);
-          document.getElementById('renTo').value = _ymd(eom);
-          loadAgentRenewals();
-        }
-      } else {
-        pay.style.display = ''; ren.style.display = 'none'; on(bP); off(bR);
-        if (stBtn) stBtn.style.display = '';
+      Object.keys(views).forEach(k => {
+        const v = views[k];
+        const el = document.getElementById(v.el);
+        const btn = document.getElementById(v.btn);
+        if (el) el.style.display = (k === which) ? '' : 'none';
+        if (btn) (k === which ? on : off)(btn);
+      });
+      const stBtn = document.getElementById('agentStatementBtn');
+      if (stBtn) stBtn.style.display = (which === 'payout') ? '' : 'none';
+
+      if (which === 'renewal' && !_renState.loaded) {
+        const today = new Date();
+        const eom = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        document.getElementById('renFrom').value = _ymd(today);
+        document.getElementById('renTo').value = _ymd(eom);
+        loadAgentRenewals();
+      }
+      if (which === 'rate' && !_rateState.metaLoaded) loadAgentRateMeta();
+    }
+
+    // ============ AGENT — SEARCH RATE ============
+    let _rateState = { metaLoaded: false };
+
+    async function loadAgentRateMeta() {
+      try {
+        const r = await fetch(API + '/agent/rate-meta').then(x => x.json());
+        if (!r.success) throw new Error(r.error || 'failed');
+        const insSel = document.getElementById('rateInsurer');
+        insSel.innerHTML = '<option value="">Select…</option>' +
+          (r.insurers || []).map(i => `<option value="${escapeHtml(i.slug)}">${escapeHtml(i.name)}</option>`).join('');
+        const vtSel = document.getElementById('rateVehicleType');
+        vtSel.innerHTML = '<option value="">Select…</option>' +
+          (r.vehicle_types || []).map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+        _rateState.metaLoaded = true;
+      } catch (e) {
+        showToast('Failed to load rate options: ' + (e && e.message ? e.message : e), 'error');
+      }
+    }
+
+    async function agentSearchRate() {
+      const insurer = document.getElementById('rateInsurer').value;
+      const vt = document.getElementById('rateVehicleType').value;
+      const state = document.getElementById('rateState').value.trim();
+      const city = document.getElementById('rateCity').value.trim();
+      const rto = document.getElementById('rateRto').value.trim();
+      if (!insurer || !vt) { showToast('Pick an insurer and vehicle type', 'error'); return; }
+      const body = document.getElementById('rateBody');
+      body.innerHTML = '<tr><td colspan="7" class="no-data">Searching…</td></tr>';
+      document.getElementById('rateResolved').textContent = '';
+      document.getElementById('rateCount').textContent = '';
+      try {
+        const qs = new URLSearchParams({ insurer, vehicle_type: vt });
+        if (state) qs.set('state', state);
+        if (city)  qs.set('city', city);
+        if (rto)   qs.set('rto', rto);
+        const r = await fetch(API + '/agent/rate-search?' + qs.toString()).then(x => x.json());
+        if (!r.success) throw new Error(r.error || 'failed');
+        document.getElementById('rateResolved').textContent = r.resolved_region ? ('Region: ' + r.resolved_region) : 'No region matched';
+        document.getElementById('rateCount').textContent = r.count + ' condition' + (r.count === 1 ? '' : 's');
+        const rows = r.results || [];
+        const badge = (c) => {
+          const col = c === 'Comp' ? '#2e7d32' : c === 'SAOD' ? '#0082C8' : '#ef6c00';
+          return `<span class="badge" style="background:${col}; color:#fff;">${escapeHtml(c)}</span>`;
+        };
+        body.innerHTML = rows.length ? rows.map(x => `
+          <tr>
+            <td>${badge(x.cover)}</td>
+            <td>${escapeHtml(x.region) || '—'}</td>
+            <td>${escapeHtml(x.segment) || '—'}</td>
+            <td>${escapeHtml(x.sub_type) || '—'}</td>
+            <td>${escapeHtml(x.fuel_type) || '—'}</td>
+            <td style="font-size:12px; color:#555;">${escapeHtml(x.conditions) || '—'}</td>
+            <td style="text-align:right; font-weight:700; color:#e65100;">${Number(x.outgoing_pct).toFixed(2)}%</td>
+          </tr>`).join('') : '<tr><td colspan="7" class="no-data">No rates found for this selection. Try a different RTO / city / state.</td></tr>';
+      } catch (e) {
+        body.innerHTML = '<tr><td colspan="7" class="no-data" style="color:#c62828;">Search failed: ' + escapeHtml(e && e.message ? e.message : String(e)) + '</td></tr>';
       }
     }
 

@@ -4562,3 +4562,11 @@ router.get('/debug-policy/:pn', async (req, res, next) => {
 module.exports = router;
 // Reusable bulk-calc internals for the Payout Summary route.
 module.exports.runBulkCalculate = runBulkCalculate;
+// Reusable margin/outgoing primitives for the Agent Rate Search route, so the
+// agent-facing outgoing rate matches exactly what the bulk pipeline computes.
+module.exports.loadMarginRules = loadMarginRules;
+module.exports.loadSpecialRulesByAgent = loadSpecialRulesByAgent;
+module.exports.loadGlobalUpliftsByAgent = loadGlobalUpliftsByAgent;
+module.exports.matchMarginForPolicy = matchMarginForPolicy;
+module.exports.policyMatchesMargin = policyMatchesMargin;
+module.exports._pickUplift = _pickUplift;

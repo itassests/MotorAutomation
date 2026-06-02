@@ -15,6 +15,8 @@ const XLSX = require('xlsx');
 const sql = require('mssql');
 const { getPool } = require('../db/connection');
 const { getPrarambhPool } = require('../db/prarambh-connection');
+const { lookupRates, resolveRTO, rtoProductFor } = require('../services/rate-lookup');
+const bulk = require('./bulk');   // reuse the exact margin/outgoing primitives
 const { attachUser } = require('./auth');
 
 const router = express.Router();
@@ -300,6 +302,219 @@ router.get('/statement', async (req, res, next) => {
     res.setHeader('Content-Disposition', `attachment; filename="payout_${agentCode}_cycle${cycleId}.xlsx"`);
     res.setHeader('Content-Length', buf.length);
     res.send(buf);
+  } catch (err) { next(err); }
+});
+
+// ── Agent Rate Search ───────────────────────────────────────────────────────
+// Agent picks insurer + vehicle type + (state / city / RTO) and sees the
+// OUTGOING rate for every matching condition. Outgoing = grid rate − the
+// agent's effective margin (their special rates + uplifts), so it reflects
+// exactly what THEY would be paid. Income/margin internals are never returned.
+
+// Vehicle type → the product spellings used in rate_rules.product.
+const RATE_PRODUCT_ALIASES = {
+  CAR:  ['CAR', '4W', 'PC'],
+  TW:   ['TW', '2W', 'TW_EV'],
+  GCV:  ['GCV', 'CV'],
+  PCV:  ['PCV', 'CV'],
+  MISC: ['MISC', 'MIS', 'CV'],
+};
+
+// RTO state-letter prefix → state name. Used as a fallback when an RTO code
+// isn't in the insurer's RTO master: we still constrain to that STATE rather
+// than returning every region's rates.
+const RTO_PREFIX_TO_STATE = {
+  MH: 'Maharashtra', GJ: 'Gujarat', DL: 'Delhi', KA: 'Karnataka', TN: 'Tamil Nadu',
+  AP: 'Andhra Pradesh', TG: 'Telangana', TS: 'Telangana', KL: 'Kerala',
+  MP: 'Madhya Pradesh', CG: 'Chhattisgarh', CT: 'Chhattisgarh', UP: 'Uttar Pradesh',
+  UK: 'Uttarakhand', UA: 'Uttarakhand', RJ: 'Rajasthan', PB: 'Punjab', HR: 'Haryana',
+  HP: 'Himachal Pradesh', JK: 'Jammu and Kashmir', WB: 'West Bengal', BR: 'Bihar',
+  JH: 'Jharkhand', OD: 'Odisha', OR: 'Odisha', GA: 'Goa', AS: 'Assam', CH: 'Chandigarh',
+  PY: 'Puducherry', DD: 'Daman', DN: 'Dadra', ML: 'Meghalaya', MN: 'Manipur',
+  MZ: 'Mizoram', NL: 'Nagaland', TR: 'Tripura', AR: 'Arunachal', SK: 'Sikkim',
+  AN: 'Andaman', LD: 'Lakshadweep',
+};
+
+// Coarse cover classification from a rate_type label (for display grouping).
+function coverTypeOf(rt) {
+  const u = String(rt || '').toUpperCase();
+  if (/SAOD|FLEXI|\bSOD\b|MIN_CD1|MAX_CD1/.test(u)) return 'SAOD';
+  if (/SATP|\bACT\b|\bTP\b|TP[_%]|\|NA\b|ON CONTRACT/.test(u)) return 'TP';
+  return 'Comp';
+}
+
+// Human-readable condition summary from a rule's band columns.
+function conditionsOf(r) {
+  const bits = [];
+  const range = (lo, hi, unit, label) => {
+    if (lo == null && hi == null) return;
+    if (lo != null && hi != null) bits.push(`${label} ${lo}-${hi}${unit}`);
+    else if (lo != null) bits.push(`${label} ≥${lo}${unit}`);
+    else bits.push(`${label} ≤${hi}${unit}`);
+  };
+  range(r.age_band_min ?? r.vehicle_age_min, r.age_band_max ?? r.vehicle_age_max, 'y', 'Age');
+  range(r.cc_band_min, r.cc_band_max, 'cc', 'CC');
+  range(r.weight_band_min, r.weight_band_max, 'T', 'GVW');
+  range(r.seating_capacity_min, r.seating_capacity_max, '', 'Seats');
+  if (r.volume_tier) bits.push(String(r.volume_tier));
+  return bits.join(', ');
+}
+
+// Resolve the agent's effective margin % for a scope — mirrors the bulk
+// pipeline (matched margin → synthetic CAR5/CV6/TW3 → agent special override →
+// global uplift) so the agent sees the same number the calculator would use.
+function resolveAgentMarginPct(params, rtoInfo, agentCode, caches) {
+  const matched = bulk.matchMarginForPolicy(params, rtoInfo, caches.marginRules);
+  const matchedPct = matched ? Number(matched.margin_pct) : null;
+  let syntheticPct = null;
+  if (!matched || !(matchedPct > 0)) {
+    const vt = String(params.vehicleType || '').toUpperCase();
+    if (vt === 'CAR' || vt === '4W' || vt === 'PC' || vt === 'PVT.CAR') syntheticPct = 5;
+    else if (vt === 'GCV' || vt === 'PCV' || vt === 'MISC' || vt === 'MIS' || vt === 'CV') syntheticPct = 6;
+    else if (vt === 'TW' || vt === '2W' || vt === 'TW_EV') syntheticPct = 3;
+  }
+  let eff = (matched && matchedPct > 0) ? matchedPct : (syntheticPct != null ? syntheticPct : (matched ? matchedPct : 0));
+  // Agent special override — lowest matching override wins (most favourable).
+  let appliedSpecial = false;
+  const upin = String(agentCode || '').trim().toUpperCase();
+  if (upin && caches.specialByAgent && caches.specialByAgent.has(upin)) {
+    for (const sr of caches.specialByAgent.get(upin)) {
+      if (sr.override_margin_pct == null) continue;       // tier-only — needs premium context, skip
+      if (!bulk.policyMatchesMargin(params, rtoInfo, sr.filters)) continue;
+      if (sr.override_margin_pct < eff) { eff = sr.override_margin_pct; appliedSpecial = true; }
+    }
+  }
+  // Global uplift fallback (only when no scope override lowered the margin).
+  if (!appliedSpecial && upin && caches.upliftByAgent && caches.upliftByAgent.has(upin)) {
+    const uplift = bulk._pickUplift(caches.upliftByAgent.get(upin), params.vehicleType, params._insurer_slug);
+    if (uplift > 0) eff = Math.max(0, eff - uplift);
+  }
+  return eff;
+}
+
+/** GET /rate-meta — insurers (that have rates) + vehicle types for the search dropdowns. */
+router.get('/rate-meta', async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const r = await pool.request().query(
+      `SELECT DISTINCT insurer FROM rate_rules WHERE insurer IS NOT NULL AND insurer <> '' ORDER BY insurer`
+    );
+    const pretty = (s) => String(s || '').split(/[_\s]+/).filter(Boolean)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    const insurers = r.recordset.map(x => ({ slug: x.insurer, name: pretty(x.insurer) }));
+    res.json({ success: true, insurers, vehicle_types: ['CAR', 'TW', 'GCV', 'PCV', 'MISC'] });
+  } catch (err) { next(err); }
+});
+
+/** GET /rate-search — outgoing rates for the agent across matching conditions.
+ *  Query: insurer (req), vehicle_type (req), state, city, rto (all optional). */
+router.get('/rate-search', async (req, res, next) => {
+  try {
+    const agentCode = agentCodeFor(req);
+    const insurer = String(req.query.insurer || '').trim();
+    const vtRaw   = String(req.query.vehicle_type || '').trim().toUpperCase();
+    const state   = String(req.query.state || '').trim();
+    const city    = String(req.query.city || '').trim();
+    const rto     = String(req.query.rto || '').trim().toUpperCase().replace(/\s+/g, '');
+    if (!insurer) return res.status(400).json({ success: false, error: 'insurer is required' });
+    if (!vtRaw)   return res.status(400).json({ success: false, error: 'vehicle_type is required' });
+
+    const pool = await getPool();
+    const product = RATE_PRODUCT_ALIASES[vtRaw] || [vtRaw];
+
+    // Resolve location → region/cluster. RTO (if given) is authoritative.
+    let rtoInfo = null;
+    let resolvedRegion = '';
+    const lookupBase = { insurer, product, include_null_region: true, limit: 1000 };
+    if (rto) {
+      const rtoProduct = rtoProductFor({ insurer, vehicleType: vtRaw });
+      rtoInfo = await resolveRTO(pool, insurer, rtoProduct, rto);
+      if (rtoInfo) {
+        resolvedRegion = rtoInfo.region || rtoInfo.cluster || '';
+        lookupBase.region = rtoInfo.region;
+        lookupBase.cluster = rtoInfo.cluster;
+      } else {
+        // RTO not in this insurer's master → fall back to the RTO's STATE
+        // (e.g. MH36 → Maharashtra) so we constrain to that state, plus any
+        // city/state the agent also typed — NOT every region.
+        const prefix = (rto.match(/^[A-Z]{2}/) || [''])[0];
+        const stFromRto = RTO_PREFIX_TO_STATE[prefix];
+        const cands = [city, state, stFromRto].filter(Boolean);
+        if (cands.length) {
+          lookupBase.region_list = cands;
+          lookupBase.region_match_mode = 'contains';
+          resolvedRegion = (stFromRto ? `${stFromRto} (from RTO ${rto})` : cands.join(' / '));
+          rtoInfo = { region: stFromRto || city || state || '', cluster: stFromRto || city || state || '' };
+        }
+      }
+    }
+    if (!rtoInfo) {
+      // No RTO (or unresolved with unknown prefix) → match on city/state.
+      const cands = [city, state].filter(Boolean);
+      if (cands.length) {
+        lookupBase.region_list = cands;
+        lookupBase.region_match_mode = 'contains';
+        resolvedRegion = cands.join(' / ');
+      }
+      rtoInfo = { region: city || state || '', cluster: city || state || '' };
+    }
+
+    const rules = await lookupRates(pool, lookupBase);
+
+    // Agent margin caches (small tables).
+    const caches = {
+      marginRules:   await bulk.loadMarginRules(pool),
+      specialByAgent: await bulk.loadSpecialRulesByAgent(pool),
+      upliftByAgent:  await bulk.loadGlobalUpliftsByAgent(pool),
+    };
+    const params = {
+      _insurer_slug: insurer,
+      vehicleType: vtRaw,
+      resolvedRegion,
+      _stateName: state,
+      cityName: city,
+      rtoCode: rto,
+      _agent_code: agentCode,
+    };
+    const effMarginPct = resolveAgentMarginPct(params, rtoInfo, agentCode, caches);
+
+    // Build outgoing rows, dropping declines / null-rate info rows, deduped.
+    const seen = new Set();
+    const results = [];
+    for (const r of rules) {
+      if (r.is_declined) continue;
+      if (r.rate_value == null) continue;                  // skip conditional/info rows for v1
+      // Normalise rate scale exactly like the bulk pipeline: some insurers store
+      // the rate as a fraction (0.255) and others as a percentage (57.48). A
+      // value > 1 is a percentage → divide by 100 to get the fraction.
+      let rv = Number(r.rate_value);
+      if (rv > 1) rv = rv / 100;
+      const ratePct = rv * 100;
+      const outgoingPct = Math.max(0, +(ratePct - effMarginPct).toFixed(3));
+      const row = {
+        cover: coverTypeOf(r.rate_type),
+        region: r.region || resolvedRegion || '—',
+        segment: r.segment || '',
+        sub_type: r.sub_type || '',
+        fuel_type: r.fuel_type || '',
+        make: r.make || '',
+        conditions: conditionsOf(r),
+        outgoing_pct: outgoingPct,
+      };
+      const key = [row.cover, row.region, row.segment, row.sub_type, row.fuel_type, row.make, row.conditions, row.outgoing_pct].join('|');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      results.push(row);
+    }
+    // Stable, useful ordering: cover (Comp, SAOD, TP), then outgoing desc.
+    const coverRank = { Comp: 0, SAOD: 1, TP: 2 };
+    results.sort((a, b) => (coverRank[a.cover] - coverRank[b.cover]) || (b.outgoing_pct - a.outgoing_pct));
+
+    res.json({
+      success: true, agent: agentCode, insurer, vehicle_type: vtRaw,
+      resolved_region: resolvedRegion || null,
+      count: results.length, results,
+    });
   } catch (err) { next(err); }
 });
 
