@@ -409,6 +409,7 @@
     <div class="tab tab-bottom" data-tab="masters" title="Masters" style="color:#0082C8; font-weight:600;"><span class="tab-icon">&#128218;</span><span class="tab-label">Masters</span></div>
     <div class="tab"             data-tab="admin"   title="Admin"   style="color:#c62828; font-weight:600;"><span class="tab-icon">&#9881;</span><span class="tab-label">Admin</span></div>
     <div class="tab"             data-tab="agent-view" title="Agent View" style="color:#0082C8; font-weight:600;"><span class="tab-icon">&#128100;</span><span class="tab-label">Agent View</span></div>
+    <div class="tab"             data-tab="employee-view" title="Business Dashboard" style="color:#2e7d32; font-weight:600;"><span class="tab-icon">&#128202;</span><span class="tab-label">Business Dashboard</span></div>
   </nav>
 
   <div class="container">
@@ -3310,6 +3311,89 @@
       </div><!-- /agentRateView -->
     </div>
 
+    <!-- ===== Employee Business Dashboard ===== -->
+    <div class="panel" id="panel-employee-view">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+        <div>
+          <h2 style="font-size:18px; margin:0;"><span class="icon">&#128202;</span> Business Dashboard</h2>
+          <div style="font-size:12px; color:#888; margin-top:2px;" id="empMeta">&nbsp;</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="empDownload()">&#128229; Download</button>
+      </div>
+
+      <!-- Filters -->
+      <div class="card" style="margin-top:14px; display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap;">
+        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">From</label>
+          <input type="date" id="empFrom" style="height:30px;font-size:13px;padding:0 6px;border:1px solid #cfe6f5;border-radius:4px;"></div>
+        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">To</label>
+          <input type="date" id="empTo" style="height:30px;font-size:13px;padding:0 6px;border:1px solid #cfe6f5;border-radius:4px;"></div>
+        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">Vertical</label>
+          <select id="empVertical" style="height:30px;font-size:13px;"><option value="">All</option></select></div>
+        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">Branch</label>
+          <select id="empBranch" style="height:30px;font-size:13px;"><option value="">All</option></select></div>
+        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">Sub Branch</label>
+          <select id="empSubBranch" style="height:30px;font-size:13px;"><option value="">All</option></select></div>
+        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">Employee</label>
+          <select id="empEmployee" style="height:30px;font-size:13px;"><option value="">All</option></select></div>
+        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">Agent</label>
+          <select id="empAgent" style="height:30px;font-size:13px;"><option value="">All</option></select></div>
+        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">Vehicle Type</label>
+          <select id="empVt" style="height:30px;font-size:13px;"><option value="">All</option></select></div>
+        <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">Channel</label>
+          <select id="empChannel" style="height:30px;font-size:13px;"><option value="">All</option><option value="online">Online</option><option value="offline">Offline</option></select></div>
+        <button class="btn btn-sm" onclick="empClear()" style="background:#fff;border:1px solid #e0a800;color:#b8860b;">Clear</button>
+        <button class="btn btn-primary btn-sm" onclick="loadEmployeeDashboard()">Search</button>
+      </div>
+
+      <!-- KPI cards -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(190px,1fr)); gap:14px; margin-top:16px;">
+        <div class="card" style="text-align:center; border-left:4px solid #0082C8;">
+          <div style="font-size:12px;color:#888;text-transform:uppercase;">Total NOP</div>
+          <div id="empKpiNop" style="font-size:28px;font-weight:700;color:#00243E;">—</div></div>
+        <div class="card" style="text-align:center; border-left:4px solid #2e7d32;">
+          <div style="font-size:12px;color:#888;text-transform:uppercase;">Total Premium</div>
+          <div id="empKpiPrem" style="font-size:28px;font-weight:700;color:#1b5e20;">—</div></div>
+        <div class="card" style="text-align:center; border-left:4px solid #00897b;">
+          <div style="font-size:12px;color:#888;text-transform:uppercase;">Online</div>
+          <div id="empKpiOnline" style="font-size:22px;font-weight:700;color:#00897b;">—</div></div>
+        <div class="card" style="text-align:center; border-left:4px solid #8e24aa;">
+          <div style="font-size:12px;color:#888;text-transform:uppercase;">Offline</div>
+          <div id="empKpiOffline" style="font-size:22px;font-weight:700;color:#8e24aa;">—</div></div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px;">
+        <div class="card">
+          <h3 style="font-size:14px;color:#00243E;">By Vehicle Type</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Vehicle Type</th><th style="text-align:right;">NOP</th><th style="text-align:right;">Premium</th></tr></thead>
+            <tbody id="empVtBody"><tr><td colspan="3" class="no-data">—</td></tr></tbody>
+          </table></div>
+        </div>
+        <div class="card">
+          <h3 style="font-size:14px;color:#00243E;">By Employee <span style="font-size:11px;color:#999;font-weight:400;">(top contributors)</span></h3>
+          <div class="table-wrap" style="max-height:260px;overflow:auto;"><table>
+            <thead><tr><th>Employee</th><th style="text-align:right;">NOP</th><th style="text-align:right;">Premium</th></tr></thead>
+            <tbody id="empEmpBody"><tr><td colspan="3" class="no-data">—</td></tr></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <h3 style="font-size:14px;color:#00243E;margin:0;">Cases</h3>
+          <span id="empCaseCount" style="font-size:12px;color:#888;"></span>
+        </div>
+        <div class="table-wrap" style="margin-top:10px;"><table>
+          <thead><tr>
+            <th>Date</th><th>Employee</th><th>Agent</th><th>Vehicle</th><th>Insurer</th><th>Customer</th>
+            <th>Policy No</th><th>Reg No</th><th>State</th><th style="text-align:center;">Channel</th>
+            <th style="text-align:right;">Premium</th><th>Status</th>
+          </tr></thead>
+          <tbody id="empCaseBody"><tr><td colspan="12" class="no-data">Loading…</td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+
   </div>
 
   <div class="toast-container" id="toastContainer"></div>
@@ -3478,6 +3562,14 @@
           tab.style.display = (_currentUser && _currentUser.role === 'admin') ? '' : 'none';
           return;
         }
+        // Business Dashboard: internal employees (role 'user') + admins. Hidden
+        // for agents (handled above). A pure employee with no other screen
+        // permissions lands here as their only visible tab.
+        if (k === 'employee-view') {
+          const role = _currentUser && _currentUser.role;
+          tab.style.display = (role === 'admin' || role === 'user') ? '' : 'none';
+          return;
+        }
         // Admin tab is admin-only.
         if (k === 'admin') {
           tab.style.display = (_currentUser && _currentUser.role === 'admin') ? '' : 'none';
@@ -3507,6 +3599,10 @@
           first.classList.add('active');
           const p = document.getElementById('panel-' + first.dataset.tab);
           if (p) p.classList.add('active');
+          // Auto-load data for the landed tab (e.g. a pure employee whose only
+          // visible tab is the Business Dashboard).
+          if (first.dataset.tab === 'employee-view') loadEmployeeDashboard();
+          if (first.dataset.tab === 'agent-view' && typeof loadAgentView === 'function') loadAgentView();
         }
       }
     }
@@ -3542,6 +3638,7 @@
         document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
         if (tab.dataset.tab === 'admin') adminLoad();
         if (tab.dataset.tab === 'agent-view') loadAgentView();
+        if (tab.dataset.tab === 'employee-view') loadEmployeeDashboard();
         if (tab.dataset.tab === 'masters' && !_mInsurersLoaded) loadMasterInsurers();
         if (tab.dataset.tab === 'utr') utrPopulateCycles();
         if (tab.dataset.tab === 'margin-exceptions') loadMarginExceptions();
@@ -3846,6 +3943,124 @@
       a.download = 'motor_renewals.csv';
       document.body.appendChild(a); a.click();
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 100);
+    }
+
+    // ============ EMPLOYEE BUSINESS DASHBOARD ============
+    let _empState = { optsLoaded: false, cases: [] };
+    const _empInr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+    function empClear() {
+      ['empVertical','empBranch','empSubBranch','empEmployee','empAgent','empVt','empChannel'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+      });
+      const today = new Date();
+      document.getElementById('empFrom').value = '2026-04-01';
+      document.getElementById('empTo').value = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+      loadEmployeeDashboard();
+    }
+
+    function empFillSelect(id, values, keepValue) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const cur = keepValue ? el.value : '';
+      el.innerHTML = '<option value="">All</option>' + values.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+      el.value = cur;
+    }
+
+    async function loadEmployeeDashboard() {
+      const meta = document.getElementById('empMeta');
+      // Default dates on first open.
+      if (!document.getElementById('empFrom').value) {
+        const today = new Date();
+        document.getElementById('empFrom').value = '2026-04-01';
+        document.getElementById('empTo').value = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+      }
+      const qs = new URLSearchParams();
+      const g = (id) => document.getElementById(id).value;
+      if (g('empFrom')) qs.set('from', g('empFrom'));
+      if (g('empTo'))   qs.set('to', g('empTo'));
+      if (g('empVertical'))  qs.set('vertical', g('empVertical'));
+      if (g('empBranch'))    qs.set('branch', g('empBranch'));
+      if (g('empSubBranch')) qs.set('sub_branch', g('empSubBranch'));
+      if (g('empEmployee'))  qs.set('employee', g('empEmployee'));
+      if (g('empAgent'))     qs.set('agent', g('empAgent'));
+      if (g('empVt'))        qs.set('vehicle_type', g('empVt'));
+      if (g('empChannel'))   qs.set('channel', g('empChannel'));
+      if (meta) meta.textContent = 'Loading…';
+      document.getElementById('empCaseBody').innerHTML = '<tr><td colspan="12" class="no-data">Loading…</td></tr>';
+      try {
+        const r = await fetch(API + '/employee/dashboard?' + qs.toString()).then(x => x.json());
+        if (!r.success) throw new Error(r.error || 'failed');
+        if (meta) meta.innerHTML = `<strong>${escapeHtml(_currentUser ? _currentUser.empcode : r.root)}</strong> · ${r.options.employees.length} employees in hierarchy · ${r.from} → ${r.to}`;
+        // KPIs
+        const s = r.summary;
+        document.getElementById('empKpiNop').textContent = (s.nop || 0).toLocaleString('en-IN');
+        document.getElementById('empKpiPrem').textContent = _empInr(s.premium);
+        document.getElementById('empKpiOnline').innerHTML = `${s.online_nop} <span style="font-size:12px;color:#888;">/ ${_empInr(s.online_premium)}</span>`;
+        document.getElementById('empKpiOffline').innerHTML = `${s.offline_nop} <span style="font-size:12px;color:#888;">/ ${_empInr(s.offline_premium)}</span>`;
+        // Filter dropdowns — populate once (keep selection on refresh).
+        empFillSelect('empVertical', r.options.verticals, _empState.optsLoaded);
+        empFillSelect('empBranch', r.options.branches, _empState.optsLoaded);
+        empFillSelect('empSubBranch', r.options.sub_branches, _empState.optsLoaded);
+        empFillSelect('empAgent', r.options.agents, _empState.optsLoaded);
+        empFillSelect('empVt', r.options.vehicle_types, _empState.optsLoaded);
+        const empSel = document.getElementById('empEmployee');
+        const curEmp = _empState.optsLoaded ? empSel.value : '';
+        empSel.innerHTML = '<option value="">All</option>' + r.options.employees.map(e => `<option value="${escapeHtml(e.code)}">${escapeHtml(e.name)} (${escapeHtml(e.code)})</option>`).join('');
+        empSel.value = curEmp;
+        _empState.optsLoaded = true;
+        // By vehicle type
+        document.getElementById('empVtBody').innerHTML = (r.by_vehicle_type || []).length
+          ? r.by_vehicle_type.map(v => `<tr><td>${escapeHtml(v.vehicle_type)}</td><td style="text-align:right;">${v.nop}</td><td style="text-align:right;">${_empInr(v.premium)}</td></tr>`).join('')
+          : '<tr><td colspan="3" class="no-data">No data.</td></tr>';
+        // By employee
+        document.getElementById('empEmpBody').innerHTML = (r.by_employee || []).length
+          ? r.by_employee.map(e => `<tr><td>${escapeHtml(e.name)} <span style="color:#999;font-size:11px;">${escapeHtml(e.code)}</span></td><td style="text-align:right;">${e.nop}</td><td style="text-align:right;">${_empInr(e.premium)}</td></tr>`).join('')
+          : '<tr><td colspan="3" class="no-data">No data.</td></tr>';
+        // Cases
+        _empState.cases = r.cases || [];
+        const fmtD = (d) => { if (!d) return '-'; const dt = new Date(d); return isNaN(dt) ? '-' : dt.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'2-digit' }); };
+        const chBadge = (on) => on
+          ? '<span class="badge" style="background:#00897b;color:#fff;">Online</span>'
+          : '<span class="badge" style="background:#8e24aa;color:#fff;">Offline</span>';
+        document.getElementById('empCaseBody').innerHTML = _empState.cases.length
+          ? _empState.cases.map(c => `<tr>
+              <td>${fmtD(c.created_date)}</td>
+              <td>${escapeHtml(c.employee_name) || '-'}</td>
+              <td>${escapeHtml(c.agent_code) || '-'}</td>
+              <td>${escapeHtml(c.vehicle_type) || '-'}</td>
+              <td>${escapeHtml(c.insurer) || '-'}</td>
+              <td>${escapeHtml(c.customer) || '-'}</td>
+              <td style="font-family:monospace;">${escapeHtml(c.policy_no) || '-'}</td>
+              <td style="font-family:monospace;">${escapeHtml(c.reg_no) || '-'}</td>
+              <td>${escapeHtml(c.state) || '-'}</td>
+              <td style="text-align:center;">${chBadge(c.is_online)}</td>
+              <td style="text-align:right;">${_empInr(c.premium)}</td>
+              <td>${escapeHtml(c.status) || '-'}</td>
+            </tr>`).join('')
+          : '<tr><td colspan="12" class="no-data">No cases match these filters.</td></tr>';
+        document.getElementById('empCaseCount').textContent =
+          (r.truncated ? `showing first ${_empState.cases.length} of ${(s.nop||0).toLocaleString('en-IN')} (refine filters to narrow)` : `${_empState.cases.length} case${_empState.cases.length===1?'':'s'}`);
+      } catch (e) {
+        if (meta) meta.textContent = 'Failed: ' + (e && e.message ? e.message : e);
+        document.getElementById('empCaseBody').innerHTML = '<tr><td colspan="12" class="no-data" style="color:#c62828;">Load failed.</td></tr>';
+      }
+    }
+
+    function empDownload() {
+      const rows = _empState.cases || [];
+      if (!rows.length) { showToast('Nothing to download', 'error'); return; }
+      const header = ['Date','Employee','Employee Code','Agent','Vehicle Type','Product','Insurer','Customer','Policy No','Reg No','RTO','State','Vertical','Branch','Sub Branch','Channel','Premium','Status'];
+      const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+      const lines = [header.map(esc).join(',')];
+      for (const c of rows) {
+        lines.push([c.created_date ? new Date(c.created_date).toLocaleDateString('en-IN') : '', c.employee_name, c.employee_code, c.agent_code,
+          c.vehicle_type, c.product_type, c.insurer, c.customer, c.policy_no, c.reg_no, c.rto, c.state, c.vertical, c.branch, c.sub_branch,
+          c.is_online ? 'Online' : 'Offline', c.premium, c.status].map(esc).join(','));
+      }
+      const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'business_dashboard.csv';
+      document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 100);
     }
 
     // ============ SIDEBAR TOGGLE ============
