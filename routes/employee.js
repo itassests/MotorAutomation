@@ -278,6 +278,12 @@ router.get('/dashboard', async (req, res, next) => {
       WHERE 1=1${DATE_SEL}${cl.full} AND b.agent_code IS NOT NULL AND b.agent_code <> ''
       GROUP BY b.agent_code;
 
+      -- 9) Month-on-month trend (NOP + premium per FY month; dimension filters
+      --    applied, but NOT the date selection so the full FY trend shows)
+      SELECT YEAR(b.cdate) AS yr, MONTH(b.cdate) AS mo, COUNT(*) AS nop, ISNULL(SUM(b.premium),0) AS premium
+      FROM #base b WHERE 1=1${cl.base}
+      GROUP BY YEAR(b.cdate), MONTH(b.cdate) ORDER BY YEAR(b.cdate), MONTH(b.cdate);
+
       DROP TABLE #base; DROP TABLE #hemp;`;
 
     const result = await rq.query(batch);
@@ -290,6 +296,8 @@ router.get('/dashboard', async (req, res, next) => {
     const pr = (recs[5] && recs[5][0]) || {};
     const branchRows = recs[6] || [];
     const agentRows = recs[7] || [];
+    const monthRows = recs[8] || [];
+    const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
     const uniq = (arr) => [...new Set(arr.filter(v => v != null && v !== ''))].sort();
     const empMap = new Map();
@@ -327,6 +335,7 @@ router.get('/dashboard', async (req, res, next) => {
       by_employee: empRows.map(r => ({ code: r.code, name: r.name || r.code, nop: Number(r.nop) || 0, premium: round(r.premium) })),
       by_branch: branchRows.map(r => ({ branch: r.branch, nop: Number(r.nop) || 0, premium: round(r.premium) })),
       by_agent: agentRows.map(r => ({ code: r.code, name: r.name || r.code, nop: Number(r.nop) || 0, premium: round(r.premium) })),
+      by_month: monthRows.map(r => ({ label: `${MON[(Number(r.mo) || 1) - 1]} ${r.yr}`, nop: Number(r.nop) || 0, premium: round(r.premium) })),
       options: {
         verticals: uniq(oRows.map(r => r.vertical)),
         branches: uniq(oRows.map(r => r.branch)),
