@@ -1,0 +1,13 @@
+{
+  "insurer": "new_india_assurance",
+  "label": "New India Assurance",
+  "sheets": [
+    {
+      "_comment": "PDF — Brokers Motor Commission grid (w.e.f. 01-Apr-2026). Rates hard-coded in new-india.js. PDF is scanned image; routed via pdf-extract → Document AI for content validation.",
+      "name": "_pdf_grid",
+      "file_pattern": "\\.pdf$|New[ _]India|Brokers|NIA[ _]Motor",
+      "layout": "new_india_pdf",
+      "config": { "engine": "new-india" }
+    }
+  ]
+}

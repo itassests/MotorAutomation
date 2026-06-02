@@ -1,0 +1,62 @@
+{
+  "insurer": "kotak",
+  "label": "Kotak General Insurance",
+  "sheets": [
+    {
+      "_comment": "Grid.xlsx — TW sheet (Bike/Scooter × Comp/SAOD/Liability rates with code labels)",
+      "name": "TW",
+      "file_pattern": "^Grid\\.|kotak[ _]grid",
+      "layout": "kotak",
+      "config": { "sheet_kind": "kotak_grid_tw" }
+    },
+    {
+      "_comment": "Grid.xlsx — Rest Grid sheet (Pvt Car / LCV / GCV / MISD / PCV base rates)",
+      "name": "Rest Grid",
+      "file_pattern": "^Grid\\.|kotak[ _]grid",
+      "layout": "kotak",
+      "config": { "sheet_kind": "kotak_grid_rest" }
+    },
+    {
+      "_comment": "TP ULR TW UW.xlsx — RTO → TP Category map (drives per-RTO LCV rules)",
+      "name": "RTO Level TP ULR",
+      "file_pattern": "TP[ _]ULR|2026_03",
+      "layout": "kotak",
+      "config": { "sheet_kind": "kotak_rto_tp_ulr" }
+    },
+    {
+      "_comment": "Private car Acceptable RTO pan india.xlsx — Sheet2 (RTO → Pvt Car Category)",
+      "name": "Sheet2",
+      "file_pattern": "Private[ _]car[ _]Acceptable[ _]RTO|pvtcar[ _]rto",
+      "layout": "kotak",
+      "config": { "sheet_kind": "kotak_rto_pvt_car" }
+    },
+    {
+      "_comment": "GCV acceptable RTO.xlsx — Upto 2.5 ton sheet",
+      "name": "Upto 2.5 ton",
+      "file_pattern": "GCV[ _]acceptable|gcv[ _]rto",
+      "layout": "kotak",
+      "config": { "sheet_kind": "kotak_rto_gcv_upto_2_5" }
+    },
+    {
+      "_comment": "GCV acceptable RTO.xlsx — 2.5-3.5 ton sheet",
+      "name": "2.5 ton 3.5 ton ",
+      "file_pattern": "GCV[ _]acceptable|gcv[ _]rto",
+      "layout": "kotak",
+      "config": { "sheet_kind": "kotak_rto_gcv_2_5_3_5" }
+    },
+    {
+      "_comment": "GCV acceptable RTO.xlsx — 3.5-7.5 ton sheet",
+      "name": "3.5 to 7.5 Ton",
+      "file_pattern": "GCV[ _]acceptable|gcv[ _]rto",
+      "layout": "kotak",
+      "config": { "sheet_kind": "kotak_rto_gcv_3_5_7_5" }
+    },
+    {
+      "_comment": "Tractor RTO file — per-RTO commission with state tier",
+      "name": "Acceptable RTO list for Tractor",
+      "file_pattern": "Tractor[ _]RTO|tractor[ _]rto",
+      "layout": "kotak",
+      "config": { "sheet_kind": "kotak_rto_tractor" }
+    }
+  ]
+}

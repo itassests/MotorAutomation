@@ -30,6 +30,14 @@ const engines = {
   liberty_grid:        require('./engines/liberty-grid'),
   future_generali:     require('./engines/future-generali'),
   united_india:        require('./engines/united-india'),
+  zuno_robinhood:      require('./engines/zuno-robinhood'),
+  oriental:            require('./engines/oriental'),
+  magma:               require('./engines/magma'),
+  national:            require('./engines/national'),
+  iffco:               require('./engines/iffco'),
+  raheja:              require('./engines/raheja'),
+  kotak:               require('./engines/kotak'),
+  tata_pci:            require('./engines/tata-pci'),
 };
 
 /**
@@ -78,6 +86,9 @@ async function parseWorkbook(filePath, insurerConfig) {
   if (/\.pdf$/i.test(filePath)) {
     return await dispatchPdf(filePath, insurerConfig);
   }
+  if (/\.msg$/i.test(filePath)) {
+    return await dispatchMsg(filePath, insurerConfig);
+  }
   const workbook = XLSX.readFile(filePath, { type: 'file' });
   const allRules = [];
   const rawFileName = path.basename(filePath);
@@ -93,6 +104,20 @@ async function parseWorkbook(filePath, insurerConfig) {
   const sheetsConfig = insurerConfig.sheets || [];
   const insurer = insurerConfig.insurer || '';
   const rateCardId = insurerConfig.rate_card_id || '';
+
+  // Workbook-scoped meta shared across every sheet's parse() call. Engines
+  // that need cross-sheet context (e.g. Magma's "RTO Vs Cluster" lookup
+  // referenced from every band sheet) can stash data here via a
+  // preprocessWorkbook hook.
+  const workbookMeta = {};
+  for (const sheetEntry of sheetsConfig) {
+    const layout = sheetEntry.layout;
+    const engine = layout && engines[layout];
+    if (engine && typeof engine.preprocessWorkbook === 'function') {
+      try { engine.preprocessWorkbook(workbook, insurerConfig, workbookMeta); }
+      catch (e) { console.warn(`[RateExtract] preprocessWorkbook("${layout}") failed:`, e.message); }
+    }
+  }
 
   for (const sheetEntry of sheetsConfig) {
     // Skip placeholder entries (legacy-disabled stubs) — they carry only a
@@ -168,6 +193,7 @@ async function parseWorkbook(filePath, insurerConfig) {
       insurer,
       rateCardId,
       sheetName,
+      ...workbookMeta,         // engines stash cross-sheet context here
     };
 
     try {
@@ -203,6 +229,33 @@ async function parseWorkbook(filePath, insurerConfig) {
  * Looks up the first sheet entry whose layout ends with `_pdf` (e.g.
  * `future_generali_pdf`) and calls its `parsePdfFile(filePath)`.
  */
+/**
+ * Dispatch a .msg (Outlook email) upload — engine must export parseMsgFile.
+ * Looks up the first sheet entry whose layout ends with `_msg` (e.g.
+ * `raheja_msg`) and calls its parseMsgFile(filePath).
+ */
+async function dispatchMsg(filePath, insurerConfig) {
+  const sheetsConfig = insurerConfig.sheets || [];
+  const msgEntry = sheetsConfig.find(s => /_msg$/i.test(String(s.layout || '')));
+  if (!msgEntry) {
+    console.warn(`[RateExtract] MSG uploaded but no MSG layout in config for ${insurerConfig.insurer}`);
+    return [];
+  }
+  const engineName = String(msgEntry.config?.engine || msgEntry.layout).replace(/_msg$/, '');
+  try {
+    const msgEngine = require('./engines/' + engineName);
+    if (!msgEngine.parseMsgFile) {
+      console.warn(`[RateExtract] MSG engine "${engineName}" missing parseMsgFile()`);
+      return [];
+    }
+    const rules = await msgEngine.parseMsgFile(filePath);
+    return rules || [];
+  } catch (err) {
+    console.error(`[RateExtract] MSG engine "${engineName}" failed:`, err.message);
+    return [];
+  }
+}
+
 async function dispatchPdf(filePath, insurerConfig) {
   const sheetsConfig = insurerConfig.sheets || [];
   const pdfEntry = sheetsConfig.find(s => /_pdf$/i.test(String(s.layout || '')));

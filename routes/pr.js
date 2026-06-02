@@ -35,6 +35,54 @@ const router = express.Router();
 
 const MAPPING_FILE = path.resolve(__dirname, '..', 'config', 'pr_mapping', 'pr_mapping.xlsx');
 
+// ─── Vehicle-class normalisation ───────────────────────────────────────────
+// The PR file encodes the vehicle class in `product` / `vehicle_category`
+// (e.g. "Goods Carrying Package Policy", "GCVGVW<=7.5TON") while Prarambh
+// encodes it in `VehicleType` (e.g. "Commercial-Goods Carrying", "Pvt.Car").
+// Both collapse to one of five canonical classes so the QC screen can flag a
+// class mismatch — e.g. a goods truck (PR=GCV) that Prarambh booked as
+// "Pvt.Car". Returns null for non-motor / unclassifiable products so the
+// comparison stays neutral (no false mismatch) rather than red.
+function vehClass(v) {
+  if (v == null || v === '') return null;
+  const s = String(v).toUpperCase();
+  // GCV/PCV tokens are substring matches: PR's vehicle_category glues them to
+  // the weight band ("GCVGVW<=7.5TON", "PCVCC<=18"), so a \b boundary fails.
+  // Safe — "GCV"/"PCV" never appear inside the CAR/TW/MISC vocabularies
+  // ("MISC-DGVW…" carries "GVW", not "GCV").
+  if (/GCV|GCCV|GOODS\s*CARR/.test(s))            return 'GCV';
+  if (/PCV|PASSENGER\s*CARR/.test(s))             return 'PCV';
+  if (/TWO\s*WHEEL|2\s*WHEEL|MOTOR\s*CYCLE|MOTORCYCLE|\bSCOOTER\b/.test(s)) return 'TW';
+  if (/PRIVATE\s*CAR|PVT\.?\s*CAR|MOTOR\s*CAR/.test(s)) return 'CAR';
+  if (/MISC|TRACTOR/.test(s))                     return 'MISC';
+  return null;
+}
+// Map a canonical class back to the exact string Prarambh stores in
+// VehicleType, so "Update as PR" writes the value Prarambh expects.
+const VEHCLASS_TO_VEHICLETYPE = {
+  CAR:  'Pvt.Car',
+  TW:   'Two Wheeler',
+  GCV:  'Commercial-Goods Carrying',
+  PCV:  'Commercial-Passenger Carrying',
+  MISC: 'Miscellaneous',
+};
+
+// ─── RTO-code normalisation ────────────────────────────────────────────────
+// The QC screen compares the RTO district both systems resolved the policy
+// to. PR carries it inside the registration number (`vehicle_no`, e.g.
+// "GJ-15-AB-1234") while Prarambh carries an explicit `RTO_Code` column (and a
+// `VEHICLE_REGISTRATION_NO` fallback). Both collapse to the BASE RTO — two
+// state letters + district digits, separators and the series letters stripped:
+//   "GJ-15-AB-1234" → "GJ15",  "DL1C"  → "DL1",  "MH 12 AB 9" → "MH12".
+// Returns null for anything without a valid state+district head ("NEW", "NA",
+// a bare branch code) so the comparison stays neutral rather than red.
+function rtoBase(v) {
+  if (v == null || v === '') return null;
+  const raw = String(v).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const m = raw.match(/^([A-Z]{2}\d{1,3})/);   // state letters + district digits
+  return m ? m[1] : null;
+}
+
 // ─── Mapping loader ────────────────────────────────────────────────────────
 
 let _mappingCache = null;
@@ -102,6 +150,99 @@ function resolveColumn(mapping, insurerSlug, impField) {
   return f ? (f.columnsByInsurerSlug[insurerSlug] || null) : null;
 }
 
+// Generic header aliases per canonical field — fallback when an insurer has
+// no explicit column-mapping in the master file, so ANY insurer's PR can be
+// parsed by common header names. pickCell matches these case-insensitively
+// and supports the `|` alternation.
+const GENERIC_PR_COLUMNS = {
+  'Policy No':           'Policy No|Policy Number|POLICY_NUMBER|Policy_No|PolicyNo|Policy|POLICY_NO_CHAR|ILPOS_POLICY_NUMBER',
+  'Policy Issued Date':  'Policy Issued Date|Issue Date|Issued Date|Policy Date|POLICY_ISSUE_DATE|Policy Issue Date',
+  'Name of Customer':    'Name of Customer|Customer Name|Insured Name|Name|Customer|INSURED_NAME',
+  'Vehicle No':          'Vehicle No|Vehicle Number|Registration No|Registration No.|Registration Number|Reg No|VEHICLE_NO|Vehicle_No|RegnNo|MOTOR_REGISTRATION_NO|REGISTRATION_NO|VEHICLE_REGISTRATION_NUMBER|VechileNo|VehicleNo',
+  'State':               'State|State Name|StateName',
+  'Region':              'Region|Zone|Cluster|RTO_LOCATION',
+  'Make':                'Make|Vehicle Make|Manufacturer|MAKE',
+  'Model':               'Model|Vehicle Model|MODEL',
+  'Sub Model':           'Sub Model|Submodel|Variant|VARIENT|VEHICLE_SUB_CLASS',
+  'ENGINE NO':           'Engine No|Engine Number|ENGINE_NO',
+  'CHASIS NO':           'Chassis No|Chasis No|Chassis Number|CHASSIS_NO',
+  'CC':                  'CC|Cubic Capacity|CUBIC_CAPACITY|MOTOR_ENGINE_CC|Engine CC|ENGINE_CC',
+  'Tonnage (GVW)':       'Tonnage|GVW|Gross Vehicle Weight|Tonnage (GVW)|VEHICLE_GROSS_WEIGHT|GVW-TONS',
+  'SEAT CAP':            'Seating|Seating Capacity|Seat Cap|No of Seats|SEAT CAP|VEHICLE_SEATING_CAPACITY|SeatingCapacity',
+  'Fuel Type':           'Fuel Type|Fuel|FUELTYPE|FUEL_TYPE',
+  'Manufacturing year':  'Manufacturing Year|Mfg Year|Year of Manufacture|Year of Manufacturing|MFG_YEAR|YR_OF_MANUFACTURING|YearOfManufacture',
+  'Sum Insured':         'Sum Insured|IDV|SI|Insured Value|TOTAL_SI|VEHICLE_BASE_VALUE_IDV|Total Sum Insured|Basic IDV|SumInsured',
+  'NCB %':               'NCB %|NCB|NCB Percentage|NCB%|NCB Percent|Previous NCB|Prev NCB|NCB_PERCENTAGE|Actual NCB Percent',
+  'Vehicle':             'Vehicle|Vehicle Type|VehicleType',
+  'Vehicle Category':    'Vehicle Category|Category|Vehicle Class|VEHICLE_SUB_CLASS',
+  'Plan Name':           'Plan Name|Plan|Cover Type',
+  'Product':             'Product|Product Name|Product Type',
+  'Nill Dep. (YES/NO)':  'Zero Dep|Nil Dep|Nill Dep|Zero Depreciation|Nil Depreciation',
+  'OD Premium':          'OD Premium|Basic OD|Net OD Premium|OD Net|NET_OD_PREMIUM|BASIC_OD_PREMIUM|ODNetPremium|OD Amount|Base Premium/Od Premium',
+  'Total OD Premium':    'Total OD Premium|Total OD|TOTAL_OD_PREMIUM',
+  'ADD ON PREMIUM':      'Add On Premium|Addon Premium|Add-on Premium|Addon|ADD ON PREMIUM|ADD_ON_PREMIUM|AddOnPremium',
+  'TP Premium':          'TP Premium|Basic TP|Net TP Premium|Liability Premium|TP Net|NET_TP_PREMIUM|TOTAL_TP_PREMIUM|BASIC_TP_PREMIUM|TpPremium|ALL OTHER TP COVER PREMIUM',
+  'Net Amount':          'Net Amount|Net Premium|Premium Without GST|Total Premium Without GST|NET_PREMIUM|Net Written Premium',
+  'Gross Amount':        'Gross Amount|Gross Premium|Total Premium|Final Premium|Premium With GST|GROSS_PREMIUM|GWP|GWPFull|GWP Amount|GrossPremium|Gross Written Premium|Gross amount including Tax|OUR SHARE OF PREMIUM GWP',
+  'GSt':                 'GST|GSt|Tax|Service Tax|TOTAL_SERVICE_TAX|Service Tax(GST)',
+  'PA Cover':            'PA Cover|PA Premium|Owner PA|CPA_PREMIUM',
+  'Status':              'Status|Policy Status',
+  'OD Start Date':       'OD Start Date|OD Risk Start|START_DATE',
+  'OD End Date':         'OD End Date|OD Risk End|EXPIRY_DATE',
+  'TP Start Date':       'TP Start Date|TP Risk Start',
+  'TP End Date':         'TP End Date|TP Risk End',
+};
+
+// ─── HTML-table PR files ───────────────────────────────────────────────────
+// Some insurer portals (e.g. Bajaj/Portal) export the PR as an HTML <table>
+// saved with a `.xls` extension. XLSX.readFile mis-reads these as plain text
+// (every cell collapses to __EMPTY → 0 valid rows). Detect HTML by content and
+// parse the table directly into header-keyed row objects so the same
+// columnMap/pickCell pipeline works unchanged.
+
+function looksLikeHtml(buf) {
+  // Sniff the first ~512 non-whitespace bytes for an HTML table/markup opener.
+  const head = String(buf).slice(0, 4096).replace(/^﻿/, '').trimStart().toLowerCase();
+  return head.startsWith('<') && /<table\b|<tr\b|<!doctype html|<html\b/.test(head);
+}
+
+function decodeHtmlEntities(s) {
+  return String(s)
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&#(\d+);/g, (m, d) => { try { return String.fromCharCode(+d); } catch { return m; } });
+}
+
+// Parse an HTML <table> string → array of row objects keyed by the first row's
+// header cells. Tolerant of stray whitespace, nested <div>, and odd markup:
+// each <tr>…</tr> yields its <td>/<th> text (tags stripped, entities decoded,
+// whitespace collapsed). Returns [] if no usable rows.
+function parseHtmlTableRows(html) {
+  const trRe = /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi;
+  const matrix = [];
+  let m;
+  while ((m = trRe.exec(html)) !== null) {
+    const cells = [];
+    const tdRe = /<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi;
+    let c;
+    while ((c = tdRe.exec(m[1])) !== null) {
+      cells.push(decodeHtmlEntities(c[1].replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim());
+    }
+    if (cells.length) matrix.push(cells);
+  }
+  if (matrix.length < 2) return [];
+  const header = matrix[0];
+  return matrix.slice(1).map((cells) => {
+    const o = {};
+    header.forEach((h, i) => { if (String(h).trim()) o[h] = cells[i] !== undefined ? cells[i] : ''; });
+    return o;
+  });
+}
+
 // ─── Row-value helpers ─────────────────────────────────────────────────────
 
 function pickCell(row, name) {
@@ -147,9 +288,34 @@ router.get('/mapping', (req, res, next) => {
   catch (err) { next(err); }
 });
 
-router.get('/insurers', (req, res, next) => {
-  try { res.json({ success: true, insurers: loadMapping().insurerLabels }); }
-  catch (err) { next(err); }
+router.get('/insurers', async (req, res, next) => {
+  try {
+    const mapped = loadMapping().insurerLabels.map(x => ({ ...x, mapped: true }));
+    const bySlug = new Map(mapped.map(x => [x.slug, x]));
+    // Merge in every insurer that has an active rate card, so PR can be
+    // uploaded for ANY configured insurer (those without an explicit
+    // column-mapping fall back to GENERIC_PR_COLUMNS on upload).
+    try {
+      const pool = await getPool();
+      const r = await pool.request().query(
+        `SELECT DISTINCT insurer FROM rate_cards
+         WHERE insurer IS NOT NULL
+           AND (effective_to IS NULL OR effective_to > GETDATE())`
+      );
+      for (const row of r.recordset) {
+        const slug = String(row.insurer || '').trim();
+        if (!slug || bySlug.has(slug)) continue;
+        const label = slug.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const e = { label, slug, columnIndex: -1, mapped: false };
+        bySlug.set(slug, e);
+      }
+    } catch (_) { /* if rate_cards unavailable, just return the mapped set */ }
+    const insurers = [...bySlug.values()].sort((a, b) => {
+      if (a.mapped !== b.mapped) return a.mapped ? -1 : 1; // mapped first
+      return a.label.localeCompare(b.label);
+    });
+    res.json({ success: true, insurers });
+  } catch (err) { next(err); }
 });
 
 router.post('/upload', async (req, res, next) => {
@@ -163,10 +329,24 @@ router.post('/upload', async (req, res, next) => {
     if (!(year >= 2000 && year <= 2100)) return res.status(400).json({ success: false, error: 'year required' });
 
     const mapping = loadMapping();
-    const known = mapping.insurerLabels.find(x => x.slug === insurerSlug);
-    if (!known) return res.status(400).json({ success: false, error: `Insurer slug "${insurerSlug}" not in mapping` });
-
-    const col = (impField) => resolveColumn(mapping, insurerSlug, impField);
+    const mapped = mapping.insurerLabels.find(x => x.slug === insurerSlug);
+    // Allow upload for ANY insurer: when there's no explicit mapping, fall
+    // back to GENERIC_PR_COLUMNS (common header names). The label is
+    // derived from the slug for the upload record.
+    const known = mapped || {
+      slug: insurerSlug,
+      label: insurerSlug.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    };
+    // col(): explicit insurer mapping FIRST, then the generic alias list APPENDED
+    // (pickCell tries them in order). So when the insurer's mapped column exists it
+    // wins, but if the file format has drifted (e.g. Reliance/Portal maps OD Premium
+    // → "OD Premium" yet the HTML export's column is "ODNetPremium"), the generic
+    // alias still resolves it instead of yielding null.
+    const col = (impField) => {
+      const mappedCol = mapped ? resolveColumn(mapping, insurerSlug, impField) : null;
+      const generic = GENERIC_PR_COLUMNS[impField] || null;
+      return [mappedCol, generic].filter(Boolean).join('|') || null;
+    };
     const columnMap = {
       policy_no:          col('Policy No'),
       policy_issued:      col('Policy Issued Date'),
@@ -212,16 +392,43 @@ router.post('/upload', async (req, res, next) => {
     // so a single mapping covers both.  Empty / hidden sheets are skipped.
     let rows;
     try {
-      const wb = XLSX.readFile(req.file.path);
-      rows = [];
-      for (const sn of wb.SheetNames) {
-        const ws = wb.Sheets[sn];
-        if (!ws) continue;
-        const sheetRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-        // Tag each row with its source sheet so debugging is easier; the
-        // tag is non-mapped so it never lands in pr_rows.
-        for (const r of sheetRows) r._sourceSheet = sn;
-        rows.push(...sheetRows);
+      const fileBuf = fs.readFileSync(req.file.path);
+      if (looksLikeHtml(fileBuf)) {
+        // HTML-table export saved as .xls (e.g. Bajaj/Portal). XLSX can't read
+        // these — parse the <table> directly into header-keyed rows.
+        rows = parseHtmlTableRows(fileBuf.toString('utf8'));
+        for (const r of rows) r._sourceSheet = 'html';
+      } else {
+        const wb = XLSX.read(fileBuf, { type: 'buffer' });
+        rows = [];
+        // The header is usually row 0, but some insurers prefix the sheet with
+        // title/metadata rows (e.g. Magma: "MTD Data From : …" + a blank row,
+        // real "Policy No" header at row 2). XLSX.sheet_to_json keys rows off
+        // the FIRST row, so those drop every record (policy_no never matches).
+        // Detect the real header row by scanning for the policy-no column label.
+        const policyAliases = new Set(
+          String(columnMap.policy_no || '').split('|')
+            .map(s => s.trim().toUpperCase()).filter(Boolean));
+        const findHeaderRow = (ws) => {
+          if (!policyAliases.size) return 0;
+          const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: true });
+          const scan = Math.min(aoa.length, 15);
+          for (let r = 0; r < scan; r++) {
+            const cells = (aoa[r] || []).map(c => String(c == null ? '' : c).trim().toUpperCase());
+            if (cells.some(c => policyAliases.has(c))) return r;
+          }
+          return 0; // not found — fall back to default (row 0)
+        };
+        for (const sn of wb.SheetNames) {
+          const ws = wb.Sheets[sn];
+          if (!ws) continue;
+          const hdrRow = findHeaderRow(ws);
+          const sheetRows = XLSX.utils.sheet_to_json(ws, { defval: '', range: hdrRow });
+          // Tag each row with its source sheet so debugging is easier; the
+          // tag is non-mapped so it never lands in pr_rows.
+          for (const r of sheetRows) r._sourceSheet = sn;
+          rows.push(...sheetRows);
+        }
       }
     } catch (err) {
       return res.status(400).json({ success: false, error: 'Failed to parse file: ' + err.message });
@@ -304,7 +511,9 @@ router.post('/upload', async (req, res, next) => {
     for (const raw of rows) {
       const policyRaw = pickCell(raw, columnMap.policy_no);
       if (!policyRaw) continue;
-      const policyNo = String(policyRaw).trim();
+      // Strip a leading Excel text-marker apostrophe (HTML-exported PR like Reliance
+      // prefix policy numbers with ' / &#39; → would never match the cycle's clean no.)
+      const policyNo = String(policyRaw).trim().replace(/^'+/, '').trim();
 
       const odPrem   = toNumber(pickCell(raw, columnMap.od_premium));
       const totalOdP = toNumber(pickCell(raw, columnMap.total_od_premium));
@@ -419,6 +628,32 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/**
+ * GET /find-upload?policy=<policy_no>
+ * Resolve which active PR upload contains a given policy, so callers that
+ * only know the policy number (e.g. the recon screen) can deep-link into the
+ * QC compare workspace (qc.html?upload=…&policy=…). Returns the most-recent
+ * active upload that has the policy.
+ */
+router.get('/find-upload', async (req, res, next) => {
+  try {
+    const pn = String(req.query.policy || '').trim();
+    if (!pn) return res.status(400).json({ success: false, error: 'policy required' });
+    const pool = await getPool();
+    const r = await pool.request()
+      .input('pn', sql.NVarChar(200), pn)
+      .query(`SELECT TOP 1 pr.upload_id
+                FROM pr_rows pr
+                JOIN pr_uploads pu ON pu.id = pr.upload_id
+               WHERE pu.status = 'active' AND pr.policy_no = @pn
+               ORDER BY pu.uploaded_at DESC`);
+    if (!r.recordset.length) {
+      return res.json({ success: false, error: 'Policy not found in any active PR upload' });
+    }
+    res.json({ success: true, upload_id: r.recordset[0].upload_id });
+  } catch (err) { next(err); }
+});
+
 router.get('/:id(\\d+)', async (req, res, next) => {
   try {
     const pool = await getPool();
@@ -520,7 +755,7 @@ router.post('/:id(\\d+)/compare', async (req, res, next) => {
         `SELECT policy_no, vehicle_no, vehicle_make, vehicle_model, sub_model,
                 cc, tonnage, seating, fuel_type, mfg_year, sum_insured, ncb,
                 od_premium, addon_premium, tp_premium, net_amount, gross_amount,
-                state
+                state, vehicle_category, product
          FROM pr_rows WHERE upload_id = @id`
       );
     const pr = prrows.recordset;
@@ -545,7 +780,7 @@ router.post('/:id(\\d+)/compare', async (req, res, next) => {
                 Vehicle_Sub_Model, CC, Tonnes, GROSS_VEHICLE_WEIGHT, SEATING_CAPACITY,
                 FUELTYPE, MFG_YEAR, VEHICLE_IDV, TOTAL_IDV, NCB, BASE_OD_PREMIUM, NET_OD_PREMIUM,
                 ADD_ON_PREMIUM, Addon_Premium, LIABILITY_PREMIUM, NET_LIABILITY_PREMIUM,
-                PREMIUM_WITHOUT_GST, ANNUAL_PREMIUM, ANNUALPREMIUM, StateName
+                PREMIUM_WITHOUT_GST, ANNUAL_PREMIUM, ANNUALPREMIUM, StateName, VehicleType
          FROM tmp_PrarambhData
          WHERE PolicyNo IN (${names.join(', ')})`
       );
@@ -558,6 +793,11 @@ router.post('/:id(\\d+)/compare', async (req, res, next) => {
     // Each entry maps a PR column to the corresponding tmp_PrarambhData source
     // (often multiple candidates). Type drives the comparison rule.
     const FIELDS = [
+      // Vehicle Class — PR's product/category vs Prarambh's VehicleType,
+      // normalised to one of GCV/PCV/CAR/TW/MISC. Flags a goods truck booked
+      // as Pvt.Car (and vice-versa). Prefer the precise vehicle_category, fall
+      // back to product. Incomparable (null) for non-motor products.
+      { field: 'Vehicle Class', type: 'class', prCols: ['vehicle_category', 'product'], dbCols: ['VehicleType'] },
       { field: 'Vehicle No',    type: 'str',  prCol: 'vehicle_no',    dbCols: ['VEHICLE_REGISTRATION_NO'] },
       { field: 'Make',          type: 'str',  prCol: 'vehicle_make',  dbCols: ['VEHICAL_MAKE'] },
       { field: 'Model',         type: 'str',  prCol: 'vehicle_model', dbCols: ['VEHICAL_MODEL'] },
@@ -589,6 +829,10 @@ router.post('/:id(\\d+)/compare', async (req, res, next) => {
       { field: 'Net Amount',    type: 'num',  prCol: 'net_amount',    dbCols: ['PREMIUM_WITHOUT_GST'] },
       { field: 'Gross Amount',  type: 'num',  prCol: 'gross_amount',  dbCols: ['ANNUAL_PREMIUM', 'ANNUALPREMIUM'] },
       { field: 'State',         type: 'str',  prCol: 'state',         dbCols: ['StateName'] },
+      // RTO Code — PR's RTO lives inside the registration number; Prarambh has
+      // an explicit RTO_Code column (registration as fallback). Both normalised
+      // to base RTO (state letters + district digits) before comparing.
+      { field: 'RTO Code',      type: 'rto',  prCols: ['vehicle_no'], dbCols: ['RTO_Code', 'VEHICLE_REGISTRATION_NO'] },
     ];
 
     function firstNonNull(row, cols) {
@@ -606,6 +850,16 @@ router.post('/:id(\\d+)/compare', async (req, res, next) => {
     }
     function compareValues(type, a, b) {
       if (a == null || b == null) return { a, b, match: null };  // incomparable
+      if (type === 'class') {
+        const ca = vehClass(a), cb = vehClass(b);
+        if (ca == null || cb == null) return { a, b, match: null };  // unclassifiable
+        return { a, b, match: ca === cb };
+      }
+      if (type === 'rto') {
+        const ra = rtoBase(a), rb = rtoBase(b);
+        if (ra == null || rb == null) return { a, b, match: null };  // unparseable
+        return { a, b, match: ra === rb };
+      }
       if (type === 'str') {
         const sa = normStr(a), sb = normStr(b);
         return { a, b, match: sa === sb };
@@ -656,7 +910,7 @@ router.post('/:id(\\d+)/compare', async (req, res, next) => {
       let pCompared = 0, pMatched = 0, pMismatched = 0;
       const pMismatchedFields = [];
       for (const f of FIELDS) {
-        const prVal = p[f.prCol];
+        const prVal = f.prCols ? firstNonNull(p, f.prCols) : p[f.prCol];
         const dbVal = firstNonNull(db, f.dbCols);
         if (prVal == null && dbVal == null) continue;       // both blank — ignore
         const cmp = compareValues(f.type, prVal, dbVal);
@@ -751,6 +1005,11 @@ async function buildSideBySide(uploadId, pn) {
     // grow; for now duplicated since compare's closure-scoped FIELDS isn't
     // exported.
     const FIELDS = [
+      // Vehicle Class — PR's product/category vs Prarambh's VehicleType,
+      // normalised to one of GCV/PCV/CAR/TW/MISC. Flags a goods truck booked
+      // as Pvt.Car (and vice-versa). Prefer the precise vehicle_category, fall
+      // back to product. Incomparable (null) for non-motor products.
+      { field: 'Vehicle Class', type: 'class', prCols: ['vehicle_category', 'product'], dbCols: ['VehicleType'] },
       { field: 'Vehicle No',    type: 'str',  prCol: 'vehicle_no',    dbCols: ['VEHICLE_REGISTRATION_NO'] },
       { field: 'Make',          type: 'str',  prCol: 'vehicle_make',  dbCols: ['VEHICAL_MAKE'] },
       { field: 'Model',         type: 'str',  prCol: 'vehicle_model', dbCols: ['VEHICAL_MODEL'] },
@@ -782,6 +1041,10 @@ async function buildSideBySide(uploadId, pn) {
       { field: 'Net Amount',    type: 'num',  prCol: 'net_amount',    dbCols: ['PREMIUM_WITHOUT_GST'] },
       { field: 'Gross Amount',  type: 'num',  prCol: 'gross_amount',  dbCols: ['ANNUAL_PREMIUM', 'ANNUALPREMIUM'] },
       { field: 'State',         type: 'str',  prCol: 'state',         dbCols: ['StateName'] },
+      // RTO Code — PR's RTO lives inside the registration number; Prarambh has
+      // an explicit RTO_Code column (registration as fallback). Both normalised
+      // to base RTO (state letters + district digits) before comparing.
+      { field: 'RTO Code',      type: 'rto',  prCols: ['vehicle_no'], dbCols: ['RTO_Code', 'VEHICLE_REGISTRATION_NO'] },
     ];
     const firstNonNull = (r, cols) => {
       if (!r) return null;
@@ -808,9 +1071,19 @@ async function buildSideBySide(uploadId, pn) {
     };
 
     const fields = FIELDS.map(f => {
-      const pr = prRow ? prRow[f.prCol] : null;
+      const pr = prRow ? (f.prCols ? firstNonNull(prRow, f.prCols) : prRow[f.prCol]) : null;
       const db = firstNonNull(dbRow, f.dbCols);
-      return { field: f.field, type: f.type, pr, db, match: cmp(f.type, pr, db) };
+      let match;
+      if (f.type === 'class') {
+        const cp = vehClass(pr), cd = vehClass(db);
+        match = (cp == null || cd == null) ? null : (cp === cd);
+      } else if (f.type === 'rto') {
+        const rp = rtoBase(pr), rd = rtoBase(db);
+        match = (rp == null || rd == null) ? null : (rp === rd);
+      } else {
+        match = cmp(f.type, pr, db);
+      }
+      return { field: f.field, type: f.type, pr, db, match };
     });
 
     return {
@@ -849,7 +1122,7 @@ router.put('/:id(\\d+)/policy/:policyNo/resolve', express.json(), async (req, re
   try {
     const uploadId = Number(req.params.id);
     const pn = String(req.params.policyNo || '').trim();
-    const { field, direction } = req.body || {};
+    const { field, direction, value } = req.body || {};
     if (!pn)                                 return res.status(400).json({ success: false, error: 'policy_no required' });
     if (!field)                              return res.status(400).json({ success: false, error: 'field required' });
     if (!['pr', 'prarambh'].includes(direction)) {
@@ -859,6 +1132,10 @@ router.put('/:id(\\d+)/policy/:policyNo/resolve', express.json(), async (req, re
     // Shared field definition — kept alongside /policy/:policyNo reader so
     // column mappings stay in one place.
     const FIELDS = [
+      // Vehicle Class resolves PR → Prarambh only: it rewrites Prarambh's
+      // VehicleType to the canonical string for PR's class (GCV truck wrongly
+      // booked as Pvt.Car → "Commercial-Goods Carrying").
+      { field: 'Vehicle Class', type: 'class', prCols: ['vehicle_category', 'product'], dbCol: 'VehicleType' },
       { field: 'Vehicle No',    type: 'str',  prCol: 'vehicle_no',    dbCol: 'VEHICLE_REGISTRATION_NO' },
       { field: 'Make',          type: 'str',  prCol: 'vehicle_make',  dbCol: 'VEHICAL_MAKE' },
       { field: 'Model',         type: 'str',  prCol: 'vehicle_model', dbCol: 'VEHICAL_MODEL' },
@@ -882,6 +1159,10 @@ router.put('/:id(\\d+)/policy/:policyNo/resolve', express.json(), async (req, re
       { field: 'Net Amount',    type: 'num',  prCol: 'net_amount',    dbCol: 'PREMIUM_WITHOUT_GST' },
       { field: 'Gross Amount',  type: 'num',  prCol: 'gross_amount',  dbCol: 'ANNUAL_PREMIUM' },
       { field: 'State',         type: 'str',  prCol: 'state',         dbCol: 'StateName' },
+      // RTO Code resolves PR → Prarambh only: it writes the base RTO derived
+      // from PR's registration number into Prarambh's RTO_Code. Reverse is
+      // rejected (pr_rows has no RTO column — the RTO lives inside vehicle_no).
+      { field: 'RTO Code',      type: 'rto',  prCol: 'vehicle_no',    dbCol: 'RTO_Code' },
     ];
     const f = FIELDS.find(x => x.field === field);
     if (!f) return res.status(400).json({ success: false, error: `Unknown field "${field}"` });
@@ -915,7 +1196,73 @@ router.put('/:id(\\d+)/policy/:policyNo/resolve', express.json(), async (req, re
     // "new" value is what we wrote. Both sides also surface the originating
     // value (the source side's pre-write value) for audit purposes.
     let oldDest = null, newDest = null;
-    if (direction === 'pr') {
+    if (f.type === 'class') {
+      // Class is normalised, not a raw copy: only PR → Prarambh makes sense
+      // (PR's product/category is the authoritative class; we fix Prarambh's
+      // VehicleType to the canonical string). Reverse direction is rejected —
+      // overwriting PR's detailed product text from a 5-way class is lossy.
+      if (direction !== 'pr') {
+        return res.status(400).json({
+          success: false,
+          error: 'Vehicle Class can only be corrected PR → Prarambh (it rewrites Prarambh\'s VehicleType).',
+        });
+      }
+      // The QC pane offers a dropdown of the canonical VehicleType strings so
+      // the reviewer can pick the correct class explicitly (not only PR's
+      // derived one). If a `value` is supplied it must be one of those exact
+      // strings (or a class key like "GCV"); otherwise fall back to deriving
+      // the class from PR's product/category as before.
+      const VALID_VEHTYPES = Object.values(VEHCLASS_TO_VEHICLETYPE);
+      let target;
+      if (value != null && String(value).trim() !== '') {
+        const v = String(value).trim();
+        target = VALID_VEHTYPES.includes(v)
+          ? v
+          : (VEHCLASS_TO_VEHICLETYPE[v.toUpperCase()] || null);
+        if (!target) {
+          return res.status(422).json({
+            success: false,
+            error: `Invalid vehicle type "${v}". Must be one of: ${VALID_VEHTYPES.join(', ')}.`,
+          });
+        }
+      } else {
+        const cls = vehClass(prRow.vehicle_category || prRow.product);
+        target = cls ? VEHCLASS_TO_VEHICLETYPE[cls] : null;
+        if (!target) {
+          return res.status(422).json({
+            success: false,
+            error: 'Could not classify the PR vehicle (product / category) into a vehicle type.',
+          });
+        }
+      }
+      oldDest = dbVal; newDest = target;
+      await prarambhPool.request()
+        .input('pn', sql.NVarChar(200), pn)
+        .input('v',  sql.NVarChar(500), target)
+        .query(`UPDATE tmp_PrarambhData SET VehicleType = @v WHERE PolicyNo = @pn`);
+    } else if (f.type === 'rto') {
+      // RTO is normalised from PR's registration number, not a raw copy, and
+      // pr_rows has no RTO column — so only PR → Prarambh is supported (writes
+      // the base RTO into Prarambh's RTO_Code). Reverse direction is rejected.
+      if (direction !== 'pr') {
+        return res.status(400).json({
+          success: false,
+          error: 'RTO Code can only be corrected PR → Prarambh (it rewrites Prarambh\'s RTO_Code).',
+        });
+      }
+      const target = rtoBase(prRow.vehicle_no);
+      if (!target) {
+        return res.status(422).json({
+          success: false,
+          error: 'Could not derive a valid RTO code from the PR registration number.',
+        });
+      }
+      oldDest = dbVal; newDest = target;
+      await prarambhPool.request()
+        .input('pn', sql.NVarChar(200), pn)
+        .input('v',  sql.NVarChar(500), target)
+        .query(`UPDATE tmp_PrarambhData SET RTO_Code = @v WHERE PolicyNo = @pn`);
+    } else if (direction === 'pr') {
       // Write PR value onto tmp_PrarambhData (all rows for this PolicyNo —
       // endorsements included — so subsequent compares stay consistent).
       const { tp, val } = typeFor(f.type, prRow[f.prCol]);

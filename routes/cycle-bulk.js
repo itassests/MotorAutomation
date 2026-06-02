@@ -35,6 +35,7 @@ const fs = require('fs');
 const XLSX = require('xlsx');
 const multer = require('multer');
 const { getPool } = require('../db/connection');
+const { getPrarambhUatPool } = require('../db/prarambh-uat-connection');
 const { runBulkCalculate } = require('./bulk');
 
 const router = express.Router();
@@ -147,11 +148,30 @@ function applyOverrides(storedRow) {
     : Number(row.effective_margin_pct != null ? row.effective_margin_pct : (row.margin_pct || 0));
   const outPct = outPctExplicit != null ? outPctExplicit : (Number(row.rate_pct || 0) - marginForOutgoing);
   if (rate != null || margin != null || outPctExplicit != null) {
-    row.income   = +(base * Number(row.rate_pct || 0) / 100).toFixed(2);
-    row.outgoing = +(base * outPct / 100).toFixed(2);
+    // Income: when the rule splits the rate into OD%+TP% legs (od_rate/tp_rate)
+    // AND the user hasn't overridden the rate, the commission is OD% on the OD
+    // premium + TP% on the TP premium — NOT rate_pct × premium_base. The OD
+    // premium ALREADY includes add-on, so add-on is NOT added again.
+    if (storedRow.rate_pct_override == null && (row.od_rate != null || row.tp_rate != null)) {
+      const odP = Number(row.od_premium) || 0;
+      const tpP = Number(row.tp_premium) || 0;
+      row.income = +((Number(row.od_rate) || 0) * odP + (Number(row.tp_rate) || 0) * tpP).toFixed(2);
+    } else {
+      row.income = +(base * Number(row.rate_pct || 0) / 100).toFixed(2);
+    }
+    // Outgoing = income − our margin cut (margin% × base). Works for both the
+    // single-rate and OD+TP income; explicit outgoing override still wins.
+    row.outgoing = outPctExplicit != null
+      ? +(base * outPctExplicit / 100).toFixed(2)
+      : +(row.income - base * marginForOutgoing / 100).toFixed(2);
     row.savings  = +(row.income - row.outgoing).toFixed(2);
     row.outgoing_pct_override = outPctExplicit;   // surface the explicit edit
   }
+  // Always expose the effective Outgoing % so the UI and CSV download
+  // can read a single field. Rate − Margin (effective) by default; the
+  // explicit override wins when present. Rounded to 3 decimals to match
+  // rate_pct precision.
+  row.outgoing_pct = +Number(outPct).toFixed(3);
   row._edited = !!(storedRow.rate_pct_override != null || storedRow.margin_pct_override != null ||
                    storedRow.outgoing_pct_override != null || storedRow.excluded || storedRow.note);
   row.stored_row_id = storedRow.id;
@@ -310,6 +330,62 @@ async function storeSnapshot(pool, cycleId, result, insurerSlug) {
   }
 }
 
+/**
+ * Partial snapshot replace — swaps ONLY the rows for `insurerSlug`, leaving
+ * every other insurer's stored rows untouched. Used for a per-insurer
+ * recompute so fixing one carrier's rates doesn't require re-running (and
+ * risking) the entire cycle. Dedupes the incoming rows by policy_no.
+ */
+async function storeSnapshotForInsurer(pool, cycleId, result, insurerSlug) {
+  const slug = String(insurerSlug || '').trim();
+  if (!slug) throw new Error('storeSnapshotForInsurer requires an insurer slug');
+  const tx = new sql.Transaction(pool);
+  await tx.begin();
+  try {
+    const rq = () => new sql.Request(tx);
+    // Delete only this insurer's rows for the cycle.
+    await rq()
+      .input('cid', sql.Int, cycleId)
+      .input('slug', sql.VarChar(100), slug)
+      .query('DELETE FROM cycle_bulk_rows WHERE cycle_id = @cid AND insurer_slug = @slug');
+
+    const seen = new Map();
+    const BACKFILL_FIELDS = ['tracker_no', 'agent_code', 'agent_name', 'submission_date'];
+    for (const row of (result.rows || [])) {
+      if (String(row.insurer_slug || '').trim() !== slug) continue; // safety: only this insurer
+      const pn = String(row.policy_no || '').trim();
+      if (!pn) continue;
+      if (seen.has(pn)) {
+        const kept = seen.get(pn);
+        for (const f of BACKFILL_FIELDS) {
+          if ((kept[f] == null || kept[f] === '') && row[f] != null && row[f] !== '') kept[f] = row[f];
+        }
+        continue;
+      }
+      seen.set(pn, row);
+    }
+    let inserted = 0;
+    for (const [pn, row] of seen) {
+      await rq()
+        .input('cid',  sql.Int, cycleId)
+        .input('pn',   sql.NVarChar(200), pn)
+        .input('tn',   sql.NVarChar(200), row.tracker_no || null)
+        .input('is',   sql.VarChar(100),  row.insurer_slug || null)
+        .input('ac',   sql.NVarChar(100), row.agent_code || null)
+        .input('json', sql.NVarChar(sql.MAX), JSON.stringify(row))
+        .query(`INSERT INTO cycle_bulk_rows
+                  (cycle_id, policy_no, tracker_no, insurer_slug, agent_code, row_json)
+                VALUES (@cid, @pn, @tn, @is, @ac, @json)`);
+      inserted++;
+    }
+    await tx.commit();
+    return inserted;
+  } catch (err) {
+    try { await tx.rollback(); } catch (_) { /* noop */ }
+    throw err;
+  }
+}
+
 // ── ROUTES ─────────────────────────────────────────────────────────────────
 
 /** GET /:cycleId — return stored rows, or { stored: false } if none. */
@@ -423,6 +499,12 @@ router.post('/:cycleId(\\d+)/calculate', async (req, res, next) => {
       date_from:    cyc.date_from,
       date_to:      cyc.date_to,
       limit:        (req.body && req.body.limit) || 20000,
+      // Carry-forward window: off by default to keep cycle strict to its
+      // configured date range. Caller can opt in via
+      // req.body.lookback_days / lookforward_days when reconciling against
+      // operator workbooks that bucket late submissions into a cycle.
+      lookback_days:    req.body && req.body.lookback_days    != null ? req.body.lookback_days    : 0,
+      lookforward_days: req.body && req.body.lookforward_days != null ? req.body.lookforward_days : 0,
     };
     let result = await runBulkCalculate(args);
     // One auto-retry on a 0-row result — covers transient WAN failures where
@@ -494,6 +576,12 @@ router.post('/:cycleId(\\d+)/recompute', async (req, res, next) => {
       date_from:    cyc.date_from,
       date_to:      cyc.date_to,
       limit:        (req.body && req.body.limit) || 20000,
+      // Carry-forward window: off by default to keep cycle strict to its
+      // configured date range. Caller can opt in via
+      // req.body.lookback_days / lookforward_days when reconciling against
+      // operator workbooks that bucket late submissions into a cycle.
+      lookback_days:    req.body && req.body.lookback_days    != null ? req.body.lookback_days    : 0,
+      lookforward_days: req.body && req.body.lookforward_days != null ? req.body.lookforward_days : 0,
     };
     let result = await runBulkCalculate(args);
     if (!result.rows || result.rows.length === 0) {
@@ -514,6 +602,15 @@ router.post('/:cycleId(\\d+)/recompute', async (req, res, next) => {
         error: 'After applying the cycle agent allowlist, 0 rows remain. Existing snapshot left intact.',
         cycle_filtered_dropped: result.cycle_filtered_dropped || 0,
       });
+    }
+    // Per-insurer recompute: when an insurer_slug is supplied, swap ONLY
+    // that insurer's rows and leave the rest of the cycle untouched.
+    // Otherwise do a full wipe + store.
+    if (args.insurer_slug) {
+      const n = await storeSnapshotForInsurer(pool, cycleId, result, args.insurer_slug);
+      const out = await loadStored(pool, cycleId);
+      return res.json({ success: true, ...out, partial: true,
+        insurer_slug: args.insurer_slug, replaced_rows: n });
     }
     await storeSnapshot(pool, cycleId, result, args.insurer_slug || null);
 
@@ -551,6 +648,135 @@ router.post('/:cycleId(\\d+)/recompute', async (req, res, next) => {
 
     const out = await loadStored(pool, cycleId);
     res.json({ success: true, ...out, replayed_overrides: overridesByPolicy.size });
+  } catch (err) { next(err); }
+});
+
+/** POST /:cycleId/recompute-policy — recompute ONE policy in place.
+ *  body:{ policy_no }. Uses runBulkCalculate's policy_nos whitelist (bypasses
+ *  date/insurer filters) so a single row can be refreshed after a PR edit
+ *  without re-running the whole cycle. Preserves that row's overrides. */
+router.post('/:cycleId(\\d+)/recompute-policy', async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const cycleId = Number(req.params.cycleId);
+    const pn = String((req.body && req.body.policy_no) || '').trim();
+    if (!pn) return res.status(400).json({ success: false, error: 'policy_no required' });
+    const cyc = await getCycle(pool, cycleId);
+    if (!cyc) return res.status(404).json({ success: false, error: 'Cycle not found' });
+    const fin = await isCycleFinalized(pool, cycleId);
+    if (fin) return finalizedRejection(res, fin);
+
+    // Preserve this policy's overrides across the swap.
+    const prev = await pool.request()
+      .input('cid', sql.Int, cycleId)
+      .input('pn',  sql.NVarChar(200), pn)
+      .query(`SELECT rate_pct_override, margin_pct_override, outgoing_pct_override,
+                     excluded, moved_to_cycle_id, note
+                FROM cycle_bulk_rows WHERE cycle_id = @cid AND policy_no = @pn`);
+    const ov = prev.recordset[0] || null;
+
+    const result = await runBulkCalculate({
+      policy_nos: [pn],
+      date_from:  cyc.date_from,
+      date_to:    cyc.date_to,
+      limit:      50,
+    });
+    const matched = (result.rows || []).filter(r => String(r.policy_no || '').trim() === pn);
+    if (!matched.length) {
+      return res.status(422).json({
+        success: false,
+        error: 'Recompute produced no row for this policy (not found in source data).',
+      });
+    }
+    const row = matched[0];
+
+    const tx = new sql.Transaction(pool);
+    await tx.begin();
+    try {
+      await new sql.Request(tx)
+        .input('cid', sql.Int, cycleId).input('pn', sql.NVarChar(200), pn)
+        .query('DELETE FROM cycle_bulk_rows WHERE cycle_id = @cid AND policy_no = @pn');
+      await new sql.Request(tx)
+        .input('cid',  sql.Int, cycleId)
+        .input('pn',   sql.NVarChar(200), pn)
+        .input('tn',   sql.NVarChar(200), row.tracker_no || null)
+        .input('is',   sql.VarChar(100),  row.insurer_slug || null)
+        .input('ac',   sql.NVarChar(100), row.agent_code || null)
+        .input('json', sql.NVarChar(sql.MAX), JSON.stringify(row))
+        .query(`INSERT INTO cycle_bulk_rows
+                  (cycle_id, policy_no, tracker_no, insurer_slug, agent_code, row_json)
+                VALUES (@cid, @pn, @tn, @is, @ac, @json)`);
+      if (ov) {
+        await new sql.Request(tx)
+          .input('cid', sql.Int, cycleId).input('pn', sql.NVarChar(200), pn)
+          .input('r',  sql.Decimal(10, 4), ov.rate_pct_override)
+          .input('m',  sql.Decimal(10, 4), ov.margin_pct_override)
+          .input('op', sql.Decimal(10, 4), ov.outgoing_pct_override)
+          .input('ex', sql.Bit, ov.excluded ? 1 : 0)
+          .input('mv', sql.Int, ov.moved_to_cycle_id)
+          .input('nt', sql.NVarChar(500), ov.note)
+          .query(`UPDATE cycle_bulk_rows
+                     SET rate_pct_override = @r, margin_pct_override = @m,
+                         outgoing_pct_override = @op, excluded = @ex,
+                         moved_to_cycle_id = @mv, note = @nt, updated_at = GETDATE()
+                   WHERE cycle_id = @cid AND policy_no = @pn`);
+      }
+      await tx.commit();
+    } catch (e) { try { await tx.rollback(); } catch (_) { /* noop */ } throw e; }
+
+    res.json({
+      success: true,
+      policy_no: pn,
+      tracker_no: row.tracker_no || null,
+      insurer_slug: row.insurer_slug || null,
+      our_rate: row.rate_pct != null ? Number(row.rate_pct) : null,
+      pr_upload_id: row.pr_upload_id || null,
+      matched_segment: row.matched_segment || null,
+    });
+  } catch (err) { next(err); }
+});
+
+/** GET /:cycleId/policy/:policyNo — look up one stored policy's computed
+ *  detail (our rate, matched segment, insurer, PR upload for QC deep-link).
+ *  Powers the recon screen's Policy Lookup box. Matches on policy_no OR
+ *  tracker_no so users can paste either. */
+router.get('/:cycleId(\\d+)/policy/:policyNo', async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const cycleId = Number(req.params.cycleId);
+    const key = String(req.params.policyNo || '').trim();
+    if (!key) return res.status(400).json({ success: false, error: 'policy_no required' });
+    const r = await pool.request()
+      .input('cid', sql.Int, cycleId)
+      .input('k',   sql.NVarChar(200), key)
+      .query(`SELECT TOP 1 policy_no, tracker_no, insurer_slug, row_json,
+                     rate_pct_override, margin_pct_override, outgoing_pct_override,
+                     excluded, note
+                FROM cycle_bulk_rows
+               WHERE cycle_id = @cid AND (policy_no = @k OR tracker_no = @k)`);
+    if (!r.recordset.length) {
+      return res.json({ success: true, found: false, key });
+    }
+    const merged = applyOverrides(r.recordset[0]);
+    res.json({
+      success: true,
+      found: true,
+      policy_no:        merged.policy_no || null,
+      tracker_no:       merged.tracker_no || null,
+      insurer:          merged.insurer || merged.insurer_slug || null,
+      insurer_slug:     merged.insurer_slug || null,
+      vehicle_type:     merged.vehicle_type || null,
+      make:             merged.make || null,
+      model:            merged.model || null,
+      region:           merged.region || null,
+      rto_code:         merged.rto_code || null,
+      our_rate:         merged.rate_pct != null ? Number(merged.rate_pct) : null,
+      matched_segment:  merged.matched_segment || null,
+      matched_rate_type: merged.matched_rate_type || null,
+      pr_upload_id:     merged.pr_upload_id || null,
+      excluded:         !!merged.excluded,
+      note:             merged.note || null,
+    });
   } catch (err) { next(err); }
 });
 
@@ -1295,6 +1521,444 @@ router.delete('/:cycleId(\\d+)', async (req, res, next) => {
     await pool.request().input('cid', sql.Int, cycleId).query('DELETE FROM cycle_runs WHERE cycle_id = @cid');
     res.json({ success: true });
   } catch (err) { next(err); }
+});
+
+/**
+ * POST /:cycleId/diagnose-missing — for a list of tracker numbers, look each
+ * up in tmp_PrarambhData and the cycle snapshot, then return a per-tracker
+ * reason for absence: out-of-window / null-insurer / null-policy / endorsed
+ * / matched-under-different-tracker / etc.
+ *
+ * Body: { trackers: ["MT/...", ...] }
+ */
+router.post('/:cycleId(\\d+)/diagnose-missing',
+  express.json(),
+  async (req, res, next) => {
+    try {
+      const cycleId = Number(req.params.cycleId);
+      const trackers = Array.isArray(req.body && req.body.trackers) ? req.body.trackers : [];
+      if (trackers.length === 0) return res.status(400).json({ success: false, error: 'trackers array required' });
+      const pool = await getPool();
+      const cyc = await getCycle(pool, cycleId);
+      if (!cyc) return res.status(404).json({ success: false, error: 'Cycle not found' });
+      const dateFrom = new Date(cyc.date_from);
+      const dateTo   = new Date(cyc.date_to);
+
+      // Step 1: lookup each tracker in tmp_PrarambhData (UAT pool).
+      const prarambhPool = await getPrarambhUatPool();
+      const sourceByTracker = new Map();
+      // Chunk in batches of 500 to keep IN-list manageable.
+      for (let i = 0; i < trackers.length; i += 500) {
+        const batch = trackers.slice(i, i + 500);
+        const r = prarambhPool.request();
+        const names = batch.map((t, j) => { r.input('t' + j, sql.NVarChar(200), t); return '@t' + j; });
+        const qr = await r.query(
+          `SELECT TrackerNo, PolicyNo, SubmissionDate, INSURERNAME, FinalStatusName
+           FROM tmp_PrarambhData
+           WHERE TrackerNo IN (${names.join(',')})`
+        );
+        for (const row of qr.recordset) sourceByTracker.set(row.TrackerNo, row);
+      }
+
+      // Step 2: load cycle snapshot keyed by policy_no.
+      const dbRows = await pool.request()
+        .input('cid', sql.Int, cycleId)
+        .query(`SELECT policy_no, row_json FROM cycle_bulk_rows WHERE cycle_id = @cid`);
+      const cycleByPolicy = new Map();
+      const cycleByTracker = new Map();
+      for (const r of dbRows.recordset) {
+        const merged = JSON.parse(r.row_json || '{}');
+        if (merged.policy_no) cycleByPolicy.set(String(merged.policy_no).trim(), merged);
+        if (merged.tracker_no) cycleByTracker.set(String(merged.tracker_no).trim(), merged);
+      }
+
+      // Step 3: classify each tracker.
+      const out = [];
+      for (const t of trackers) {
+        const src = sourceByTracker.get(t);
+        if (!src) {
+          out.push({ tracker: t, reason: 'not_in_source', detail: 'No row in tmp_PrarambhData' });
+          continue;
+        }
+        const sd = src.SubmissionDate ? new Date(src.SubmissionDate) : null;
+        const inWindow = sd && sd >= dateFrom && sd <= dateTo;
+        const r = {
+          tracker: t,
+          source_policy_no: src.PolicyNo || null,
+          source_submit_date: src.SubmissionDate || null,
+          source_insurer: src.INSURERNAME || null,
+          source_status: src.FinalStatusName || null,
+        };
+        if (!src.PolicyNo) { r.reason = 'null_policy_no'; out.push(r); continue; }
+        if (!src.INSURERNAME) { r.reason = 'null_insurer'; out.push(r); continue; }
+        if (!inWindow) {
+          r.reason = sd && sd < dateFrom ? 'submit_before_window' : 'submit_after_window';
+          out.push(r);
+          continue;
+        }
+        // In window — check if the policy IS in cycle 11 under a different tracker.
+        const cyc = cycleByPolicy.get(String(src.PolicyNo).trim());
+        if (cyc) {
+          r.reason = 'in_cycle_under_different_tracker';
+          r.cycle_tracker = cyc.tracker_no;
+          r.cycle_rate_pct = cyc.rate_pct;
+          out.push(r);
+          continue;
+        }
+        // In window, insurer + policy_no present, but not in cycle → likely
+        // dropped by the insurer-slug filter or by cycle-agent allowlist.
+        const cfgInsurer = String(src.INSURERNAME).toLowerCase();
+        // Check rate_cards configured slugs (already fetched once per call).
+        // For simplicity, just flag as "filtered" — operator can drill in.
+        r.reason = 'filtered_out_during_calc';
+        r.detail = 'In date window but not in cycle — likely insurer without rate card, or agent allowlist filter';
+        out.push(r);
+      }
+
+      // Summary buckets.
+      const summary = {};
+      for (const r of out) summary[r.reason] = (summary[r.reason] || 0) + 1;
+      res.json({ success: true, cycle_id: cycleId,
+        cycle_window: { from: cyc.date_from, to: cyc.date_to },
+        total: out.length, summary, rows: out });
+    } catch (err) { next(err); }
+  }
+);
+
+/**
+ * POST /:cycleId/compare-trackers — one-time reconciliation tool.
+ *
+ * Accepts an Excel / CSV upload with two columns:
+ *   - Tracker No / TrackerNo / Tracker / PTrackerno
+ *   - Total Rate / TotalRate / Rate %        (decimal or % string)
+ *
+ * Joins against the cycle's snapshot and returns:
+ *   - missing_in_our_data : trackers in the Excel that aren't in the cycle
+ *   - missing_in_excel    : trackers in the cycle that aren't in the Excel
+ *   - rate_comparison     : matched trackers with our rate_pct vs their total_rate
+ *                           and the diff (in %). Sorted by abs(diff) desc.
+ */
+// Last-uploaded reconciliation file per cycle, so the user can re-compare
+// after a recompute without re-uploading. Persisted to a JSON sidecar so it
+// survives server restarts.
+const RECON_CACHE_PATH = path.join(UPLOAD_DIR, '_recon_file_cache.json');
+function loadReconCache() {
+  try { return JSON.parse(fs.readFileSync(RECON_CACHE_PATH, 'utf8')); } catch (_) { return {}; }
+}
+function saveReconFile(cycleId, filePath, originalName) {
+  const c = loadReconCache();
+  c[String(cycleId)] = { path: filePath, name: originalName || null, at: new Date().toISOString() };
+  try { fs.writeFileSync(RECON_CACHE_PATH, JSON.stringify(c, null, 2)); } catch (_) { /* noop */ }
+}
+
+/** Core comparison — shared by the upload route and the re-compare route. */
+async function compareTrackersCore(cycleId, filePath, fmt, res) {
+      const pool = await getPool();
+
+      // Parse the uploaded file. Operator workbooks may stack a group-label
+      // row above the real headers and keep the tracker detail on a "Data"
+      // sheet — both handled below.
+      const wb = XLSX.readFile(filePath);
+      const normHeader = (s) => String(s || '').toLowerCase().replace(/[\s_/%-]+/g, '');
+      const trackerPats = ['trackerno', 'ptrackerno', 'tracker'];
+      const ratePats    = ['totalrate', 'totalrt', 'ratepct', 'rate'];
+      const isTracker = (s) => { const n = normHeader(s); return trackerPats.some(p => n === p || n.includes(p)); };
+      const isRate    = (s) => { const n = normHeader(s); return ratePats.some(p => n === p || n.includes(p)); };
+      // Scan EVERY sheet for the one whose header row carries BOTH a
+      // tracker-ish and a total-rate-ish cell. Operator workbooks often
+      // lead with a payout-summary sheet (Vertical/Branch/Bank) and keep
+      // the tracker-level detail on a later sheet. Within each sheet, scan
+      // the first 10 rows so a group-label band above the headers is OK.
+      let arr = null, headerRowIdx = -1, chosenSheet = null;
+      const sheetProbes = [];
+      // Prefer a sheet literally named "Data" (the operator's tracker-level
+      // detail tab) before falling back to the rest. Avoids accidentally
+      // locking onto a payout-summary sheet whose headers also contain a
+      // loose "rate"-ish column.
+      const orderedSheets = [
+        ...wb.SheetNames.filter(sn => /^data$/i.test(String(sn).trim())),
+        ...wb.SheetNames.filter(sn => !/^data$/i.test(String(sn).trim())),
+      ];
+      for (const sn of orderedSheets) {
+        const a = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '', raw: false });
+        let hr = -1;
+        for (let i = 0; i < Math.min(a.length, 10); i++) {
+          const r = a[i] || [];
+          if (r.some(isTracker) && r.some(isRate)) { hr = i; break; }
+        }
+        sheetProbes.push(`${sn}: ${a[0] ? a[0].slice(0, 8).join(' | ') : '(empty)'}`);
+        if (hr >= 0) { arr = a; headerRowIdx = hr; chosenSheet = sn; break; }
+      }
+      if (headerRowIdx < 0) {
+        return res.status(400).json({
+          success: false,
+          error: `Could not detect Tracker / Total Rate header row in any sheet. Sheets scanned:\n${sheetProbes.join('\n')}`,
+        });
+      }
+      const headers = arr[headerRowIdx];
+      const dataRows = arr.slice(headerRowIdx + 1);
+      // Map to objects using the detected headers.
+      const rawRows = dataRows.map(r => {
+        const o = {};
+        for (let c = 0; c < headers.length; c++) o[String(headers[c] || `_col${c}`)] = r[c] != null ? r[c] : '';
+        return o;
+      });
+      const findKey = (row, patterns) => {
+        for (const k of Object.keys(row)) {
+          const n = normHeader(k);
+          if (patterns.some(p => n === p || n.includes(p))) return k;
+        }
+        return null;
+      };
+      // Resolve columns by INDEX (not object key) because operator workbooks
+      // frequently repeat header names — e.g. the conso file has two "Rewards"
+      // columns (one a rate, one a commission amount). Object-keyed access
+      // would silently collapse them; index access is unambiguous.
+      const idxOf = (patterns, fromIdx = 0) => {
+        for (let c = fromIdx; c < headers.length; c++) {
+          const n = normHeader(headers[c]);
+          if (patterns.some(p => n === p || n.includes(p))) return c;
+        }
+        return -1;
+      };
+      const trackerColIdx = idxOf(trackerPats);
+      // Total Rate = the operator's gross commission rate INCLUDING the
+      // "Rewards" incentive line. We don't model Rewards, so the apples-to-
+      // apples comparison against our computed rate is (Total Rate − Rewards),
+      // which equals the operator's "Net%" base for GCV/TW/PCV and the
+      // effective rate for CAR (where Net% is left blank). Pick the Rewards
+      // column that sits just LEFT of Total Rate (the rate-block rewards),
+      // not the later commission-amount "Rewards".
+      const totalRateColIdx = idxOf(['totalrate']) >= 0 ? idxOf(['totalrate'])
+                            : (idxOf(['totalrt']) >= 0 ? idxOf(['totalrt']) : idxOf(ratePats));
+      let rewardsColIdx = -1;
+      for (let c = totalRateColIdx - 1; c >= 0; c--) {
+        if (normHeader(headers[c]) === 'rewards' || normHeader(headers[c]).includes('reward')) { rewardsColIdx = c; break; }
+      }
+      if (trackerColIdx < 0 || totalRateColIdx < 0) {
+        return res.status(400).json({
+          success: false,
+          error: `Could not detect Tracker / Total Rate columns. Header row ${headerRowIdx} = ${headers.join(' | ')}`,
+        });
+      }
+
+      // Build excelMap: tracker → rate (decimal as % i.e. 12.5 means 12.5%)
+      const parseRate = (v) => {
+        if (v == null || v === '') return null;
+        const s = String(v).trim().replace(/%/g, '').replace(/,/g, '');
+        const n = Number(s);
+        if (!Number.isFinite(n)) return null;
+        // Heuristic: if value <= 1, treat as fraction (0.275 → 27.5%);
+        //            else assume already in %.
+        return n <= 1 ? +(n * 100).toFixed(3) : +n.toFixed(3);
+      };
+      const excelMap = new Map();
+      for (const r of dataRows) {
+        const t = String(r[trackerColIdx] || '').trim();
+        if (!t) continue;
+        const total = parseRate(r[totalRateColIdx]);
+        const rewards = rewardsColIdx >= 0 ? parseRate(r[rewardsColIdx]) : null;
+        // Net commission rate = Total − Rewards (Rewards is an incentive we
+        // don't compute). Guard: only subtract when both are present.
+        let rate = total;
+        if (total != null && rewards != null) rate = +(total - rewards).toFixed(3);
+        excelMap.set(t, rate);
+      }
+
+      // Load our cycle snapshot.
+      const dbRows = await pool.request()
+        .input('cid', sql.Int, cycleId)
+        .query(`SELECT id, policy_no, row_json,
+                       rate_pct_override, margin_pct_override,
+                       outgoing_pct_override, excluded, note
+                FROM cycle_bulk_rows WHERE cycle_id = @cid`);
+
+      const ours = new Map();   // tracker → { our_rate, policy_no, income, ... }
+      for (const r of dbRows.recordset) {
+        const merged = applyOverrides(r);
+        const tracker = merged.tracker_no || merged.policy_no;
+        if (!tracker) continue;
+        ours.set(String(tracker).trim(), {
+          policy_no: merged.policy_no,
+          tracker_no: merged.tracker_no,
+          insurer: merged.insurer || merged.insurer_slug || null,
+          insurer_slug: merged.insurer_slug || null,
+          vehicle_type: merged.vehicle_type || null,
+          our_rate: merged.rate_pct != null ? Number(merged.rate_pct) : null,
+          income: merged.income,
+          premium_base: merged.premium_base,
+          excluded: !!merged.excluded,
+          matched_rule_id: merged.matched_rule_id,
+        });
+      }
+
+      // Set differences.
+      const missing_in_our_data = [];
+      const rate_comparison = [];
+      for (const [tracker, theirRate] of excelMap.entries()) {
+        const us = ours.get(tracker);
+        if (!us) { missing_in_our_data.push({ tracker, their_rate: theirRate }); continue; }
+        const diff = (us.our_rate != null && theirRate != null)
+          ? +(us.our_rate - theirRate).toFixed(3)
+          : null;
+        rate_comparison.push({
+          tracker,
+          policy_no: us.policy_no,
+          insurer: us.insurer,
+          insurer_slug: us.insurer_slug,
+          vehicle_type: us.vehicle_type,
+          our_rate: us.our_rate,
+          their_rate: theirRate,
+          diff,
+          income: us.income,
+          excluded: us.excluded,
+          no_rule: !us.matched_rule_id,
+          // rate_match: true when within tolerance. Default ±0.5%, but Reliance
+          // uses ±1.0% — its operator tracker applies a ~1% Rewards/retention so the
+          // net paid rate is consistently ~1 below the grid we compute (per direction:
+          // "if 1 diff consider as match" — Reliance only). When we produce NO rule
+          // (our_rate null → zero commission) and the operator also paid zero, that's
+          // agreement (both decline) — count it as a match.
+          rate_match: (us.our_rate != null && theirRate != null)
+            ? Math.abs(us.our_rate - theirRate) <= (/reliance/i.test(us.insurer_slug || '') ? 1 : 0.5)
+            : (us.our_rate == null && (theirRate == null || theirRate === 0)),
+        });
+      }
+      const missing_in_excel = [];
+      for (const [tracker, us] of ours.entries()) {
+        if (!excelMap.has(tracker)) missing_in_excel.push({
+          tracker, policy_no: us.policy_no, insurer: us.insurer,
+          insurer_slug: us.insurer_slug, vehicle_type: us.vehicle_type,
+          our_rate: us.our_rate,
+        });
+      }
+
+      // Sort the rate comparison by |diff| desc so largest mismatches surface first.
+      rate_comparison.sort((a, b) => Math.abs(b.diff || 0) - Math.abs(a.diff || 0));
+
+      const summary = {
+        excel_total:               excelMap.size,
+        cycle_total:               ours.size,
+        missing_in_our_data_count: missing_in_our_data.length,
+        missing_in_excel_count:    missing_in_excel.length,
+        matched_count:             rate_comparison.length,
+        // Within matched, how many have a rate difference > 0.5% vs perfect agreement.
+        rate_match_exact:    rate_comparison.filter(r => r.diff != null && Math.abs(r.diff) < 0.01).length,
+        rate_match_within_1: rate_comparison.filter(r => r.diff != null && Math.abs(r.diff) < 1).length,
+        rate_diff_over_5:    rate_comparison.filter(r => r.diff != null && Math.abs(r.diff) > 5).length,
+        // Rate match within ±0.5% tolerance (the UI's match/un-match split).
+        rate_matched:        rate_comparison.filter(r => r.rate_match).length,
+        rate_unmatched:      rate_comparison.filter(r => !r.rate_match).length,
+      };
+
+      // CSV / XLSX download — fmt passed by the caller route.
+      if (fmt === 'xlsx') {
+        const wbOut = XLSX.utils.book_new();
+        const summarySheet = XLSX.utils.json_to_sheet([summary]);
+        XLSX.utils.book_append_sheet(wbOut, summarySheet, 'Summary');
+        const rcSheet = XLSX.utils.json_to_sheet(rate_comparison);
+        XLSX.utils.book_append_sheet(wbOut, rcSheet, 'Rate Comparison');
+        const m1 = XLSX.utils.json_to_sheet(missing_in_our_data);
+        XLSX.utils.book_append_sheet(wbOut, m1, 'Missing In Our Data');
+        const m2 = XLSX.utils.json_to_sheet(missing_in_excel);
+        XLSX.utils.book_append_sheet(wbOut, m2, 'Missing In Excel');
+        const buf = XLSX.write(wbOut, { type: 'buffer', bookType: 'xlsx' });
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="cycle${cycleId}_compare.xlsx"`);
+        return res.send(buf);
+      }
+      if (fmt === 'csv') {
+        const esc = (v) => {
+          if (v == null) return '';
+          const s = String(v);
+          return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+        };
+        const sections = [];
+        sections.push('# Summary');
+        sections.push(Object.keys(summary).join(','));
+        sections.push(Object.values(summary).map(esc).join(','));
+        sections.push('');
+        sections.push('# Rate Comparison (largest |diff| first)');
+        if (rate_comparison[0]) {
+          const cols = Object.keys(rate_comparison[0]);
+          sections.push(cols.join(','));
+          for (const r of rate_comparison) sections.push(cols.map(c => esc(r[c])).join(','));
+        }
+        sections.push('');
+        sections.push('# Missing In Our Data (in Excel, not in cycle)');
+        if (missing_in_our_data[0]) {
+          const cols = Object.keys(missing_in_our_data[0]);
+          sections.push(cols.join(','));
+          for (const r of missing_in_our_data) sections.push(cols.map(c => esc(r[c])).join(','));
+        }
+        sections.push('');
+        sections.push('# Missing In Excel (in cycle, not in Excel)');
+        if (missing_in_excel[0]) {
+          const cols = Object.keys(missing_in_excel[0]);
+          sections.push(cols.join(','));
+          for (const r of missing_in_excel) sections.push(cols.map(c => esc(r[c])).join(','));
+        }
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="cycle${cycleId}_compare.csv"`);
+        return res.send('﻿' + sections.join('\r\n'));
+      }
+
+      res.json({
+        success: true,
+        cycle_id: cycleId,
+        detected_columns: {
+          tracker: headers[trackerColIdx],
+          rate: headers[totalRateColIdx],
+          rewards: rewardsColIdx >= 0 ? headers[rewardsColIdx] : null,
+          rate_basis: rewardsColIdx >= 0 ? 'Total Rate − Rewards' : 'Total Rate',
+          sheet: chosenSheet,
+        },
+        summary,
+        missing_in_our_data,
+        missing_in_excel,
+        rate_comparison,
+      });
+}
+
+// Upload + compare. Caches the file path so it can be re-compared later
+// (e.g. after a recompute) without re-uploading.
+router.post('/:cycleId(\\d+)/compare-trackers',
+  utrUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) return res.status(400).json({ success: false, error: 'File upload required' });
+      const cycleId = Number(req.params.cycleId);
+      saveReconFile(cycleId, req.file.path, req.file.originalname);
+      const fmt = String((req.query && req.query.format) || '').toLowerCase();
+      await compareTrackersCore(cycleId, req.file.path, fmt, res);
+    } catch (err) { next(err); }
+  }
+);
+
+// Re-compare against the LAST uploaded file for this cycle — no re-upload.
+// Reflects the current (possibly just-recomputed) cycle snapshot.
+router.post('/:cycleId(\\d+)/recompare',
+  async (req, res, next) => {
+    try {
+      const cycleId = Number(req.params.cycleId);
+      const cache = loadReconCache();
+      const entry = cache[String(cycleId)];
+      if (!entry || !entry.path || !fs.existsSync(entry.path)) {
+        return res.status(404).json({ success: false,
+          error: 'No previously uploaded file for this cycle — upload once first.' });
+      }
+      const fmt = String((req.query && req.query.format) || '').toLowerCase();
+      await compareTrackersCore(cycleId, entry.path, fmt, res);
+    } catch (err) { next(err); }
+  }
+);
+
+// Report whether a cached reconciliation file exists for a cycle (UI uses
+// this to enable/disable the "Re-compare (last file)" button).
+router.get('/:cycleId(\\d+)/recon-file', async (req, res) => {
+  const entry = loadReconCache()[String(Number(req.params.cycleId))];
+  res.json({ success: true, has_file: !!(entry && entry.path && fs.existsSync(entry.path)),
+    name: entry ? entry.name : null, at: entry ? entry.at : null });
 });
 
 module.exports = router;

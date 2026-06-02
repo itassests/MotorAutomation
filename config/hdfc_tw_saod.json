@@ -1,0 +1,538 @@
+[
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Goa",
+  "loc": "Goa",
+  "rem": "",
+  "bde": 40
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "West Bengal",
+  "loc": "Kolkata",
+  "rem": "",
+  "bde": 55
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "West Bengal",
+  "loc": "Rest Of WB",
+  "rem": "",
+  "bde": 35
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Punjab",
+  "loc": "All",
+  "rem": "",
+  "bde": 40
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Delhi NCR",
+  "loc": "All",
+  "rem": "",
+  "bde": 25
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Delhi NCR",
+  "loc": "All",
+  "rem": "",
+  "bde": 35
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Uttarakhand",
+  "loc": "All",
+  "rem": "",
+  "bde": 61
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Uttarakhand",
+  "loc": "All",
+  "rem": "",
+  "bde": 40
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Uttar Pradesh",
+  "loc": "Agra",
+  "rem": "exc Hero",
+  "bde": 20
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Uttar Pradesh",
+  "loc": "Kanpur,Varanasi",
+  "rem": "exc Hero",
+  "bde": 45
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Uttar Pradesh",
+  "loc": "Lucknow",
+  "rem": "exc Hero",
+  "bde": 20
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Uttar Pradesh",
+  "loc": "Rest of UP",
+  "rem": "exc Hero",
+  "bde": 20
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Uttar Pradesh",
+  "loc": "Kanpur,Varanasi",
+  "rem": "",
+  "bde": 30
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Gujarat",
+  "loc": "All",
+  "rem": "exc Suzuki",
+  "bde": 30
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Nagpur",
+  "rem": "exc Suzuki",
+  "bde": 35
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Goa",
+  "loc": "Goa",
+  "rem": "",
+  "bde": 35
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Nashik",
+  "rem": "exc Suzuki",
+  "bde": 50
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Pune",
+  "rem": "exc Suzuki",
+  "bde": 40
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Mumbai",
+  "rem": "exc Suzuki",
+  "bde": 30
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "ROM",
+  "rem": "exc Suzuki",
+  "bde": 30
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Madhya Pradesh",
+  "loc": "Indore",
+  "rem": "exc Suzuki",
+  "bde": 40
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "West Bengal",
+  "loc": "Kolkata",
+  "rem": "",
+  "bde": 25
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Odisha",
+  "loc": "All",
+  "rem": "",
+  "bde": 30
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Assam",
+  "loc": "All",
+  "rem": "exc TVS",
+  "bde": 40
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Arunachal Pradesh",
+  "loc": "All",
+  "rem": "",
+  "bde": 20
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Assam",
+  "loc": "All",
+  "rem": "",
+  "bde": 40
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Mizoram",
+  "loc": "All",
+  "rem": "",
+  "bde": 35
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Meghalaya",
+  "loc": "All",
+  "rem": "",
+  "bde": 40
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Tripura",
+  "loc": "All",
+  "rem": "",
+  "bde": 50
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Chattisgarh",
+  "loc": "All",
+  "rem": "",
+  "bde": 25
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Delhi NCR",
+  "loc": "All",
+  "rem": "exc Hero, Yamaha",
+  "bde": 20
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Delhi NCR",
+  "loc": "All",
+  "rem": "exc Hero, Yamaha",
+  "bde": 35
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Haryana",
+  "loc": "All",
+  "rem": "",
+  "bde": 20
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Jammu & Kashmir",
+  "loc": "All",
+  "rem": "",
+  "bde": 20
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Himachal Pradesh",
+  "loc": "All",
+  "rem": "",
+  "bde": 20
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Himachal Pradesh",
+  "loc": "All",
+  "rem": "",
+  "bde": 20
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Chandigarh",
+  "loc": "All",
+  "rem": "",
+  "bde": 30
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Kerela",
+  "loc": "All",
+  "rem": "",
+  "bde": 35
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Karnataka",
+  "loc": "Bangalore",
+  "rem": "",
+  "bde": 65
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Karnataka",
+  "loc": "Rest of KA",
+  "rem": "",
+  "bde": 55
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Karnataka",
+  "loc": "All",
+  "rem": "",
+  "bde": 60
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Telangana",
+  "loc": "All",
+  "rem": "",
+  "bde": 60
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Telangana",
+  "loc": "All",
+  "rem": "",
+  "bde": 40
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Andhra Pradesh",
+  "loc": "All",
+  "rem": "",
+  "bde": 45
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Andhra Pradesh",
+  "loc": "All",
+  "rem": "Exc Suzuki",
+  "bde": 55
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Tamil nadu",
+  "loc": "Chennai",
+  "rem": "",
+  "bde": 55
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Tamil nadu",
+  "loc": "ROTN",
+  "rem": "",
+  "bde": 55
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Tamil nadu",
+  "loc": "Chennai",
+  "rem": "",
+  "bde": 55
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Tamil nadu",
+  "loc": "ROTN",
+  "rem": "",
+  "bde": 55
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Mumbai",
+  "rem": "exc Suzuki",
+  "bde": 40
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Pune",
+  "rem": "exc Suzuki",
+  "bde": 40
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Nashik",
+  "rem": "exc Suzuki",
+  "bde": 40
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "ROM",
+  "rem": "exc Suzuki",
+  "bde": 40
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Nagpur",
+  "rem": "exc Suzuki",
+  "bde": 40
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Gujarat",
+  "loc": "All",
+  "rem": "exc Suzuki",
+  "bde": 40
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Rajasthan",
+  "loc": "All",
+  "rem": "",
+  "bde": 35
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Madhya Pradesh",
+  "loc": "Indore",
+  "rem": "exc Suzuki",
+  "bde": 50
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Bihar",
+  "loc": "All",
+  "rem": "",
+  "bde": 35
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Bihar",
+  "loc": "All",
+  "rem": "",
+  "bde": 25
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Chandigarh",
+  "loc": "All",
+  "rem": "",
+  "bde": 35
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Chattisgarh",
+  "loc": "All",
+  "rem": "",
+  "bde": 40
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Haryana",
+  "loc": "All",
+  "rem": "exc TVS",
+  "bde": 40
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Jammu & Kashmir",
+  "loc": "All",
+  "rem": "",
+  "bde": 20
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Rajasthan",
+  "loc": "All",
+  "rem": "",
+  "bde": 10
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Kerela",
+  "loc": "All",
+  "rem": "exc Suzuki",
+  "bde": 30
+ },
+ {
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Odisha",
+  "loc": "All",
+  "rem": "",
+  "bde": 20
+ },
+ {
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Jharkhand",
+  "loc": "All",
+  "rem": "",
+  "bde": 35
+ }
+]

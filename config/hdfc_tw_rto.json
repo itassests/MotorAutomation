@@ -1,0 +1,1050 @@
+{
+ "MH01": {
+  "state": "Maharashtra",
+  "loc": "Mumbai"
+ },
+ "MH02": {
+  "state": "Maharashtra",
+  "loc": "Mumbai"
+ },
+ "MH03": {
+  "state": "Maharashtra",
+  "loc": "Mumbai"
+ },
+ "MH43": {
+  "state": "Maharashtra",
+  "loc": "Mumbai"
+ },
+ "MH47": {
+  "state": "Maharashtra",
+  "loc": "Mumbai"
+ },
+ "MH05": {
+  "state": "Maharashtra",
+  "loc": "Mumbai"
+ },
+ "MH46": {
+  "state": "Maharashtra",
+  "loc": "Mumbai"
+ },
+ "MH04": {
+  "state": "Maharashtra",
+  "loc": "Mumbai"
+ },
+ "MH56": {
+  "state": "Maharashtra",
+  "loc": "Mumbai"
+ },
+ "MH48": {
+  "state": "Maharashtra",
+  "loc": "Mumbai"
+ },
+ "MH12": {
+  "state": "Maharashtra",
+  "loc": "Pune"
+ },
+ "MH53": {
+  "state": "Maharashtra",
+  "loc": "Pune"
+ },
+ "MH54": {
+  "state": "Maharashtra",
+  "loc": "Pune"
+ },
+ "MH55": {
+  "state": "Maharashtra",
+  "loc": "Pune"
+ },
+ "MH14": {
+  "state": "Maharashtra",
+  "loc": "Pune"
+ },
+ "ALL": {
+  "state": "Goa",
+  "loc": "Goa"
+ },
+ "MH15": {
+  "state": "Maharashtra",
+  "loc": "Nashik"
+ },
+ "MH51": {
+  "state": "Maharashtra",
+  "loc": "Nashik"
+ },
+ "MH31": {
+  "state": "Maharashtra",
+  "loc": "Nagpur"
+ },
+ "MH40": {
+  "state": "Maharashtra",
+  "loc": "Nagpur"
+ },
+ "MH49": {
+  "state": "Maharashtra",
+  "loc": "Nagpur"
+ },
+ "GJ06": {
+  "state": "Gujarat",
+  "loc": "VADODARA"
+ },
+ "GJ29": {
+  "state": "Gujarat",
+  "loc": "VADODARA"
+ },
+ "MP09": {
+  "state": "Madhya Pradesh",
+  "loc": "Indore"
+ },
+ "MP56": {
+  "state": "Madhya Pradesh",
+  "loc": "Indore"
+ },
+ "RJ14": {
+  "state": "Rajasthan",
+  "loc": "Jaipur"
+ },
+ "RJ41": {
+  "state": "Rajasthan",
+  "loc": "Jaipur"
+ },
+ "RJ45": {
+  "state": "Rajasthan",
+  "loc": "Jaipur"
+ },
+ "RJ47": {
+  "state": "Rajasthan",
+  "loc": "Jaipur"
+ },
+ "RJ52": {
+  "state": "Rajasthan",
+  "loc": "Jaipur"
+ },
+ "RJ60": {
+  "state": "Rajasthan",
+  "loc": "Jaipur"
+ },
+ "WB01": {
+  "state": "West Bengal",
+  "loc": "Kolkata"
+ },
+ "WB02": {
+  "state": "West Bengal",
+  "loc": "Kolkata"
+ },
+ "WB03": {
+  "state": "West Bengal",
+  "loc": "Kolkata"
+ },
+ "WB04": {
+  "state": "West Bengal",
+  "loc": "Kolkata"
+ },
+ "WB05": {
+  "state": "West Bengal",
+  "loc": "Kolkata"
+ },
+ "WB06": {
+  "state": "West Bengal",
+  "loc": "Kolkata"
+ },
+ "WB07": {
+  "state": "West Bengal",
+  "loc": "Kolkata"
+ },
+ "WB08": {
+  "state": "West Bengal",
+  "loc": "Kolkata"
+ },
+ "WB09": {
+  "state": "West Bengal",
+  "loc": "Kolkata"
+ },
+ "WB10": {
+  "state": "West Bengal",
+  "loc": "Kolkata"
+ },
+ "WB19": {
+  "state": "West Bengal",
+  "loc": "Kolkata"
+ },
+ "WB22": {
+  "state": "West Bengal",
+  "loc": "Kolkata"
+ },
+ "WB20": {
+  "state": "West Bengal",
+  "loc": "Kolkata"
+ },
+ "WB27": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "OD05": {
+  "state": "Odisha",
+  "loc": "Bhubaneshwar, Cuttack"
+ },
+ "OR05": {
+  "state": "Odisha",
+  "loc": "Bhubaneshwar, Cuttack"
+ },
+ "OD02": {
+  "state": "Odisha",
+  "loc": "Bhubaneshwar, Cuttack"
+ },
+ "OD33": {
+  "state": "Odisha",
+  "loc": "Bhubaneshwar, Cuttack"
+ },
+ "OR02": {
+  "state": "Odisha",
+  "loc": "Bhubaneshwar, Cuttack"
+ },
+ "OR33": {
+  "state": "Odisha",
+  "loc": "Bhubaneshwar, Cuttack"
+ },
+ "BR14": {
+  "state": "Jharkhand",
+  "loc": "Ranchi"
+ },
+ "JH01": {
+  "state": "Jharkhand",
+  "loc": "Ranchi"
+ },
+ "BR20": {
+  "state": "Jharkhand",
+  "loc": "Bokaro"
+ },
+ "JH09": {
+  "state": "Jharkhand",
+  "loc": "Bokaro"
+ },
+ "KA01": {
+  "state": "Karnataka",
+  "loc": "Bangalore"
+ },
+ "KA02": {
+  "state": "Karnataka",
+  "loc": "Bangalore"
+ },
+ "KA03": {
+  "state": "Karnataka",
+  "loc": "Bangalore"
+ },
+ "KA04": {
+  "state": "Karnataka",
+  "loc": "Bangalore"
+ },
+ "KA05": {
+  "state": "Karnataka",
+  "loc": "Bangalore"
+ },
+ "KA41": {
+  "state": "Karnataka",
+  "loc": "Bangalore"
+ },
+ "KA43": {
+  "state": "Karnataka",
+  "loc": "Bangalore"
+ },
+ "KA50": {
+  "state": "Karnataka",
+  "loc": "Bangalore"
+ },
+ "KA51": {
+  "state": "Karnataka",
+  "loc": "Bangalore"
+ },
+ "KA52": {
+  "state": "Karnataka",
+  "loc": "Bangalore"
+ },
+ "KA53": {
+  "state": "Karnataka",
+  "loc": "Bangalore"
+ },
+ "KA57": {
+  "state": "Karnataka",
+  "loc": "Bangalore"
+ },
+ "KA59": {
+  "state": "Karnataka",
+  "loc": "Bangalore"
+ },
+ "KA60": {
+  "state": "Karnataka",
+  "loc": "Bangalore"
+ },
+ "KA61": {
+  "state": "Karnataka",
+  "loc": "Bangalore"
+ },
+ "AP31": {
+  "state": "Andhra Pradesh",
+  "loc": "Vishakhapatnam"
+ },
+ "AP32": {
+  "state": "Andhra Pradesh",
+  "loc": "Vishakhapatnam"
+ },
+ "AP34": {
+  "state": "Andhra Pradesh",
+  "loc": "Vishakhapatnam"
+ },
+ "AP40": {
+  "state": "Andhra Pradesh",
+  "loc": "Vishakhapatnam"
+ },
+ "AP09": {
+  "state": "Telangana",
+  "loc": "Hyderabad"
+ },
+ "AP10": {
+  "state": "Telangana",
+  "loc": "Hyderabad"
+ },
+ "AP11": {
+  "state": "Telangana",
+  "loc": "Hyderabad"
+ },
+ "AP12": {
+  "state": "Telangana",
+  "loc": "Hyderabad"
+ },
+ "AP13": {
+  "state": "Telangana",
+  "loc": "Hyderabad"
+ },
+ "TG09": {
+  "state": "Telangana",
+  "loc": "Hyderabad"
+ },
+ "TG10": {
+  "state": "Telangana",
+  "loc": "Hyderabad"
+ },
+ "TG11": {
+  "state": "Telangana",
+  "loc": "Hyderabad"
+ },
+ "TG12": {
+  "state": "Telangana",
+  "loc": "Hyderabad"
+ },
+ "TG13": {
+  "state": "Telangana",
+  "loc": "Hyderabad"
+ },
+ "TG14": {
+  "state": "Telangana",
+  "loc": "Hyderabad"
+ },
+ "TS09": {
+  "state": "Telangana",
+  "loc": "Hyderabad"
+ },
+ "TS10": {
+  "state": "Telangana",
+  "loc": "Hyderabad"
+ },
+ "TS11": {
+  "state": "Telangana",
+  "loc": "Hyderabad"
+ },
+ "TS12": {
+  "state": "Telangana",
+  "loc": "Hyderabad"
+ },
+ "TS13": {
+  "state": "Telangana",
+  "loc": "Hyderabad"
+ },
+ "TS14": {
+  "state": "Telangana",
+  "loc": "Hyderabad"
+ },
+ "TN01": {
+  "state": "Tamil Nadu",
+  "loc": "Chennai"
+ },
+ "TN02": {
+  "state": "Tamil Nadu",
+  "loc": "Chennai"
+ },
+ "TN03": {
+  "state": "Tamil Nadu",
+  "loc": "Chennai"
+ },
+ "TN04": {
+  "state": "Tamil Nadu",
+  "loc": "Chennai"
+ },
+ "TN05": {
+  "state": "Tamil Nadu",
+  "loc": "Chennai"
+ },
+ "TN06": {
+  "state": "Tamil Nadu",
+  "loc": "Chennai"
+ },
+ "TN07": {
+  "state": "Tamil Nadu",
+  "loc": "Chennai"
+ },
+ "TN09": {
+  "state": "Tamil Nadu",
+  "loc": "Chennai"
+ },
+ "TN10": {
+  "state": "Tamil Nadu",
+  "loc": "Chennai"
+ },
+ "TN11": {
+  "state": "Tamil Nadu",
+  "loc": "Chennai"
+ },
+ "TN12": {
+  "state": "Tamil Nadu",
+  "loc": "Chennai"
+ },
+ "TN13": {
+  "state": "Tamil Nadu",
+  "loc": "Chennai"
+ },
+ "TN14": {
+  "state": "Tamil Nadu",
+  "loc": "Chennai"
+ },
+ "TN18": {
+  "state": "Tamil Nadu",
+  "loc": "Chennai"
+ },
+ "TN22": {
+  "state": "Tamil Nadu",
+  "loc": "Chennai"
+ },
+ "TN85": {
+  "state": "Tamil Nadu",
+  "loc": "Chennai"
+ },
+ "PB10": {
+  "state": "Punjab",
+  "loc": "Ludhiana"
+ },
+ "PB91": {
+  "state": "Punjab",
+  "loc": "Ludhiana"
+ },
+ "UA07": {
+  "state": "Uttarakhand",
+  "loc": "Dehradun"
+ },
+ "UK07": {
+  "state": "Uttarakhand",
+  "loc": "Dehradun"
+ },
+ "UP07": {
+  "state": "Uttarakhand",
+  "loc": "Dehradun"
+ },
+ "UP80": {
+  "state": "Uttar Pradesh",
+  "loc": "Agra"
+ },
+ "UP77": {
+  "state": "Uttar Pradesh",
+  "loc": "Kanpur"
+ },
+ "UP78": {
+  "state": "Uttar Pradesh",
+  "loc": "Kanpur"
+ },
+ "UP32": {
+  "state": "Uttar Pradesh",
+  "loc": "Lucknow"
+ },
+ "UP36": {
+  "state": "Uttar Pradesh",
+  "loc": "Lucknow"
+ },
+ "UP65": {
+  "state": "Uttar Pradesh",
+  "loc": "Varanasi"
+ },
+ "RJ19": {
+  "state": "Rajasthan",
+  "loc": "Jodhpur"
+ },
+ "MH30": {
+  "state": "Maharashtra",
+  "loc": "Bad locations"
+ },
+ "MH27": {
+  "state": "Maharashtra",
+  "loc": "Bad locations"
+ },
+ "MH19": {
+  "state": "Maharashtra",
+  "loc": "Bad locations"
+ },
+ "MH36": {
+  "state": "Maharashtra",
+  "loc": "Bad locations"
+ },
+ "MH34": {
+  "state": "Maharashtra",
+  "loc": "Bad locations"
+ },
+ "MH18": {
+  "state": "Maharashtra",
+  "loc": "Bad locations"
+ },
+ "MH26": {
+  "state": "Maharashtra",
+  "loc": "Bad locations"
+ },
+ "MH62": {
+  "state": "Maharashtra",
+  "loc": "Bad locations"
+ },
+ "MH32": {
+  "state": "Maharashtra",
+  "loc": "Bad locations"
+ },
+ "MH29": {
+  "state": "Maharashtra",
+  "loc": "Bad locations"
+ },
+ "GJ34": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ32": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ37": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ30": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ08": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ04": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ19": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ13": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ31": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ39": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ38": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ20": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ07": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ22": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ09": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ35": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ26": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ14": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ17": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ10": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ02": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ24": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "GJ25": {
+  "state": "Gujarat",
+  "loc": "ROG Bad locations"
+ },
+ "WB11": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB - Good locations"
+ },
+ "WB12": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB - Good locations"
+ },
+ "WB13": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB - Good locations"
+ },
+ "WB14": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB - Good locations"
+ },
+ "WB73": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB - Good locations"
+ },
+ "WB74": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB - Good locations"
+ },
+ "WB69": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB37": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB38": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB44": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB61": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB62": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB25": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB26": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB23": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB24": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB53": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB54": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB41": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB42": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB31": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB32": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB63": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB64": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB76": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB77": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB39": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB40": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB15": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB16": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB17": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB18": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB71": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB72": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB78": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB79": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB65": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB66": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB33": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB34": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB36": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB57": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB58": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB51": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB52": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB55": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB56": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB29": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB30": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB89": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB90": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB59": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB60": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB91": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB92": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB47": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB48": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB85": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB86": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB95": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB96": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB81": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB82": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB43": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB21": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB87": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB88": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB45": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB46": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB83": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB49": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB50": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB93": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB94": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB97": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB98": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB28": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB99": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "WB75": {
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations"
+ },
+ "DL1": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "DL10": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "DL11": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "DL12": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "DL13": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "DL2": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "DL3": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "DL4": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "DL5": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "DL6": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "DL7": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "DL8": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "DL9": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "DL18": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "UP14": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "DL15": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "HR26": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "HR55": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "HR72": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "DL16": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "HR38": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "HR51": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "HR87": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "HR29": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "DL17": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "DL30": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "UP16": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "UP18": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "HR89": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "HR93": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ },
+ "HR98": {
+  "state": "Delhi NCR",
+  "loc": "Delhi NCR"
+ }
+}

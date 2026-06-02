@@ -78,6 +78,14 @@ router.post('/upload', async (req, res, next) => {
 
     if (fs.existsSync(configPath)) {
       insurerConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    } else if (/\.(pdf|msg)$/i.test(req.file.path)) {
+      // No config for this insurer AND the upload isn't an Excel workbook —
+      // skip auto-detection (XLSX would error on PDF/MSG). Return a clean
+      // error so the operator knows to add a config first.
+      return res.status(400).json({
+        success: false,
+        error: `No config found for insurer "${insurer}". PDF/MSG uploads require a hand-written config in config/insurers/${insurer}.json.`,
+      });
     } else {
       // Auto-generate a basic flat_table config by scanning the uploaded Excel
       const XLSX = require('xlsx');

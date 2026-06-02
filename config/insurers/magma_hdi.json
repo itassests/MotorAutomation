@@ -1,0 +1,38 @@
+{
+  "insurer": "magma_hdi",
+  "label": "Magma HDI General Insurance",
+  "sheets": [
+    {
+      "_comment": "Comp Grid — 4 sum-insured band sheets (≤5 lac / 5-18 / 18-30 / >30 lac). Each: 114 clusters × ~49 vehicle sub-categories.",
+      "name": "< =5 lac",
+      "file_pattern": "Comprehensive|Comp[ _]Grid|magma[ _]comp|magma.*Comp",
+      "layout": "magma"
+    },
+    {
+      "name": ">5 to <=18",
+      "file_pattern": "Comprehensive|Comp[ _]Grid|magma[ _]comp|magma.*Comp",
+      "layout": "magma"
+    },
+    {
+      "name": ">18 to <=30",
+      "file_pattern": "Comprehensive|Comp[ _]Grid|magma[ _]comp|magma.*Comp",
+      "layout": "magma"
+    },
+    {
+      "name": "> 30 lac",
+      "file_pattern": "Comprehensive|Comp[ _]Grid|magma[ _]comp|magma.*Comp",
+      "layout": "magma"
+    },
+    {
+      "_comment": "SATP Grid — 2 premium band sheets (≤2 lac / >2 lac). Each: 114 clusters × 35 TP sub-categories.",
+      "name": "<=2 Lacs",
+      "file_pattern": "SATP|magma[ _]satp",
+      "layout": "magma"
+    },
+    {
+      "name": ">2 Lacs",
+      "file_pattern": "SATP|magma[ _]satp",
+      "layout": "magma"
+    }
+  ]
+}

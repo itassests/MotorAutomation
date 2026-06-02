@@ -103,7 +103,7 @@
         "column_map": {
           "region": 0,
           "segment": 1,
-          "sub_type": 2,
+          "vehicle_age": 2,
           "rate_value": 3
         },
         "rate_type": "MAX_CD2",
@@ -206,14 +206,7 @@
           "segment": 1
         },
         "rate_columns": [
-          { "column": 2, "rate_type": "MIN_CD1" },
-          { "column": 3, "rate_type": "MAX_CD1_NO_BREAKIN" },
-          { "column": 4, "rate_type": "MAX_CD1_BREAKIN" },
-          { "column": 5, "rate_type": "CD2" },
-          { "column": 6, "rate_type": "MAX_1YR_CD2" },
-          { "column": 7, "rate_type": "MAX_2YR_CD2" },
-          { "column": 8, "rate_type": "MAX_3YR_CD2" },
-          { "column": 9, "rate_type": "MAX_4YR_CD2" }
+          { "column": 5, "rate_type": "SAOD" }
         ],
         "decline_markers": ["D", "NA"]
       }
@@ -275,22 +268,18 @@
       "config": {
         "header_row": 1,
         "data_start_row": 2,
+        "rate_divisor": 100,
         "column_map": {
           "region": 0
         },
         "rate_columns": [
-          { "column": 1, "rate_type": "SAOD" },
-          { "column": 2, "rate_type": "Comp" },
-          { "column": 3, "rate_type": "SAOD_NON_NCB" },
-          { "column": 4, "rate_type": "SAOD_NCB" },
-          { "column": 5, "rate_type": "COMP_NON_NCB" },
-          { "column": 6, "rate_type": "COMP_NCB" },
-          { "column": 7, "rate_type": "SAOD_NON_NCB_2" },
-          { "column": 8, "rate_type": "SAOD_NCB_2" },
-          { "column": 9, "rate_type": "COMP_ALL" },
-          { "column": 10, "rate_type": "HEV" }
+          { "column": 1, "rate_type": "SAOD_NON_NCB" },
+          { "column": 2, "rate_type": "SAOD_NCB" },
+          { "column": 3, "rate_type": "COMP_NON_NCB" },
+          { "column": 4, "rate_type": "COMP_NCB" },
+          { "column": 5, "rate_type": "HEV" }
         ],
-        "decline_markers": ["D", "NA"]
+        "decline_markers": ["D", "NA", "Decline"]
       }
     },
     {
@@ -307,6 +296,19 @@
       }
     },
     {
+      "name": "CV RTO Mapping",
+      "layout": "rto_mapping",
+      "product": "PCV_3W_EV",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": {
+          "rto_code": 0,
+          "region": 6
+        }
+      }
+    },
+    {
       "name": "2W RTO's",
       "layout": "rto_mapping",
       "product": "TW",
@@ -316,6 +318,32 @@
         "column_map": {
           "rto_code": 0,
           "region": 1
+        }
+      }
+    },
+    {
+      "name": "2W RTO's",
+      "layout": "rto_mapping",
+      "product": "TW",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": {
+          "rto_code": 4,
+          "region": 5
+        }
+      }
+    },
+    {
+      "name": "4W  RTO",
+      "layout": "rto_mapping",
+      "product": "4W",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "column_map": {
+          "rto_code": 0,
+          "region": 2
         }
       }
     },

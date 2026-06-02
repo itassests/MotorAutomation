@@ -1,0 +1,27 @@
+{
+  "insurer": "iffco_tokio",
+  "label": "IFFCO Tokio General Insurance",
+  "sheets": [
+    {
+      "_comment": "PDF — base commission rates. OCR'd via Document AI; the extracted rates are cached so the subsequent xlsx upload uses them. Upload PDF FIRST, then xlsx.",
+      "name": "_pdf_rates",
+      "file_pattern": "\\.pdf$|iffco|tokio",
+      "layout": "iffco_pdf",
+      "config": { "engine": "iffco" }
+    },
+    {
+      "_comment": "IFFCO heat map — Comp side (CV category × state). Drives the CV Comp per-state-per-category rules; also emits Pan-India base rules for Pvt Car and TW Comp.",
+      "name": "RTO Comp",
+      "file_pattern": "iffco|tokio",
+      "layout": "iffco",
+      "config": { "sheet_kind": "iffco_rto_comp" }
+    },
+    {
+      "_comment": "IFFCO heat map — TP side (state × vehicle category). Drives the SATP per-state-per-category rules.",
+      "name": "TP",
+      "file_pattern": "iffco|tokio",
+      "layout": "iffco",
+      "config": { "sheet_kind": "iffco_tp" }
+    }
+  ]
+}

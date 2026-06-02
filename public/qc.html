@@ -175,6 +175,10 @@
     // Canonical field set — mirrors routes/pr.js. Used to decide which fields
     // drive the mismatch summary + per-field resolve actions.
     const FIELDS = [
+      // Vehicle Class — PR's product/category vs Prarambh's VehicleType,
+      // normalised to one of GCV/PCV/CAR/TW/MISC. Flags a goods truck booked
+      // as Pvt.Car (and vice-versa). Resolves PR → Prarambh only.
+      { field: 'Vehicle Class', type: 'class', prCols: ['vehicle_category', 'product'], dbCols: ['VehicleType'] },
       { field: 'Vehicle No',    type: 'str',  prCol: 'vehicle_no',    dbCols: ['VEHICLE_REGISTRATION_NO'] },
       { field: 'Make',          type: 'str',  prCol: 'vehicle_make',  dbCols: ['VEHICAL_MAKE'] },
       { field: 'Model',         type: 'str',  prCol: 'vehicle_model', dbCols: ['VEHICAL_MODEL'] },
@@ -202,7 +206,27 @@
       { field: 'Net Amount',    type: 'num',  prCol: 'net_amount',    dbCols: ['PREMIUM_WITHOUT_GST'] },
       { field: 'Gross Amount',  type: 'num',  prCol: 'gross_amount',  dbCols: ['ANNUAL_PREMIUM', 'ANNUALPREMIUM'] },
       { field: 'State',         type: 'str',  prCol: 'state',         dbCols: ['StateName'] },
+      // RTO Code — PR's RTO lives inside the registration number; Prarambh has
+      // an explicit RTO_Code column (registration as fallback). Both normalised
+      // to base RTO (state letters + district digits). Resolves PR → Prarambh only.
+      { field: 'RTO Code',      type: 'rto',  prCols: ['vehicle_no'], dbCols: ['RTO_Code', 'VEHICLE_REGISTRATION_NO'] },
     ];
+    // Canonical VehicleType strings Prarambh stores — offered as a dropdown on
+    // the Vehicle Class row so the reviewer can set the correct class explicitly
+    // (must mirror VEHCLASS_TO_VEHICLETYPE in routes/pr.js).
+    const VEHTYPE_OPTIONS = ['Pvt.Car', 'Two Wheeler', 'Commercial-Goods Carrying', 'Commercial-Passenger Carrying', 'Miscellaneous'];
+    /** Best-guess canonical VehicleType from a PR product/category string, used
+     *  only to pre-select the dropdown. Mirrors vehClass() in routes/pr.js. */
+    function guessVehType(v) {
+      if (v == null || v === '') return '';
+      const s = String(v).toUpperCase();
+      if (/GCV|GCCV|GOODS\s*CARR/.test(s))               return 'Commercial-Goods Carrying';
+      if (/PCV|PASSENGER\s*CARR/.test(s))                return 'Commercial-Passenger Carrying';
+      if (/TWO\s*WHEEL|2\s*WHEEL|MOTOR\s*CYCLE|MOTORCYCLE|\bSCOOTER\b/.test(s)) return 'Two Wheeler';
+      if (/PRIVATE\s*CAR|PVT\.?\s*CAR|MOTOR\s*CAR/.test(s)) return 'Pvt.Car';
+      if (/MISC|TRACTOR/.test(s))                        return 'Miscellaneous';
+      return '';
+    }
     const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const escAttr = s => String(s == null ? '' : s).replace(/'/g, "\\'").replace(/"/g, '&quot;');
     /** Excel stores dates as "days since 1900-01-00" (off-by-one from Unix).
@@ -338,13 +362,19 @@
         </div>`;
         return;
       }
-      const hardHtml = hardMismatches.map(f => `
+      const hardHtml = hardMismatches.map(f => {
+        // Vehicle Class / RTO Code resolve PR → Prarambh only, so drop the ⇐ button.
+        const prOnly = f.type === 'class' || f.type === 'rto';
+        const prbBtn = prOnly ? '' :
+          `<button class="btn-prb" onclick="resolveField('${escAttr(f.field)}', 'prarambh', this)" title="Update as Prarambh — copy Prarambh value into PR">&#8678;</button>`;
+        return `
         <span class="field-pill" title="Both sides have values — they differ">
           <span class="name">${esc(f.field)}</span>
           <span style="color:#888; font-size:11px;">PR: <b>${esc(formatVal(f.pr))}</b> · P: <b>${esc(formatVal(f.db))}</b></span>
           <button class="btn-pr"  onclick="resolveField('${escAttr(f.field)}', 'pr',       this)" title="Update as PR — copy PR value into Prarambh">&#8680;</button>
-          <button class="btn-prb" onclick="resolveField('${escAttr(f.field)}', 'prarambh', this)" title="Update as Prarambh — copy Prarambh value into PR">&#8678;</button>
-        </span>`).join('');
+          ${prbBtn}
+        </span>`;
+      }).join('');
       const isEmpty = (v) => v == null || v === '';
       const missHtml = oneSidedMissing.map(f => {
         const prHas = !isEmpty(f.pr);
@@ -403,7 +433,16 @@
       const canonRows = FIELDS.map(spec => {
         const fld = fieldStatus.get(spec.field) || {};
         const status = fld.match;  // true | false | null | undefined
-        const prVal  = spec.prCol in prRow ? prRow[spec.prCol] : null;
+        // PR side: most fields are single-column (prCol); class/rto use prCols
+        // (plural) and take the FIRST non-empty column — same firstNonNull
+        // semantics the server used to compute the match.
+        const prCols = spec.prCols || [spec.prCol];
+        let prCol = null, prVal = null;
+        for (const c of prCols) {
+          const v = prRow[c];
+          if (v !== null && v !== undefined && v !== '') { prCol = c; prVal = v; break; }
+        }
+        if (prCol == null) prCol = prCols[0];   // keep a column name for tracking/display
         // For Prarambh: pick the FIRST dbCol that exists in dbRow (the one
         // the server used for the comparison — which is now NET_OD_PREMIUM
         // for OD Premium thanks to the swapped order in pr.js).
@@ -411,7 +450,7 @@
         for (const c of spec.dbCols) {
           if (c in dbRow) { dbCol = c; dbVal = dbRow[c]; break; }
         }
-        return { spec, status, prCol: spec.prCol, prVal, dbCol, dbVal };
+        return { spec, status, prCol, prVal, dbCol, dbVal };
       });
 
       // Track which raw columns are already shown via the canonical mapping
@@ -488,13 +527,28 @@
       let showBtn = false;
       if (row.status === false)      showBtn = true;
       else if (oneSided)             showBtn = isPr ? prHas : dbHas;
+      // Vehicle Class / RTO Code resolve PR → Prarambh only (the server rewrites
+      // Prarambh's value and rejects the reverse), so suppress the Prarambh-pane
+      // (⇐) button for those — only the PR-pane (⇒) action is valid.
+      const prOnly = row.spec.type === 'class' || row.spec.type === 'rto';
+      if (prOnly && !isPr) showBtn = false;
       // Icon-only buttons keep the actions column slim. The title carries
       // the long-form action so hovering still gives the reviewer context.
       // Symbols chosen to mirror the direction of the data flow:
       //   PR pane uses "⇒"  (push PR value rightward into Prarambh)
       //   Prarambh pane uses "⇐"  (pull Prarambh value leftward into PR)
       let btn = '';
-      if (showBtn) {
+      // Vehicle Class on the PR pane gets a dropdown of the canonical
+      // VehicleType strings (pre-selected to PR's derived class) + a Set button,
+      // so the reviewer can write the correct class into Prarambh explicitly
+      // rather than blindly copying PR's guess.
+      if (isPr && row.spec.type === 'class' && showBtn) {
+        const sel = guessVehType(row.prVal);
+        const opts = VEHTYPE_OPTIONS.map(o =>
+          `<option value="${escAttr(o)}"${o === sel ? ' selected' : ''}>${esc(o)}</option>`).join('');
+        btn = `<select class="vt-select" style="font-size:11px; max-width:150px;">${opts}</select>` +
+          `<button class="row-btn pr" onclick="resolveVehType(this)" title="Set Prarambh's VehicleType to the selected value">Set</button>`;
+      } else if (showBtn) {
         if (isPr) {
           btn = `<button class="row-btn pr"  onclick="resolveField('${escAttr(row.spec.field)}', 'pr', this)" title="Update as PR — copy PR value into Prarambh">&#8680;</button>`;
         } else {
@@ -508,24 +562,37 @@
       </tr>`;
     }
 
+    /** Set Prarambh's VehicleType from the dropdown beside the Set button. */
+    function resolveVehType(btn) {
+      const sel = btn.parentNode.querySelector('select.vt-select');
+      const value = sel ? sel.value : '';
+      if (!value) { toast('Pick a vehicle type first', 'info'); return; }
+      resolveField('Vehicle Class', 'pr', btn, value);
+    }
+
     /** Resolve one mismatched field via PUT /api/pr/:id/policy/:pn/resolve, then
-     *  refresh the whole QC page. */
-    async function resolveField(field, direction, btn) {
-      const msg = direction === 'pr'
-        ? `Copy PR value for "${field}" into Prarambh (tmp_PrarambhData)?\n\nThis writes to the source system.`
-        : `Copy Prarambh value for "${field}" into the Premium Register (pr_rows)?\n\nThis updates the local PR record.`;
+     *  refresh the whole QC page. `value` (optional) sets an explicit target
+     *  (used by the Vehicle Class dropdown) instead of copying a side's value. */
+    async function resolveField(field, direction, btn, value) {
+      const msg = value != null
+        ? `Set Prarambh's vehicle type for "${field}" to "${value}"?\n\nThis writes to the source system.`
+        : direction === 'pr'
+          ? `Copy PR value for "${field}" into Prarambh (tmp_PrarambhData)?\n\nThis writes to the source system.`
+          : `Copy Prarambh value for "${field}" into the Premium Register (pr_rows)?\n\nThis updates the local PR record.`;
       if (!confirm(msg)) return;
       btn.disabled = true; const orig = btn.textContent; btn.textContent = '…';
       try {
+        const body = { field, direction };
+        if (value != null) body.value = value;
         const res = await fetch(API + '/pr/' + UPLOAD + '/policy/' + encodeURIComponent(POLICY) + '/resolve', {
           method: 'PUT', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ field, direction }),
+          body: JSON.stringify(body),
         });
         const data = await res.json();
         if (!data.success) throw new Error(data.error || 'resolve failed');
         _data = data;
         render();
-        toast(`Resolved ${field} — used ${direction === 'pr' ? 'PR' : 'Prarambh'} value`, 'success');
+        toast(value != null ? `Set ${field} → ${value}` : `Resolved ${field} — used ${direction === 'pr' ? 'PR' : 'Prarambh'} value`, 'success');
       } catch (e) {
         btn.textContent = orig; btn.disabled = false;
         toast('Resolve failed: ' + e.message, 'error');

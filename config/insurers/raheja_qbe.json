@@ -1,0 +1,13 @@
+{
+  "insurer": "raheja_qbe",
+  "label": "Raheja QBE General Insurance",
+  "sheets": [
+    {
+      "_comment": "Raheja QBE monthly motor grid arrives as an Outlook .msg email. Rates parsed dynamically from the email body each upload.",
+      "name": "_msg_grid",
+      "file_pattern": "\\.msg$|raheja|motor[ _]grid",
+      "layout": "raheja_msg",
+      "config": { "engine": "raheja" }
+    }
+  ]
+}

@@ -320,6 +320,55 @@ function inferVehicleCategory(segment, rateType, sheetName) {
   if (/^Auto$/i.test(s)) return 'Auto';
   if (/^BOLERO$/i.test(s)) return 'BOLERO';
 
+  // United India "Two Wheeled PCV" / "Three Wheeled PCV" / "Four Wheeled PCV":
+  // VehicleType is PCV (handled by product), but Category should call out the
+  // wheel-count carrier subtype.
+  if (/^2W\s+PCV$/i.test(s)) return 'TW';
+  if (/^3W\s+PCV$/i.test(s)) return '3W';
+  if (/^4W\s+PCV(\s|$)/i.test(s)) return '4W';
+  // Taxi, Educational/Staff Bus
+  if (/^Taxi$/i.test(s)) return 'Taxi';
+  if (/^Educational\/Staff\s+Bus$/i.test(s) || /Educational.*Staff.*Bus/i.test(s)) return 'Staff Bus';
+  // UII Misc "Bands / Vehicle Type" rows — surface segment as VC verbatim
+  if (/^Ambulance(s)?$/i.test(s)) return 'Ambulance';
+  if (/^Agricultural\s+Tractor/i.test(s)) return 'Agricultural Tractor';
+  if (/^All\s+other\s+Misc/i.test(s)) return 'MISC-D';
+  if (/^Road\s+Risk,?\s*Transit/i.test(s)) return 'Road Risk, Transit & Internal Risk';
+  if (/^Standalone\s+CPA$/i.test(s)) return 'Standalone CPA';
+  // UII GCV E-Cart — distinct GVW-bucketed electric goods carrier, shown
+  // as its own VehicleCategory rather than the generic "GCV".
+  if (/^E-?Cart$/i.test(s)) return 'E-Cart';
+  // Magma 2W split — segment is tagged "TW Bike" / "TW Scooter" so the
+  // VehicleCategory column can distinguish bikes from scooters even though
+  // both share product='TW'.
+  if (/^TW\s+Bike$/i.test(s))    return 'Bike';
+  if (/^TW\s+Scooter$/i.test(s)) return 'Scooter';
+  // Magma Misc-D variants (Others / Garbage) — segment 'MISC-D' alone.
+  if (/^MISC-?D$/i.test(s)) return 'MISC-D';
+  // IFFCO bus seat-band segments → VehicleCategory = "Bus"
+  if (/^Bus\s*\(/i.test(s)) return 'Bus';
+  // IFFCO Misc-D sub-types → surface verbatim in VehicleCategory
+  if (/^Ambulance$/i.test(s))      return 'Ambulance';
+  if (/^Excavator/i.test(s))       return 'Excavator';
+  if (/^Mobile\s+Crane/i.test(s))  return 'Mobile Crane';
+  if (/^Publicity\s+Van/i.test(s)) return 'Publicity Van';
+  if (/^Transit\s+Mixer/i.test(s)) return 'Transit Mixer';
+  if (/^E-?Rickshaw$/i.test(s))    return 'E-Rickshaw';
+  // Kotak MISD Garbage Van / Cash Van carve-outs
+  if (/^Garbage\s+Van$/i.test(s))  return 'Garbage Van';
+  if (/^Cash\s+Van$/i.test(s))     return 'Cash Van';
+  // Raheja PCV Auto Rickshaw / Kali Peeli (split into two distinct categories).
+  if (/^Auto\s+Ric?ks?h?aw$/i.test(s)) return 'Auto Rickshaw';
+  if (/^Kali\s+Peeli$/i.test(s))       return 'Kali Peeli';
+  // Legacy combined label (in case any older rule still uses it)
+  if (/Auto\s*Ric?ks?h?aw.*Kali\s*Peeli|Kali\s*Peeli.*Auto/i.test(s)) return 'Auto Rickshaw / Kali Peeli';
+  if (/^Agri\s+Tractor$/i.test(s)) return 'Agri Tractor';
+  // Raheja GCV weight bands & Flat Bed
+  if (/^GCV\s+Flat\s*Bed$/i.test(s)) return 'GCV Flat Bed';
+  if (/^GCV\s+≤?2\.5T$/i.test(s) || /^GCV\s+<=?\s*2\.5T$/i.test(s)) return 'GCV ≤2.5T';
+  if (/^GCV\s+2\.5-3\.5T$/i.test(s)) return 'GCV 2.5-3.5T';
+  if (/^GCV\s+3\.5-7\.5T$/i.test(s)) return 'GCV 3.5-7.5T';
+
   // Sheet-name-based detection for PCV categories
   if (/School.*Bus/i.test(sn) || /Staff.*Bus/i.test(sn)) {
     if (/STAFF/i.test(rt)) return 'Staff Bus';
@@ -1013,8 +1062,11 @@ function inferHEV(rateType, fuelType, model, subType, segment) {
     .map(v => String(v || '').toUpperCase())
     .join(' ');
 
-  // Hybrid-electric tag in rate_type / fuel_type
+  // Hybrid-electric tag in rate_type / fuel_type — both "HEV" and "Hybrid"
+  // are recognised so engines that emit fuel_type='Hybrid' (e.g. Kotak)
+  // get the Highend column flagged.
   if (/\bHEV\b/.test(all)) return 'Yes';
+  if (/\bHYBRID\b/.test(all)) return 'Yes';
   // HE/UHE shorthand or spelled-out high-end markers
   if (/\bHE\s*\/\s*UHE\b/.test(all)) return 'Yes';
   if (/\bUHE\b/.test(all))           return 'Yes';

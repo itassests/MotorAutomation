@@ -399,6 +399,7 @@
     <div class="tab"        data-tab="bulk"              title="Bulk Calculation"   ><span class="tab-icon">&#129518;</span><span class="tab-label">Bulk Calculation</span></div>
     <div class="tab"        data-tab="payout"            title="Payout Summary"     ><span class="tab-icon">&#128181;</span><span class="tab-label">Payout Summary</span></div>
     <div class="tab"        data-tab="recon"             title="Recon Summary"      ><span class="tab-icon">&#128200;</span><span class="tab-label">Recon Summary</span></div>
+    <div class="tab"        data-tab="reconcile"         title="File Reconciliation"><span class="tab-icon">&#128203;</span><span class="tab-label">File Reconcile</span></div>
     <div class="tab"        data-tab="calculate"         title="Calculate Payout"   ><span class="tab-icon">&#128290;</span><span class="tab-label">Calculate Payout</span></div>
     <div class="tab"        data-tab="policy"            title="Policy Lookup"      ><span class="tab-icon">&#128270;</span><span class="tab-label">Policy Lookup</span></div>
     <div class="tab"        data-tab="cards"             title="Manage Rate Cards"  ><span class="tab-icon">&#128221;</span><span class="tab-label">Manage Rate Cards</span></div>
@@ -407,6 +408,7 @@
     <div class="tab"        data-tab="margin-exceptions" title="Margin Exceptions"  ><span class="tab-icon">&#9888;</span><span class="tab-label">Margin Exceptions</span></div>
     <div class="tab tab-bottom" data-tab="masters" title="Masters" style="color:#0082C8; font-weight:600;"><span class="tab-icon">&#128218;</span><span class="tab-label">Masters</span></div>
     <div class="tab"             data-tab="admin"   title="Admin"   style="color:#c62828; font-weight:600;"><span class="tab-icon">&#9881;</span><span class="tab-label">Admin</span></div>
+    <div class="tab"             data-tab="agent-view" title="Agent View" style="color:#0082C8; font-weight:600;"><span class="tab-icon">&#128100;</span><span class="tab-label">Agent View</span></div>
   </nav>
 
   <div class="container">
@@ -974,6 +976,7 @@
             <option value="MISC">MISC</option>
           </select>
           <button class="btn btn-primary btn-sm" id="downloadAllMasterBtn" onclick="downloadAllMaster()">Download Master Excel</button>
+          <button class="btn btn-outline btn-sm" id="downloadLucaBtn" onclick="downloadLucaData()" title="All insurers' outgoing rates in Luca format (no income / margin)">Download Luca Data</button>
         </div>
         <div id="rateCardsList"></div>
       </div>
@@ -1469,10 +1472,14 @@
                 <th title="Insured Declared Value — drives the Compliance flag (≤ ₹50L for non-TP)">IDV</th>
                 <th>Premium Base</th>
                 <th>Rule</th>
-                <th>Rate %</th>
+                <th title="OD commission % (applied to OD premium) — for OD+TP rules">OD Rate %</th>
+                <th title="TP commission % (applied to TP premium) — for OD+TP rules">TP Rate %</th>
+                <th title="Total commission rate (OD% + TP% for OD+TP rules)">Rate %</th>
                 <th>Margin %</th>
                 <th>Outgoing %</th>
-                <th>Income</th>
+                <th title="OD commission = OD% × OD premium">OD Comm</th>
+                <th title="TP commission = TP% × TP premium">TP Comm</th>
+                <th title="Total commission (OD Comm + TP Comm for OD+TP rules)">Income</th>
                 <th>Savings</th>
                 <th>Outgoing</th>
                 <th>Stmt Amount</th>
@@ -2319,6 +2326,107 @@
       </div>
     </div>
 
+    <!-- ============ FILE RECONCILIATION PANEL ============ -->
+    <div class="panel" id="panel-reconcile">
+      <div class="card">
+        <h2><span class="icon">&#128203;</span> File Reconciliation</h2>
+        <p style="color:#666; font-size:13px; margin-top:-8px;">
+          Upload a manual-compute workbook (with <strong>Tracker No</strong> and <strong>Total Rate</strong> columns).
+          The tool compares it against a cycle's computed data: which policies match, which are missing on
+          either side, and where our income rate disagrees with the file's Total Rate.
+        </p>
+        <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-top:12px;">
+          <div>
+            <label style="display:block; font-size:12px; color:#555; margin-bottom:4px;">Cycle</label>
+            <select id="rcCycle" style="min-width:280px; padding:7px;"></select>
+          </div>
+          <div>
+            <label style="display:block; font-size:12px; color:#555; margin-bottom:4px;">Manual Compute File (.xlsx / .csv)</label>
+            <input type="file" id="rcFile" accept=".xlsx,.xls,.csv">
+          </div>
+          <button class="btn btn-primary" id="rcRunBtn" onclick="rcRun()" disabled>Compare</button>
+          <button class="btn btn-outline" id="rcRecompareBtn" onclick="rcRecompare()" disabled title="Re-run against the last uploaded file (use after a recompute)">Re-compare (last file)</button>
+          <button class="btn btn-outline" id="rcXlsxBtn" onclick="rcDownloadXlsx()" disabled>Download XLSX</button>
+        </div>
+        <div id="rcStatus" style="margin-top:10px; font-size:13px; color:#666;"></div>
+
+        <!-- Policy lookup — pull up one policy's computed detail (our rate,
+             matched segment, insurer) with QC + recompute, independent of any
+             uploaded recon file. Accepts a policy number OR a tracker. -->
+        <div style="margin-top:14px; padding-top:12px; border-top:1px dashed #ddd; display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+          <div>
+            <label style="display:block; font-size:12px; color:#555; margin-bottom:4px;">Policy / Tracker Lookup</label>
+            <input type="text" id="rcLookupInput" placeholder="Policy No or Tracker No…" style="padding:7px; min-width:320px;"
+                   onkeydown="if(event.key==='Enter')rcLookupPolicy();">
+          </div>
+          <button class="btn btn-outline" id="rcLookupBtn" onclick="rcLookupPolicy()">Look up</button>
+        </div>
+        <div id="rcLookupResult" style="margin-top:10px;"></div>
+      </div>
+
+      <!-- KPI summary -->
+      <div id="rcKpis" class="card" style="display:none;">
+        <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:12px;">
+          <div style="background:#f0f6ff; border-radius:8px; padding:12px; text-align:center;">
+            <div style="font-size:12px; color:#555;">File Trackers</div>
+            <div id="rcKpiExcel" style="font-size:22px; font-weight:600; color:#0a3d62;">—</div>
+          </div>
+          <div style="background:#f0f6ff; border-radius:8px; padding:12px; text-align:center;">
+            <div style="font-size:12px; color:#555;">Cycle Trackers</div>
+            <div id="rcKpiCycle" style="font-size:22px; font-weight:600; color:#0a3d62;">—</div>
+          </div>
+          <div style="background:#eafaf0; border-radius:8px; padding:12px; text-align:center;">
+            <div style="font-size:12px; color:#555;">Matched (both)</div>
+            <div id="rcKpiMatched" style="font-size:22px; font-weight:600; color:#1b5e20;">—</div>
+          </div>
+          <div style="background:#fff4f4; border-radius:8px; padding:12px; text-align:center;">
+            <div style="font-size:12px; color:#555;">Missing in Our Data</div>
+            <div id="rcKpiMissOurs" style="font-size:22px; font-weight:600; color:#b71c1c;">—</div>
+          </div>
+          <div style="background:#fff8ec; border-radius:8px; padding:12px; text-align:center;">
+            <div style="font-size:12px; color:#555;">Missing in File</div>
+            <div id="rcKpiMissExcel" style="font-size:22px; font-weight:600; color:#a04a00;">—</div>
+          </div>
+          <div style="background:#eafaf0; border-radius:8px; padding:12px; text-align:center;">
+            <div style="font-size:12px; color:#555;">Rate Match / Mismatch</div>
+            <div id="rcKpiRate" style="font-size:22px; font-weight:600; color:#1b5e20;">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div id="rcResults" class="card" style="display:none;">
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+          <button class="rcView btn btn-sm btn-primary" data-view="rate"      onclick="rcSetView('rate')">Rate Comparison</button>
+          <button class="rcView btn btn-sm btn-outline"  data-view="missOurs" onclick="rcSetView('missOurs')">Missing in Our Data</button>
+          <button class="rcView btn btn-sm btn-outline"  data-view="missExcel"onclick="rcSetView('missExcel')">Missing in File</button>
+          <button class="rcView btn btn-sm btn-outline"  data-view="ignored"  onclick="rcSetView('ignored')">Ignored</button>
+          <span style="flex:1;"></span>
+          <label style="font-size:12px; color:#555;">Insurer:</label>
+          <select id="rcInsurerFilter" style="padding:6px;" onchange="rcRender()"><option value="">All</option></select>
+          <label style="font-size:12px; color:#555;">Vehicle:</label>
+          <select id="rcVehFilter" style="padding:6px;" onchange="rcRender()"><option value="">All</option></select>
+          <label style="font-size:12px; color:#555;">Show:</label>
+          <select id="rcMatchFilter" style="padding:6px;" onchange="rcRender()">
+            <option value="all">All</option>
+            <option value="match">Rate Match only</option>
+            <option value="mismatch">Rate Mismatch only</option>
+          </select>
+          <input type="text" id="rcSearch" placeholder="Search tracker / policy…" style="padding:6px; min-width:200px;" oninput="rcRender()">
+          <button class="btn btn-sm btn-outline" onclick="rcClearIgnores()">Clear Ignores</button>
+        </div>
+        <div style="font-size:12px; color:#888; margin-bottom:6px;" id="rcRowCount"></div>
+        <div class="table-wrap" style="max-height:560px; overflow:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead style="position:sticky; top:0; background:#fff; z-index:1;">
+              <tr id="rcThead" style="border-bottom:2px solid #0a3d62;"></tr>
+            </thead>
+            <tbody id="rcBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- ============ UTR / BANK TRANSFER PANEL ============ -->
     <div class="panel" id="panel-utr">
       <div class="card">
@@ -3008,6 +3116,155 @@
       </div>
     </div>
 
+    <!-- ============ AGENT VIEW PANEL ============ -->
+    <div class="panel" id="panel-agent-view">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+        <div>
+          <h2 style="font-size:18px; margin:0;"><span class="icon">&#128100;</span> My Dashboard</h2>
+          <div style="font-size:12px; color:#888; margin-top:2px;" id="agentMeta">&nbsp;</div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="agentStatementBtn" onclick="agentDownloadStatement()">&#128229; Download Statement</button>
+      </div>
+
+      <!-- Sub-view toggle: Payout vs Renewals -->
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button class="btn btn-sm" id="agentSubPayout" onclick="agentSwitchView('payout')"
+                style="background:#0082C8; color:#fff;">&#128181; My Payout</button>
+        <button class="btn btn-sm" id="agentSubRenewal" onclick="agentSwitchView('renewal')"
+                style="background:#eef4fa; color:#00243E;">&#128260; Motor Renewals</button>
+      </div>
+
+      <div id="agentPayoutView">
+      <!-- KPI cards -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:14px; margin-top:16px;">
+        <div class="card" style="text-align:center; border-left:4px solid #0082C8;">
+          <div style="font-size:12px; color:#888; text-transform:uppercase; letter-spacing:0.5px;">Total NOP</div>
+          <div id="agentKpiNop" style="font-size:30px; font-weight:700; color:#00243E;">—</div>
+        </div>
+        <div class="card" style="text-align:center; border-left:4px solid #2e7d32;">
+          <div style="font-size:12px; color:#888; text-transform:uppercase; letter-spacing:0.5px;">Total Premium</div>
+          <div id="agentKpiPremium" style="font-size:30px; font-weight:700; color:#1b5e20;">—</div>
+        </div>
+        <div class="card" style="text-align:center; border-left:4px solid #ef6c00;">
+          <div style="font-size:12px; color:#888; text-transform:uppercase; letter-spacing:0.5px;">Total Commission</div>
+          <div id="agentKpiComm" style="font-size:30px; font-weight:700; color:#e65100;">—</div>
+        </div>
+      </div>
+
+      <!-- By vehicle type (click a row to filter the policy list) -->
+      <div class="card" style="margin-top:16px;">
+        <h3 style="font-size:14px; color:#00243E;">By Vehicle Type <span style="font-size:11px; color:#999; font-weight:400;">(click a row to see its policies)</span></h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Vehicle Type</th><th style="text-align:right;">NOP</th><th style="text-align:right;">Premium</th><th style="text-align:right;">Commission</th></tr></thead>
+            <tbody id="agentVtBody"><tr><td colspan="4" class="no-data">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Monthly commission view (across cycles) -->
+      <div class="card" style="margin-top:16px;">
+        <h3 style="font-size:14px; color:#00243E;">Monthly View <span style="font-size:11px; color:#999; font-weight:400;">(commission earned per month)</span></h3>
+        <div id="agentMonthlyCards" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:12px; margin-top:6px;">
+          <div class="no-data" style="grid-column:1/-1;">Loading…</div>
+        </div>
+        <div class="table-wrap" style="margin-top:12px;">
+          <table>
+            <thead><tr><th>Month</th><th>Cycles</th><th style="text-align:right;">NOP</th><th style="text-align:right;">Premium</th><th style="text-align:right;">Commission</th></tr></thead>
+            <tbody id="agentMonthlyBody"><tr><td colspan="5" class="no-data">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Policy detail + filters -->
+      <div class="card" style="margin-top:16px;">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <h3 style="font-size:14px; color:#00243E; margin:0;">Policy Details</h3>
+          <input id="agentFilterInsurer" placeholder="Insurer contains…" oninput="agentRenderPolicies()"
+                 style="height:30px; font-size:13px; padding:0 8px; border:1px solid #cfe6f5; border-radius:4px;">
+          <select id="agentFilterVt" onchange="agentRenderPolicies()" style="height:30px; font-size:13px;"><option value="">All vehicle types</option></select>
+          <select id="agentFilterPaid" onchange="agentRenderPolicies()" style="height:30px; font-size:13px;">
+            <option value="">Paid &amp; Unpaid</option><option value="paid">Paid only</option><option value="unpaid">Unpaid only</option>
+          </select>
+          <span id="agentPolicyCount" style="font-size:12px; color:#888; margin-left:auto;"></span>
+        </div>
+        <div class="table-wrap" style="margin-top:10px;">
+          <table>
+            <thead><tr>
+              <th>Policy No</th><th>Insurer</th><th>Vehicle Type</th><th>Reg No</th>
+              <th style="text-align:right;">Premium</th><th style="text-align:right;">Comm Rate %</th>
+              <th style="text-align:right;">Comm Amount</th><th style="text-align:center;">Status</th>
+            </tr></thead>
+            <tbody id="agentPolicyBody"><tr><td colspan="8" class="no-data">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      </div><!-- /agentPayoutView -->
+
+      <!-- ===== Motor Renewals view ===== -->
+      <div id="agentRenewalView" style="display:none;">
+        <!-- Date filters -->
+        <div class="card" style="margin-top:16px; display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap;">
+          <div>
+            <label style="font-size:11px; color:#888; display:block; text-transform:uppercase; letter-spacing:0.5px;">End Date From</label>
+            <input type="date" id="renFrom" style="height:32px; font-size:13px; padding:0 8px; border:1px solid #cfe6f5; border-radius:4px;">
+          </div>
+          <div>
+            <label style="font-size:11px; color:#888; display:block; text-transform:uppercase; letter-spacing:0.5px;">End Date To</label>
+            <input type="date" id="renTo" style="height:32px; font-size:13px; padding:0 8px; border:1px solid #cfe6f5; border-radius:4px;">
+          </div>
+          <button class="btn btn-sm" onclick="agentClearRenewals()" style="background:#fff; border:1px solid #e0a800; color:#b8860b;">Clear</button>
+          <button class="btn btn-primary btn-sm" onclick="loadAgentRenewals()">Search</button>
+          <input id="renSearch" placeholder="&#128269; Search…" oninput="renRenderTable()"
+                 style="height:32px; font-size:13px; padding:0 10px; border:1px solid #cfe6f5; border-radius:20px; margin-left:auto; min-width:220px;">
+          <button class="btn btn-primary btn-sm" onclick="agentDownloadRenewals()">&#128229; Download</button>
+        </div>
+
+        <!-- Summary: Total / Renewed / Lost -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:14px; margin-top:16px;">
+          <div class="card" style="border-top:4px solid #e0a800;">
+            <div style="text-align:center; font-weight:700; color:#00243E;">Total</div>
+            <div style="display:flex; justify-content:space-around; margin-top:10px;">
+              <div style="text-align:center;"><div style="font-size:11px; color:#888;">NOP</div><div id="renTotNop" style="font-size:24px; font-weight:700;">—</div></div>
+              <div style="text-align:center;"><div style="font-size:11px; color:#888;">Premium</div><div id="renTotPrem" style="font-size:24px; font-weight:700;">—</div></div>
+            </div>
+          </div>
+          <div class="card" style="border-top:4px solid #2e7d32;">
+            <div style="text-align:center; font-weight:700; color:#1b5e20;">Renewed</div>
+            <div style="display:flex; justify-content:space-around; margin-top:10px;">
+              <div style="text-align:center;"><div style="font-size:11px; color:#888;">NOP</div><div id="renRenNop" style="font-size:24px; font-weight:700; color:#1b5e20;">—</div></div>
+              <div style="text-align:center;"><div style="font-size:11px; color:#888;">Premium</div><div id="renRenPrem" style="font-size:24px; font-weight:700; color:#1b5e20;">—</div></div>
+            </div>
+          </div>
+          <div class="card" style="border-top:4px solid #c62828;">
+            <div style="text-align:center; font-weight:700; color:#c62828;">Lost</div>
+            <div style="display:flex; justify-content:space-around; margin-top:10px;">
+              <div style="text-align:center;"><div style="font-size:11px; color:#888;">NOP</div><div id="renLostNop" style="font-size:24px; font-weight:700; color:#c62828;">—</div></div>
+              <div style="text-align:center;"><div style="font-size:11px; color:#888;">Premium</div><div id="renLostPrem" style="font-size:24px; font-weight:700; color:#c62828;">—</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Details -->
+        <div class="card" style="margin-top:16px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+            <h3 style="font-size:14px; color:#00243E; margin:0;">Details</h3>
+            <span id="renCount" style="font-size:12px; color:#888;"></span>
+          </div>
+          <div class="table-wrap" style="margin-top:10px;">
+            <table>
+              <thead><tr>
+                <th>Insurer</th><th>Product</th><th>Customer</th><th>Agent</th><th>Vehicle</th>
+                <th>Reg No</th><th>Policy No</th><th>End Date</th><th style="text-align:right;">Premium</th>
+                <th style="text-align:center;">Status</th><th style="text-align:center;">Docs</th>
+              </tr></thead>
+              <tbody id="renBody"><tr><td colspan="11" class="no-data">Choose a date range and click Search.</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div><!-- /agentRenewalView -->
+    </div>
+
   </div>
 
   <div class="toast-container" id="toastContainer"></div>
@@ -3166,8 +3423,16 @@
      *  can't read. Column hiding happens per-render in each screen's code,
      *  reading from permFor(screenKey).hidden_columns. */
     function applyPermissions() {
+      const isAgent = !!(_currentUser && _currentUser.role === 'agent');
       document.querySelectorAll('.tabs .tab').forEach(tab => {
         const k = tab.dataset.tab;
+        // Agents (POSLG logins) see ONLY the Agent View tab.
+        if (isAgent) { tab.style.display = (k === 'agent-view') ? '' : 'none'; return; }
+        // Agent View tab: agents (handled above) + admins only.
+        if (k === 'agent-view') {
+          tab.style.display = (_currentUser && _currentUser.role === 'admin') ? '' : 'none';
+          return;
+        }
         // Admin tab is admin-only.
         if (k === 'admin') {
           tab.style.display = (_currentUser && _currentUser.role === 'admin') ? '' : 'none';
@@ -3176,6 +3441,17 @@
         const p = permFor(k);
         tab.style.display = p.read ? '' : 'none';
       });
+      // Agents land on Agent View by default.
+      if (isAgent) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        const at = document.querySelector('.tab[data-tab="agent-view"]');
+        const ap = document.getElementById('panel-agent-view');
+        if (at) at.classList.add('active');
+        if (ap) ap.classList.add('active');
+        if (typeof loadAgentView === 'function') loadAgentView();
+        return;
+      }
       // If the currently-active tab got hidden, fall back to the first visible.
       const active = document.querySelector('.tabs .tab.active');
       if (active && active.style.display === 'none') {
@@ -3220,10 +3496,12 @@
         tab.classList.add('active');
         document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
         if (tab.dataset.tab === 'admin') adminLoad();
+        if (tab.dataset.tab === 'agent-view') loadAgentView();
         if (tab.dataset.tab === 'masters' && !_mInsurersLoaded) loadMasterInsurers();
         if (tab.dataset.tab === 'utr') utrPopulateCycles();
         if (tab.dataset.tab === 'margin-exceptions') loadMarginExceptions();
         if (tab.dataset.tab === 'recon' && !window._reconInited) reconInit();
+        if (tab.dataset.tab === 'reconcile') rcInit();
         if (tab.dataset.tab === 'pr' && !window._prDashInited) prDashInit();
         // Margin coverage scan is expensive — defer until tab first opened.
         if (tab.dataset.tab === 'margins' && !window._marginCoverageInited) {
@@ -3232,6 +3510,236 @@
         }
       });
     });
+
+    // ============ AGENT VIEW ============
+    // Self-service dashboard for POSLG agents (and admins inspecting an agent).
+    // All data is server-scoped to the logged-in agent's own policies.
+    let _agentState = { policies: [], summary: null };
+    const _inrFmt = (n) => '₹ ' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    async function loadAgentView() {
+      const metaEl = document.getElementById('agentMeta');
+      if (metaEl) metaEl.textContent = (_currentUser ? (_currentUser.name || _currentUser.empcode) : '') + ' — loading…';
+      try {
+        const [sumR, polR, monR] = await Promise.all([
+          fetch(API + '/agent/summary').then(r => r.json()),
+          fetch(API + '/agent/policies').then(r => r.json()),
+          fetch(API + '/agent/monthly').then(r => r.json()),
+        ]);
+        if (!sumR.success) throw new Error(sumR.error || 'summary failed');
+        if (!polR.success) throw new Error(polR.error || 'policies failed');
+        _agentState.summary = sumR;
+        _agentState.policies = polR.policies || [];
+        // KPIs
+        document.getElementById('agentKpiNop').textContent = sumR.totals.nop;
+        document.getElementById('agentKpiPremium').textContent = _inrFmt(sumR.totals.premium);
+        document.getElementById('agentKpiComm').textContent = _inrFmt(sumR.totals.commission);
+        if (metaEl) metaEl.innerHTML = `<strong>${escapeHtml(_currentUser ? (_currentUser.empcode) : sumR.agent)}</strong>` +
+          (sumR.cycle_id != null ? ` · ${escapeHtml(sumR.cycle_name || ('Cycle ' + sumR.cycle_id))}` : ' · no data');
+        // By vehicle type (clickable → sets the VT filter)
+        const vtBody = document.getElementById('agentVtBody');
+        const vts = sumR.by_vehicle_type || [];
+        vtBody.innerHTML = vts.length ? vts.map(g => `
+          <tr style="cursor:pointer;" onclick="agentFilterByVt('${escapeHtml(g.vehicle_type)}')">
+            <td><strong>${escapeHtml(g.vehicle_type)}</strong></td>
+            <td style="text-align:right;">${g.nop}</td>
+            <td style="text-align:right;">${_inrFmt(g.premium)}</td>
+            <td style="text-align:right; color:#e65100;">${_inrFmt(g.commission)}</td>
+          </tr>`).join('') : '<tr><td colspan="4" class="no-data">No policies in this cycle.</td></tr>';
+        // VT filter dropdown
+        const vtSel = document.getElementById('agentFilterVt');
+        const cur = vtSel.value;
+        vtSel.innerHTML = '<option value="">All vehicle types</option>' +
+          vts.map(g => `<option value="${escapeHtml(g.vehicle_type)}">${escapeHtml(g.vehicle_type)} (${g.nop})</option>`).join('');
+        vtSel.value = cur;
+        agentRenderMonthly(monR && monR.success ? (monR.months || []) : []);
+        agentRenderPolicies();
+      } catch (e) {
+        if (metaEl) metaEl.textContent = 'Failed to load: ' + (e && e.message ? e.message : e);
+        document.getElementById('agentPolicyBody').innerHTML = '<tr><td colspan="8" class="no-data" style="color:#c62828;">Load failed.</td></tr>';
+      }
+    }
+
+    function agentRenderMonthly(months) {
+      const cards = document.getElementById('agentMonthlyCards');
+      const body  = document.getElementById('agentMonthlyBody');
+      if (!cards || !body) return;
+      if (!months.length) {
+        cards.innerHTML = '<div class="no-data" style="grid-column:1/-1;">No commission yet.</div>';
+        body.innerHTML  = '<tr><td colspan="5" class="no-data">No data.</td></tr>';
+        return;
+      }
+      cards.innerHTML = months.map(m => `
+        <div class="card" style="text-align:center; border-left:4px solid #ef6c00; margin:0;">
+          <div style="font-size:12px; color:#888; text-transform:uppercase; letter-spacing:0.5px;">${escapeHtml(m.month)}</div>
+          <div style="font-size:22px; font-weight:700; color:#e65100;">${_inrFmt(m.commission)}</div>
+          <div style="font-size:11px; color:#999;">${m.nop} policies</div>
+        </div>`).join('');
+      body.innerHTML = months.map(m => `
+        <tr>
+          <td><strong>${escapeHtml(m.month)}</strong></td>
+          <td style="font-size:12px; color:#666;">${escapeHtml((m.cycles || []).join(', ')) || '—'}</td>
+          <td style="text-align:right;">${m.nop}</td>
+          <td style="text-align:right;">${_inrFmt(m.premium)}</td>
+          <td style="text-align:right; color:#e65100; font-weight:600;">${_inrFmt(m.commission)}</td>
+        </tr>`).join('');
+    }
+
+    function agentFilterByVt(vt) {
+      const sel = document.getElementById('agentFilterVt');
+      if (sel) sel.value = vt;
+      agentRenderPolicies();
+    }
+
+    function agentRenderPolicies() {
+      const ins  = (document.getElementById('agentFilterInsurer').value || '').trim().toLowerCase();
+      const vt   = document.getElementById('agentFilterVt').value || '';
+      const paid = document.getElementById('agentFilterPaid').value || '';
+      let rows = _agentState.policies.slice();
+      if (ins)  rows = rows.filter(r => String(r.insurer || '').toLowerCase().includes(ins) || String(r.insurer_slug || '').toLowerCase().includes(ins));
+      if (vt)   rows = rows.filter(r => r.vehicle_type === vt);
+      if (paid === 'paid')   rows = rows.filter(r => r.paid);
+      if (paid === 'unpaid') rows = rows.filter(r => !r.paid);
+      const body = document.getElementById('agentPolicyBody');
+      body.innerHTML = rows.length ? rows.map(r => `
+        <tr>
+          <td style="font-family:monospace;">${escapeHtml(r.policy_no) || '-'}</td>
+          <td>${escapeHtml(r.insurer) || '-'}</td>
+          <td>${escapeHtml(r.vehicle_type) || '-'}</td>
+          <td>${escapeHtml(r.reg_no) || '-'}</td>
+          <td style="text-align:right;">${_inrFmt(r.premium)}</td>
+          <td style="text-align:right;">${Number(r.commission_rate || 0).toFixed(2)}%</td>
+          <td style="text-align:right; color:#e65100; font-weight:600;">${_inrFmt(r.commission)}</td>
+          <td style="text-align:center;">${r.paid
+            ? '<span class="badge" style="background:#2e7d32; color:#fff;">Paid</span>'
+            : '<span class="badge" style="background:#bbb; color:#fff;">Unpaid</span>'}</td>
+        </tr>`).join('') : '<tr><td colspan="8" class="no-data">No policies match these filters.</td></tr>';
+      document.getElementById('agentPolicyCount').textContent = rows.length + ' of ' + _agentState.policies.length + ' policies';
+    }
+
+    function agentDownloadStatement() {
+      const cid = _agentState.summary && _agentState.summary.cycle_id;
+      const url = API + '/agent/statement' + (cid != null ? ('?cycle_id=' + cid) : '');
+      // fetchAndDownload sends the Bearer token (wrapped fetch) and saves the blob.
+      fetchAndDownload(url, 'payout_statement.xlsx').catch(e => showToast('Download failed: ' + (e && e.message ? e.message : e), 'error'));
+    }
+
+    // ============ AGENT — MOTOR RENEWALS ============
+    let _renState = { details: [], loaded: false };
+    const _lakhFmt = (n) => '₹' + (Number(n || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'L';
+    const _ymd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+
+    function agentSwitchView(which) {
+      const pay = document.getElementById('agentPayoutView');
+      const ren = document.getElementById('agentRenewalView');
+      const bP = document.getElementById('agentSubPayout');
+      const bR = document.getElementById('agentSubRenewal');
+      const stBtn = document.getElementById('agentStatementBtn');
+      const on = (b) => { b.style.background = '#0082C8'; b.style.color = '#fff'; };
+      const off = (b) => { b.style.background = '#eef4fa'; b.style.color = '#00243E'; };
+      if (which === 'renewal') {
+        pay.style.display = 'none'; ren.style.display = ''; on(bR); off(bP);
+        if (stBtn) stBtn.style.display = 'none';
+        // Default the date range to this month, then load once.
+        if (!_renState.loaded) {
+          const today = new Date();
+          const eom = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+          document.getElementById('renFrom').value = _ymd(today);
+          document.getElementById('renTo').value = _ymd(eom);
+          loadAgentRenewals();
+        }
+      } else {
+        pay.style.display = ''; ren.style.display = 'none'; on(bP); off(bR);
+        if (stBtn) stBtn.style.display = '';
+      }
+    }
+
+    function agentClearRenewals() {
+      document.getElementById('renFrom').value = '';
+      document.getElementById('renTo').value = '';
+      document.getElementById('renSearch').value = '';
+      loadAgentRenewals();
+    }
+
+    async function loadAgentRenewals() {
+      const from = document.getElementById('renFrom').value || '';
+      const to   = document.getElementById('renTo').value || '';
+      const body = document.getElementById('renBody');
+      body.innerHTML = '<tr><td colspan="11" class="no-data">Loading…</td></tr>';
+      try {
+        const qs = new URLSearchParams();
+        if (from) qs.set('from', from);
+        if (to)   qs.set('to', to);
+        const r = await fetch(API + '/agent/renewals?' + qs.toString()).then(x => x.json());
+        if (!r.success) throw new Error(r.error || 'failed');
+        _renState.details = r.details || [];
+        _renState.loaded = true;
+        const s = r.summary || {};
+        document.getElementById('renTotNop').textContent  = s.total_nop || 0;
+        document.getElementById('renTotPrem').textContent = _lakhFmt(s.total_premium_lakhs);
+        document.getElementById('renRenNop').textContent  = s.renewed_nop || 0;
+        document.getElementById('renRenPrem').textContent = _lakhFmt(s.renewed_premium_lakhs);
+        document.getElementById('renLostNop').textContent  = s.lost_nop || 0;
+        document.getElementById('renLostPrem').textContent = _lakhFmt(s.lost_premium_lakhs);
+        renRenderTable();
+      } catch (e) {
+        body.innerHTML = '<tr><td colspan="11" class="no-data" style="color:#c62828;">Load failed: ' + escapeHtml(e && e.message ? e.message : String(e)) + '</td></tr>';
+      }
+    }
+
+    function renRenderTable() {
+      const q = (document.getElementById('renSearch').value || '').trim().toLowerCase();
+      let rows = _renState.details.slice();
+      if (q) rows = rows.filter(r => [r.insurer, r.product_type, r.customer_name, r.agent_code, r.agent_name,
+        r.vehicle_type, r.registration_no, r.policy_no, r.status].some(v => String(v || '').toLowerCase().includes(q)));
+      const body = document.getElementById('renBody');
+      const fmtDate = (d) => { if (!d) return '-'; const dt = new Date(d); return isNaN(dt) ? '-' : dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); };
+      const statusBadge = (st) => {
+        const s = String(st || '').toLowerCase();
+        if (s === 'renewed') return '<span class="badge" style="background:#2e7d32; color:#fff;">Renewed</span>';
+        if (s === 'lost')    return '<span class="badge" style="background:#c62828; color:#fff;">Lost</span>';
+        return '<span class="badge" style="background:#bbb; color:#fff;">' + (escapeHtml(st) || 'Pending') + '</span>';
+      };
+      const docLink = (url, label) => url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" title="${label}" style="text-decoration:none;">&#128196;</a>` : '';
+      body.innerHTML = rows.length ? rows.map(r => `
+        <tr>
+          <td>${escapeHtml(r.insurer) || '-'}</td>
+          <td>${escapeHtml(r.product_type) || '-'}</td>
+          <td>${escapeHtml(r.customer_name) || '-'}</td>
+          <td>${escapeHtml(r.agent_code) || '-'}<div style="font-size:11px; color:#888;">${escapeHtml(r.agent_name) || ''}</div></td>
+          <td>${escapeHtml(r.vehicle_type) || '-'}</td>
+          <td style="font-family:monospace;">${escapeHtml(r.registration_no) || '-'}</td>
+          <td style="font-family:monospace;">${escapeHtml(r.policy_no) || '-'}</td>
+          <td style="color:#e65100;">${fmtDate(r.policy_end_date)}</td>
+          <td style="text-align:right;">${_inrFmt(r.premium)}</td>
+          <td style="text-align:center;">${statusBadge(r.status)}</td>
+          <td style="text-align:center; white-space:nowrap;">${docLink(r.prev_policy_url, 'Previous Policy')} ${docLink(r.renewal_notice_url, 'Renewal Notice')}</td>
+        </tr>`).join('') : '<tr><td colspan="11" class="no-data">No renewals in this range.</td></tr>';
+      document.getElementById('renCount').textContent = rows.length + ' of ' + _renState.details.length + ' policies';
+    }
+
+    function agentDownloadRenewals() {
+      const q = (document.getElementById('renSearch').value || '').trim().toLowerCase();
+      let rows = _renState.details.slice();
+      if (q) rows = rows.filter(r => [r.insurer, r.product_type, r.customer_name, r.agent_code, r.agent_name,
+        r.vehicle_type, r.registration_no, r.policy_no, r.status].some(v => String(v || '').toLowerCase().includes(q)));
+      if (!rows.length) { showToast('Nothing to download', 'error'); return; }
+      const header = ['Insurer', 'Product Type', 'Customer Name', 'Agent Code', 'Agent Name', 'Vehicle Type',
+        'Engine No', 'Chassis No', 'Reg No', 'Policy No', 'Policy End Date', 'Premium', 'Status'];
+      const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+      const lines = [header.map(esc).join(',')];
+      for (const r of rows) {
+        lines.push([r.insurer, r.product_type, r.customer_name, r.agent_code, r.agent_name, r.vehicle_type,
+          r.engine_no, r.chassis_no, r.registration_no, r.policy_no,
+          r.policy_end_date ? new Date(r.policy_end_date).toLocaleDateString('en-IN') : '', r.premium, r.status].map(esc).join(','));
+      }
+      const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'motor_renewals.csv';
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 100);
+    }
 
     // ============ SIDEBAR TOGGLE ============
     // Collapse / expand the vertical sidebar.  State persists in
@@ -6954,6 +7462,33 @@
       }
     }
 
+    // Download ALL insurers' OUTGOING rates in the Luca format (no income/margin).
+    async function downloadLucaData() {
+      const insurer = (document.getElementById('exportInsurerFilter') || {}).value || '';
+      const qs = new URLSearchParams();
+      if (insurer) qs.set('insurer', insurer);
+      const url = API + '/export/luca' + (qs.toString() ? '?' + qs.toString() : '');
+      const stem = ['luca', insurer || 'all'].filter(Boolean).join('_');
+      const btn = document.getElementById('downloadLucaBtn');
+      const originalLabel = btn ? btn.innerHTML : null;
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner" style="display:inline-block; margin-right:6px;"></span>Preparing…';
+        btn.style.cursor = 'wait';
+      }
+      try {
+        await fetchAndDownload(url, stem + '.xlsx');
+      } catch (e) {
+        showToast('Luca download failed: ' + (e && e.message ? e.message : e), 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalLabel;
+          btn.style.cursor = '';
+        }
+      }
+    }
+
     async function cloneRateCard(id, name) {
       // Default the new effective_from to the 1st of next month based on
       // today's date.  Lets the user click through quickly while still
@@ -7115,6 +7650,7 @@
         <div class="stat-card"><div class="num" style="font-size:14px; font-family:monospace; letter-spacing:1px;">${params.vehicleRegNo || '-'}</div><div class="label">Vehicle Reg No</div></div>
         <div class="stat-card"><div class="num">\u20B9 ${(params.odPremium || 0).toLocaleString('en-IN')}</div><div class="label">OD Premium</div></div>
         <div class="stat-card"><div class="num">\u20B9 ${(params.tpPremium || 0).toLocaleString('en-IN')}</div><div class="label">TP Premium</div></div>
+        <div class="stat-card"><div class="num">\u20B9 ${(params.addonPremium || 0).toLocaleString('en-IN')}</div><div class="label">Add-on Premium</div></div>
         <div class="stat-card"><div class="num">\u20B9 ${(params.netPremium || 0).toLocaleString('en-IN')}</div><div class="label">Net Premium</div></div>
         <div class="stat-card"><div class="num">\u20B9 ${(params.annualPremium || 0).toLocaleString('en-IN')}</div><div class="label">Annual Premium</div></div>
         <div class="stat-card"><div class="num">${params.vehicleAge != null ? params.vehicleAge + ' yr' : '-'}</div><div class="label">Vehicle Age</div></div>
@@ -8775,16 +9311,22 @@
       if (!a) { showToast('Pick an agent first', 'error'); return; }
       const val = Number(document.getElementById('srGlobalUpliftInput').value);
       if (!isFinite(val)) { showToast('Enter a number', 'error'); return; }
+      // Scope the uplift to the current Vehicle Type / Insurer filter, if set.
+      // Blank filters = agent-wide uplift (original behaviour).
+      const product = (document.getElementById('srFilterProduct') || {}).value || '';
+      const insurer = (document.getElementById('srFilterInsurer') || {}).value || '';
+      const scopeLabel = [product && product.trim(), insurer && insurer.trim()].filter(Boolean).join(' + ') || 'all rules';
       try {
         const res = await fetch(API + '/special-rates/global', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             upincode: a.upincode, pos_name: a.posfullname || null, uplift_pct: val,
+            product: product.trim() || null, insurer: insurer.trim() || null,
           }),
         });
         const j = await res.json();
         if (!j.success) throw new Error(j.error || 'save failed');
-        showToast(`Global uplift ${j.action || 'saved'}`, 'success');
+        showToast(`Uplift ${j.action || 'saved'} (+${val}% → ${scopeLabel})`, 'success');
         // Refetch so the table reflects the new effective margins.
         srPickAgent(a);
       } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
@@ -9651,7 +10193,7 @@
       if (addBar) addBar.style.display = _bulkActiveCycleId ? '' : 'none';
 
       if (rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="27" class="no-data">No policies in the selected range.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="31" class="no-data">No policies in the selected range.</td></tr>';
         return;
       }
       // Small helper: pretty source tag for tmp_poscodes vs TMP_MAAGENT fallback.
@@ -9700,6 +10242,8 @@
           })()}</td>
           <td style="text-align:right;">${inr(r.premium_base)}</td>
           <td>${escapeHtml(r.matched_rate_type) || '-'}<div style="font-size:11px; color:#888;">${escapeHtml(r.matched_segment) || ''}</div></td>
+          <td style="text-align:right; color:#0066cc;">${r.od_rate != null ? (r.od_rate*100).toFixed(2) + '%' : '<span style="color:#ccc;">—</span>'}</td>
+          <td style="text-align:right; color:#0066cc;">${r.tp_rate != null ? (r.tp_rate*100).toFixed(2) + '%' : '<span style="color:#ccc;">—</span>'}</td>
           <td style="text-align:right;">${r.rate_pct != null ? r.rate_pct.toFixed(2) + '%' : '-'}</td>
           <td style="text-align:right;">
             <span class="badge badge-orange">${(r.margin_pct || 0).toFixed(2)}%</span>
@@ -9729,6 +10273,8 @@
                   style="width:68px; padding:3px 6px; font-size:12px; text-align:right; border:1px solid #BFE5FF; border-radius:4px; ${_bulkFinalized ? 'background:#fafafa; color:#888; cursor:not-allowed;' : ''}"
                   title="${_bulkFinalized ? 'Cycle is finalized — unfinalize to edit' : 'Edit outgoing % — saves on blur / Enter when a cycle is active'}">` : '<span style="color:#bbb;">\u2014</span>'}
           </td>
+          <td style="text-align:right; color:#0066cc;">${r.od_comm != null ? inr(r.od_comm) : '<span style="color:#ccc;">—</span>'}</td>
+          <td style="text-align:right; color:#0066cc;">${r.tp_comm != null ? inr(r.tp_comm) : '<span style="color:#ccc;">—</span>'}</td>
           <td style="text-align:right;"><strong>${inr(r.income)}</strong></td>
           <td style="text-align:right; color:#ef6c00;" data-bulk-savings="${i}"><strong>${inr(r.savings)}</strong></td>
           <td style="text-align:right; color:#2e7d32;" data-bulk-outgoing="${i}"><strong>${inr(r.outgoing)}</strong></td>
@@ -9782,7 +10328,7 @@
         </tr>`;
       }).join('');
       if (rows.length > MAX_RENDER) {
-        const moreNote = `<tr><td colspan="27" style="padding:12px; text-align:center; color:#888;">Showing first ${MAX_RENDER} of ${rows.length} \u2014 download CSV for the full breakdown.</td></tr>`;
+        const moreNote = `<tr><td colspan="31" style="padding:12px; text-align:center; color:#888;">Showing first ${MAX_RENDER} of ${rows.length} \u2014 download CSV for the full breakdown.</td></tr>`;
         tbody.insertAdjacentHTML('beforeend', moreNote);
       }
     }
@@ -10072,7 +10618,7 @@
             <div><div style="font-size:11px; color:#888;">Sheet</div><div>${escapeHtml(r.matched_sheet) || '-'}</div></div>
             <div><div style="font-size:11px; color:#888;">Segment</div><div>${escapeHtml(r.matched_segment) || '-'}</div></div>
             <div><div style="font-size:11px; color:#888;">Rate Type</div><div><span class="badge badge-blue">${escapeHtml(r.matched_rate_type) || '-'}</span></div></div>
-            <div><div style="font-size:11px; color:#888;">Rate</div><div><strong>${r.rate_pct != null ? r.rate_pct.toFixed(2) + '%' : '-'}</strong></div></div>
+            <div><div style="font-size:11px; color:#888;">Rate${(r.od_rate != null && r.tp_rate != null) ? ' (OD+TP)' : ''}</div><div><strong>${r.rate_pct != null ? r.rate_pct.toFixed(2) + '%' : '-'}</strong>${(r.od_rate != null && r.tp_rate != null) ? `<span style="font-size:11px; color:#0066cc;"> = OD ${(r.od_rate*100).toFixed(2)}% + TP ${(r.tp_rate*100).toFixed(2)}%</span>` : ''}</div></div>
             <div><div style="font-size:11px; color:#888;">Resolved Region</div><div>${escapeHtml(r.region) || '-'}</div></div>
             <div><div style="font-size:11px; color:#888;">Insurer slug</div><div>${escapeHtml(r.insurer_slug) || '-'}</div></div>
             <div><div style="font-size:11px; color:#888;">Vehicle Type</div><div>${r.vehicle_type || '-'}</div></div>
@@ -10084,7 +10630,11 @@
               <div style="font-size:11px; color:#888; margin-bottom:4px;">Calculation</div>
               <div style="font-family:ui-monospace, Menlo, monospace; font-size:12px; color:#333;">
                 <div>Premium base &rarr; <strong>${inr(r.premium_base)}</strong></div>
-                <div>Income   = ${r.rate_pct != null ? r.rate_pct.toFixed(2) : 0}% &times; ${inr(r.premium_base)} = <strong style="color:#00243E;">${inr(r.income)}</strong></div>
+                ${(r.od_rate != null && r.tp_rate != null)
+                  ? `<div>OD Comm  = ${(r.od_rate*100).toFixed(2)}% &times; ${inr(r.od_premium)} = <strong>${inr(r.od_comm)}</strong></div>
+                     <div>TP Comm  = ${(r.tp_rate*100).toFixed(2)}% &times; ${inr(r.tp_premium)} = <strong>${inr(r.tp_comm)}</strong></div>
+                     <div>Income   = OD Comm + TP Comm = <strong style="color:#00243E;">${inr(r.income)}</strong></div>`
+                  : `<div>Income   = ${r.rate_pct != null ? r.rate_pct.toFixed(2) : 0}% &times; ${inr(r.premium_base)} = <strong style="color:#00243E;">${inr(r.income)}</strong></div>`}
                 <div>Savings  = ${(r.margin_pct || 0).toFixed(2)}% &times; ${inr(r.premium_base)} = <strong style="color:#ef6c00;">${inr(r.savings)}</strong>${r.margin_id ? ` <span class="badge badge-orange" style="margin-left:6px;">Margin id ${r.margin_id}</span>` : ' <span style="color:#999; font-size:11px;">(no matching margin rule)</span>'}</div>
                 <div>Outgoing = Income &minus; Savings = <strong style="color:#2e7d32;">${inr(r.outgoing)}</strong></div>
                 ${r.statement_amount != null
@@ -10415,7 +10965,7 @@
         for (const ins of (data.insurers || [])) {
           const opt = document.createElement('option');
           opt.value = ins.slug;
-          opt.textContent = ins.label + ' (' + ins.slug + ')';
+          opt.textContent = ins.label + ' (' + ins.slug + ')' + (ins.mapped === false ? ' — generic' : '');
           sel.appendChild(opt);
         }
         // Year dropdown — current-3 through current+1
@@ -11376,6 +11926,441 @@
       a.href = url; a.download = 'payout_summary_' + new Date().toISOString().slice(0, 10) + '.csv';
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
+    }
+
+    // ============ FILE RECONCILIATION ============
+    let _rcData = null;            // last comparison result
+    let _rcView = 'rate';          // 'rate' | 'missOurs' | 'missExcel'
+    let _rcIgnored = new Set();    // tracker keys the user ignored (persisted per cycle)
+    let _rcIgnoreNotes = {};       // tracker -> { note, ts } reason captured on ignore (persisted per cycle)
+
+    // Ignores persist per cycle in localStorage so they survive Re-compare
+    // and page reloads.
+    function rcIgnoreKey() {
+      const cid = document.getElementById('rcCycle').value || '0';
+      return 'rx.reconcile.ignored.' + cid;
+    }
+    function rcNotesKey() {
+      const cid = document.getElementById('rcCycle').value || '0';
+      return 'rx.reconcile.ignorenotes.' + cid;
+    }
+    function rcLoadIgnores() {
+      try { _rcIgnored = new Set(JSON.parse(localStorage.getItem(rcIgnoreKey()) || '[]')); }
+      catch (_) { _rcIgnored = new Set(); }
+      try { _rcIgnoreNotes = JSON.parse(localStorage.getItem(rcNotesKey()) || '{}') || {}; }
+      catch (_) { _rcIgnoreNotes = {}; }
+    }
+    function rcSaveIgnores() {
+      try { localStorage.setItem(rcIgnoreKey(), JSON.stringify([..._rcIgnored])); } catch (_) {}
+      try { localStorage.setItem(rcNotesKey(), JSON.stringify(_rcIgnoreNotes)); } catch (_) {}
+    }
+
+    function rcInit() {
+      // Populate cycle dropdown (reuse the shared _cycles list).
+      const sel = document.getElementById('rcCycle');
+      if (sel) {
+        const cur = sel.value;
+        sel.innerHTML = '<option value="">-- Select a cycle --</option>' +
+          (_cycles || []).map(c => `<option value="${c.id}">${escapeHtml(c.name)} (${escapeHtml(c.date_from)} → ${escapeHtml(c.date_to)})</option>`).join('');
+        if (cur) sel.value = cur;
+      }
+      const file = document.getElementById('rcFile');
+      const updateBtn = async () => {
+        document.getElementById('rcRunBtn').disabled = !(sel.value && file.files.length);
+        // Enable Re-compare only if the server has a cached file for this cycle.
+        const rcBtn = document.getElementById('rcRecompareBtn');
+        rcBtn.disabled = true;
+        if (sel.value) {
+          try {
+            const j = await fetch(API + '/cycle-bulk/' + sel.value + '/recon-file').then(r => r.json());
+            if (j.has_file) {
+              rcBtn.disabled = false;
+              rcBtn.title = 'Re-run against last uploaded file' + (j.name ? ' (' + j.name + ')' : '');
+            }
+          } catch (_) { /* noop */ }
+        }
+      };
+      sel.onchange = updateBtn;
+      file.onchange = updateBtn;
+      updateBtn();
+    }
+
+    async function rcRecompare() {
+      const cycleId = document.getElementById('rcCycle').value;
+      if (!cycleId) { showToast('Pick a cycle', 'error'); return; }
+      const status = document.getElementById('rcStatus');
+      const btn = document.getElementById('rcRecompareBtn');
+      btn.disabled = true;
+      status.textContent = 'Re-comparing against last uploaded file…';
+      try {
+        const res = await fetch(API + '/cycle-bulk/' + cycleId + '/recompare', { method: 'POST' });
+        const j = await res.json();
+        if (!res.ok || !j.success) throw new Error(j.error || ('HTTP ' + res.status));
+        _rcData = j;
+        rcLoadIgnores();
+        rcRenderKpis();
+        rcPopulateInsurers();
+        document.getElementById('rcKpis').style.display = '';
+        document.getElementById('rcResults').style.display = '';
+        document.getElementById('rcXlsxBtn').disabled = false;
+        rcSetView(_rcView || 'rate');
+        status.textContent = 'Re-compared (last file) · Sheet "' + (j.detected_columns?.sheet || '?') + '".';
+      } catch (e) {
+        showToast('Re-compare failed: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function rcRun() {
+      const cycleId = document.getElementById('rcCycle').value;
+      const file = document.getElementById('rcFile').files[0];
+      if (!cycleId || !file) { showToast('Pick a cycle and a file', 'error'); return; }
+      const status = document.getElementById('rcStatus');
+      const btn = document.getElementById('rcRunBtn');
+      btn.disabled = true;
+      status.textContent = 'Uploading & comparing…';
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch(API + '/cycle-bulk/' + cycleId + '/compare-trackers', {
+          method: 'POST', body: fd,
+        });
+        const j = await res.json();
+        if (!res.ok || !j.success) throw new Error(j.error || ('HTTP ' + res.status));
+        _rcData = j;
+        rcLoadIgnores();
+        rcRenderKpis();
+        rcPopulateInsurers();
+        document.getElementById('rcKpis').style.display = '';
+        document.getElementById('rcResults').style.display = '';
+        document.getElementById('rcXlsxBtn').disabled = false;
+        rcSetView('rate');
+        status.textContent = 'Sheet "' + (j.detected_columns?.sheet || '?') +
+          '" · Tracker col="' + (j.detected_columns?.tracker || '?') +
+          '" · Rate col="' + (j.detected_columns?.rate || '?') + '".';
+      } catch (e) {
+        status.textContent = '';
+        showToast('Compare failed: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function rcRenderKpis() {
+      const s = _rcData.summary || {};
+      document.getElementById('rcKpiExcel').textContent     = s.excel_total ?? '—';
+      document.getElementById('rcKpiCycle').textContent     = s.cycle_total ?? '—';
+      document.getElementById('rcKpiMatched').textContent   = s.matched_count ?? '—';
+      document.getElementById('rcKpiMissOurs').textContent  = s.missing_in_our_data_count ?? '—';
+      document.getElementById('rcKpiMissExcel').textContent = s.missing_in_excel_count ?? '—';
+      // Rate matched / unmatched — recompute on the client so that any tracker
+      // the user has marked "Ignore" counts as a MATCH (not a mismatch).
+      // Excluded rows are left out of both tallies. `ignored` tracks how many
+      // of the matched were genuine mismatches folded in via Ignore, so the
+      // count is transparent.
+      const rc = _rcData.rate_comparison || [];
+      let matched = 0, unmatched = 0, ignored = 0;
+      for (const r of rc) {
+        if (r.excluded) continue;
+        const isIgnored = _rcIgnored.has(r.tracker);
+        if (r.rate_match) matched++;
+        else if (isIgnored) { matched++; ignored++; }   // ignored mismatch → counts as match
+        else unmatched++;
+      }
+      document.getElementById('rcKpiRate').textContent =
+        matched + ' / ' + unmatched + (ignored ? ' (' + ignored + ' ignored)' : '');
+    }
+
+    function rcPopulateInsurers() {
+      const set = new Set();
+      for (const r of (_rcData.rate_comparison || [])) if (r.insurer) set.add(r.insurer);
+      for (const r of (_rcData.missing_in_excel || [])) if (r.insurer) set.add(r.insurer);
+      const sel = document.getElementById('rcInsurerFilter');
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">All Insurers</option>' +
+        [...set].sort().map(i => `<option value="${escapeAttr(i)}">${escapeHtml(i)}</option>`).join('');
+      if (cur) sel.value = cur;
+
+      // Vehicle Type filter
+      const vset = new Set();
+      for (const r of (_rcData.rate_comparison || [])) if (r.vehicle_type) vset.add(r.vehicle_type);
+      for (const r of (_rcData.missing_in_excel || [])) if (r.vehicle_type) vset.add(r.vehicle_type);
+      const vsel = document.getElementById('rcVehFilter');
+      if (vsel) {
+        const vcur = vsel.value;
+        vsel.innerHTML = '<option value="">All</option>' +
+          [...vset].sort().map(v => `<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`).join('');
+        if (vcur) vsel.value = vcur;
+      }
+    }
+
+    function rcSetView(v) {
+      _rcView = v;
+      document.querySelectorAll('.rcView').forEach(b => {
+        const on = b.dataset.view === v;
+        b.classList.toggle('btn-primary', on);
+        b.classList.toggle('btn-outline', !on);
+      });
+      // The insurer + match filters only apply to the rate view; keep them
+      // visible but the match filter is meaningful only for rate comparison.
+      document.getElementById('rcMatchFilter').style.display = (v === 'rate') ? '' : 'none';
+      rcRender();
+    }
+
+    function rcRender() {
+      if (!_rcData) return;
+      const insF = document.getElementById('rcInsurerFilter').value;
+      const vehF = (document.getElementById('rcVehFilter') || {}).value || '';
+      const matchF = document.getElementById('rcMatchFilter').value;
+      const q = (document.getElementById('rcSearch').value || '').trim().toLowerCase();
+      const thead = document.getElementById('rcThead');
+      const body = document.getElementById('rcBody');
+      const esc = (v) => v == null ? '' : escapeHtml(String(v));
+      const ignoreBtn = (t) => `<button class="btn btn-sm btn-outline" style="padding:1px 8px;" onclick="rcIgnore('${escapeAttr(t)}')">Ignore</button>`;
+      const rowActions = (r) => `<div style="display:flex; gap:4px; justify-content:center; flex-wrap:wrap;">`
+        + `<button class="btn btn-sm btn-outline" style="padding:1px 8px;" title="Look up this policy (resolved RTO/region, matched rule, our vs file rate)" onclick="rcLookupPolicy('${escapeAttr(r.policy_no || r.tracker || '')}')">🔍</button>`
+        + `<button class="btn btn-sm btn-outline" style="padding:1px 8px;" title="Open QC compare (PR vs Prarambh)" onclick="rcOpenQc('${escapeAttr(r.policy_no || '')}')">QC</button>`
+        + `<button class="btn btn-sm btn-outline" style="padding:1px 8px;" title="Recompute this policy only" onclick="rcRecomputePolicy('${escapeAttr(r.policy_no || '')}', this)">↻ Rate</button>`
+        + ignoreBtn(r.tracker)
+        + `</div>`;
+      const matchesFilters = (r) => {
+        if (_rcIgnored.has(r.tracker)) return false;
+        if (insF && r.insurer !== insF) return false;
+        if (vehF && r.vehicle_type !== vehF) return false;
+        if (q && !(String(r.tracker).toLowerCase().includes(q) ||
+                   String(r.policy_no || '').toLowerCase().includes(q))) return false;
+        return true;
+      };
+      let rows = [], cols = [];
+      if (_rcView === 'rate') {
+        cols = ['Tracker', 'Policy No', 'Insurer', 'Our Rate %', 'File Rate %', 'Diff', 'Match', ''];
+        rows = (_rcData.rate_comparison || []).filter(r => {
+          if (!matchesFilters(r)) return false;
+          if (matchF === 'match' && !r.rate_match) return false;
+          if (matchF === 'mismatch' && r.rate_match) return false;
+          return true;
+        }).map(r => `<tr style="border-bottom:1px solid #eee; ${r.rate_match ? '' : 'background:#fff6f6;'}">
+          <td style="padding:6px;">${esc(r.tracker)}</td>
+          <td style="padding:6px;">${esc(r.policy_no)}</td>
+          <td style="padding:6px;">${esc(r.insurer)}</td>
+          <td style="padding:6px; text-align:right;">${r.our_rate ?? '—'}</td>
+          <td style="padding:6px; text-align:right;">${r.their_rate ?? '—'}</td>
+          <td style="padding:6px; text-align:right; ${Math.abs(r.diff||0)>5?'color:#b71c1c; font-weight:600;':''}">${r.diff ?? '—'}</td>
+          <td style="padding:6px; text-align:center;">${r.rate_match ? '✅' : '❌'}</td>
+          <td style="padding:6px; text-align:center;">${rowActions(r)}</td></tr>`);
+      } else if (_rcView === 'missOurs') {
+        cols = ['Tracker', 'File Rate %', ''];
+        rows = (_rcData.missing_in_our_data || []).filter(r => {
+          if (_rcIgnored.has(r.tracker)) return false;
+          if (q && !String(r.tracker).toLowerCase().includes(q)) return false;
+          return true;
+        }).map(r => `<tr style="border-bottom:1px solid #eee;">
+          <td style="padding:6px;">${esc(r.tracker)}</td>
+          <td style="padding:6px; text-align:right;">${r.their_rate ?? '—'}</td>
+          <td style="padding:6px; text-align:center;">${ignoreBtn(r.tracker)}</td></tr>`);
+      } else if (_rcView === 'missExcel') {
+        cols = ['Tracker', 'Policy No', 'Insurer', 'Our Rate %', ''];
+        rows = (_rcData.missing_in_excel || []).filter(matchesFilters).map(r => `<tr style="border-bottom:1px solid #eee;">
+          <td style="padding:6px;">${esc(r.tracker)}</td>
+          <td style="padding:6px;">${esc(r.policy_no)}</td>
+          <td style="padding:6px;">${esc(r.insurer)}</td>
+          <td style="padding:6px; text-align:right;">${r.our_rate ?? '—'}</td>
+          <td style="padding:6px; text-align:center;">${ignoreBtn(r.tracker)}</td></tr>`);
+      } else {  // 'ignored' — every ignored tracker with its saved reason, for later reference
+        cols = ['Tracker', 'Policy No', 'Insurer', 'Reason', 'When', ''];
+        // Index all known rows by tracker so we can show policy/insurer context.
+        const byTracker = {};
+        for (const r of (_rcData.rate_comparison || [])) byTracker[r.tracker] = r;
+        for (const r of (_rcData.missing_in_our_data || [])) byTracker[r.tracker] = byTracker[r.tracker] || r;
+        for (const r of (_rcData.missing_in_excel || [])) byTracker[r.tracker] = byTracker[r.tracker] || r;
+        rows = [..._rcIgnored].filter(t => {
+          if (!q) return true;
+          const r = byTracker[t] || {};
+          return String(t).toLowerCase().includes(q) || String(r.policy_no || '').toLowerCase().includes(q);
+        }).sort().map(t => {
+          const r = byTracker[t] || {};
+          const n = _rcIgnoreNotes[t] || {};
+          const when = n.ts ? new Date(n.ts).toLocaleString() : '—';
+          return `<tr style="border-bottom:1px solid #eee; background:#fcfcfc;">
+            <td style="padding:6px;">${esc(t)}</td>
+            <td style="padding:6px;">${esc(r.policy_no)}</td>
+            <td style="padding:6px;">${esc(r.insurer)}</td>
+            <td style="padding:6px; color:#444;">${n.note ? esc(n.note) : '<span style="color:#bbb;">(no reason)</span>'}</td>
+            <td style="padding:6px; font-size:12px; color:#888; white-space:nowrap;">${esc(when)}</td>
+            <td style="padding:6px; text-align:center; white-space:nowrap;">
+              <button class="btn btn-sm btn-outline" style="padding:1px 8px;" title="Edit reason" onclick="rcEditNote('${escapeAttr(t)}')">✎ Note</button>
+              <button class="btn btn-sm btn-outline" style="padding:1px 8px;" title="Restore to active comparison" onclick="rcUnignore('${escapeAttr(t)}')">Un-ignore</button>
+            </td></tr>`;
+        });
+      }
+      thead.innerHTML = cols.map(c => `<th style="text-align:${/rate|diff/i.test(c)?'right':'left'}; padding:8px;">${c}</th>`).join('');
+      body.innerHTML = rows.length ? rows.join('') :
+        `<tr><td colspan="${cols.length}" style="padding:20px; text-align:center; color:#999;">No rows.</td></tr>`;
+      document.getElementById('rcRowCount').textContent =
+        rows.length + ' rows' + (_rcIgnored.size ? ' · ' + _rcIgnored.size + ' ignored' : '');
+    }
+
+    /** Open the QC compare workspace for one recon-row policy. The recon row
+     *  only knows the policy_no, so resolve the PR upload that holds it first. */
+    async function rcOpenQc(policyNo) {
+      if (!policyNo) { showToast('No policy number on this row', 'info'); return; }
+      try {
+        const j = await fetch(API + '/pr/find-upload?policy=' + encodeURIComponent(policyNo)).then(r => r.json());
+        if (!j.success || !j.upload_id) {
+          showToast(j.error || 'Policy not found in any active PR upload', 'error');
+          return;
+        }
+        window.open('qc.html?upload=' + j.upload_id + '&policy=' + encodeURIComponent(policyNo), '_blank', 'noopener');
+      } catch (e) {
+        showToast('Could not open QC: ' + e.message, 'error');
+      }
+    }
+
+    /** Recompute a single policy in place (after a PR edit) without re-running
+     *  the whole cycle, then refresh just that row's numbers in the table. */
+    async function rcRecomputePolicy(policyNo, btn) {
+      if (!policyNo) return;
+      const cycleId = document.getElementById('rcCycle').value;
+      if (!cycleId) { showToast('Pick a cycle first', 'info'); return; }
+      const oldLabel = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = '…'; }
+      try {
+        const j = await fetch(API + '/cycle-bulk/' + cycleId + '/recompute-policy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ policy_no: policyNo }),
+        }).then(r => r.json());
+        if (!j.success) throw new Error(j.error || 'recompute failed');
+        // Patch the in-memory row so the table reflects the new rate without a
+        // full re-compare (operator rate is unchanged by a recompute).
+        const row = (_rcData.rate_comparison || []).find(r => r.policy_no === policyNo);
+        if (row) {
+          row.our_rate = j.our_rate;
+          if (row.their_rate != null && j.our_rate != null) {
+            row.diff = +(j.our_rate - row.their_rate).toFixed(3);
+            row.rate_match = Math.abs(row.diff) <= 0.5;
+          }
+        }
+        rcRenderKpis();
+        rcRender();
+        showToast('Recomputed ' + policyNo + ' → ' + (j.our_rate != null ? j.our_rate + '%' : 'no rule'), 'success');
+      } catch (e) {
+        showToast('Recompute failed: ' + e.message, 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = oldLabel || '↻ Rate'; }
+      }
+    }
+
+    /** Policy lookup — fetch one policy's computed detail for the selected
+     *  cycle and render a compact card. Cross-references the loaded recon file
+     *  (if any) for the operator rate, and offers QC + per-policy recompute. */
+    async function rcLookupPolicy(keyArg) {
+      const cycleId = document.getElementById('rcCycle').value;
+      // When invoked from a row action we pass the policy explicitly; mirror it
+      // into the lookup box so the user sees what was looked up and can re-run.
+      const input = document.getElementById('rcLookupInput');
+      let key;
+      if (keyArg != null) { key = String(keyArg).trim(); if (input) input.value = key; }
+      else { key = (input && input.value || '').trim(); }
+      const out = document.getElementById('rcLookupResult');
+      if (!cycleId) { showToast('Pick a cycle first', 'info'); return; }
+      if (!key) { out.innerHTML = ''; return; }
+      // Surface the detail card even when triggered from a deep row.
+      if (out && out.scrollIntoView) out.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      out.innerHTML = '<span style="color:#888; font-size:13px;">Looking up…</span>';
+      try {
+        const j = await fetch(API + '/cycle-bulk/' + cycleId + '/policy/' + encodeURIComponent(key)).then(r => r.json());
+        if (!j.success) throw new Error(j.error || 'lookup failed');
+        if (!j.found) {
+          out.innerHTML = `<div style="background:#fff8ec; border:1px solid #f0d9a8; border-radius:8px; padding:12px; font-size:13px; color:#a04a00;">No policy or tracker matching <strong>${escapeHtml(key)}</strong> in this cycle.</div>`;
+          return;
+        }
+        // Cross-reference the loaded recon file for the operator rate.
+        let opRate = null, diff = null, matchTxt = '';
+        if (_rcData && _rcData.rate_comparison) {
+          const m = _rcData.rate_comparison.find(r => r.policy_no === j.policy_no || r.tracker === j.tracker_no);
+          if (m) {
+            opRate = m.their_rate;
+            if (m.our_rate != null && opRate != null) {
+              diff = +(j.our_rate - opRate).toFixed(3);
+              matchTxt = Math.abs(diff) <= 0.5 ? ' ✅' : ' ❌';
+            }
+          }
+        }
+        const cell = (label, val) => `<div style="min-width:120px;"><div style="font-size:11px; color:#888;">${label}</div><div style="font-size:14px; color:#222;">${val == null || val === '' ? '—' : escapeHtml(String(val))}</div></div>`;
+        const pn = escapeAttr(j.policy_no || '');
+        out.innerHTML = `<div style="background:#f7faff; border:1px solid #cfe0f5; border-radius:8px; padding:14px;">
+          <div style="display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;">
+            ${cell('Policy No', j.policy_no)}
+            ${cell('Tracker', j.tracker_no)}
+            ${cell('Insurer', j.insurer)}
+            ${cell('Vehicle', j.vehicle_type)}
+            ${cell('Make / Model', [j.make, j.model].filter(Boolean).join(' '))}
+            ${cell('Region (RTO)', [j.region, j.rto_code].filter(Boolean).join(' / '))}
+            ${cell('Our Rate %', j.our_rate != null ? j.our_rate : '—')}
+            ${cell('File Rate %', opRate != null ? opRate : '—')}
+            ${cell('Diff', diff != null ? diff + matchTxt : '—')}
+            ${cell('Matched Segment', j.matched_segment)}
+            ${cell('Rate Type', j.matched_rate_type)}
+          </div>
+          <div style="margin-top:12px; display:flex; gap:8px;">
+            <button class="btn btn-sm btn-outline" onclick="rcOpenQc('${pn}')">Open QC compare</button>
+            <button class="btn btn-sm btn-outline" onclick="rcRecomputePolicy('${pn}', this).then(()=>rcLookupPolicy())">↻ Recompute this policy</button>
+          </div>
+        </div>`;
+      } catch (e) {
+        out.innerHTML = `<div style="color:#b71c1c; font-size:13px;">Lookup failed: ${escapeHtml(e.message)}</div>`;
+      }
+    }
+
+    function rcIgnore(tracker) {
+      // Capture an optional reason so the ignore is auditable later. Pre-fill
+      // with any existing note (re-ignoring an item keeps its message).
+      const prev = (_rcIgnoreNotes[tracker] && _rcIgnoreNotes[tracker].note) || '';
+      const msg = window.prompt('Reason for ignoring this policy (saved for later reference):', prev);
+      if (msg === null) return;   // user cancelled — don't ignore
+      _rcIgnored.add(tracker);
+      _rcIgnoreNotes[tracker] = { note: String(msg).trim(), ts: new Date().toISOString() };
+      rcSaveIgnores(); rcRenderKpis(); rcRender();
+    }
+    // Edit a saved ignore note in place (from the Ignored view).
+    function rcEditNote(tracker) {
+      const prev = (_rcIgnoreNotes[tracker] && _rcIgnoreNotes[tracker].note) || '';
+      const msg = window.prompt('Edit ignore reason:', prev);
+      if (msg === null) return;
+      _rcIgnoreNotes[tracker] = { note: String(msg).trim(), ts: new Date().toISOString() };
+      rcSaveIgnores(); rcRender();
+    }
+    // Restore a single ignored policy back into the active comparison.
+    function rcUnignore(tracker) {
+      _rcIgnored.delete(tracker);
+      delete _rcIgnoreNotes[tracker];
+      rcSaveIgnores(); rcRenderKpis(); rcRender();
+    }
+    function rcClearIgnores() {
+      if (_rcIgnored.size && !window.confirm('Clear all ' + _rcIgnored.size + ' ignores and their saved notes?')) return;
+      _rcIgnored.clear(); _rcIgnoreNotes = {}; rcSaveIgnores(); rcRenderKpis(); rcRender();
+    }
+
+    async function rcDownloadXlsx() {
+      const cycleId = document.getElementById('rcCycle').value;
+      const file = document.getElementById('rcFile').files[0];
+      if (!cycleId) return;
+      try {
+        let res;
+        if (file) {
+          const fd = new FormData();
+          fd.append('file', file);
+          res = await fetch(API + '/cycle-bulk/' + cycleId + '/compare-trackers?format=xlsx', { method: 'POST', body: fd });
+        } else {
+          // No file in the picker — use the server's cached file (after a Re-compare).
+          res = await fetch(API + '/cycle-bulk/' + cycleId + '/recompare?format=xlsx', { method: 'POST' });
+        }
+        if (!res.ok) throw new Error(await res.text());
+        const blob = await res.blob();
+        triggerDownload(blob, 'cycle' + cycleId + '_reconcile_' + stampNow() + '.xlsx');
+      } catch (e) { showToast('Download failed: ' + e.message, 'error'); }
     }
 
     // ============ INIT ============

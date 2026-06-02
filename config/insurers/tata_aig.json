@@ -50,6 +50,37 @@
       }
     },
     {
+      "name": "PCI",
+      "name_pattern": "^pci$",
+      "layout": "tata_pci",
+      "product": "CAR",
+      "config": {
+        "data_start_row": 1,
+        "col": { "business_type": 1, "section": 2, "fuel": 3, "ncb": 5, "od_rate": 6 }
+      }
+    },
+    {
+      "name": "PCI SATP",
+      "name_pattern": "^pci[\\s_]*satp$",
+      "layout": "pivot_by_city",
+      "product": "CAR",
+      "config": {
+        "header_row": 1,
+        "data_start_row": 2,
+        "key_columns": {
+          "vehicle_type": 0,
+          "business_type": 1,
+          "fuel_type": 2,
+          "section_text": 3
+        },
+        "city_blocks": [
+          { "start_col": 4, "end_col": 60, "channel_row": 0 }
+        ],
+        "decline_markers": ["D", "NA", "Decline"],
+        "skip_zero_rates": false
+      }
+    },
+    {
       "name": "Pvtcar",
       "name_pattern": "^pvt[\\s_]*car$",
       "layout": "pivot_by_city",
@@ -80,13 +111,13 @@
         "header_row": 4,
         "data_start_row": 5,
         "key_columns": {
-          "segment": 1,
-          "fuel_type": 2,
-          "section_text": 3,
-          "vehicle_age": 4
+          "segment": 0,
+          "fuel_type": 1,
+          "section_text": 2,
+          "vehicle_age": 3
         },
         "city_blocks": [
-          { "start_col": 5, "end_col": 63, "channel_row": 3 }
+          { "start_col": 4, "end_col": 63, "channel_row": 3 }
         ],
         "decline_markers": ["D", "NA", "Decline"]
       }

@@ -1,0 +1,41 @@
+{
+  "PVT_CAR": {
+    "comp_with_ncb": 0.25,
+    "comp_without_ncb": 0.2,
+    "saod": 0.15,
+    "satp": 0.025
+  },
+  "TW": {
+    "comp_od": 0.175,
+    "comp_net_above1L": 0.2,
+    "satp_green": 0.025,
+    "satp_red": 0
+  },
+  "CV": {
+    "slabs": [
+      {
+        "tier": "Upto 3L",
+        "tier_min": 0,
+        "tier_max": 3,
+        "comp_net": 0.175,
+        "satp_net": 0.2
+      },
+      {
+        "tier": "3L-6L",
+        "tier_min": 3,
+        "tier_max": 6,
+        "comp_net": 0.175,
+        "satp_net": 0.175
+      },
+      {
+        "tier": "Above 6L",
+        "tier_min": 6,
+        "tier_max": null,
+        "comp_net": 0.2,
+        "satp_net": 0.2
+      }
+    ],
+    "comp_net": 0.175,
+    "satp_net": 0.2
+  }
+}

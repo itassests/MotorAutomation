@@ -77,6 +77,7 @@ app.use('/api/masters', mastersRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/company-margins', companyMarginRoutes);
 app.use('/api/recon', reconRoutes);
+app.use('/api/agent', require('./routes/agent'));
 
 // Health check
 app.get('/api/health', (req, res) => {

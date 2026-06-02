@@ -21,6 +21,59 @@ const { normalizeRate, cleanString, parseWeightBand, parseCCBand, parseSeatingCa
 const { classifyProduct } = require('../utils/product-classifier');
 
 /**
+ * Parse an age-banded conditional cell into one band per age range.
+ *
+ * Handles cells like:
+ *   "Age 0-5: 7.5%\nAge>=6: 29%"   → [{min:0,max:5,rate:0.075}, {min:6,max:99,rate:0.29}]
+ *   "Age 0-2: 55%, Age 3+: 65%"    → [{min:0,max:2,rate:0.55}, {min:3,max:99,rate:0.65}]
+ *   "Age<5: 7.5%; Age 5-10: 12%"   → handles <N and N-M and N+ / >=N
+ *
+ * Returns null when the cell doesn't match the age-band shape (caller should
+ * leave the conditional cell alone — downstream handles rate_text manually).
+ */
+function parseAgeBandedRates(text) {
+  if (!text) return null;
+  const s = String(text).replace(/ /g, ' ');
+  // Split on newline, comma, or semicolon — each chunk is one band.
+  const chunks = s.split(/[\n,;]+/).map(c => c.trim()).filter(Boolean);
+  if (chunks.length < 2) return null;
+  const out = [];
+  for (const chunk of chunks) {
+    // Pattern variants:
+    //   "Age 0-5: 7.5%"          → min=0, max=5
+    //   "Age >= 6: 29%"          → min=6, max=99
+    //   "Age >6: 29%"            → min=7, max=99
+    //   "Age 3+: 65%"            → min=3, max=99
+    //   "Age <5: 7.5%"           → min=0, max=4
+    //   "Age <=5: 7.5%"          → min=0, max=5
+    //   "Age 0 to 5 yrs: 7.5%"   → min=0, max=5
+    let m;
+    let min = null, max = null;
+    if ((m = chunk.match(/age\s*(\d+)\s*[-–to]+\s*(\d+)\s*(?:yrs?)?\s*[:=]\s*([\d.]+)\s*%/i))) {
+      min = parseInt(m[1], 10); max = parseInt(m[2], 10);
+    } else if ((m = chunk.match(/age\s*>=\s*(\d+)\s*[:=]\s*([\d.]+)\s*%/i))) {
+      min = parseInt(m[1], 10); max = 99;
+    } else if ((m = chunk.match(/age\s*>\s*(\d+)\s*[:=]\s*([\d.]+)\s*%/i))) {
+      min = parseInt(m[1], 10) + 1; max = 99;
+    } else if ((m = chunk.match(/age\s*(\d+)\s*\+\s*[:=]\s*([\d.]+)\s*%/i))) {
+      min = parseInt(m[1], 10); max = 99;
+    } else if ((m = chunk.match(/age\s*<=\s*(\d+)\s*[:=]\s*([\d.]+)\s*%/i))) {
+      min = 0; max = parseInt(m[1], 10);
+    } else if ((m = chunk.match(/age\s*<\s*(\d+)\s*[:=]\s*([\d.]+)\s*%/i))) {
+      min = 0; max = parseInt(m[1], 10) - 1;
+    } else {
+      // Unrecognised chunk — bail out, don't emit a partial fan-out.
+      return null;
+    }
+    const pctIdx = m.length - 1;
+    const pct = parseFloat(m[pctIdx]);
+    if (!Number.isFinite(pct)) return null;
+    out.push({ vehicle_age_min: min, vehicle_age_max: max, rate_value: +(pct / 100).toFixed(6) });
+  }
+  return out.length >= 2 ? out : null;
+}
+
+/**
  * @param {Array<Array>} sheetData - Raw rows from xlsx
  * @param {object} sheetConfig - Config for this sheet
  * @param {object} meta - { insurer, rateCardId, sheetName }
@@ -101,7 +154,16 @@ function parse(sheetData, sheetConfig, meta) {
 
         const classified = classifyProduct(segment, product, meta.sheetName);
 
-        rules.push({
+        // Age-banded cell fan-out: cells like "Age 0-5: 7.5%\nAge>=6: 29%"
+        // come back from normalizeRate as is_conditional=true + rate_value=null.
+        // Try to split them into per-age-band rules with vehicle_age_min/max
+        // populated so the bulk lookup picks the right band for the policy.
+        // If the cell isn't age-banded, fall through to the single-rule path.
+        const ageBands = (normalized.is_conditional && normalized.rate_value == null)
+          ? parseAgeBandedRates(normalized.rate_text)
+          : null;
+
+        const baseRule = {
           insurer: meta.insurer,
           product: classified.product,
           sheet_name: meta.sheetName,
@@ -129,7 +191,21 @@ function parse(sheetData, sheetConfig, meta) {
           is_declined: normalized.is_declined,
           rate_text: normalized.rate_text,
           is_conditional: normalized.is_conditional,
-        });
+        };
+
+        if (ageBands) {
+          for (const band of ageBands) {
+            rules.push({
+              ...baseRule,
+              vehicle_age_min: band.vehicle_age_min,
+              vehicle_age_max: band.vehicle_age_max,
+              rate_value: band.rate_value,
+              is_conditional: false,
+            });
+          }
+        } else {
+          rules.push(baseRule);
+        }
       }
     }
   }
@@ -137,4 +213,4 @@ function parse(sheetData, sheetConfig, meta) {
   return rules;
 }
 
-module.exports = { parse };
+module.exports = { parse, parseAgeBandedRates };

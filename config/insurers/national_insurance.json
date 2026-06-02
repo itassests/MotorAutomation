@@ -1,0 +1,13 @@
+{
+  "insurer": "national_insurance",
+  "label": "National Insurance",
+  "sheets": [
+    {
+      "_comment": "National Motor Remuneration & Reward Scheme Q1 FY2026-27 (Circular 03/2026-27, w.e.f. 01-Apr-2026 to 30-Jun-2026). Rates hard-coded in national.js — Remuneration only (excl Reward).",
+      "name": "_pdf_grid",
+      "file_pattern": "\\.pdf$|National|Remuneration|Reward[ _]Scheme|Q1[ _]26",
+      "layout": "national_pdf",
+      "config": { "engine": "national" }
+    }
+  ]
+}

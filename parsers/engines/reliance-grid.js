@@ -198,10 +198,13 @@ const CV_RATE_COLS = [
   { col: 5,  segment: 'PCV 3W',           sub_type: 'Non Diesel', fuel_split: PETROL_CNG_BATTERY, rate_type: 'SATP' },
 
   // School Bus (4 ownership × age variants)  cols 6-9
-  { col: 6, segment: 'School Bus', sub_type: '>10 Year, Owned by Individual', vehicle_age_min: 11, vehicle_age_max: 99, rate_type: 'COMP' },
-  { col: 7, segment: 'School Bus', sub_type: '>10 Year, Owned by School',     vehicle_age_min: 11, vehicle_age_max: 99, rate_type: 'COMP' },
-  { col: 8, segment: 'School Bus', sub_type: '<10 Year, Owned by Individual', vehicle_age_min: 0,  vehicle_age_max: 10, rate_type: 'COMP' },
-  { col: 9, segment: 'School Bus', sub_type: '<10 Year, Owned by School',     vehicle_age_min: 0,  vehicle_age_max: 10, rate_type: 'COMP' },
+  // Source cell carries a single % that applies to both Comp and SATP policies
+  // (Reliance broker grid doesn't split Comp/TP rates for School Bus). Emit a
+  // sister SATP rule per cell so policies with insProduct='TP' also match.
+  { col: 6, segment: 'School Bus', sub_type: '>10 Year, Owned by Individual', vehicle_age_min: 11, vehicle_age_max: 99, rate_type: 'COMP', dual_emit_rt: 'SATP' },
+  { col: 7, segment: 'School Bus', sub_type: '>10 Year, Owned by School',     vehicle_age_min: 11, vehicle_age_max: 99, rate_type: 'COMP', dual_emit_rt: 'SATP' },
+  { col: 8, segment: 'School Bus', sub_type: '<10 Year, Owned by Individual', vehicle_age_min: 0,  vehicle_age_max: 10, rate_type: 'COMP', dual_emit_rt: 'SATP' },
+  { col: 9, segment: 'School Bus', sub_type: '<10 Year, Owned by School',     vehicle_age_min: 0,  vehicle_age_max: 10, rate_type: 'COMP', dual_emit_rt: 'SATP' },
 
   // PCV TAXI  NND <6ST (cols 10-12) — three sub-types
   // Col 10: Comp Other (Petrol+CNG+Battery) NND     → fuel split, COMP, NoNilDep

@@ -242,16 +242,33 @@ function parsePvtCar(stateCols, sheetData, dataStart, meta) {
       };
 
       if (/^package[-\s]*ncb\/?new/i.test(labelLower)) {
-        // Two variants: New vehicle (age 0/0) + With-NCB (age 1-99 + age_band 1-99)
+        // Package-NCB/New COMP rate. Two variants:
+        //   • New vehicle  (age 0/0)            — NCB n/a, brand new
+        //   • With-NCB     (age 1-99, NCB 1-99) — rolled-over WITH NCB
+        // Tag the with-NCB variant in remarks so the NCB-band filter only
+        // applies it to a policy that actually has NCB. (age_band isn't
+        // matched anywhere, so the NCB gate must live in remarks/sub_type.)
         rules.push({ ...baseRule, segment: 'Pvt Car', rate_type: 'COMP',
-                     vehicle_age_min: 0, vehicle_age_max: 0 });
+                     vehicle_age_min: 0, vehicle_age_max: 0,
+                     remarks: `${sc.code} | Pvt Car Package (New vehicle)` });
         rules.push({ ...baseRule, segment: 'Pvt Car', rate_type: 'COMP',
                      vehicle_age_min: 1, vehicle_age_max: 99,
-                     age_band_min: 1, age_band_max: 99 });
+                     age_band_min: 1, age_band_max: 99,
+                     remarks: `${sc.code} | Pvt Car Package | NCB 1-99` });
       } else if (/^saod[-\s]*non[-\s]*ncb/i.test(labelLower)) {
-        rules.push({ ...baseRule, segment: 'Pvt Car', rate_type: 'SAOD',
-                     age_band_min: 0, age_band_max: 0,
-                     vehicle_age_min: 1, vehicle_age_max: 99 });
+        // SAOD-Non-NCB rate = OD commission for a ZERO-NCB rolled-over
+        // vehicle. Per business rule it serves BOTH:
+        //   • SAOD product (whole policy is OD), and
+        //   • COMP product when the policy is Non-NCB (NCB=0) — the
+        //     Package COMP rate above only covers with-NCB / new vehicles.
+        // Emit both rate_types, tagged "NCB = 0" so the NCB-band filter
+        // routes only zero-NCB policies here.
+        for (const rt of ['SAOD', 'COMP']) {
+          rules.push({ ...baseRule, segment: 'Pvt Car', rate_type: rt,
+                       age_band_min: 0, age_band_max: 0,
+                       vehicle_age_min: 1, vehicle_age_max: 99,
+                       remarks: `${sc.code} | Pvt Car SAOD-Non-NCB | NCB = 0 (applies to SAOD & Comp)` });
+        }
       } else if (/^tp.*diesel.*bifuel/i.test(labelLower)) {
         for (const f of ['Diesel', 'Bifuel', 'CNG']) {
           rules.push({ ...baseRule, segment: 'Pvt Car', rate_type: 'SATP', fuel_type: f });
@@ -261,14 +278,16 @@ function parsePvtCar(stateCols, sheetData, dataStart, meta) {
           rules.push({ ...baseRule, segment: 'Pvt Car', rate_type: 'SATP', fuel_type: f });
         }
       } else if (/more\s+than\s+5\s*yr.*without\s+addon/i.test(labelLower)) {
-        // Overlay rule for vehicle age > 5 AND no addon — applies to both
-        // COMP and SAOD, paid on Net premium.
+        // Overlay rule for vehicle age 5+ (5 years and above) AND no addon —
+        // applies to both COMP and SAOD, paid on Net premium. Business rule
+        // treats "more than 5 yr" as ">= 5 years" (a 5-yr-old vehicle is
+        // included), so vehicle_age_min = 5.
         for (const rt of ['COMP', 'SAOD']) {
           rules.push({
             ...baseRule, segment: 'Pvt Car', rate_type: rt,
-            vehicle_age_min: 6, vehicle_age_max: 99,
+            vehicle_age_min: 5, vehicle_age_max: 99,
             addon: 'N', applied_on: 'NET',
-            remarks: '>5 yr vehicle without addon — paid on net premium',
+            remarks: '5+ yr vehicle without addon — paid on net premium',
           });
         }
       }

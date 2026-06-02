@@ -121,6 +121,94 @@ function parsePC(sheetData, sheetConfig, meta) {
     is_declined: false,
     rate_text: baseFields.rate_text + ' | Non-NCB',
   });
+
+  // ---- Pan-India tariff from notes table (rows 11-21) ------------------
+  // Layout: col 0 = product/policy label, col 1 = description, col 2 = OD rate,
+  //         col 3 = business type. The table covers Comp / SAOD with discount-
+  //         band (Upto 80% / above 80%), NCB / Non-NCB, fuel splits, and a
+  //         High-End vehicle carve-out. These are state-agnostic — emit as
+  //         Pan-India rules so policies outside the row-3 region (e.g.
+  //         Gujarat) still match.
+  rules.push(...emitPcPanIndiaNotes(sheetData, meta));
+  return rules;
+}
+
+// Parse the rate notes table embedded in the PC sheet (rows ~11-21).
+// Each row: [policy_label, description, OD_rate, business_type].
+// Returns Pan-India Pvt Car rules covering the various NCB/CD/fuel splits.
+function emitPcPanIndiaNotes(sheetData, meta) {
+  const rules = [];
+  // Locate the table header row — "Description | Payout on OD | Business Type"
+  let tableStart = -1;
+  for (let r = 0; r < sheetData.length; r++) {
+    const row = sheetData[r] || [];
+    const c1 = String(row[1] || '').trim().toLowerCase();
+    const c2 = String(row[2] || '').trim().toLowerCase();
+    if (c1 === 'description' && /payout/i.test(c2)) {
+      tableStart = r + 1;
+      break;
+    }
+  }
+  if (tableStart < 0) return rules;
+
+  // Walk rows until a blank/section divider.
+  for (let r = tableStart; r < sheetData.length; r++) {
+    const row = sheetData[r] || [];
+    const policy = String(row[0] || '').trim();
+    const desc   = String(row[1] || '').trim();
+    const rate   = parsePercent(row[2]);
+    if (!policy && !desc) break;          // blank row → end of table
+    if (rate == null) continue;
+    if (!desc) continue;
+
+    // Derive rate_type, fuel, NCB, discount cap, high-end from the description.
+    const isSaod = /^SAOD$/i.test(policy);
+    const isCompSaod = /Comp\s*\/\s*SAOD/i.test(policy);
+    const isHighEnd = /high\s*end/i.test(desc);
+    const isWithNcb = /\bwith\s+ncb\b/i.test(desc) && !/without/i.test(desc);
+    const isWithoutNcb = /(without|out)\s*ncb|non[\s-]?ncb/i.test(desc);
+    const fuelDiesel = /diesel/i.test(desc);
+    const fuelPetrol = /petrol/i.test(desc);
+    // Discount-cap band — "Upto 80%" / "above 80% CD" / "[DTD 79]"
+    const isUpto80 = /upto\s*80/i.test(desc);
+    const isAbove80 = /above\s*80/i.test(desc);
+    const dtdMatch = desc.match(/DTD\s*(\d+)/i);
+
+    const rate_types = isCompSaod ? ['COMP', 'SAOD'] : (isSaod ? ['SAOD'] : ['COMP']);
+    const fuels = fuelDiesel ? ['Diesel'] : (fuelPetrol ? ['Petrol'] : [null]);
+
+    // Volume_tier carries the discount-cap band so the export's Discount
+    // Min/Max columns populate.
+    let volumeTier = null;
+    if (isUpto80)   volumeTier = '0-80';
+    else if (isAbove80) volumeTier = '80-99';
+    else if (dtdMatch)  volumeTier = '0-' + dtdMatch[1];
+
+    for (const rt of rate_types) {
+      for (const fuel of fuels) {
+        rules.push({
+          product: 'CAR',
+          sheet_name: meta.sheetName,
+          region: 'Pan India',
+          segment: 'Pvt Car',
+          make: 'All',
+          fuel_type: fuel,
+          volume_tier: volumeTier,
+          // age_band = NCB band per the column repurposing convention
+          age_band_min: isWithNcb ? 1 : (isWithoutNcb ? 0 : null),
+          age_band_max: isWithNcb ? 99 : (isWithoutNcb ? 0 : null),
+          rate_type: rt,
+          rate_value: rate,
+          is_declined: false,
+          remarks: `Bajaj PC notes-tariff | ${policy} | ${desc}`,
+          rate_text: `Bajaj PC notes | ${policy} ${desc} | ${(rate*100).toFixed(2)}%`,
+          // Mark high-end rules — the export's inferHEV picks this up via
+          // the segment marker for the Highend column.
+          ...(isHighEnd ? { segment: 'Pvt Car High End' } : {}),
+        });
+      }
+    }
+  }
   return rules;
 }
 

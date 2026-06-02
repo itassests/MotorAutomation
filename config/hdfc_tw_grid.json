@@ -1,0 +1,1010 @@
+[
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Mumbai",
+  "le150": 66,
+  "gt150": 66
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Pune",
+  "le150": 66,
+  "gt150": 66
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Goa",
+  "loc": "Goa",
+  "le150": 40,
+  "gt150": 40
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Nashik",
+  "le150": 40,
+  "gt150": 40
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Bad locations",
+  "le150": 0,
+  "gt150": 0
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "ROM",
+  "le150": 45,
+  "gt150": 45
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Nagpur",
+  "le150": 45,
+  "gt150": 45
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Mumbai",
+  "le150": 30,
+  "gt150": 30
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Pune",
+  "le150": 56,
+  "gt150": 45
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Gujarat",
+  "loc": "All",
+  "le150": 62,
+  "gt150": 62
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Gujarat",
+  "loc": "VADODARA",
+  "le150": 30,
+  "gt150": 30
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Gujarat",
+  "loc": "ROG Bad locations",
+  "le150": 0,
+  "gt150": 0
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Gujarat",
+  "loc": "ROG location",
+  "le150": 45,
+  "gt150": 45
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Gujarat",
+  "loc": "All",
+  "le150": 65,
+  "gt150": 65
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Gujarat",
+  "loc": "VADODARA",
+  "le150": 20,
+  "gt150": 20
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Gujarat",
+  "loc": "ROG Bad locations",
+  "le150": 0,
+  "gt150": 0
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Gujarat",
+  "loc": "ROG location",
+  "le150": 45,
+  "gt150": 45
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Mumbai",
+  "le150": 67,
+  "gt150": 67
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Pune",
+  "le150": 67,
+  "gt150": 67
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Goa",
+  "loc": "Goa",
+  "le150": 45,
+  "gt150": 45
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Nashik",
+  "le150": 45,
+  "gt150": 45
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Bad locations",
+  "le150": 0,
+  "gt150": 0
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "ROM",
+  "le150": 50,
+  "gt150": 50
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Nagpur",
+  "le150": 45,
+  "gt150": 45
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Mumbai",
+  "le150": 35,
+  "gt150": 35
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Maharashtra",
+  "loc": "Pune",
+  "le150": 45,
+  "gt150": 45
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Madhya Pradesh",
+  "loc": "Indore",
+  "le150": 50,
+  "gt150": 50
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Madhya Pradesh",
+  "loc": "Indore",
+  "le150": 45,
+  "gt150": 45
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Rajasthan",
+  "loc": "Rest of Rajasthan - Decline Jodhpur",
+  "le150": 55,
+  "gt150": 55
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Rajasthan",
+  "loc": "Jaipur",
+  "le150": 20,
+  "gt150": 20
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Rajasthan",
+  "loc": "Rest of Rajasthan - Decline Jodhpur",
+  "le150": 55,
+  "gt150": 55
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Rajasthan",
+  "loc": "Jaipur",
+  "le150": 20,
+  "gt150": 20
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "West Bengal",
+  "loc": "Kolkata",
+  "le150": 55,
+  "gt150": 55
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "West Bengal",
+  "loc": "Rest Of WB - Good locations",
+  "le150": 35,
+  "gt150": 35
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations",
+  "le150": 20,
+  "gt150": 20
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "West Bengal",
+  "loc": "Kolkata",
+  "le150": 59,
+  "gt150": 59
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "West Bengal",
+  "loc": "Rest Of WB - Good locations",
+  "le150": 50,
+  "gt150": 50
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "West Bengal",
+  "loc": "Rest Of WB- Avg Locations",
+  "le150": 20,
+  "gt150": 20
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Odisha",
+  "loc": "All",
+  "le150": 50,
+  "gt150": 50
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Odisha",
+  "loc": "Rest Of OD",
+  "le150": 46,
+  "gt150": 46
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Odisha",
+  "loc": "Bhubaneshwar, Cuttack",
+  "le150": 55,
+  "gt150": 55
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Chattisgarh",
+  "loc": "All",
+  "le150": 51,
+  "gt150": 51
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Chattisgarh",
+  "loc": "All",
+  "le150": 51,
+  "gt150": 51
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Bihar",
+  "loc": "All",
+  "le150": 45,
+  "gt150": 45
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Jharkhand",
+  "loc": "Ranchi",
+  "le150": 57,
+  "gt150": 57
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Jharkhand",
+  "loc": "Rest of JH",
+  "le150": 57,
+  "gt150": 57
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Bihar",
+  "loc": "All",
+  "le150": 50,
+  "gt150": 35
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Jharkhand",
+  "loc": "JH except Bokaro",
+  "le150": 30,
+  "gt150": 30
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Jharkhand",
+  "loc": "Bokaro",
+  "le150": 0,
+  "gt150": 0
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Bihar",
+  "loc": "All",
+  "le150": 60.5,
+  "gt150": 60.5
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Jharkhand",
+  "loc": "All",
+  "le150": 57,
+  "gt150": 57
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Bihar",
+  "loc": "All",
+  "le150": 54,
+  "gt150": 54
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Jharkhand",
+  "loc": "JH except Bokaro",
+  "le150": 55,
+  "gt150": 52
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Jharkhand",
+  "loc": "Bokaro",
+  "le150": 20,
+  "gt150": 20
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Karnataka",
+  "loc": "Bangalore",
+  "le150": 50,
+  "gt150": 50
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Karnataka",
+  "loc": "Rest of Karnataka",
+  "le150": 20,
+  "gt150": 20
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Karnataka",
+  "loc": "Bangalore",
+  "le150": 50,
+  "gt150": 50
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Karnataka",
+  "loc": "Rest of Karnataka",
+  "le150": 20,
+  "gt150": 20
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Andhra Pradesh",
+  "loc": "All",
+  "le150": 62.5,
+  "gt150": 62.5
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Telangana",
+  "loc": "All",
+  "le150": 62.5,
+  "gt150": 62.5
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Andhra Pradesh",
+  "loc": "All",
+  "le150": 63,
+  "gt150": 63
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Telangana",
+  "loc": "All",
+  "le150": 64,
+  "gt150": 64
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Andhra Pradesh",
+  "loc": "Vishakhapatnam",
+  "le150": 10,
+  "gt150": 10
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Andhra Pradesh",
+  "loc": "Rest of AP",
+  "le150": 30,
+  "gt150": 30
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Telangana",
+  "loc": "Hyderabad",
+  "le150": 45,
+  "gt150": 30
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Andhra Pradesh",
+  "loc": "Vishakhapatnam",
+  "le150": 10,
+  "gt150": 10
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Andhra Pradesh",
+  "loc": "Rest of AP",
+  "le150": 30,
+  "gt150": 30
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Telangana",
+  "loc": "Hyderabad",
+  "le150": 53,
+  "gt150": 49
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Tamil Nadu",
+  "loc": "Chennai",
+  "le150": 46,
+  "gt150": 46
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Tamil Nadu",
+  "loc": "Rest of TN",
+  "le150": 35,
+  "gt150": 35
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Tamil Nadu",
+  "loc": "Chennai",
+  "le150": 50,
+  "gt150": 50
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Tamil Nadu",
+  "loc": "Rest of TN",
+  "le150": 35,
+  "gt150": 35
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Punjab",
+  "loc": "Ludhiana",
+  "le150": 55,
+  "gt150": 55
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Punjab",
+  "loc": "Rest of Punjab",
+  "le150": 55,
+  "gt150": 55
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Chandigarh",
+  "loc": "",
+  "le150": 50,
+  "gt150": 50
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Chandigarh",
+  "loc": "",
+  "le150": 33,
+  "gt150": 25
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Punjab",
+  "loc": "Ludhiana",
+  "le150": 62,
+  "gt150": 62
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Punjab",
+  "loc": "Rest of Punjab",
+  "le150": 56,
+  "gt150": 56
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Chandigarh",
+  "loc": "",
+  "le150": 55,
+  "gt150": 55
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Chandigarh",
+  "loc": "",
+  "le150": 40,
+  "gt150": 25
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Himachal Pradesh",
+  "loc": "All",
+  "le150": 60,
+  "gt150": 60
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Himachal Pradesh",
+  "loc": "All",
+  "le150": 46,
+  "gt150": 46
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Himachal Pradesh",
+  "loc": "All",
+  "le150": 60,
+  "gt150": 60
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Himachal Pradesh",
+  "loc": "All",
+  "le150": 46,
+  "gt150": 46
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Jammu and Kashmir",
+  "loc": "All",
+  "le150": 57,
+  "gt150": 57
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Jammu and Kashmir",
+  "loc": "All",
+  "le150": 40,
+  "gt150": 40
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Jammu and Kashmir",
+  "loc": "All",
+  "le150": 57,
+  "gt150": 57
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Jammu and Kashmir",
+  "loc": "All",
+  "le150": 45,
+  "gt150": 45
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Delhi NCR",
+  "loc": "",
+  "le150": 60,
+  "gt150": 60
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Delhi NCR",
+  "loc": "",
+  "le150": 50,
+  "gt150": 50
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Delhi NCR",
+  "loc": "",
+  "le150": 64,
+  "gt150": 64
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Delhi NCR",
+  "loc": "",
+  "le150": 54.5,
+  "gt150": 54.5
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Uttarakhand",
+  "loc": "All",
+  "le150": 61,
+  "gt150": 61
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Uttarakhand",
+  "loc": "Dehradun",
+  "le150": 45,
+  "gt150": 30
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Uttarakhand",
+  "loc": "Rest of UK",
+  "le150": 40,
+  "gt150": 25
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Uttarakhand",
+  "loc": "All",
+  "le150": 63,
+  "gt150": 63
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Uttarakhand",
+  "loc": "Dehradun",
+  "le150": 45,
+  "gt150": 41
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Uttarakhand",
+  "loc": "Rest of UK",
+  "le150": 40,
+  "gt150": 40
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Haryana",
+  "loc": "All",
+  "le150": 55,
+  "gt150": 55
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Haryana",
+  "loc": "All",
+  "le150": 55,
+  "gt150": 55
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Uttar Pradesh",
+  "loc": "Agra",
+  "le150": 20,
+  "gt150": 20
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Uttar Pradesh",
+  "loc": "Kanpur",
+  "le150": 61,
+  "gt150": 61
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Uttar Pradesh",
+  "loc": "Lucknow,Varanasi",
+  "le150": 63,
+  "gt150": 63
+ },
+ {
+  "pt": "Comp",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Uttar Pradesh",
+  "loc": "Rest of UP",
+  "le150": 20,
+  "gt150": 20
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Uttar Pradesh",
+  "loc": "Kanpur",
+  "le150": 40,
+  "gt150": 25
+ },
+ {
+  "pt": "Comp",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Uttar Pradesh",
+  "loc": "Varanasi",
+  "le150": 40,
+  "gt150": 25
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Uttar Pradesh",
+  "loc": "Kanpur",
+  "le150": 61,
+  "gt150": 61
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Uttar Pradesh",
+  "loc": "Varanasi",
+  "le150": 61,
+  "gt150": 61
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Uttar Pradesh",
+  "loc": "Lucknow",
+  "le150": 61,
+  "gt150": 61
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Scooter / Moped",
+  "fuel": "Petrol",
+  "state": "Uttar Pradesh",
+  "loc": "Rest of UP",
+  "le150": 30,
+  "gt150": 30
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Uttar Pradesh",
+  "loc": "Kanpur",
+  "le150": 45,
+  "gt150": 45
+ },
+ {
+  "pt": "TP Only",
+  "seg": "Bike",
+  "fuel": "Petrol",
+  "state": "Uttar Pradesh",
+  "loc": "Varanasi",
+  "le150": 45,
+  "gt150": 45
+ }
+]

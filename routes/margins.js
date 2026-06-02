@@ -653,6 +653,21 @@ router.get('/coverage', async (req, res, next) => {
     const rr = await rq.query(`SELECT ${selectCols} FROM rate_rules ${where}`);
     const rateRules = rr.recordset;
 
+    // Synthetic-margin default: the bulk policy engine applies a flat default
+    // margin when no explicit margin_rule matches (see bulk.js processOnePolicy):
+    //   Commercial (GCV / PCV / MISC / MIS / CV — incl. TAXI / GCCV) → 6%
+    //   Pvt Car    (CAR / 4W / PC / PVT.CAR)                         → 5%
+    //   Two-wheeler (TW / 2W / TW_EV)                                → 3%
+    // Mirror that here so the coverage card doesn't flag those rules as "pending"
+    // — they ARE margined (by the synthetic default) at compute time. TESTING
+    // default; remove this block to revert the card to explicit-rule coverage only.
+    const SYNTH_MARGIN_PRODUCTS = new Set([
+      'GCV', 'PCV', 'MISC', 'MIS', 'CV', 'TAXI', 'GCCV', 'PCCV',  // CV → 6%
+      'CAR', '4W', 'PC', 'PVT.CAR',                                // Pvt Car → 5%
+      'TW', '2W', 'TW_EV',                                         // Two-wheeler → 3%
+    ]);
+    const isCvProduct = (p) => SYNTH_MARGIN_PRODUCTS.has(String(p == null ? '' : p).toUpperCase().trim());
+
     let withMargin = 0;
     const byInsurer = new Map();
     const byProduct = new Map();
@@ -667,7 +682,7 @@ router.get('/coverage', async (req, res, next) => {
         const k = rateRuleConsolidationKey(rule);
         if (!groups.has(k)) groups.set(k, { rep: rule, covered: false });
         const g = groups.get(k);
-        if (!g.covered && margins.some(m => marginCoversRateRule(m.filters, rule))) {
+        if (!g.covered && (isCvProduct(rule.product) || margins.some(m => marginCoversRateRule(m.filters, rule)))) {
           g.covered = true;
         }
       }
@@ -701,7 +716,7 @@ router.get('/coverage', async (req, res, next) => {
 
     // Default mode — count raw rate_rules.
     for (const rule of rateRules) {
-      const covered = margins.some(m => marginCoversRateRule(m.filters, rule));
+      const covered = isCvProduct(rule.product) || margins.some(m => marginCoversRateRule(m.filters, rule));
       if (covered) withMargin++;
       const ik = rule.insurer || '(unknown)';
       if (!byInsurer.has(ik)) byInsurer.set(ik, { insurer: ik, total: 0, with_margin: 0 });
@@ -768,10 +783,17 @@ router.get('/coverage/pending', async (req, res, next) => {
 
     // Group pending rules by (insurer, product, segment, region) — that's the
     // tuple the user typically scopes a margin to anyway.
+    // CV (6%) + Pvt Car (5%) + TW (3%) carry the synthetic default — not pending.
+    const SYNTH_MARGIN_PRODUCTS = new Set([
+      'GCV', 'PCV', 'MISC', 'MIS', 'CV', 'TAXI', 'GCCV', 'PCCV',
+      'CAR', '4W', 'PC', 'PVT.CAR',
+      'TW', '2W', 'TW_EV',
+    ]);
+    const isCvProduct = (p) => SYNTH_MARGIN_PRODUCTS.has(String(p == null ? '' : p).toUpperCase().trim());
     const groups = new Map();
     let totalPending = 0;
     for (const rule of rr.recordset) {
-      if (margins.some(m => marginCoversRateRule(m.filters, rule))) continue;
+      if (isCvProduct(rule.product) || margins.some(m => marginCoversRateRule(m.filters, rule))) continue;
       totalPending++;
       const key = [
         rule.insurer || '?',

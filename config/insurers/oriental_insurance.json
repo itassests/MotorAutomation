@@ -1,0 +1,13 @@
+{
+  "insurer": "oriental_insurance",
+  "label": "Oriental Insurance",
+  "sheets": [
+    {
+      "_comment": "Oriental Motor Commission grid (Circular CR-8742, w.e.f. 01-Aug-2025 to 31-Mar-2026). Scanned PDF — routed via Document AI for validation; rates hard-coded in oriental.js.",
+      "name": "_pdf_grid",
+      "file_pattern": "\\.pdf$|Oriental|Remuneration|Circular[ _]8742|CR[ _-]?8742",
+      "layout": "oriental_pdf",
+      "config": { "engine": "oriental" }
+    }
+  ]
+}

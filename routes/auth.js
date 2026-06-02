@@ -94,27 +94,36 @@ router.post('/verify-otp', async (req, res, next) => {
     if (!empcode || !otp) return res.status(400).json({ success: false, error: 'empcode + otp required' });
     if (otp !== FIXED_OTP) return res.status(401).json({ success: false, error: 'Invalid OTP' });
 
+    // Agents log in with their POSLG… UPIN. They get the dedicated 'agent' role
+    // (Agent View only — see applyPermissions), scoped to their own data.
+    const isAgent = /^POSLG/i.test(empcode);
     const pool = await getPool();
     // Upsert user with safe defaults so first-time logins work immediately.
     const existing = await pool.request().input('e', sql.NVarChar(100), empcode)
       .query('SELECT empcode, name, role, permissions_json, active FROM app_users WHERE empcode = @e');
     let user;
     if (existing.recordset.length === 0) {
-      // First-time login — register as a regular user with read-only on all
-      // screens. An admin can promote them later.
-      const defaultPerms = { all: false, screens: {} };
+      // First-time login. POSLG → agent (Agent View only); others → read-only
+      // regular user an admin can promote later.
+      const role = isAgent ? 'agent' : 'user';
+      const defaultPerms = isAgent ? { all: false, agent: true, screens: {} } : { all: false, screens: {} };
       await pool.request()
         .input('e', sql.NVarChar(100), empcode)
+        .input('r', sql.NVarChar(20), role)
         .input('p', sql.NVarChar(sql.MAX), JSON.stringify(defaultPerms))
         .query(`INSERT INTO app_users (empcode, name, role, permissions_json)
-                VALUES (@e, @e, 'user', @p)`);
-      user = { empcode, name: empcode, role: 'user', permissions: defaultPerms };
+                VALUES (@e, @e, @r, @p)`);
+      user = { empcode, name: empcode, role, permissions: defaultPerms };
     } else {
       const u = existing.recordset[0];
       if (u.active === false) return res.status(403).json({ success: false, error: 'User is disabled' });
       let perms = {};
       try { perms = JSON.parse(u.permissions_json || '{}'); } catch (_) { /* ignore */ }
-      user = { empcode: u.empcode, name: u.name, role: u.role, permissions: perms };
+      let role = u.role;
+      // A POSLG login is always an agent (unless explicitly an admin) — coerce
+      // legacy 'user' rows so the prefix rule holds regardless of signup order.
+      if (isAgent && role !== 'admin') { role = 'agent'; perms = { ...perms, agent: true }; }
+      user = { empcode: u.empcode, name: u.name, role, permissions: perms };
     }
     await pool.request().input('e', sql.NVarChar(100), empcode)
       .query('UPDATE app_users SET last_login = GETDATE() WHERE empcode = @e');

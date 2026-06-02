@@ -12,9 +12,13 @@ const config = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   connectionTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT, 10) || 30000,
-  requestTimeout:    parseInt(process.env.DB_REQUEST_TIMEOUT, 10) || 60000,
+  requestTimeout:    parseInt(process.env.DB_REQUEST_TIMEOUT, 10) || 600000,
   pool: {
-    max: 10,
+    // Bulk recompute runs N concurrent policies; each does ~3 DB queries
+    // (rto, lookup, fallback). Pool max must comfortably exceed concurrency
+    // so the driver doesn't queue requests behind a saturated pool. Override
+    // via DB_POOL_MAX env var.
+    max: parseInt(process.env.DB_POOL_MAX, 10) || 30,
     min: 0,
     idleTimeoutMillis: 30000,
     // Tolerate a few retries when a freshly-acquired connection races with

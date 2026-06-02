@@ -110,15 +110,22 @@ router.get('/global', async (req, res, next) => {
     if (upin) {
       const r = await pool.request()
         .input('upin', sql.NVarChar(50), upin)
-        .query(`SELECT TOP 1 id, upincode, pos_name, uplift_pct, note,
+        .query(`SELECT id, upincode, pos_name, uplift_pct, note, product, insurer,
                               created_at, updated_at
                 FROM agent_global_uplifts
-                WHERE active = 1 AND upincode = @upin`);
+                WHERE active = 1 AND upincode = @upin
+                ORDER BY CASE WHEN product IS NULL AND insurer IS NULL THEN 0 ELSE 1 END, id`);
       if (r.recordset.length === 0) {
-        return res.json({ success: true, upincode: upin, uplift_pct: null });
+        return res.json({ success: true, upincode: upin, uplift_pct: null, scopes: [] });
       }
+      // Prefer the agent-wide (product/insurer null) row for the input display;
+      // expose every scope so the UI can list product/insurer-specific uplifts.
       const row = r.recordset[0];
-      return res.json({ success: true, ...row, uplift_pct: Number(row.uplift_pct) });
+      const scopes = r.recordset.map(x => ({
+        product: x.product || null, insurer: x.insurer || null,
+        uplift_pct: Number(x.uplift_pct),
+      }));
+      return res.json({ success: true, ...row, uplift_pct: Number(row.uplift_pct), scopes });
     }
     const r = await pool.request().query(`
       SELECT id, upincode, pos_name, uplift_pct, note, updated_at
@@ -142,11 +149,22 @@ router.post('/global', async (req, res, next) => {
     if (uplift_pct == null || isNaN(Number(uplift_pct))) {
       return res.status(400).json({ success: false, error: 'uplift_pct required (number)' });
     }
+    // Optional scope — when set, the uplift applies ONLY to that vehicle
+    // product (and/or insurer); blank = agent-wide (original behaviour).
+    // Three levels: agent / agent+product / agent+product+insurer.
+    const product = String(req.body.product || '').trim().toUpperCase() || null;
+    const insurer = String(req.body.insurer || '').trim().toLowerCase() || null;
     const pool = await getPool();
+    // Key the row on (upincode, product, insurer) so an agent can hold a global
+    // uplift PLUS per-product / per-product+insurer uplifts side by side.
     const existing = await pool.request()
       .input('upin', sql.NVarChar(50), upincode.trim())
+      .input('product', sql.NVarChar(20), product)
+      .input('insurer', sql.NVarChar(100), insurer)
       .query(`SELECT TOP 1 id FROM agent_global_uplifts
-              WHERE active = 1 AND upincode = @upin`);
+              WHERE active = 1 AND upincode = @upin
+                AND ISNULL(product,'') = ISNULL(@product,'')
+                AND ISNULL(insurer,'') = ISNULL(@insurer,'')`);
     if (existing.recordset.length > 0) {
       const id = existing.recordset[0].id;
       await pool.request()
@@ -158,17 +176,19 @@ router.post('/global', async (req, res, next) => {
                 SET pos_name = @pos, uplift_pct = @uplift, note = @note,
                     updated_at = GETDATE()
                 WHERE id = @id`);
-      return res.json({ success: true, id, action: 'updated' });
+      return res.json({ success: true, id, action: 'updated', product, insurer });
     }
     const ins = await pool.request()
       .input('upin', sql.NVarChar(50), upincode.trim())
       .input('pos', sql.NVarChar(200), pos_name || null)
       .input('uplift', sql.Decimal(6, 3), Number(uplift_pct))
       .input('note', sql.NVarChar(500), note || null)
-      .query(`INSERT INTO agent_global_uplifts (upincode, pos_name, uplift_pct, note)
+      .input('product', sql.NVarChar(20), product)
+      .input('insurer', sql.NVarChar(100), insurer)
+      .query(`INSERT INTO agent_global_uplifts (upincode, pos_name, uplift_pct, note, product, insurer)
               OUTPUT INSERTED.id
-              VALUES (@upin, @pos, @uplift, @note)`);
-    res.json({ success: true, id: ins.recordset[0].id, action: 'created' });
+              VALUES (@upin, @pos, @uplift, @note, @product, @insurer)`);
+    res.json({ success: true, id: ins.recordset[0].id, action: 'created', product, insurer });
   } catch (err) { next(err); }
 });
 

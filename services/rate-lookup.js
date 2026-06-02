@@ -17,6 +17,11 @@ async function lookupRates(pool, params) {
     cluster,
     region_list, // Optional: array of candidate region values (used by cluster fallback).
     region_match_mode, // 'strict' (default) | 'token' (slash-delimited list match)
+    include_null_region, // Optional: when true, also match rules with NULL/'' region
+                         // (national / "PAN INDIA" rows). Used by state-keyed insurers
+                         // (e.g. Shriram) so a state-constrained lookup still surfaces
+                         // the national rules that would otherwise only appear in an
+                         // unfiltered (all-region) query.
     segment,
     make,
     vehicle_age,
@@ -31,7 +36,24 @@ async function lookupRates(pool, params) {
   } = params;
 
   const request = pool.request();
-  const conditions = [];
+  // Skip "info" rules that carry no numeric rate (e.g. Bajaj's "Doable" /
+  // "Refer UW" cells stored as rate_value=NULL). They aren't usable for
+  // commission calculation and only displace real-rate rules in the lookup.
+  //
+  // Exception: keep rate=NULL rows whose `rate_text` carries an age-banded
+  // table (e.g. Digit's "Age 0-5: 7.5%\nAge>=6: 29%") OR whose `remarks`
+  // encode an IRDA-default rate (e.g. SBI's "Premium below ₹1L — IRDA
+  // default applied (SATP 2.5%)"). The bulk pipeline's null-rate
+  // recovery block parses these at lookup time and substitutes the
+  // applicable rate.
+  //
+  // is_conditional is a boolean column populated by the parsers for any
+  // age-banded / multi-rate cell — using it avoids the `LIKE '%...%'`
+  // full-text scans that the previous version triggered on every lookup
+  // (full table scans on rate_text/remarks would tank query latency).
+  const conditions = [
+    `(rr.rate_value IS NOT NULL OR rr.is_conditional = 1)`,
+  ];
   let paramIndex = 0;
 
   function addParam(name, value, type) {
@@ -79,7 +101,9 @@ async function lookupRates(pool, params) {
   //                         whole point.
   //
   // When `region_list` is provided (cluster fallback), it overrides region/cluster.
-  const regionMode = region_match_mode === 'token' ? 'token' : 'strict';
+  const regionMode = region_match_mode === 'token' ? 'token'
+                   : region_match_mode === 'contains' ? 'contains'
+                   : 'strict';
   function buildRegionClause(values, namePrefix) {
     const parts = [];
     values.forEach((v, i) => {
@@ -92,10 +116,37 @@ async function lookupRates(pool, params) {
       const pName = `${namePrefix}${i}`;
       request.input(pName, sql.NVarChar, safe);
       parts.push(`rr.region = @${pName}`);
+      // Separator-insensitive equality. Digit is internally inconsistent about
+      // how it spells the same cluster across sheets — the CV RTO mapping
+      // resolves "Delhi NCR" (space) while the Taxi grid stores "DELHI-NCR"
+      // (hyphen), and exact equality misses the cross-sheet match (zero Taxi
+      // candidates → No-Rule). Compare both sides with spaces / hyphens /
+      // underscores stripped so "Delhi NCR" ≡ "DELHI-NCR" ≡ "DELHI_NCR".
+      // Collation is case-insensitive, so no UPPER() is needed. Skip when the
+      // normalised form is empty or identical to the raw value (no separators).
+      const normVal = safe.replace(/[\s\-_]/g, '');
+      if (normVal && normVal !== safe) {
+        const nName = `${namePrefix}n${i}`;
+        request.input(nName, sql.NVarChar, normVal);
+        parts.push(`REPLACE(REPLACE(REPLACE(rr.region, ' ', ''), '-', ''), '_', '') = @${nName}`);
+      }
       if (regionMode === 'token') {
         parts.push(`CHARINDEX('/' + @${pName} + '/', '/' + rr.region + '/') > 0`);
       }
+      // 'contains' mode: the search token is a distinctive SUBSTRING of a verbose
+      // card label (Shriram stores "GUJARAT & DADRA NAGAR HAVELI & DAMAN & DIU",
+      // "TAMILNADU & PONDICHERRY", "PUNJAB/CHANDIGARH"). Match when the token
+      // appears anywhere inside rr.region. Collation is case-insensitive.
+      if (regionMode === 'contains') {
+        parts.push(`rr.region LIKE '%' + @${pName} + '%'`);
+      }
     });
+    // National / "PAN INDIA" rows are stored with a NULL/'' region. When the
+    // caller opts in, OR them into the clause so a state-constrained lookup
+    // (e.g. region = 'MAHARASHTRA') still surfaces the national rules.
+    if (include_null_region) {
+      parts.push(`rr.region IS NULL OR rr.region = ''`);
+    }
     return parts.length > 0 ? `(${parts.join(' OR ')})` : '1=0';
   }
 
@@ -333,42 +384,134 @@ async function lookupRates(pool, params) {
  * @param {string} rtoCode
  * @returns {Promise<object|null>}
  */
-async function resolveRTO(pool, insurer, product, rtoCode) {
-  // Get all RTO mappings for this insurer + rto_code
-  const result = await pool.request()
-    .input('insurer', sql.NVarChar, insurer)
-    .input('rtoCode', sql.NVarChar, rtoCode)
-    .query(
-      `SELECT * FROM rto_mappings
-       WHERE insurer = @insurer AND rto_code = @rtoCode`
-    );
+// Build the set of equivalent RTO-code spellings for a raw code. The mapping
+// table is inconsistent about zero-padding the numeric district portion
+// (e.g. it stores "DL09" while a tracker may carry "DL9"), so we generate both
+// the padded and unpadded forms plus the original and match on any of them.
+function rtoCodeVariants(rtoCode) {
+  const raw = String(rtoCode || '').trim().toUpperCase().replace(/\s+/g, '');
+  if (!raw) return [];
+  const set = new Set([raw]);
+  // State letters + numeric district + optional suffix letters (e.g. "DL7C").
+  const m = raw.match(/^([A-Z]{2})0*(\d+)([A-Z]*)$/);
+  if (m) {
+    const [, st, num, suf] = m;
+    const n = String(parseInt(num, 10));
+    set.add(`${st}${n}${suf}`);                       // unpadded: DL9
+    set.add(`${st}${n.padStart(2, '0')}${suf}`);      // 2-padded: DL09
+  }
+  return [...set];
+}
 
+async function resolveRTO(pool, insurer, product, rtoCode) {
+  // Get all RTO mappings for this insurer + rto_code (matching any spelling
+  // variant — see rtoCodeVariants for the padding-normalisation rationale).
+  const variants = rtoCodeVariants(rtoCode);
+  if (variants.length === 0) return null;
+  const req = pool.request().input('insurer', sql.NVarChar, insurer);
+  const params = variants.map((v, i) => {
+    req.input(`rto${i}`, sql.NVarChar, v);
+    return `@rto${i}`;
+  });
+  const result = await req.query(
+    `SELECT * FROM rto_mappings
+     WHERE insurer = @insurer AND rto_code IN (${params.join(', ')})
+     ORDER BY rate_card_id DESC`
+  );
+
+  // Prefer the most recent rate-card generation. RTO masters accumulate
+  // across re-uploads (old cards aren't purged), and an older generation can
+  // carry a stale cluster (e.g. GJ09 GCV was ROGJ1 on card 63 but ROGJ2 on
+  // the newer cards, matching the current master). Ordering by rate_card_id
+  // DESC means the latest mapping wins the exact/alias product match below.
   if (result.recordset.length === 0) return null;
-  if (!product) return result.recordset[0];
+  // Prefer a record whose rto_code matches the exact (original) spelling, then
+  // fall through to product matching below over the remaining variant rows.
+  const rawUpper = String(rtoCode || '').trim().toUpperCase().replace(/\s+/g, '');
+  const exactSpelling = result.recordset.filter(r =>
+    String(r.rto_code || '').toUpperCase() === rawUpper);
+  const rows = exactSpelling.length ? exactSpelling : result.recordset;
+  if (!product) return rows[0];
 
   // Map vehicle types to config-level product names for matching
   // e.g. GCV/PCV -> CV, CAR -> 4W, TW/TW_EV -> TW
   const productAliases = {
     'GCV': ['CV', 'GCV', 'GCCV'],
-    'PCV': ['CV', 'PCV', 'TAXI', 'SCHOOL_STAFF_BUS'],
+    // PCV / MISC are commercial vehicles — their RTO→cluster comes from the
+    // CV mapper (stored under product 'GCV'), NOT the Pvt-Car mapper. Without
+    // 'GCV' here they fall through to the CAR mapping, which can carry a
+    // different cluster (e.g. GJ04 CAR→"ROGJ" has no MISC rules, GJ04
+    // GCV→"ROGJ1" does). Include 'GCV' so commercial vehicles use the CV map.
+    'PCV': ['CV', 'GCV', 'PCV', 'TAXI', 'SCHOOL_STAFF_BUS'],
     'CAR': ['4W', 'CAR', 'PC'],
     'TW': ['TW', '2W', 'TW_EV'],
     'TW_EV': ['TW', 'TW_EV', '2W'],
-    'MISC': ['CV', 'MISC'],
+    'MISC': ['CV', 'GCV', 'MISC'],
+    // E-Rickshaw / electric 3W passenger — Digit's CV RTO sheet maps these to
+    // a DIFFERENT cluster column (PCV_3W_Electric) than the generic CV (MCV)
+    // column. Prefer the EV-3W mapping, fall back to CV/GCV/PCV.
+    'PCV_3W_EV': ['PCV_3W_EV', 'CV', 'GCV', 'PCV'],
     'NON_MOTOR': ['NON_MOTOR'],
   };
   const aliases = productAliases[product] || [product];
 
   // Try exact product match first
-  const exact = result.recordset.find(r => r.product === product);
+  const exact = rows.find(r => r.product === product);
   if (exact) return exact;
 
   // Try alias match
-  const aliasMatch = result.recordset.find(r => aliases.includes(r.product));
+  const aliasMatch = rows.find(r => aliases.includes(r.product));
   if (aliasMatch) return aliasMatch;
 
   // Fallback: return first available
-  return result.recordset[0];
+  return rows[0];
 }
 
-module.exports = { lookupRates, resolveRTO };
+/**
+ * Choose the RTO-mapping product for a policy. Most policies use their coarse
+ * vehicleType (CAR/TW/GCV/PCV/...), but some sub-types map to a different
+ * cluster column in the insurer's RTO sheet. E-Rickshaw / electric 3W
+ * passenger uses the PCV_3W_Electric column (distinct from the generic CV/MCV
+ * cluster), so route it to the dedicated 'PCV_3W_EV' product.
+ */
+function rtoProductFor(params) {
+  if (!params) return null;
+  const cat = String(params.vehicleCategory || params.vehicleClass || '').toUpperCase();
+  const model = String(params.model || '').toUpperCase();
+  const hay = `${cat} ${model}`;
+  const vt = String(params.vehicleType || '').toUpperCase();
+
+  // Liberty (Robinhood) files THREE different RTO→Geo-Cluster columns keyed by
+  // product family (master "RTO_TP Geo Cluster", ingested under card 488):
+  //   col5 → Pvt Car & Two Wheeler                       (product 'CAR' / 'TW')
+  //   col6 → GCV 3W, GCV 4W <7.5T, PCV 3W & PCV Taxi      (product 'LIB_CV_LIGHT')
+  //   col7 → GCV 4W >7.5T, PCV 4W Others & Misc D         (product 'LIB_CV_HEAVY')
+  // The zones differ per column (e.g. MH12 = "MAHARASHTRA - 2 P" for PC/TW &
+  // light-CV but "MAHARASHTRA - 1 MPK" for heavy-CV), so the right column must
+  // be chosen from the policy's CV sub-segment. resolveRTO does an exact
+  // product match on these literal product strings.
+  if (String(params.insurer || '').toLowerCase() === 'liberty_videocon') {
+    if (vt === 'CAR') return 'CAR';
+    if (vt === 'TW' || vt === 'TW_EV') return 'TW';
+    // MISC (Misc D — tractors etc.) lives in the heavy column.
+    if (vt === 'MISC') return 'LIB_CV_HEAVY';
+    // 3-wheelers (GCV 3W, PCV 3W / e-rickshaw) → light column.
+    const is3W = /3\s*-?\s*W|3\s*WHEEL|RIKSHAW|RICKSHAW|E[-\s]?RICK|E[-\s]?RIK/.test(hay);
+    if (is3W) return 'LIB_CV_LIGHT';
+    // GCV / PCV 4-wheelers split at 7.5T GVW. Prefer parsed tonnage; fall back
+    // to a tonnage figure embedded in the category label ("GCV - 4W 12-20Tn").
+    let ton = (params.tonnage != null && params.tonnage !== '') ? Number(params.tonnage) : null;
+    if (ton == null || !Number.isFinite(ton)) {
+      const m = cat.match(/(\d+(?:\.\d+)?)\s*TN/);   // first number before "Tn"
+      if (m) ton = parseFloat(m[1]);
+    }
+    if (ton != null && Number.isFinite(ton) && ton > 7.5) return 'LIB_CV_HEAVY';
+    return 'LIB_CV_LIGHT';   // ≤7.5T, taxis, or unknown → light column
+  }
+
+  const isERick = /RIKSHAW|RICKSHAW|E[-\s]?RICK|E[-\s]?RIK/.test(hay);
+  if (isERick) return 'PCV_3W_EV';
+  return params.vehicleType;
+}
+
+module.exports = { lookupRates, resolveRTO, rtoProductFor };

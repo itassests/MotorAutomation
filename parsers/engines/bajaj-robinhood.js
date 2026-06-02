@@ -1495,6 +1495,65 @@ function parseSegmentSeating(seg) {
 //   - "Existing grid will apply"            → no rules emitted from this row
 function parsePvtCarComp(sheetData, sheetConfig, meta) {
   const rules = [];
+  // First pass: find the "Existing Grid" fallback rate ("Motor 4W on OD = 0.4")
+  // and the CD>80% override ("PO will be 15%"). These are global Pan-India
+  // defaults applied to states not listed in the per-row grid (e.g. Gujarat).
+  let baseExistingRate = null;  // motor 4W on OD rate
+  let cdAbove80Rate = null;     // CD > 80% PO rate
+  let hevWithoutNcbRate = null; // "All without NCB for HEV only" rate
+  for (let r = 0; r < sheetData.length; r++) {
+    const row = sheetData[r] || [];
+    const txt = (row[0] || row[1] || '').toString();
+    if (/Motor\s*4W\s*on\s*OD/i.test(row[0] || '')) {
+      const v = parseFloat(row[1]);
+      if (Number.isFinite(v)) baseExistingRate = v > 1 ? v / 100 : v;
+    }
+    const cdMatch = txt.match(/CD\s*>\s*80.*?PO\s*will\s*be\s*(\d+(?:\.\d+)?)\s*%/i);
+    if (cdMatch) cdAbove80Rate = parseFloat(cdMatch[1]) / 100;
+    const hevMatch = txt.match(/without\s+NCB.*?(\d+(?:\.\d+)?)\s*%\s*on\s*OD\s*FOR\s*HEV/i);
+    if (hevMatch) hevWithoutNcbRate = parseFloat(hevMatch[1]) / 100;
+  }
+  // Emit Pan-India fallback rules — these cover states not enumerated in the
+  // per-row grid (Gujarat, Maharashtra, Delhi, etc.) per the row 18 note
+  // "For All Other States following grid will apply - Existing Grid".
+  if (baseExistingRate != null) {
+    for (const rt of ['COMP', 'SAOD']) {
+      rules.push({
+        product: 'CAR', sheet_name: meta.sheetName,
+        region: 'Pan India', segment: 'Pvt Car', make: 'All',
+        rate_type: rt, rate_value: baseExistingRate, applied_on: 'OD',
+        volume_tier: '0-80', is_declined: false,
+        remarks: 'Existing Grid — CD ≤ 80% — Motor 4W on OD',
+        rate_text: `Bajaj Robinhood Pvt Car ${rt} | Pan India Existing Grid | CD ≤80% | ${(baseExistingRate*100).toFixed(2)}% OD`,
+      });
+    }
+  }
+  if (cdAbove80Rate != null) {
+    for (const rt of ['COMP', 'SAOD']) {
+      rules.push({
+        product: 'CAR', sheet_name: meta.sheetName,
+        region: 'Pan India', segment: 'Pvt Car', make: 'All',
+        rate_type: rt, rate_value: cdAbove80Rate, applied_on: 'OD',
+        volume_tier: '80-99', is_declined: false,
+        remarks: 'Existing Grid — CD > 80% PO override',
+        rate_text: `Bajaj Robinhood Pvt Car ${rt} | Pan India CD >80% | ${(cdAbove80Rate*100).toFixed(2)}% OD`,
+      });
+    }
+  }
+  if (hevWithoutNcbRate != null) {
+    for (const rt of ['COMP', 'SAOD']) {
+      rules.push({
+        product: 'CAR', sheet_name: meta.sheetName,
+        region: 'Pan India', segment: 'Pvt Car High End', make: 'All',
+        rate_type: rt, rate_value: hevWithoutNcbRate, applied_on: 'OD',
+        age_band_min: 0, age_band_max: 0,                            // Non-NCB
+        is_declined: false,
+        remarks: 'HEV without NCB — Pan India',
+        rate_text: `Bajaj Robinhood Pvt Car ${rt} HEV w/o NCB | ${(hevWithoutNcbRate*100).toFixed(2)}% OD`,
+      });
+    }
+  }
+
   for (let r = 1; r < sheetData.length; r++) {
     const row = sheetData[r];
     if (!row) continue;

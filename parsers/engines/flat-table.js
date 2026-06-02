@@ -816,6 +816,11 @@ function parse(sheetData, sheetConfig, meta) {
         // Optional: drop rows where the rate is exactly 0 (TATA ROBINHOOD
         // emits 0 in either OD or TP depending on which section applies).
         if (sheetConfig.skip_zero_rates && normalized.rate_value === 0) continue;
+        // Optional: scale whole-number-percent grids (e.g. Digit's Apr grid
+        // stores "19.5" meaning 19.5%, not 0.195). rate_divisor:100 → ÷100.
+        if (sheetConfig.rate_divisor && normalized.rate_value != null) {
+          normalized.rate_value = +(normalized.rate_value / sheetConfig.rate_divisor).toFixed(6);
+        }
         const overrides = { rate_type: applyPrefix(rc.rate_type), ...normalized };
         // Support make override from column config (e.g. column header contains make name)
         if (rc.make) overrides.make = rc.make;

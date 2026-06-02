@@ -49,3 +49,8 @@ tmp_rules*.json
 
 # Runtime caches
 all-insurers-cache.json
+
+# Google Document AI service account (never commit credentials)
+config/docai-service-account.json
+config/*-service-account.json
+*.gcp-key.json

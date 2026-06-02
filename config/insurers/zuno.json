@@ -1,0 +1,12 @@
+{
+  "insurer": "zuno",
+  "label": "Zuno General Insurance",
+  "sheets": [
+    {
+      "_comment": "Zuno Robinhood broker payout grid (w.e.f. 01-Apr-2026). Single sheet with two sections: per-region Product Line rates + state × commercial-vehicle grid.",
+      "name": "BROKERS",
+      "file_pattern": "Zuno|Robinhood",
+      "layout": "zuno_robinhood"
+    }
+  ]
+}

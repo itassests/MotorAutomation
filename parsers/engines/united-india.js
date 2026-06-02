@@ -56,9 +56,10 @@ const TW_SAOD_RATE = 0.20;   // All states, all bands incl Electric
 
 // PCV — passenger-carrying capacity bands (page 5)
 const PCV_RATES = [
-  // Two-Wheeled PCV
-  { class: '2W PCV', band_label: 'All CC Bands',          rate: 0.10, applies_to: 'all' },
-  { class: '2W PCV', band_label: 'Electric Vehicles',     rate: 0.10, applies_to: 'all' },
+  // Two-Wheeled PCV — split by fuel: All CC Bands = Petrol; Electric Vehicles
+  // emit a sister rule with fuel_type=Electric.
+  { class: '2W PCV', band_label: 'All CC Bands',          fuel: 'Petrol',   rate: 0.10, applies_to: 'all' },
+  { class: '2W PCV', band_label: 'Electric Vehicles',     fuel: 'Electric', rate: 0.10, applies_to: 'all' },
   // Three-Wheeled PCV
   {
     class: '3W PCV', band_label: 'All Bands (incl Electric)',
@@ -84,11 +85,16 @@ const PCV_RATES = [
   { class: '4W PCV > 6', band_label: '50<PCC<=60 (Except EV)',  seat_min: 51, seat_max: 60, rate: 0.05, applies_to: 'all' },
   { class: '4W PCV > 6', band_label: 'PCC>60 (Except EV)',      seat_min: 61, seat_max: null, rate: 0.05, applies_to: 'all' },
   { class: '4W PCV > 6', band_label: 'PCC>20 (Electric)',       seat_min: 21, seat_max: null, fuel: 'Electric', rate: 0.10, applies_to: 'all' },
-  // Taxis (page 5)
+  // Taxis (page 5) — 15% in Haryana / Karnataka / Rajasthan / Tamil Nadu /
+  // Uttar Pradesh / Madhya Pradesh; 25% in all other states.
   { class: 'Taxi', band_label: 'All CC Bands (incl Electric)',
-    low_states: ['Madhya Pradesh'], low_rate: 0.25, other_rate: 0.40 },
-  // Educational/Staff Bus — 62.5% all states
-  { class: 'Educational/Staff Bus', band_label: 'All Capacity (incl Electric)', rate: 0.625, applies_to: 'all' },
+    low_states: ['Haryana', 'Karnataka', 'Rajasthan', 'Tamil Nadu', 'Uttar Pradesh', 'Madhya Pradesh'],
+    low_rate: 0.15, other_rate: 0.25 },
+  // "Educational Institution and Staff Buses" — PDF lists a single 62.5% row
+  // covering both bus types. Split into two independent categories so
+  // VehicleCategory shows "School Bus" / "Staff Bus" explicitly.
+  { class: 'School Bus', band_label: 'All Capacity (incl Electric)', rate: 0.625, applies_to: 'all' },
+  { class: 'Staff Bus',  band_label: 'All Capacity (incl Electric)', rate: 0.625, applies_to: 'all' },
 ];
 
 // GCV — Gross Vehicle Weight bands (page 5-6)
@@ -135,8 +141,9 @@ const GCV_RATES = [
     low_states: ['Haryana', 'Madhya Pradesh', 'Rajasthan', 'Tamil Nadu', 'Uttar Pradesh', 'Karnataka', 'Kerala'],
     low_rate: 0, other_rate: 0.05,
   },
-  // E-Cart — 50% all states, fuel=Electric
-  { band_label: 'E-Cart', weight_min: null, weight_max: null, fuel: 'Electric', rate: 0.50, applies_to: 'all' },
+  // E-Cart — 50% all states, fuel=Electric. Distinct segment so the export
+  // surfaces "E-Cart" in the VehicleCategory column (vs the generic "GCV").
+  { band_label: 'E-Cart', segment: 'E-Cart', weight_min: null, weight_max: null, fuel: 'Electric', rate: 0.50, applies_to: 'all' },
 ];
 
 // Pvt Car (page 7)
@@ -173,9 +180,15 @@ const PVT_CAR_RATES = [
     rule: 'All vehicles New',                                rate: 0.225 },
   { policy: 'SATP',        business: 'New',     fuel: 'All',
     rule: 'All vehicles New',                                rate: 0.225 },
-  // Package/SAOD/SATP Renewal/Roll-over (fallback)
-  { policy: 'Package',     business: 'Renewal', fuel: 'All',
-    rule: 'Rollover (fallback)',                             rate: 0.17 },
+  // Package/SAOD/SATP Renewal/Roll-over — Electric. The PDF lists "All vehicles"
+  // with 17%/17% under all three policy headers for Electric fuel. We emit
+  // three independent rules so each policy is reportable on its own.
+  { policy: 'Package',     business: 'Renewal', fuel: 'Electric',
+    rule: 'All vehicles Electric Renewal/Rollover',          rate: 0.17 },
+  { policy: 'SAOD',        business: 'Renewal', fuel: 'Electric',
+    rule: 'All vehicles Electric Renewal/Rollover',          rate: 0.17 },
+  { policy: 'SATP',        business: 'Renewal', fuel: 'Electric',
+    rule: 'All vehicles Electric Renewal/Rollover',          rate: 0.17 },
 ];
 
 // Additional per-policy incentive (page 7-8) — applies on TOP of base rate.
@@ -193,15 +206,20 @@ const PVT_CAR_ADDITIONAL_INCENTIVE = [
     od_pct: 0.10, tp_pct: 0.10 },
 ];
 
-// Misc / Tractor / Ambulance / Trade Plate (page 6)
+// Misc / Tractor / Ambulance / Trade Plate (page 6 — "Misc Vehicles, Motor
+// Trade and Standalone CPA" table). Each row produces its own rule with
+// product=MIS|CPA (Class of Vehicles) and segment=<Bands/Vehicle Type> so
+// the export populates VehicleCategory correctly.
 const MISC_RATES = [
-  { class: 'Ambulance',                                          rate: 0.20, applies_to: 'all' },
-  { class: 'Agricultural Tractor', period: 'w.e.f. 01-01-2026',  rate: 0.25, applies_to: 'all' },
-  { class: 'Agricultural Tractor', period: 'w.e.f. 05-03-2026',  rate: 0.40, applies_to: 'all' },
-  { class: 'All other Misc Vehicles',                            rate: 0.10, applies_to: 'all' },
-  { class: 'Motor Trade Road Risk / Transit / Internal Risk',    rate: 0.05, applies_to: 'all' },
-  { class: 'Standalone CPA',                                     rate: 0.15, applies_to: 'all' },
-  { class: 'Misc Vehicles (all states)',                         rate: 0.40, applies_to: 'all' },
+  { product: 'MIS', class: 'Misc Vehicles', category: 'Ambulance',                                  rate: 0.20 },
+  // Agricultural Tractor — "Maximum proposed Commission" (w.e.f. 01/04/2026)
+  // is 40% across both source periods (the 25% column was Existing Pay-out
+  // and is superseded by the new grid).
+  { product: 'MIS', class: 'Misc Vehicles', category: 'Agricultural Tractor', period: 'w.e.f. 01-01-2026', rate: 0.40 },
+  { product: 'MIS', class: 'Misc Vehicles', category: 'Agricultural Tractor', period: 'w.e.f. 05-03-2026', rate: 0.40 },
+  { product: 'MIS', class: 'Misc Vehicles', category: 'All other Miscellaneous Vehicles',           rate: 0.10 },
+  { product: 'MIS', class: 'Motor Trade',   category: 'Road Risk, Transit & Internal Risk',         rate: 0.05 },
+  { product: 'CPA', class: 'Standalone CPA',category: 'Standalone CPA',                             rate: 0.15 },
 ];
 
 // ============================================================================
@@ -241,10 +259,37 @@ async function parsePdfFile(filePath) {
 // under "Non-Electric"; we fan out into one rule per fuel for precise
 // matching downstream.
 const NON_ELECTRIC_FUELS = ['Petrol', 'Diesel', 'CNG'];
+
+// All Indian states/UTs we serve. When a grid row applies a single "other
+// states" rate to everything except a small low-rate exclusion list, we
+// fan that catch-all out into one explicit rule per remaining state so the
+// downstream grid shows the rate against every state name.
+const ALL_INDIA_STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu & Kashmir',
+  'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra',
+  'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
+  'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+  'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  'Delhi', 'Chandigarh', 'Puducherry',
+];
+function otherStates(exclude) {
+  const ex = new Set((exclude || []).map(s => s.toLowerCase()));
+  return ALL_INDIA_STATES.filter(s => !ex.has(s.toLowerCase()));
+}
 function fuelsFor(fuel) {
   if (!fuel || fuel === 'All') return [null];        // null = any fuel
   if (fuel === 'Non-Electric') return NON_ELECTRIC_FUELS;
   return [fuel];                                     // 'Electric' etc.
+}
+
+// UII rule: unless an entry calls out a separate TP rate, the same grid %
+// applies to BOTH OD and TP. So every COMP entry is emitted as a pair of
+// rules (applied_on='OD' and applied_on='TP') with the same rate — the
+// export's mergeOdTpPairs() folds them into one row.
+function pushComp(rules, base, rate) {
+  rules.push({ ...base, applied_on: 'OD', rate_value: rate });
+  rules.push({ ...base, applied_on: 'TP', rate_value: rate });
 }
 
 function emitTwoWheeler(meta) {
@@ -254,7 +299,7 @@ function emitTwoWheeler(meta) {
     // One rule per (state × fuel) in the low-rate group
     for (const state of r.low_states) {
       for (const fuel of fuels) {
-        rules.push({
+        pushComp(rules, {
           product: 'TW',
           sheet_name: meta.sheetName,
           segment: 'TW',
@@ -264,31 +309,30 @@ function emitTwoWheeler(meta) {
           cc_band_max: r.cc_max,
           fuel_type: fuel,
           rate_type: 'COMP',
-          rate_value: r.low_rate,
-          applied_on: 'NET',
           is_declined: false,
-          remarks: `${r.cc_label} | Low-rate state${fuel ? ' (' + fuel + ')' : ''}`,
+          remarks: `${r.cc_label} | Low-rate state${fuel ? ' (' + fuel + ')' : ''} | rate applies to OD & TP`,
           rate_text: `TW ${r.cc_label} | ${state}${fuel ? ' ' + fuel : ''} | ${(r.low_rate*100).toFixed(2)}%`,
-        });
+        }, r.low_rate);
       }
     }
-    // Catch-all "Other states" rules — one per fuel
-    for (const fuel of fuels) {
-      rules.push({
-        product: 'TW',
-        sheet_name: meta.sheetName,
-        segment: 'TW',
-        make: 'Others',
-        cc_band_min: r.cc_min,
-        cc_band_max: r.cc_max,
-        fuel_type: fuel,
-        rate_type: 'COMP',
-        rate_value: r.other_rate,
-        applied_on: 'NET',
-        is_declined: false,
-        remarks: `${r.cc_label} | Other states${fuel ? ' (' + fuel + ')' : ''} (excluding ${r.low_states.join(', ')})`,
-        rate_text: `TW ${r.cc_label} | Other states${fuel ? ' ' + fuel : ''} | ${(r.other_rate*100).toFixed(2)}%`,
-      });
+    // Catch-all "Other states" — fan out into one rule per remaining state × fuel
+    for (const state of otherStates(r.low_states)) {
+      for (const fuel of fuels) {
+        pushComp(rules, {
+          product: 'TW',
+          sheet_name: meta.sheetName,
+          segment: 'TW',
+          state: state, region: state,
+          make: 'All',
+          cc_band_min: r.cc_min,
+          cc_band_max: r.cc_max,
+          fuel_type: fuel,
+          rate_type: 'COMP',
+          is_declined: false,
+          remarks: `${r.cc_label} | ${state}${fuel ? ' (' + fuel + ')' : ''} (other-states bucket) | rate applies to OD & TP`,
+          rate_text: `TW ${r.cc_label} | ${state}${fuel ? ' ' + fuel : ''} | ${(r.other_rate*100).toFixed(2)}%`,
+        }, r.other_rate);
+      }
     }
   }
   // TW SAOD — 20% all states all bands (no fuel split)
@@ -305,34 +349,51 @@ function emitTwoWheeler(meta) {
 function emitPCV(meta) {
   const rules = [];
   for (const r of PCV_RATES) {
-    const baseRule = {
-      product: 'PCV',
-      sheet_name: meta.sheetName,
-      segment: r.class,
-      make: 'All',
-      seating_capacity_min: r.seat_min ?? null,
-      seating_capacity_max: r.seat_max ?? null,
-      fuel_type: r.fuel || null,
-      rate_type: 'COMP',
-      applied_on: 'NET',
-      is_declined: false,
-      rate_text: `PCV ${r.class} | ${r.band_label}`,
-    };
-    if (r.applies_to === 'all') {
-      rules.push({ ...baseRule, rate_value: r.rate, remarks: `${r.band_label} (all states)` });
-    } else {
-      // One rule per low-rate state
-      for (const state of r.low_states) {
-        rules.push({
-          ...baseRule, state: state, region: state, rate_value: r.low_rate,
-          remarks: `${r.band_label} | ${state}`,
-        });
+    // "Except EV" rows apply to Non-Electric fuels only — fan out into
+    // Petrol/Diesel/CNG so the rule grid lists each fuel explicitly.
+    // Otherwise use whatever the row declared (or null = any fuel).
+    const isExceptEV = /except\s*ev/i.test(r.band_label || '');
+    const fuelList = isExceptEV ? NON_ELECTRIC_FUELS : [r.fuel || null];
+
+    for (const fuel of fuelList) {
+      const fuelTag = isExceptEV ? ` (${fuel})` : '';
+      const baseRule = {
+        product: 'PCV',
+        sheet_name: meta.sheetName,
+        segment: r.class,
+        make: 'All',
+        seating_capacity_min: r.seat_min ?? null,
+        seating_capacity_max: r.seat_max ?? null,
+        fuel_type: fuel,
+        rate_type: 'COMP',
+        is_declined: false,
+        rate_text: `PCV ${r.class} | ${r.band_label}${fuelTag}`,
+      };
+      if (r.applies_to === 'all') {
+        // Fan out "all states" rows into one rule per state too, so the
+        // grid shows the rate against each state explicitly.
+        for (const state of ALL_INDIA_STATES) {
+          pushComp(rules, {
+            ...baseRule, state: state, region: state,
+            remarks: `${r.band_label}${fuelTag} | ${state} | rate applies to OD & TP`,
+          }, r.rate);
+        }
+      } else {
+        // One rule per low-rate state
+        for (const state of r.low_states) {
+          pushComp(rules, {
+            ...baseRule, state: state, region: state,
+            remarks: `${r.band_label}${fuelTag} | ${state} (low-rate state) | rate applies to OD & TP`,
+          }, r.low_rate);
+        }
+        // Fan "Others" bucket out into one rule per remaining state
+        for (const state of otherStates(r.low_states)) {
+          pushComp(rules, {
+            ...baseRule, state: state, region: state,
+            remarks: `${r.band_label}${fuelTag} | ${state} (other-states bucket) | rate applies to OD & TP`,
+          }, r.other_rate);
+        }
       }
-      // Catch-all "Others"
-      rules.push({
-        ...baseRule, make: 'Others', rate_value: r.other_rate,
-        remarks: `${r.band_label} | Other states (excluding ${r.low_states.join(', ')})`,
-      });
     }
   }
   return rules;
@@ -344,30 +405,37 @@ function emitGCV(meta) {
     const baseRule = {
       product: 'GCV',
       sheet_name: meta.sheetName,
-      segment: 'GCV',
+      segment: r.segment || 'GCV',     // E-Cart overrides to its own segment
       make: 'All',
       weight_band_min: r.weight_min,
       weight_band_max: r.weight_max,
       fuel_type: r.fuel || null,
       rate_type: 'COMP',
-      applied_on: 'NET',
       is_declined: false,
       rate_text: `GCV ${r.band_label}`,
     };
     if (r.applies_to === 'all') {
-      rules.push({ ...baseRule, rate_value: r.rate, remarks: `${r.band_label} (all states)` });
+      for (const state of ALL_INDIA_STATES) {
+        pushComp(rules, {
+          ...baseRule, state: state, region: state,
+          remarks: `${r.band_label} | ${state} | rate applies to OD & TP`,
+        }, r.rate);
+      }
     } else {
       // One rule per low-rate / excluded state
       for (const state of r.low_states) {
-        rules.push({
-          ...baseRule, state: state, region: state, rate_value: r.low_rate,
-          remarks: `${r.band_label} | ${state} (excluded — Sub-Annexure 2 RTOs override)`,
-        });
+        pushComp(rules, {
+          ...baseRule, state: state, region: state,
+          remarks: `${r.band_label} | ${state} (excluded — Sub-Annexure 2 RTOs override) | rate applies to OD & TP`,
+        }, r.low_rate);
       }
-      rules.push({
-        ...baseRule, make: 'Others', rate_value: r.other_rate,
-        remarks: `${r.band_label} | Other states (excluding ${r.low_states.join(', ')})`,
-      });
+      // Fan "Others" out per remaining state
+      for (const state of otherStates(r.low_states)) {
+        pushComp(rules, {
+          ...baseRule, state: state, region: state,
+          remarks: `${r.band_label} | ${state} (other-states bucket) | rate applies to OD & TP`,
+        }, r.other_rate);
+      }
     }
   }
   return rules;
@@ -403,7 +471,7 @@ function emitPvtCar(meta) {
     const vehAgeMax = isNew ? 0 : null;
 
     for (const fuel of fuelList) {
-      rules.push({
+      const base = {
         product: 'CAR',
         sheet_name: meta.sheetName,
         segment: 'Pvt Car',
@@ -412,30 +480,46 @@ function emitPvtCar(meta) {
         vehicle_age_min: vehAgeMin,
         vehicle_age_max: vehAgeMax,
         rate_type: rateType,
-        rate_value: r.rate,
-        applied_on: r.policy === 'SAOD' ? 'OD' : r.policy === 'SATP' ? 'TP' : 'NET',
         is_declined: false,
-        remarks: `${r.policy} | ${r.business}${isNew ? ' (Vehicle age 0)' : ''} | ${r.rule}${fuel && fuel !== 'Diesel' ? ' (' + fuel + ')' : ''}`,
+        remarks: `${r.policy} | ${r.business}${isNew ? ' (Vehicle age 0)' : ''} | ${r.rule}${fuel && fuel !== 'Diesel' ? ' (' + fuel + ')' : ''}${r.policy === 'Package' || r.policy === 'Bundled 1+3' ? ' | rate applies to OD & TP' : ''}`,
         rate_text: `Pvt Car ${r.policy} ${r.business} | ${r.rule} | ${fuel || 'All Fuels'} | ${(r.rate*100).toFixed(2)}%`,
-      });
+      };
+      // SAOD = OD only; SATP = TP only; Bundled/Package = same rate to both OD & TP.
+      if (r.policy === 'SAOD') {
+        rules.push({ ...base, applied_on: 'OD', rate_value: r.rate });
+      } else if (r.policy === 'SATP') {
+        rules.push({ ...base, applied_on: 'TP', rate_value: r.rate });
+      } else {
+        pushComp(rules, base, r.rate);
+      }
     }
   }
   return rules;
 }
 
 function emitMisc(meta) {
-  return MISC_RATES.map(r => ({
-    product: /Tractor/i.test(r.class) ? 'MIS' : /Standalone CPA/i.test(r.class) ? 'CPA' : 'MIS',
-    sheet_name: meta.sheetName,
-    segment: r.class,
-    make: 'All',
-    rate_type: 'COMP',
-    applied_on: 'NET',
-    rate_value: r.rate,
-    is_declined: false,
-    remarks: r.period || 'All states',
-    rate_text: `${r.class}${r.period ? ' (' + r.period + ')' : ''} | ${(r.rate*100).toFixed(2)}%`,
-  }));
+  const rules = [];
+  for (const r of MISC_RATES) {
+    const base = {
+      product: r.product,
+      sheet_name: meta.sheetName,
+      // segment carries the "Bands / Vehicle Type" so the export's
+      // inferVehicleCategory surfaces it in the VehicleCategory column.
+      segment: r.category,
+      make: 'All',
+      rate_type: r.product === 'CPA' ? 'CPA' : 'COMP',
+      is_declined: false,
+      remarks: `${r.class} | ${r.category}${r.period ? ' (' + r.period + ')' : ''} (all states)${r.product === 'CPA' ? '' : ' | rate applies to OD & TP'}`,
+      rate_text: `${r.class} | ${r.category}${r.period ? ' (' + r.period + ')' : ''} | ${(r.rate*100).toFixed(2)}%`,
+    };
+    if (r.product === 'CPA') {
+      // CPA = standalone personal-accident liability — keep as NET (no OD/TP split).
+      rules.push({ ...base, applied_on: 'NET', rate_value: r.rate });
+    } else {
+      pushComp(rules, base, r.rate);
+    }
+  }
+  return rules;
 }
 
 // ============================================================================
@@ -504,7 +588,7 @@ function parseRtoGcv(data, meta) {
         if (!code) continue;
         const cleanCode = code.replace(/\s+/g, '').toUpperCase();
         if (!/^[A-Z]{2}\d{1,3}$/.test(cleanCode)) continue;
-        rules.push({
+        pushComp(rules, {
           product: 'GCV',
           sheet_name: meta.sheetName,
           state: currentState,
@@ -515,12 +599,10 @@ function parseRtoGcv(data, meta) {
           weight_band_min: currentSection.weight_min,
           weight_band_max: currentSection.weight_max,
           rate_type: 'COMP',
-          rate_value: currentSection.rate,
-          applied_on: 'NET',
           is_declined: false,
-          remarks: `Preferred RTO (${currentState}) — overrides low-rate state base for ${currentSection.name}`,
+          remarks: `Preferred RTO (${currentState}) — overrides low-rate state base for ${currentSection.name} | rate applies to OD & TP`,
           rate_text: `UII GCV preferred RTO | ${currentState} ${cleanCode} | ${(currentSection.rate*100).toFixed(2)}%`,
-        });
+        }, currentSection.rate);
       }
     }
   }
@@ -530,8 +612,18 @@ function parseRtoGcv(data, meta) {
 /**
  * "RTO FOR PVT CAR" sheet — Sub-Annexure 3.
  * Layout: per-city subgroup with up to 4 RTO codes per row.
- * Each RTO becomes a 40% commission rule (excluding Diesel ≤ 1500cc).
+ * Each RTO becomes a 40% commission rule with fuel fan-out:
+ *   - Petrol (any CC)
+ *   - CNG (any CC)
+ *   - Diesel >1500cc only (PDF clause "excluding Diesel ≤1500cc")
+ * So 3 fuel rules per RTO × OD+TP = 6 rate-rule rows per RTO code.
  */
+const PVT_CAR_PREFERRED_FUEL_FANOUT = [
+  { fuel: 'Petrol', cc_min: null, cc_max: null },
+  { fuel: 'CNG',    cc_min: null, cc_max: null },
+  { fuel: 'Diesel', cc_min: 1500, cc_max: null }, // >1500cc only
+];
+
 function parseRtoPvtCar(data, meta) {
   const rules = [];
   let currentCity = null;
@@ -549,43 +641,82 @@ function parseRtoPvtCar(data, meta) {
       const code = cellOrNull(row[c]);
       if (!code) continue;
 
-      // Kerala State — "All RTOs except KL15" — emit a single state-level rule
+      // Kerala State — "All RTOs except KL15" — emit one rule per fuel fan-out
+      // for the state-wide 40% bucket, then explicit ZERO-rate rules for each
+      // excluded RTO (so the excluded RTOs are first-class no-payout rows).
+      //
+      // NB: the source xlsx cell occasionally drops the "15" suffix and reads
+      // just "All RTOs except KL" — fall back to KL15 (the documented excluded
+      // RTO per operator spec) when the regex finds no explicit codes.
       if (/^all\s+rtos?\s+except/i.test(code)) {
-        const excluded = code.match(/KL\s*\d{1,2}/gi)?.map(s => s.replace(/\s+/g, '').toUpperCase()) || [];
-        rules.push({
-          product: 'CAR',
-          sheet_name: meta.sheetName,
-          state: 'Kerala',
-          region: 'Kerala',
-          segment: 'Pvt Car',
-          make: 'All',
-          rate_type: 'COMP',
-          rate_value: 0.40,
-          applied_on: 'NET',
-          is_declined: false,
-          remarks: `Preferred Kerala — 40% (excluding Diesel ≤1500cc, excluding RTOs: ${excluded.join(', ')})`,
-          rate_text: `UII Pvt Car preferred | Kerala (except ${excluded.join('/')}) | 40%`,
-        });
+        let excluded = code.match(/KL\s*\d{1,2}/gi)?.map(s => s.replace(/\s+/g, '').toUpperCase()) || [];
+        if (excluded.length === 0) excluded = ['KL15'];
+        for (const f of PVT_CAR_PREFERRED_FUEL_FANOUT) {
+          const ccTag = f.fuel === 'Diesel' ? ' >1500cc' : '';
+          pushComp(rules, {
+            product: 'CAR',
+            sheet_name: meta.sheetName,
+            state: 'Kerala',
+            region: 'Kerala',
+            segment: 'Pvt Car',
+            make: 'All',
+            fuel_type: f.fuel,
+            cc_band_min: f.cc_min,
+            cc_band_max: f.cc_max,
+            rate_type: 'COMP',
+            is_declined: false,
+            remarks: `Preferred Kerala (${f.fuel}${ccTag}) — 40% (excluding Diesel ≤1500cc, excluding RTOs: ${excluded.join(', ')}) | rate applies to OD & TP`,
+            rate_text: `UII Pvt Car preferred | Kerala ${f.fuel}${ccTag} (except ${excluded.join('/')}) | 40%`,
+          }, 0.40);
+        }
+        // Excluded RTOs (e.g. KL15) get explicit ZERO commission rules,
+        // same fuel fan-out as preferred — so the grid clearly shows they
+        // are no-payout rather than being silently absent.
+        for (const rtoCode of excluded) {
+          for (const f of PVT_CAR_PREFERRED_FUEL_FANOUT) {
+            const ccTag = f.fuel === 'Diesel' ? ' >1500cc' : '';
+            pushComp(rules, {
+              product: 'CAR',
+              sheet_name: meta.sheetName,
+              state: 'Kerala',
+              region: rtoCode,
+              sub_type: rtoCode,
+              segment: 'Pvt Car',
+              make: 'All',
+              fuel_type: f.fuel,
+              cc_band_min: f.cc_min,
+              cc_band_max: f.cc_max,
+              rate_type: 'COMP',
+              is_declined: false,
+              remarks: `Excluded Kerala RTO (${rtoCode}, ${f.fuel}${ccTag}) — 0% (carved out of preferred-state 40% bucket)`,
+              rate_text: `UII Pvt Car excluded | Kerala ${rtoCode} ${f.fuel}${ccTag} | 0%`,
+            }, 0.00);
+          }
+        }
         continue;
       }
 
       const cleanCode = code.replace(/\s+/g, '').toUpperCase();
       if (!/^[A-Z]{2}\d{1,3}$/.test(cleanCode)) continue;
-      rules.push({
-        product: 'CAR',
-        sheet_name: meta.sheetName,
-        region: cleanCode,
-        sub_type: cleanCode,
-        state: stateFromRtoCode(cleanCode),
-        segment: 'Pvt Car',
-        make: 'All',
-        rate_type: 'COMP',
-        rate_value: 0.40,
-        applied_on: 'NET',
-        is_declined: false,
-        remarks: `Preferred city RTO (${currentCity}) — 40% commission (excluding Diesel ≤1500cc)`,
-        rate_text: `UII Pvt Car preferred | ${currentCity} ${cleanCode} | 40%`,
-      });
+      for (const f of PVT_CAR_PREFERRED_FUEL_FANOUT) {
+        const ccTag = f.fuel === 'Diesel' ? ' >1500cc' : '';
+        pushComp(rules, {
+          product: 'CAR',
+          sheet_name: meta.sheetName,
+          region: cleanCode,
+          sub_type: cleanCode,
+          state: stateFromRtoCode(cleanCode),
+          segment: 'Pvt Car',
+          make: 'All',
+          fuel_type: f.fuel,
+          cc_band_min: f.cc_min,
+          cc_band_max: f.cc_max,
+          rate_type: 'COMP',
+          is_declined: false,
+          remarks: `Preferred city RTO (${currentCity}, ${f.fuel}${ccTag}) — 40% commission (excluding Diesel ≤1500cc) | rate applies to OD & TP`,
+          rate_text: `UII Pvt Car preferred | ${currentCity} ${cleanCode} ${f.fuel}${ccTag} | 40%`,
+        }, 0.40);
+      }
     }
   }
   return rules;

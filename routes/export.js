@@ -6,6 +6,7 @@
 const express = require('express');
 const { getPool } = require('../db/connection');
 const { buildExportBuffer } = require('../services/excel-export');
+const { buildLucaBuffer } = require('../services/luca-export');
 
 const router = express.Router();
 
@@ -108,6 +109,34 @@ router.get('/all', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+/**
+ * GET /export/luca
+ * Download ALL outgoing rates of ALL active insurers in the 35-column Luca
+ * format. Only the commission rate is exported — income and margin are NOT
+ * included. Optional ?insurer= filter.
+ */
+router.get('/luca', async (req, res, next) => {
+  try {
+    const insurer = String(req.query.insurer || '').trim();
+    const pool = await getPool();
+    const reqCard = pool.request();
+    reqCard.timeout = 600000;
+    let q = `SELECT id FROM rate_cards
+              WHERE status = 'active'
+                AND (effective_from IS NULL OR effective_from <= CAST(GETDATE() AS DATE))
+                AND (effective_to IS NULL OR effective_to > CAST(GETDATE() AS DATE))`;
+    if (insurer) { reqCard.input('ins', insurer); q += ' AND LOWER(insurer) = LOWER(@ins)'; }
+    const result = await reqCard.query(q);
+    const ids = result.recordset.map(r => r.id);
+    if (ids.length === 0) {
+      return res.status(404).json({ success: false, error: 'No active rate cards to export' });
+    }
+    const buffer = await buildLucaBuffer(ids);
+    const stem = ['luca', insurer || 'all'].filter(Boolean).join('_');
+    sendXlsx(res, buffer, `${stem}_${todayStamp()}.xlsx`);
+  } catch (err) { next(err); }
 });
 
 module.exports = router;
