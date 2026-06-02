@@ -192,7 +192,14 @@ router.get('/dashboard', async (req, res, next) => {
         SUM(CASE WHEN b.LogStatusId = 2 AND b.cdate >= @mtd THEN 1 ELSE 0 END) AS mtd_ok_nop,
         ISNULL(SUM(CASE WHEN b.LogStatusId = 2 AND b.cdate >= @mtd THEN b.premium ELSE 0 END),0) AS mtd_ok_prem,
         SUM(CASE WHEN b.LogStatusId = 2 AND b.cdate = @today THEN 1 ELSE 0 END) AS ftd_ok_nop,
-        ISNULL(SUM(CASE WHEN b.LogStatusId = 2 AND b.cdate = @today THEN b.premium ELSE 0 END),0) AS ftd_ok_prem
+        ISNULL(SUM(CASE WHEN b.LogStatusId = 2 AND b.cdate = @today THEN b.premium ELSE 0 END),0) AS ftd_ok_prem,
+        -- U/W Pending = LogStatusId 1
+        SUM(CASE WHEN b.LogStatusId = 1 THEN 1 ELSE 0 END) AS ytd_uw_nop,
+        ISNULL(SUM(CASE WHEN b.LogStatusId = 1 THEN b.premium ELSE 0 END),0) AS ytd_uw_prem,
+        SUM(CASE WHEN b.LogStatusId = 1 AND b.cdate >= @mtd THEN 1 ELSE 0 END) AS mtd_uw_nop,
+        ISNULL(SUM(CASE WHEN b.LogStatusId = 1 AND b.cdate >= @mtd THEN b.premium ELSE 0 END),0) AS mtd_uw_prem,
+        SUM(CASE WHEN b.LogStatusId = 1 AND b.cdate = @today THEN 1 ELSE 0 END) AS ftd_uw_nop,
+        ISNULL(SUM(CASE WHEN b.LogStatusId = 1 AND b.cdate = @today THEN b.premium ELSE 0 END),0) AS ftd_uw_prem
       FROM base b WHERE b.rn = 1${perP.clause}${OPT}`;
 
     const [sumR, vtR, empR, optR, listR, perR] = await Promise.all([
@@ -214,11 +221,14 @@ router.get('/dashboard', async (req, res, next) => {
     const periods = {
       fy_start: pr.fy_start, mtd_start: pr.mtd_start, today: pr.today,
       ytd: { nop: Number(pr.ytd_nop) || 0, premium: round(pr.ytd_prem), from: pr.fy_start, to: pr.today,
-             ok_to_log: { nop: Number(pr.ytd_ok_nop) || 0, premium: round(pr.ytd_ok_prem) } },
+             ok_to_log: { nop: Number(pr.ytd_ok_nop) || 0, premium: round(pr.ytd_ok_prem) },
+             uw_pending: { nop: Number(pr.ytd_uw_nop) || 0, premium: round(pr.ytd_uw_prem) } },
       mtd: { nop: Number(pr.mtd_nop) || 0, premium: round(pr.mtd_prem), from: pr.mtd_start, to: pr.today,
-             ok_to_log: { nop: Number(pr.mtd_ok_nop) || 0, premium: round(pr.mtd_ok_prem) } },
+             ok_to_log: { nop: Number(pr.mtd_ok_nop) || 0, premium: round(pr.mtd_ok_prem) },
+             uw_pending: { nop: Number(pr.mtd_uw_nop) || 0, premium: round(pr.mtd_uw_prem) } },
       ftd: { nop: Number(pr.ftd_nop) || 0, premium: round(pr.ftd_prem), from: pr.today, to: pr.today,
-             ok_to_log: { nop: Number(pr.ftd_ok_nop) || 0, premium: round(pr.ftd_ok_prem) } },
+             ok_to_log: { nop: Number(pr.ftd_ok_nop) || 0, premium: round(pr.ftd_ok_prem) },
+             uw_pending: { nop: Number(pr.ftd_uw_nop) || 0, premium: round(pr.ftd_uw_prem) } },
     };
 
     res.json({
