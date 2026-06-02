@@ -3347,9 +3347,10 @@
 
       <!-- KPI cards (colourful gradients) -->
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(190px,1fr)); gap:14px; margin-top:16px;">
-        <div style="text-align:center; border-radius:12px; padding:18px 12px; color:#fff; box-shadow:0 4px 14px rgba(0,40,80,0.18); background:linear-gradient(135deg,#1e88e5,#00243e);">
+        <div style="text-align:center; border-radius:12px; padding:18px 12px; color:#fff; box-shadow:0 4px 14px rgba(0,40,80,0.18); background:linear-gradient(135deg,#1e88e5,#00243e); cursor:pointer;" onclick="empToggleCases(true)" title="Click to view case details">
           <div style="font-size:12px;opacity:.85;text-transform:uppercase;letter-spacing:.5px;">&#128202; Total NOP</div>
-          <div id="empKpiNop" style="font-size:30px;font-weight:800;">—</div></div>
+          <div id="empKpiNop" style="font-size:30px;font-weight:800;">—</div>
+          <div style="font-size:10px;opacity:.8;margin-top:2px;">click to view cases &#9662;</div></div>
         <div style="text-align:center; border-radius:12px; padding:18px 12px; color:#fff; box-shadow:0 4px 14px rgba(27,94,32,0.2); background:linear-gradient(135deg,#43a047,#1b5e20);">
           <div style="font-size:12px;opacity:.85;text-transform:uppercase;letter-spacing:.5px;">&#128176; Total Premium</div>
           <div id="empKpiPrem" style="font-size:30px;font-weight:800;">—</div></div>
@@ -3378,10 +3379,13 @@
         </div>
       </div>
 
-      <div class="card" style="margin-top:16px; border-top:4px solid #ef6c00;">
+      <div class="card" id="empCasesCard" style="margin-top:16px; border-top:4px solid #ef6c00; display:none;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
-          <h3 style="font-size:14px;color:#e65100;margin:0;">&#128203; Cases <span style="font-size:11px;color:#999;font-weight:400;">(premium in ₹ Lakhs)</span></h3>
-          <span id="empCaseCount" style="font-size:12px;color:#888;"></span>
+          <h3 style="font-size:14px;color:#e65100;margin:0;">&#128203; Cases <span id="empCasesScope" style="font-size:11px;color:#999;font-weight:400;">(premium in ₹ Lakhs)</span></h3>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span id="empCaseCount" style="font-size:12px;color:#888;"></span>
+            <button class="btn btn-sm" onclick="empToggleCases(false)" style="background:#fff;border:1px solid #ddd;color:#666;padding:2px 8px;">&#10005; Hide</button>
+          </div>
         </div>
         <div class="table-wrap" style="margin-top:10px;"><table>
           <thead><tr style="background:#fff3e0;">
@@ -3988,6 +3992,8 @@
       if (g('empVt'))        qs.set('vehicle_type', g('empVt'));
       if (g('empChannel'))   qs.set('channel', g('empChannel'));
       if (meta) meta.textContent = 'Loading…';
+      // Case details stay hidden until the user explicitly drills in.
+      const _cc = document.getElementById('empCasesCard'); if (_cc) _cc.style.display = 'none';
       document.getElementById('empCaseBody').innerHTML = '<tr><td colspan="12" class="no-data">Loading…</td></tr>';
       try {
         const r = await fetch(API + '/employee/dashboard?' + qs.toString()).then(x => x.json());
@@ -4010,13 +4016,13 @@
         empSel.innerHTML = '<option value="">All</option>' + r.options.employees.map(e => `<option value="${escapeHtml(e.code)}">${escapeHtml(e.name)} (${escapeHtml(e.code)})</option>`).join('');
         empSel.value = curEmp;
         _empState.optsLoaded = true;
-        // By vehicle type
+        // By vehicle type (click a row → drill into its cases)
         document.getElementById('empVtBody').innerHTML = (r.by_vehicle_type || []).length
-          ? r.by_vehicle_type.map(v => `<tr><td>${escapeHtml(v.vehicle_type)}</td><td style="text-align:right;">${v.nop}</td><td style="text-align:right;">${_empInr(v.premium)}</td></tr>`).join('')
+          ? r.by_vehicle_type.map(v => `<tr style="cursor:pointer;" title="Click to view cases" onclick="empDrill('vt', this.dataset.v)" data-v="${escapeHtml(v.vehicle_type)}"><td>${escapeHtml(v.vehicle_type)}</td><td style="text-align:right;">${v.nop}</td><td style="text-align:right;">${_empInr(v.premium)}</td></tr>`).join('')
           : '<tr><td colspan="3" class="no-data">No data.</td></tr>';
-        // By employee
+        // By employee (click a row → drill into their cases)
         document.getElementById('empEmpBody').innerHTML = (r.by_employee || []).length
-          ? r.by_employee.map(e => `<tr><td>${escapeHtml(e.name)} <span style="color:#999;font-size:11px;">${escapeHtml(e.code)}</span></td><td style="text-align:right;">${e.nop}</td><td style="text-align:right;">${_empInr(e.premium)}</td></tr>`).join('')
+          ? r.by_employee.map(e => `<tr style="cursor:pointer;" title="Click to view cases" onclick="empDrill('emp', this.dataset.c)" data-c="${escapeHtml(e.code)}"><td>${escapeHtml(e.name)} <span style="color:#999;font-size:11px;">${escapeHtml(e.code)}</span></td><td style="text-align:right;">${e.nop}</td><td style="text-align:right;">${_empInr(e.premium)}</td></tr>`).join('')
           : '<tr><td colspan="3" class="no-data">No data.</td></tr>';
         // Cases
         _empState.cases = r.cases || [];
@@ -4046,6 +4052,25 @@
         if (meta) meta.textContent = 'Failed: ' + (e && e.message ? e.message : e);
         document.getElementById('empCaseBody').innerHTML = '<tr><td colspan="12" class="no-data" style="color:#c62828;">Load failed.</td></tr>';
       }
+    }
+
+    // Reveal / hide the case-detail table. show=true forces open, false closes,
+    // undefined toggles. Scrolls into view when opened.
+    function empToggleCases(show) {
+      const card = document.getElementById('empCasesCard');
+      if (!card) return;
+      const willShow = (show === undefined) ? (card.style.display === 'none') : !!show;
+      card.style.display = willShow ? '' : 'none';
+      if (willShow) setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    }
+
+    // Drill into cases for a vehicle type / employee: set that filter, reload
+    // (so the case list is the accurate filtered set), then reveal the table.
+    async function empDrill(type, val) {
+      if (type === 'vt')  document.getElementById('empVt').value = val;
+      if (type === 'emp') document.getElementById('empEmployee').value = val;
+      await loadEmployeeDashboard();
+      empToggleCases(true);
     }
 
     function empDownload() {
