@@ -66,7 +66,7 @@ const CTES = `
     SELECT
       m.TrackerNo,
       CAST(m.CREATED_DATE AS date) AS cdate, m.CREATED_DATE AS created_dt,
-      m.NatureOfSale, m.LogStatusId,
+      m.NatureOfSale, m.LogStatusId, mis.POLICY_STATUS_ID AS policy_status_id,
       f1.Name AS vertical, msb.Location AS branch, mssb.Sub_Location AS sub_branch,
       ISNULL(r.IDVpos, r.UPIN_CODE) AS agent_code,
       up.EmployeeCode AS employee_code, up.DisplayName AS employee_name,
@@ -115,7 +115,8 @@ function prep(pool, root, from, to, q, withFilters) {
     if (q.agent)        { rq.input('agent', sql.NVarChar(100), q.agent); add('b.agent_code = @agent'); }
     if (q.employee)     { rq.input('employee', sql.NVarChar(50), q.employee); add('b.employee_code = @employee'); }
     if (q.vehicle_type) { rq.input('vehicle_type', sql.NVarChar(200), q.vehicle_type); add('b.vehicle_type = @vehicle_type'); }
-    if (q.log_status)   { rq.input('log_status', sql.Int, parseInt(q.log_status, 10)); add('b.LogStatusId = @log_status'); }
+    if (q.log_status)    { rq.input('log_status', sql.Int, parseInt(q.log_status, 10)); add('b.LogStatusId = @log_status'); }
+    if (q.policy_status) { rq.input('policy_status', sql.Int, parseInt(q.policy_status, 10)); add('b.policy_status_id = @policy_status'); }
     const ch = String(q.channel || '').toLowerCase();
     if (ch === 'online')  add(`b.NatureOfSale IN ${ONLINE_SET}`);
     if (ch === 'offline') add(`(b.NatureOfSale NOT IN ${ONLINE_SET} OR b.NatureOfSale IS NULL)`);
@@ -178,7 +179,7 @@ router.get('/dashboard', async (req, res, next) => {
 
     // 6) Period buckets (YTD / MTD / FTD) — Total + Ok-to-Log. Periods report
     //    both, so strip the log-status drill filter for this request.
-    const perP = prep(pool, root, from, to, { ...q, log_status: '' }, true);
+    const perP = prep(pool, root, from, to, { ...q, log_status: '', policy_status: '' }, true);
     const periodsQ = `${DECLARES}${CTES}
       SELECT
         CONVERT(varchar(10), @fy, 23) AS fy_start, CONVERT(varchar(10), @mtd, 23) AS mtd_start, CONVERT(varchar(10), @today, 23) AS today,
@@ -206,7 +207,14 @@ router.get('/dashboard', async (req, res, next) => {
         SUM(CASE WHEN b.LogStatusId = 6 AND b.cdate >= @mtd THEN 1 ELSE 0 END) AS mtd_rtb_nop,
         ISNULL(SUM(CASE WHEN b.LogStatusId = 6 AND b.cdate >= @mtd THEN b.premium ELSE 0 END),0) AS mtd_rtb_prem,
         SUM(CASE WHEN b.LogStatusId = 6 AND b.cdate = @today THEN 1 ELSE 0 END) AS ftd_rtb_nop,
-        ISNULL(SUM(CASE WHEN b.LogStatusId = 6 AND b.cdate = @today THEN b.premium ELSE 0 END),0) AS ftd_rtb_prem
+        ISNULL(SUM(CASE WHEN b.LogStatusId = 6 AND b.cdate = @today THEN b.premium ELSE 0 END),0) AS ftd_rtb_prem,
+        -- CQB = MIS POLICY_STATUS_ID 7
+        SUM(CASE WHEN b.policy_status_id = 7 THEN 1 ELSE 0 END) AS ytd_cqb_nop,
+        ISNULL(SUM(CASE WHEN b.policy_status_id = 7 THEN b.premium ELSE 0 END),0) AS ytd_cqb_prem,
+        SUM(CASE WHEN b.policy_status_id = 7 AND b.cdate >= @mtd THEN 1 ELSE 0 END) AS mtd_cqb_nop,
+        ISNULL(SUM(CASE WHEN b.policy_status_id = 7 AND b.cdate >= @mtd THEN b.premium ELSE 0 END),0) AS mtd_cqb_prem,
+        SUM(CASE WHEN b.policy_status_id = 7 AND b.cdate = @today THEN 1 ELSE 0 END) AS ftd_cqb_nop,
+        ISNULL(SUM(CASE WHEN b.policy_status_id = 7 AND b.cdate = @today THEN b.premium ELSE 0 END),0) AS ftd_cqb_prem
       FROM base b WHERE b.rn = 1${perP.clause}${OPT}`;
 
     const [sumR, vtR, empR, optR, listR, perR] = await Promise.all([
@@ -230,15 +238,18 @@ router.get('/dashboard', async (req, res, next) => {
       ytd: { nop: Number(pr.ytd_nop) || 0, premium: round(pr.ytd_prem), from: pr.fy_start, to: pr.today,
              ok_to_log: { nop: Number(pr.ytd_ok_nop) || 0, premium: round(pr.ytd_ok_prem) },
              uw_pending: { nop: Number(pr.ytd_uw_nop) || 0, premium: round(pr.ytd_uw_prem) },
-             return_to_bops: { nop: Number(pr.ytd_rtb_nop) || 0, premium: round(pr.ytd_rtb_prem) } },
+             return_to_bops: { nop: Number(pr.ytd_rtb_nop) || 0, premium: round(pr.ytd_rtb_prem) },
+             cqb: { nop: Number(pr.ytd_cqb_nop) || 0, premium: round(pr.ytd_cqb_prem) } },
       mtd: { nop: Number(pr.mtd_nop) || 0, premium: round(pr.mtd_prem), from: pr.mtd_start, to: pr.today,
              ok_to_log: { nop: Number(pr.mtd_ok_nop) || 0, premium: round(pr.mtd_ok_prem) },
              uw_pending: { nop: Number(pr.mtd_uw_nop) || 0, premium: round(pr.mtd_uw_prem) },
-             return_to_bops: { nop: Number(pr.mtd_rtb_nop) || 0, premium: round(pr.mtd_rtb_prem) } },
+             return_to_bops: { nop: Number(pr.mtd_rtb_nop) || 0, premium: round(pr.mtd_rtb_prem) },
+             cqb: { nop: Number(pr.mtd_cqb_nop) || 0, premium: round(pr.mtd_cqb_prem) } },
       ftd: { nop: Number(pr.ftd_nop) || 0, premium: round(pr.ftd_prem), from: pr.today, to: pr.today,
              ok_to_log: { nop: Number(pr.ftd_ok_nop) || 0, premium: round(pr.ftd_ok_prem) },
              uw_pending: { nop: Number(pr.ftd_uw_nop) || 0, premium: round(pr.ftd_uw_prem) },
-             return_to_bops: { nop: Number(pr.ftd_rtb_nop) || 0, premium: round(pr.ftd_rtb_prem) } },
+             return_to_bops: { nop: Number(pr.ftd_rtb_nop) || 0, premium: round(pr.ftd_rtb_prem) },
+             cqb: { nop: Number(pr.ftd_cqb_nop) || 0, premium: round(pr.ftd_cqb_prem) } },
     };
 
     res.json({
