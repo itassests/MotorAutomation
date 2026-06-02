@@ -4157,7 +4157,22 @@
       const inact = (b) => { b.style.background = '#eef1fb'; b.style.color = '#3949ab'; };
       if (metric === 'nop') { act(onB); inact(prB); } else { act(prB); inact(onB); }
       const el = document.getElementById('empBranchChart');
-      const rows = (_empState.branches || []).slice().sort((a, b) => (b[metric] || 0) - (a[metric] || 0));
+      // Consolidate branch-name variants (e.g. "DIR - Gujarat", "DIR Gujarat 2",
+      // "Gujarat" → "Gujarat"). Strip a leading DIR/DIR- prefix + trailing number;
+      // "Direct …" is left intact (a distinct channel).
+      const canon = (b) => {
+        let s = String(b || '').trim();
+        s = s.replace(/^DIR(\s*-\s*|\s+)/i, '');   // "DIR - " / "DIR " prefix (not "Direct")
+        s = s.replace(/\s+\d+$/, '').trim();         // trailing " 2"
+        return s || '—';
+      };
+      const agg = new Map();
+      (_empState.branches || []).forEach(r => {
+        const k = canon(r.branch);
+        if (!agg.has(k)) agg.set(k, { branch: k, nop: 0, premium: 0 });
+        const g = agg.get(k); g.nop += (r.nop || 0); g.premium += (r.premium || 0);
+      });
+      const rows = [...agg.values()].sort((a, b) => (b[metric] || 0) - (a[metric] || 0));
       if (!rows.length) { el.innerHTML = '<div class="no-data">No data.</div>'; return; }
       const max = Math.max(...rows.map(r => r[metric] || 0), 1);
       const val = (r) => metric === 'premium' ? _empInr(r.premium) : (r.nop || 0).toLocaleString('en-IN');
