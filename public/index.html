@@ -3342,41 +3342,59 @@
         <div><label style="font-size:11px;color:#888;display:block;text-transform:uppercase;">Channel</label>
           <select id="empChannel" style="height:30px;font-size:13px;"><option value="">All</option><option value="online">Online</option><option value="offline">Offline</option></select></div>
         <button class="btn btn-sm" onclick="empClear()" style="background:#fff;border:1px solid #e0a800;color:#b8860b;">Clear</button>
-        <button class="btn btn-primary btn-sm" onclick="loadEmployeeDashboard()">Search</button>
+        <button class="btn btn-primary btn-sm" onclick="empSearch()">Search</button>
       </div>
 
-      <!-- Period sections: YTD / MTD / FTD. Each is a single NOP + Premium card
-           (more cards will be added per section later). Click a card to view
-           that period's cases. All amounts in ₹ Lakhs. -->
+      <!-- Period sections: YTD / MTD / FTD. Each holds a stack of metric cards
+           (Total, Ok to Log, … more to come). Click a card to drill into its
+           cases. All amounts in ₹ Lakhs. -->
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px,1fr)); gap:18px; margin-top:18px;">
         <!-- YTD -->
         <div>
           <div style="font-weight:700;color:#1565c0;font-size:13px;margin-bottom:7px;">&#128197; YTD <span style="font-weight:400;color:#999;font-size:11px;">· Full FY (<span id="ytdRange">—</span>)</span></div>
-          <div class="empPeriodCard" onclick="empDrillPeriod('ytd')" title="Click to view YTD cases"
+          <div class="empPeriodCard" onclick="empDrillPeriod('ytd','total')" title="Click to view YTD cases"
                style="cursor:pointer; border-radius:12px; padding:16px; color:#fff; box-shadow:0 4px 14px rgba(0,40,80,0.18); background:linear-gradient(135deg,#1e88e5,#00243e); display:flex; justify-content:space-around; align-items:center;">
             <div style="text-align:center;"><div style="font-size:11px;opacity:.85;text-transform:uppercase;">NOP</div><div id="ytdNop" style="font-size:26px;font-weight:800;">—</div></div>
             <div style="width:1px;height:38px;background:rgba(255,255,255,.25);"></div>
             <div style="text-align:center;"><div style="font-size:11px;opacity:.85;text-transform:uppercase;">Premium</div><div id="ytdPrem" style="font-size:22px;font-weight:800;">—</div></div>
           </div>
+          <div class="empOkCard" onclick="empDrillPeriod('ytd','oklog')" title="Click to view YTD Ok-to-Log cases"
+               style="cursor:pointer; margin-top:10px; border-radius:10px; padding:11px 14px; background:#fff; border:1px solid #bbdefb; border-left:4px solid #1e88e5; display:flex; justify-content:space-around; align-items:center; color:#1565c0;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;">&#9989; Ok to Log</div>
+            <div style="text-align:center;"><div style="font-size:10px;color:#888;">NOP</div><div id="ytdOkNop" style="font-size:18px;font-weight:800;">—</div></div>
+            <div style="text-align:center;"><div style="font-size:10px;color:#888;">PREM</div><div id="ytdOkPrem" style="font-size:15px;font-weight:800;">—</div></div>
+          </div>
         </div>
         <!-- MTD -->
         <div>
           <div style="font-weight:700;color:#2e7d32;font-size:13px;margin-bottom:7px;">&#128198; MTD <span style="font-weight:400;color:#999;font-size:11px;">· Business month (<span id="mtdRange">—</span>)</span></div>
-          <div class="empPeriodCard" onclick="empDrillPeriod('mtd')" title="Click to view MTD cases"
+          <div class="empPeriodCard" onclick="empDrillPeriod('mtd','total')" title="Click to view MTD cases"
                style="cursor:pointer; border-radius:12px; padding:16px; color:#fff; box-shadow:0 4px 14px rgba(27,94,32,0.2); background:linear-gradient(135deg,#43a047,#1b5e20); display:flex; justify-content:space-around; align-items:center;">
             <div style="text-align:center;"><div style="font-size:11px;opacity:.85;text-transform:uppercase;">NOP</div><div id="mtdNop" style="font-size:26px;font-weight:800;">—</div></div>
             <div style="width:1px;height:38px;background:rgba(255,255,255,.25);"></div>
             <div style="text-align:center;"><div style="font-size:11px;opacity:.85;text-transform:uppercase;">Premium</div><div id="mtdPrem" style="font-size:22px;font-weight:800;">—</div></div>
           </div>
+          <div class="empOkCard" onclick="empDrillPeriod('mtd','oklog')" title="Click to view MTD Ok-to-Log cases"
+               style="cursor:pointer; margin-top:10px; border-radius:10px; padding:11px 14px; background:#fff; border:1px solid #c8e6c9; border-left:4px solid #43a047; display:flex; justify-content:space-around; align-items:center; color:#2e7d32;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;">&#9989; Ok to Log</div>
+            <div style="text-align:center;"><div style="font-size:10px;color:#888;">NOP</div><div id="mtdOkNop" style="font-size:18px;font-weight:800;">—</div></div>
+            <div style="text-align:center;"><div style="font-size:10px;color:#888;">PREM</div><div id="mtdOkPrem" style="font-size:15px;font-weight:800;">—</div></div>
+          </div>
         </div>
         <!-- FTD -->
         <div>
           <div style="font-weight:700;color:#e65100;font-size:13px;margin-bottom:7px;">&#128338; FTD <span style="font-weight:400;color:#999;font-size:11px;">· Today (<span id="ftdRange">—</span>)</span></div>
-          <div class="empPeriodCard" onclick="empDrillPeriod('ftd')" title="Click to view today's cases"
+          <div class="empPeriodCard" onclick="empDrillPeriod('ftd','total')" title="Click to view today's cases"
                style="cursor:pointer; border-radius:12px; padding:16px; color:#fff; box-shadow:0 4px 14px rgba(230,108,0,0.22); background:linear-gradient(135deg,#fb8c00,#e65100); display:flex; justify-content:space-around; align-items:center;">
             <div style="text-align:center;"><div style="font-size:11px;opacity:.85;text-transform:uppercase;">NOP</div><div id="ftdNop" style="font-size:26px;font-weight:800;">—</div></div>
             <div style="width:1px;height:38px;background:rgba(255,255,255,.25);"></div>
             <div style="text-align:center;"><div style="font-size:11px;opacity:.85;text-transform:uppercase;">Premium</div><div id="ftdPrem" style="font-size:22px;font-weight:800;">—</div></div>
+          </div>
+          <div class="empOkCard" onclick="empDrillPeriod('ftd','oklog')" title="Click to view today's Ok-to-Log cases"
+               style="cursor:pointer; margin-top:10px; border-radius:10px; padding:11px 14px; background:#fff; border:1px solid #ffe0b2; border-left:4px solid #fb8c00; display:flex; justify-content:space-around; align-items:center; color:#e65100;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;">&#9989; Ok to Log</div>
+            <div style="text-align:center;"><div style="font-size:10px;color:#888;">NOP</div><div id="ftdOkNop" style="font-size:18px;font-weight:800;">—</div></div>
+            <div style="text-align:center;"><div style="font-size:10px;color:#888;">PREM</div><div id="ftdOkPrem" style="font-size:15px;font-weight:800;">—</div></div>
           </div>
         </div>
       </div>
@@ -3974,6 +3992,7 @@
     const _empInr = (n) => '₹' + (Number(n || 0) / 100000).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'L';
 
     function empClear() {
+      _empState.logStatus = null;
       ['empVertical','empBranch','empSubBranch','empEmployee','empAgent','empVt','empChannel'].forEach(id => {
         const el = document.getElementById(id); if (el) el.value = '';
       });
@@ -4010,6 +4029,7 @@
       if (g('empAgent'))     qs.set('agent', g('empAgent'));
       if (g('empVt'))        qs.set('vehicle_type', g('empVt'));
       if (g('empChannel'))   qs.set('channel', g('empChannel'));
+      if (_empState.logStatus != null) qs.set('log_status', _empState.logStatus);
       if (meta) meta.textContent = 'Loading…';
       // Case details stay hidden until the user explicitly drills in.
       const _cc = document.getElementById('empCasesCard'); if (_cc) _cc.style.display = 'none';
@@ -4023,8 +4043,11 @@
         _empState.periods = pd;
         const setP = (key, range) => {
           const o = pd[key] || {};
+          const ok = o.ok_to_log || {};
           document.getElementById(key + 'Nop').textContent = (o.nop || 0).toLocaleString('en-IN');
           document.getElementById(key + 'Prem').textContent = _empInr(o.premium);
+          document.getElementById(key + 'OkNop').textContent = (ok.nop || 0).toLocaleString('en-IN');
+          document.getElementById(key + 'OkPrem').textContent = _empInr(ok.premium);
           const el = document.getElementById(key + 'Range'); if (el) el.textContent = range;
         };
         setP('ytd', `${pd.fy_start || ''} → ${pd.today || ''}`);
@@ -4071,6 +4094,8 @@
               <td>${escapeHtml(c.status) || '-'}</td>
             </tr>`).join('')
           : '<tr><td colspan="12" class="no-data">No cases match these filters.</td></tr>';
+        const scopeEl = document.getElementById('empCasesScope');
+        if (scopeEl) scopeEl.textContent = (_empState.logStatus === 2 ? '✅ Ok to Log · ' : '') + 'premium in ₹ Lakhs';
         const totNop = (r.summary && r.summary.nop) || 0;
         document.getElementById('empCaseCount').textContent =
           (r.truncated ? `showing first ${_empState.cases.length} of ${totNop.toLocaleString('en-IN')} (refine filters to narrow)` : `${_empState.cases.length} case${_empState.cases.length===1?'':'s'}`);
@@ -4090,13 +4115,14 @@
       if (willShow) setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
     }
 
-    // Drill into a period (YTD/MTD/FTD): set the date range to that period,
-    // reload, and open the case list for it.
-    async function empDrillPeriod(key) {
+    // Drill into a period (YTD/MTD/FTD): set the date range to that period.
+    // mode 'oklog' additionally filters to Ok-to-Log (LogStatusId=2).
+    async function empDrillPeriod(key, mode) {
       const p = (_empState.periods || {})[key];
       if (!p) return;
       document.getElementById('empFrom').value = p.from || '';
       document.getElementById('empTo').value = p.to || '';
+      _empState.logStatus = (mode === 'oklog') ? 2 : null;
       await loadEmployeeDashboard();
       empToggleCases(true);
     }
@@ -4104,11 +4130,15 @@
     // Drill into cases for a vehicle type / employee: set that filter, reload
     // (so the case list is the accurate filtered set), then reveal the table.
     async function empDrill(type, val) {
+      _empState.logStatus = null;
       if (type === 'vt')  document.getElementById('empVt').value = val;
       if (type === 'emp') document.getElementById('empEmployee').value = val;
       await loadEmployeeDashboard();
       empToggleCases(true);
     }
+
+    // Search button — a fresh search clears any Ok-to-Log drill filter.
+    function empSearch() { _empState.logStatus = null; loadEmployeeDashboard(); }
 
     function empDownload() {
       const rows = _empState.cases || [];

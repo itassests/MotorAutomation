@@ -102,6 +102,7 @@ function prep(pool, root, from, to, q, withFilters) {
     if (q.agent)        { rq.input('agent', sql.NVarChar(100), q.agent); add('ISNULL(r.IDVpos, r.UPIN_CODE) = @agent'); }
     if (q.employee)     { rq.input('employee', sql.NVarChar(50), q.employee); add('up.EmployeeCode = @employee'); }
     if (q.vehicle_type) { rq.input('vehicle_type', sql.NVarChar(200), q.vehicle_type); add('f3.Name = @vehicle_type'); }
+    if (q.log_status)   { rq.input('log_status', sql.Int, parseInt(q.log_status, 10)); add('m.LogStatusId = @log_status'); }
     const ch = String(q.channel || '').toLowerCase();
     if (ch === 'online')  add(`m.NatureOfSale IN ${ONLINE_SET}`);
     if (ch === 'offline') add(`(m.NatureOfSale NOT IN ${ONLINE_SET} OR m.NatureOfSale IS NULL)`);
@@ -172,7 +173,9 @@ router.get('/dashboard', async (req, res, next) => {
     //    month runs 2nd → 1st, so from the most recent 2nd-of-month → today),
     //    FTD (today). Respects the hierarchy + non-date filters; the date
     //    windows are computed in SQL from the DB's current date.
-    const perP = prep(pool, root, from, to, q, true);
+    // Periods ignore the log-status drill filter (they report Total AND
+    // Ok-to-Log side by side), so strip log_status for this request.
+    const perP = prep(pool, root, from, to, { ...q, log_status: '' }, true);
     const periodsQ = `
       DECLARE @today date = CAST(GETDATE() AS date);
       DECLARE @fy date = DATEFROMPARTS(CASE WHEN MONTH(@today) >= 4 THEN YEAR(@today) ELSE YEAR(@today) - 1 END, 4, 1);
@@ -187,7 +190,14 @@ router.get('/dashboard', async (req, res, next) => {
         SUM(CASE WHEN CAST(m.CREATED_DATE AS date) >= @mtd THEN 1 ELSE 0 END) AS mtd_nop,
         ISNULL(SUM(CASE WHEN CAST(m.CREATED_DATE AS date) >= @mtd THEN md.ANNUAL_PREMIUM ELSE 0 END),0) AS mtd_prem,
         SUM(CASE WHEN CAST(m.CREATED_DATE AS date) = @today THEN 1 ELSE 0 END) AS ftd_nop,
-        ISNULL(SUM(CASE WHEN CAST(m.CREATED_DATE AS date) = @today THEN md.ANNUAL_PREMIUM ELSE 0 END),0) AS ftd_prem
+        ISNULL(SUM(CASE WHEN CAST(m.CREATED_DATE AS date) = @today THEN md.ANNUAL_PREMIUM ELSE 0 END),0) AS ftd_prem,
+        -- Ok to Log = LogStatusId 2 (IsActive already enforced above)
+        SUM(CASE WHEN m.LogStatusId = 2 THEN 1 ELSE 0 END) AS ytd_ok_nop,
+        ISNULL(SUM(CASE WHEN m.LogStatusId = 2 THEN md.ANNUAL_PREMIUM ELSE 0 END),0) AS ytd_ok_prem,
+        SUM(CASE WHEN m.LogStatusId = 2 AND CAST(m.CREATED_DATE AS date) >= @mtd THEN 1 ELSE 0 END) AS mtd_ok_nop,
+        ISNULL(SUM(CASE WHEN m.LogStatusId = 2 AND CAST(m.CREATED_DATE AS date) >= @mtd THEN md.ANNUAL_PREMIUM ELSE 0 END),0) AS mtd_ok_prem,
+        SUM(CASE WHEN m.LogStatusId = 2 AND CAST(m.CREATED_DATE AS date) = @today THEN 1 ELSE 0 END) AS ftd_ok_nop,
+        ISNULL(SUM(CASE WHEN m.LogStatusId = 2 AND CAST(m.CREATED_DATE AS date) = @today THEN md.ANNUAL_PREMIUM ELSE 0 END),0) AS ftd_ok_prem
       ${JOINS}
       WHERE m.InsuranceType = 16 AND m.IsActive = 1
         AND CAST(m.CREATED_DATE AS date) BETWEEN @fy AND @today${perP.clause}
@@ -211,9 +221,12 @@ router.get('/dashboard', async (req, res, next) => {
     const pr = perR.recordset[0] || {};
     const periods = {
       fy_start: pr.fy_start, mtd_start: pr.mtd_start, today: pr.today,
-      ytd: { nop: Number(pr.ytd_nop) || 0, premium: round(pr.ytd_prem), from: pr.fy_start, to: pr.today },
-      mtd: { nop: Number(pr.mtd_nop) || 0, premium: round(pr.mtd_prem), from: pr.mtd_start, to: pr.today },
-      ftd: { nop: Number(pr.ftd_nop) || 0, premium: round(pr.ftd_prem), from: pr.today, to: pr.today },
+      ytd: { nop: Number(pr.ytd_nop) || 0, premium: round(pr.ytd_prem), from: pr.fy_start, to: pr.today,
+             ok_to_log: { nop: Number(pr.ytd_ok_nop) || 0, premium: round(pr.ytd_ok_prem) } },
+      mtd: { nop: Number(pr.mtd_nop) || 0, premium: round(pr.mtd_prem), from: pr.mtd_start, to: pr.today,
+             ok_to_log: { nop: Number(pr.mtd_ok_nop) || 0, premium: round(pr.mtd_ok_prem) } },
+      ftd: { nop: Number(pr.ftd_nop) || 0, premium: round(pr.ftd_prem), from: pr.today, to: pr.today,
+             ok_to_log: { nop: Number(pr.ftd_ok_nop) || 0, premium: round(pr.ftd_ok_prem) } },
     };
 
     res.json({
