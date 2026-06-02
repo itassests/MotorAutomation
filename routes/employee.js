@@ -67,6 +67,7 @@ const CTES = `
       m.TrackerNo,
       CAST(m.CREATED_DATE AS date) AS cdate, m.CREATED_DATE AS created_dt,
       m.NatureOfSale, m.LogStatusId, mis.POLICY_STATUS_ID AS policy_status_id,
+      CASE WHEN mt.PTrackerno IS NOT NULL THEN 1 ELSE 0 END AS in_txn,
       f1.Name AS vertical, msb.Location AS branch, mssb.Sub_Location AS sub_branch,
       ISNULL(r.IDVpos, r.UPIN_CODE) AS agent_code,
       up.EmployeeCode AS employee_code, up.DisplayName AS employee_name,
@@ -90,6 +91,10 @@ const CTES = `
     LEFT JOIN MST_FieldMasters ff WITH (NOLOCK) ON ff.MasterId = 8050 AND ff.Value = m.FinalStatus
     LEFT JOIN MST_SalesBranch msb WITH (NOLOCK) ON msb.id = r.SALES_BRANCH_Id
     LEFT JOIN MST_SalesSubBranch mssb WITH (NOLOCK) ON mssb.id = r.SALES_SUB_BRANCH_Id
+    -- Online = tracker present in Beeinsured_v3_2 motor-transaction table (join
+    -- a deduped PTrackerno set once; #base materialisation runs this a single time)
+    LEFT JOIN (SELECT DISTINCT PTrackerno FROM Beeinsured_v3_2.dbo.TRN_MotorTransactionForPrarambh WITH (NOLOCK)
+               WHERE PTrackerno IS NOT NULL AND PTrackerno <> 'DUMMY') mt ON mt.PTrackerno = m.TrackerNo
     WHERE m.InsuranceType = 16 AND m.IsActive = 1
       -- exclude 15 (duplicates), 16 (Hold) and NULL (no log status / in-process)
       AND m.LogStatusId IS NOT NULL AND m.LogStatusId NOT IN (15, 16)
@@ -100,29 +105,31 @@ const OPT = ' OPTION (MAXRECURSION 1000)';
 // Date window for the "current selection" queries (summary / breakdowns / list).
 const DATE_SEL = ' AND b.cdate BETWEEN CONVERT(date, @from) AND CONVERT(date, @to)';
 
-// Build a request with the always-present params; optionally bind + return the
-// optional-filter WHERE fragment (referencing the deduped `base` alias `b`).
-function prep(pool, root, from, to, q, withFilters) {
-  const rq = pool.request();
+// Bind the always-present params + optional filters on a single request, and
+// return two WHERE fragments (referencing the materialised #base alias `b`):
+//   full — every filter incl. the status drills (summary / breakdowns / list)
+//   base — only the non-status filters (periods, which report every status)
+function buildClauses(rq, root, from, to, q) {
   rq.input('emp', sql.VarChar(50), root);
   rq.input('from', sql.VarChar(20), from);
   rq.input('to', sql.VarChar(20), to);
-  let clause = '';
-  if (withFilters) {
-    const add = (cond) => { clause += ` AND ${cond}`; };
-    if (q.vertical)     { rq.input('vertical', sql.NVarChar(300), q.vertical); add('b.vertical = @vertical'); }
-    if (q.branch)       { rq.input('branch', sql.NVarChar(300), q.branch); add('b.branch = @branch'); }
-    if (q.sub_branch)   { rq.input('sub_branch', sql.NVarChar(300), q.sub_branch); add('b.sub_branch = @sub_branch'); }
-    if (q.agent)        { rq.input('agent', sql.NVarChar(100), q.agent); add('b.agent_code = @agent'); }
-    if (q.employee)     { rq.input('employee', sql.NVarChar(50), q.employee); add('b.employee_code = @employee'); }
-    if (q.vehicle_type) { rq.input('vehicle_type', sql.NVarChar(200), q.vehicle_type); add('b.vehicle_type = @vehicle_type'); }
-    if (q.log_status)    { rq.input('log_status', sql.Int, parseInt(q.log_status, 10)); add('b.LogStatusId = @log_status'); }
-    if (q.policy_status) { rq.input('policy_status', sql.Int, parseInt(q.policy_status, 10)); add('b.policy_status_id = @policy_status'); }
-    const ch = String(q.channel || '').toLowerCase();
-    if (ch === 'online')  add(`b.NatureOfSale IN ${ONLINE_SET}`);
-    if (ch === 'offline') add(`(b.NatureOfSale NOT IN ${ONLINE_SET} OR b.NatureOfSale IS NULL)`);
-  }
-  return { rq, clause };
+  let full = '', base = '';
+  const both = (c) => { full += ` AND ${c}`; base += ` AND ${c}`; };
+  const onlyFull = (c) => { full += ` AND ${c}`; };
+  if (q.vertical)     { rq.input('vertical', sql.NVarChar(300), q.vertical); both('b.vertical = @vertical'); }
+  if (q.branch)       { rq.input('branch', sql.NVarChar(300), q.branch); both('b.branch = @branch'); }
+  if (q.sub_branch)   { rq.input('sub_branch', sql.NVarChar(300), q.sub_branch); both('b.sub_branch = @sub_branch'); }
+  if (q.agent)        { rq.input('agent', sql.NVarChar(100), q.agent); both('b.agent_code = @agent'); }
+  if (q.employee)     { rq.input('employee', sql.NVarChar(50), q.employee); both('b.employee_code = @employee'); }
+  if (q.vehicle_type) { rq.input('vehicle_type', sql.NVarChar(200), q.vehicle_type); both('b.vehicle_type = @vehicle_type'); }
+  const ch = String(q.channel || '').toLowerCase();
+  if (ch === 'online')  both(`b.NatureOfSale IN ${ONLINE_SET}`);
+  if (ch === 'offline') both(`(b.NatureOfSale NOT IN ${ONLINE_SET} OR b.NatureOfSale IS NULL)`);
+  // status drills — full only (periods always report all statuses side by side)
+  if (q.log_status)    { rq.input('log_status', sql.Int, parseInt(q.log_status, 10)); onlyFull('b.LogStatusId = @log_status'); }
+  if (q.policy_status) { rq.input('policy_status', sql.Int, parseInt(q.policy_status, 10)); onlyFull('b.policy_status_id = @policy_status'); }
+  if (q.online_txn)    { onlyFull('b.in_txn = 1'); }
+  return { full, base };
 }
 
 router.get('/dashboard', async (req, res, next) => {
@@ -135,53 +142,48 @@ router.get('/dashboard', async (req, res, next) => {
     const pool = await getPrarambhPool();
     const round = (n) => +Number(n || 0).toFixed(2);
 
-    // 1) Summary + online/offline (current selection).
-    const sumP = prep(pool, root, from, to, q, true);
-    const summaryQ = `${DECLARES}${CTES}
+    // Materialise the deduped hierarchy set into #base ONCE (the recursive
+    // hierarchy + the cross-DB online join run a single time), then run every
+    // aggregation against #base — far cheaper than rebuilding base per query
+    // and avoids the cross-DB join timing out under 6× parallel evaluation.
+    const rq = pool.request();
+    const cl = buildClauses(rq, root, from, to, q);
+    const batch = `
+      ${DECLARES}
+      IF OBJECT_ID('tempdb..#base') IS NOT NULL DROP TABLE #base;
+      ${CTES}
+      SELECT * INTO #base FROM base WHERE rn = 1${OPT};
+
+      -- 1) Summary + online/offline (NatureOfSale-based)
       SELECT COUNT(*) AS nop, ISNULL(SUM(b.premium),0) AS premium,
         SUM(CASE WHEN b.NatureOfSale IN ${ONLINE_SET} THEN 1 ELSE 0 END) AS online_nop,
         ISNULL(SUM(CASE WHEN b.NatureOfSale IN ${ONLINE_SET} THEN b.premium ELSE 0 END),0) AS online_premium,
         SUM(CASE WHEN b.NatureOfSale IN ${ONLINE_SET} THEN 0 ELSE 1 END) AS offline_nop,
         ISNULL(SUM(CASE WHEN b.NatureOfSale IN ${ONLINE_SET} THEN 0 ELSE b.premium END),0) AS offline_premium
-      FROM base b WHERE b.rn = 1${DATE_SEL}${sumP.clause}${OPT}`;
+      FROM #base b WHERE 1=1${DATE_SEL}${cl.full};
 
-    // 2) By vehicle type.
-    const vtP = prep(pool, root, from, to, q, true);
-    const vtQ = `${DECLARES}${CTES}
+      -- 2) By vehicle type
       SELECT ISNULL(b.vehicle_type,'—') AS vehicle_type, COUNT(*) AS nop, ISNULL(SUM(b.premium),0) AS premium
-      FROM base b WHERE b.rn = 1${DATE_SEL}${vtP.clause}
-      GROUP BY b.vehicle_type ORDER BY COUNT(*) DESC${OPT}`;
+      FROM #base b WHERE 1=1${DATE_SEL}${cl.full} GROUP BY b.vehicle_type ORDER BY COUNT(*) DESC;
 
-    // 3) By employee.
-    const empP = prep(pool, root, from, to, q, true);
-    const empQ = `${DECLARES}${CTES}
+      -- 3) By employee
       SELECT b.employee_code AS code, MAX(b.employee_name) AS name, COUNT(*) AS nop, ISNULL(SUM(b.premium),0) AS premium
-      FROM base b WHERE b.rn = 1${DATE_SEL}${empP.clause}
-      GROUP BY b.employee_code ORDER BY COUNT(*) DESC${OPT}`;
+      FROM #base b WHERE 1=1${DATE_SEL}${cl.full} GROUP BY b.employee_code ORDER BY COUNT(*) DESC;
 
-    // 4) Filter options — whole hierarchy (FY window), no optional filters.
-    const optP = prep(pool, root, from, to, q, false);
-    const optionsQ = `${DECLARES}${CTES}
-      SELECT DISTINCT b.vertical, b.branch, b.sub_branch, b.agent_code, b.vehicle_type,
-             b.employee_code, b.employee_name
-      FROM base b WHERE b.rn = 1${OPT}`;
+      -- 4) Filter options (whole hierarchy, no optional filters)
+      SELECT DISTINCT b.vertical, b.branch, b.sub_branch, b.agent_code, b.vehicle_type, b.employee_code, b.employee_name
+      FROM #base b;
 
-    // 5) Case list (current selection, capped).
-    const listP = prep(pool, root, from, to, q, true);
-    const listQ = `${DECLARES}${CTES}
+      -- 5) Case list (capped)
       SELECT TOP ${LIST_CAP}
         b.TrackerNo AS tracker_no, b.created_dt AS created_date, b.channel,
         CASE WHEN b.NatureOfSale IN ${ONLINE_SET} THEN 1 ELSE 0 END AS is_online,
         b.vertical, b.branch, b.sub_branch, b.agent_code, b.employee_code, b.employee_name,
         b.vehicle_type, b.product_type, b.insurer, b.customer, b.policy_no,
         b.reg_no, b.rto, b.state, b.premium, b.status
-      FROM base b WHERE b.rn = 1${DATE_SEL}${listP.clause}
-      ORDER BY b.created_dt DESC${OPT}`;
+      FROM #base b WHERE 1=1${DATE_SEL}${cl.full} ORDER BY b.created_dt DESC;
 
-    // 6) Period buckets (YTD / MTD / FTD) — Total + Ok-to-Log. Periods report
-    //    both, so strip the log-status drill filter for this request.
-    const perP = prep(pool, root, from, to, { ...q, log_status: '', policy_status: '' }, true);
-    const periodsQ = `${DECLARES}${CTES}
+      -- 6) Period buckets (YTD / MTD / FTD) — every status side by side
       SELECT
         CONVERT(varchar(10), @fy, 23) AS fy_start, CONVERT(varchar(10), @mtd, 23) AS mtd_start, CONVERT(varchar(10), @today, 23) AS today,
         COUNT(*) AS ytd_nop, ISNULL(SUM(b.premium),0) AS ytd_prem,
@@ -215,42 +217,50 @@ router.get('/dashboard', async (req, res, next) => {
         SUM(CASE WHEN b.policy_status_id = 7 AND b.cdate >= @mtd THEN 1 ELSE 0 END) AS mtd_cqb_nop,
         ISNULL(SUM(CASE WHEN b.policy_status_id = 7 AND b.cdate >= @mtd THEN b.premium ELSE 0 END),0) AS mtd_cqb_prem,
         SUM(CASE WHEN b.policy_status_id = 7 AND b.cdate = @today THEN 1 ELSE 0 END) AS ftd_cqb_nop,
-        ISNULL(SUM(CASE WHEN b.policy_status_id = 7 AND b.cdate = @today THEN b.premium ELSE 0 END),0) AS ftd_cqb_prem
-      FROM base b WHERE b.rn = 1${perP.clause}${OPT}`;
+        ISNULL(SUM(CASE WHEN b.policy_status_id = 7 AND b.cdate = @today THEN b.premium ELSE 0 END),0) AS ftd_cqb_prem,
+        -- Online = tracker present in Beeinsured motor-transaction table
+        SUM(CASE WHEN b.in_txn = 1 THEN 1 ELSE 0 END) AS ytd_on_nop,
+        ISNULL(SUM(CASE WHEN b.in_txn = 1 THEN b.premium ELSE 0 END),0) AS ytd_on_prem,
+        SUM(CASE WHEN b.in_txn = 1 AND b.cdate >= @mtd THEN 1 ELSE 0 END) AS mtd_on_nop,
+        ISNULL(SUM(CASE WHEN b.in_txn = 1 AND b.cdate >= @mtd THEN b.premium ELSE 0 END),0) AS mtd_on_prem,
+        SUM(CASE WHEN b.in_txn = 1 AND b.cdate = @today THEN 1 ELSE 0 END) AS ftd_on_nop,
+        ISNULL(SUM(CASE WHEN b.in_txn = 1 AND b.cdate = @today THEN b.premium ELSE 0 END),0) AS ftd_on_prem
+      FROM #base b WHERE 1=1${cl.base};
 
-    const [sumR, vtR, empR, optR, listR, perR] = await Promise.all([
-      sumP.rq.query(summaryQ),
-      vtP.rq.query(vtQ),
-      empP.rq.query(empQ),
-      optP.rq.query(optionsQ),
-      listP.rq.query(listQ),
-      perP.rq.query(periodsQ),
-    ]);
+      DROP TABLE #base;`;
 
-    const s = sumR.recordset[0] || {};
+    const result = await rq.query(batch);
+    const recs = result.recordsets;
+    const s = (recs[0] && recs[0][0]) || {};
+    const vtRows = recs[1] || [];
+    const empRows = recs[2] || [];
+    const oRows = recs[3] || [];
+    const listRows = recs[4] || [];
+    const pr = (recs[5] && recs[5][0]) || {};
+
     const uniq = (arr) => [...new Set(arr.filter(v => v != null && v !== ''))].sort();
-    const oRows = optR.recordset;
     const empMap = new Map();
     oRows.forEach(r => { if (r.employee_code) empMap.set(r.employee_code, r.employee_name || r.employee_code); });
-
-    const pr = perR.recordset[0] || {};
     const periods = {
       fy_start: pr.fy_start, mtd_start: pr.mtd_start, today: pr.today,
       ytd: { nop: Number(pr.ytd_nop) || 0, premium: round(pr.ytd_prem), from: pr.fy_start, to: pr.today,
              ok_to_log: { nop: Number(pr.ytd_ok_nop) || 0, premium: round(pr.ytd_ok_prem) },
              uw_pending: { nop: Number(pr.ytd_uw_nop) || 0, premium: round(pr.ytd_uw_prem) },
              return_to_bops: { nop: Number(pr.ytd_rtb_nop) || 0, premium: round(pr.ytd_rtb_prem) },
-             cqb: { nop: Number(pr.ytd_cqb_nop) || 0, premium: round(pr.ytd_cqb_prem) } },
+             cqb: { nop: Number(pr.ytd_cqb_nop) || 0, premium: round(pr.ytd_cqb_prem) },
+             online: { nop: Number(pr.ytd_on_nop) || 0, premium: round(pr.ytd_on_prem) } },
       mtd: { nop: Number(pr.mtd_nop) || 0, premium: round(pr.mtd_prem), from: pr.mtd_start, to: pr.today,
              ok_to_log: { nop: Number(pr.mtd_ok_nop) || 0, premium: round(pr.mtd_ok_prem) },
              uw_pending: { nop: Number(pr.mtd_uw_nop) || 0, premium: round(pr.mtd_uw_prem) },
              return_to_bops: { nop: Number(pr.mtd_rtb_nop) || 0, premium: round(pr.mtd_rtb_prem) },
-             cqb: { nop: Number(pr.mtd_cqb_nop) || 0, premium: round(pr.mtd_cqb_prem) } },
+             cqb: { nop: Number(pr.mtd_cqb_nop) || 0, premium: round(pr.mtd_cqb_prem) },
+             online: { nop: Number(pr.mtd_on_nop) || 0, premium: round(pr.mtd_on_prem) } },
       ftd: { nop: Number(pr.ftd_nop) || 0, premium: round(pr.ftd_prem), from: pr.today, to: pr.today,
              ok_to_log: { nop: Number(pr.ftd_ok_nop) || 0, premium: round(pr.ftd_ok_prem) },
              uw_pending: { nop: Number(pr.ftd_uw_nop) || 0, premium: round(pr.ftd_uw_prem) },
              return_to_bops: { nop: Number(pr.ftd_rtb_nop) || 0, premium: round(pr.ftd_rtb_prem) },
-             cqb: { nop: Number(pr.ftd_cqb_nop) || 0, premium: round(pr.ftd_cqb_prem) } },
+             cqb: { nop: Number(pr.ftd_cqb_nop) || 0, premium: round(pr.ftd_cqb_prem) },
+             online: { nop: Number(pr.ftd_on_nop) || 0, premium: round(pr.ftd_on_prem) } },
     };
 
     res.json({
@@ -260,8 +270,8 @@ router.get('/dashboard', async (req, res, next) => {
         online_nop: Number(s.online_nop) || 0, online_premium: round(s.online_premium),
         offline_nop: Number(s.offline_nop) || 0, offline_premium: round(s.offline_premium),
       },
-      by_vehicle_type: vtR.recordset.map(r => ({ vehicle_type: r.vehicle_type, nop: Number(r.nop) || 0, premium: round(r.premium) })),
-      by_employee: empR.recordset.map(r => ({ code: r.code, name: r.name || r.code, nop: Number(r.nop) || 0, premium: round(r.premium) })),
+      by_vehicle_type: vtRows.map(r => ({ vehicle_type: r.vehicle_type, nop: Number(r.nop) || 0, premium: round(r.premium) })),
+      by_employee: empRows.map(r => ({ code: r.code, name: r.name || r.code, nop: Number(r.nop) || 0, premium: round(r.premium) })),
       options: {
         verticals: uniq(oRows.map(r => r.vertical)),
         branches: uniq(oRows.map(r => r.branch)),
@@ -270,8 +280,8 @@ router.get('/dashboard', async (req, res, next) => {
         vehicle_types: uniq(oRows.map(r => r.vehicle_type)),
         employees: [...empMap.entries()].map(([code, name]) => ({ code, name })).sort((a, b) => (a.name > b.name ? 1 : -1)),
       },
-      truncated: listR.recordset.length >= LIST_CAP,
-      cases: listR.recordset.map(r => ({
+      truncated: listRows.length >= LIST_CAP,
+      cases: listRows.map(r => ({
         tracker_no: r.tracker_no || '', created_date: r.created_date || null,
         channel: r.channel || '', is_online: !!r.is_online,
         vertical: r.vertical || '', branch: r.branch || '', sub_branch: r.sub_branch || '',

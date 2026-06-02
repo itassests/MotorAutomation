@@ -3356,7 +3356,7 @@
            grid across all three so the metrics line up vertically. Click a
            metric to drill. Amounts in ₹ Lakhs. -->
       <style>
-        .empBand{display:grid;grid-template-columns:120px repeat(5,minmax(112px,1fr));align-items:stretch;
+        .empBand{display:grid;grid-template-columns:108px repeat(6,minmax(100px,1fr));align-items:stretch;
                  background:#fff;border:1px solid #e8e8f0;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);overflow:hidden;}
         .empBand+.empBand{margin-top:10px;}
         .empBand .lbl{padding:10px 14px;display:flex;flex-direction:column;justify-content:center;}
@@ -3376,6 +3376,7 @@
           <div class="met" onclick="empDrillPeriod('ytd','uw')" title="View YTD U/W Pending cases"><div class="k">&#9203; U/W Pending · NOP / Prem</div><div id="ytdUwNop" class="v" style="color:#5e35b1;">—</div><div id="ytdUwPrem" class="vp" style="color:#8e24aa;">—</div></div>
           <div class="met" onclick="empDrillPeriod('ytd','rtb')" title="View YTD Return to Bops cases"><div class="k">&#8617; Return to Bops · NOP / Prem</div><div id="ytdRtbNop" class="v" style="color:#e53935;">—</div><div id="ytdRtbPrem" class="vp" style="color:#b71c1c;">—</div></div>
           <div class="met" onclick="empDrillPeriod('ytd','cqb')" title="View YTD CQB cases"><div class="k">&#127974; CQB · NOP / Prem</div><div id="ytdCqbNop" class="v" style="color:#00838f;">—</div><div id="ytdCqbPrem" class="vp" style="color:#006064;">—</div></div>
+          <div class="met" onclick="empDrillPeriod('ytd','online')" title="View YTD Online cases"><div class="k">&#127760; Online · NOP / Prem</div><div id="ytdOnNop" class="v" style="color:#2e7d32;">—</div><div id="ytdOnPrem" class="vp" style="color:#1b5e20;">—</div></div>
         </div>
 
         <!-- MTD -->
@@ -3386,6 +3387,7 @@
           <div class="met" onclick="empDrillPeriod('mtd','uw')" title="View MTD U/W Pending cases"><div class="k">&#9203; U/W Pending · NOP / Prem</div><div id="mtdUwNop" class="v" style="color:#5e35b1;">—</div><div id="mtdUwPrem" class="vp" style="color:#8e24aa;">—</div></div>
           <div class="met" onclick="empDrillPeriod('mtd','rtb')" title="View MTD Return to Bops cases"><div class="k">&#8617; Return to Bops · NOP / Prem</div><div id="mtdRtbNop" class="v" style="color:#e53935;">—</div><div id="mtdRtbPrem" class="vp" style="color:#b71c1c;">—</div></div>
           <div class="met" onclick="empDrillPeriod('mtd','cqb')" title="View MTD CQB cases"><div class="k">&#127974; CQB · NOP / Prem</div><div id="mtdCqbNop" class="v" style="color:#00838f;">—</div><div id="mtdCqbPrem" class="vp" style="color:#006064;">—</div></div>
+          <div class="met" onclick="empDrillPeriod('mtd','online')" title="View MTD Online cases"><div class="k">&#127760; Online · NOP / Prem</div><div id="mtdOnNop" class="v" style="color:#2e7d32;">—</div><div id="mtdOnPrem" class="vp" style="color:#1b5e20;">—</div></div>
         </div>
 
         <!-- FTD -->
@@ -3396,6 +3398,7 @@
           <div class="met" onclick="empDrillPeriod('ftd','uw')" title="View today's U/W Pending cases"><div class="k">&#9203; U/W Pending · NOP / Prem</div><div id="ftdUwNop" class="v" style="color:#5e35b1;">—</div><div id="ftdUwPrem" class="vp" style="color:#8e24aa;">—</div></div>
           <div class="met" onclick="empDrillPeriod('ftd','rtb')" title="View today's Return to Bops cases"><div class="k">&#8617; Return to Bops · NOP / Prem</div><div id="ftdRtbNop" class="v" style="color:#e53935;">—</div><div id="ftdRtbPrem" class="vp" style="color:#b71c1c;">—</div></div>
           <div class="met" onclick="empDrillPeriod('ftd','cqb')" title="View today's CQB cases"><div class="k">&#127974; CQB · NOP / Prem</div><div id="ftdCqbNop" class="v" style="color:#00838f;">—</div><div id="ftdCqbPrem" class="vp" style="color:#006064;">—</div></div>
+          <div class="met" onclick="empDrillPeriod('ftd','online')" title="View today's Online cases"><div class="k">&#127760; Online · NOP / Prem</div><div id="ftdOnNop" class="v" style="color:#2e7d32;">—</div><div id="ftdOnPrem" class="vp" style="color:#1b5e20;">—</div></div>
         </div>
 
       </div>
@@ -4003,7 +4006,7 @@
     }
 
     function empClear() {
-      _empState.logStatus = null; _empState.policyStatus = null;
+      _empState.logStatus = null; _empState.policyStatus = null; _empState.onlineTxn = null;
       ['empVertical','empBranch','empSubBranch','empEmployee','empAgent','empVt','empChannel'].forEach(id => {
         const el = document.getElementById(id); if (el) el.value = '';
       });
@@ -4042,6 +4045,7 @@
       if (g('empChannel'))   qs.set('channel', g('empChannel'));
       if (_empState.logStatus != null) qs.set('log_status', _empState.logStatus);
       if (_empState.policyStatus != null) qs.set('policy_status', _empState.policyStatus);
+      if (_empState.onlineTxn != null) qs.set('online_txn', _empState.onlineTxn);
       if (meta) meta.textContent = 'Loading…';
       // Case details stay hidden until the user explicitly drills in.
       const _cc = document.getElementById('empCasesCard'); if (_cc) _cc.style.display = 'none';
@@ -4069,6 +4073,9 @@
           document.getElementById(key + 'RtbPrem').textContent = _empInr(rtb.premium);
           document.getElementById(key + 'CqbNop').textContent = (cqb.nop || 0).toLocaleString('en-IN');
           document.getElementById(key + 'CqbPrem').textContent = _empInr(cqb.premium);
+          const on = o.online || {};
+          document.getElementById(key + 'OnNop').textContent = (on.nop || 0).toLocaleString('en-IN');
+          document.getElementById(key + 'OnPrem').textContent = _empInr(on.premium);
           const el = document.getElementById(key + 'Range'); if (el) el.textContent = range;
         };
         setP('ytd', `${pd.fy_start || ''} → ${pd.today || ''}`);
@@ -4145,6 +4152,7 @@
       document.getElementById('empTo').value = p.to || '';
       _empState.logStatus = (mode === 'oklog') ? 2 : (mode === 'uw') ? 1 : (mode === 'rtb') ? 6 : null;
       _empState.policyStatus = (mode === 'cqb') ? 7 : null;
+      _empState.onlineTxn = (mode === 'online') ? 1 : null;
       await loadEmployeeDashboard();
       empToggleCases(true);
     }
@@ -4152,7 +4160,7 @@
     // Drill into cases for a vehicle type / employee: set that filter, reload
     // (so the case list is the accurate filtered set), then reveal the table.
     async function empDrill(type, val) {
-      _empState.logStatus = null; _empState.policyStatus = null;
+      _empState.logStatus = null; _empState.policyStatus = null; _empState.onlineTxn = null;
       if (type === 'vt')  document.getElementById('empVt').value = val;
       if (type === 'emp') document.getElementById('empEmployee').value = val;
       await loadEmployeeDashboard();
