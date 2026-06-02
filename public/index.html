@@ -3356,43 +3356,37 @@
            grid across all three so the metrics line up vertically. Click a
            metric to drill. Amounts in ₹ Lakhs. -->
       <style>
-        .empBand{display:grid;grid-template-columns:160px repeat(4,minmax(110px,1fr));align-items:stretch;
+        .empBand{display:grid;grid-template-columns:150px repeat(2,minmax(170px,1fr));align-items:stretch;
                  background:#fff;border:1px solid #e8e8f0;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);overflow:hidden;}
         .empBand+.empBand{margin-top:10px;}
         .empBand .lbl{padding:10px 14px;display:flex;flex-direction:column;justify-content:center;}
-        .empBand .met{padding:9px 14px;border-left:1px solid #f0f0f5;display:flex;flex-direction:column;justify-content:center;cursor:pointer;}
+        .empBand .met{padding:8px 16px;border-left:1px solid #f0f0f5;display:flex;flex-direction:column;justify-content:center;cursor:pointer;}
         .empBand .met:hover{background:#fafbff;}
-        .empBand .met .k{font-size:8px;color:#8a8a99;text-transform:uppercase;letter-spacing:.3px;font-weight:700;}
-        .empBand .met .v{font-size:27px;font-weight:800;line-height:1.1;}
-        .empBand .met .v.sm{font-size:21px;}
+        .empBand .met .k{font-size:8px;color:#8a8a99;text-transform:uppercase;letter-spacing:.3px;font-weight:700;margin-bottom:1px;}
+        .empBand .met .v{font-size:27px;font-weight:800;line-height:1;}
+        .empBand .met .vp{font-size:15px;font-weight:800;line-height:1.25;}
       </style>
       <div style="margin-top:16px;">
 
         <!-- YTD -->
         <div class="empBand" style="border-left:5px solid #1e88e5;">
           <div class="lbl" style="background:#f3f8fe;"><div style="font-weight:800;color:#1565c0;font-size:13px;">&#128197; YTD</div><div style="font-size:10px;color:#999;">FY · <span id="ytdRange">—</span></div></div>
-          <div class="met" onclick="empDrillPeriod('ytd','total')" title="View YTD cases"><div class="k">Total NOP</div><div id="ytdNop" class="v" style="color:#1e88e5;">—</div></div>
-          <div class="met" onclick="empDrillPeriod('ytd','total')" title="View YTD cases"><div class="k">Premium</div><div id="ytdPrem" class="v sm" style="color:#00897b;">—</div></div>
-          <div class="met" onclick="empDrillPeriod('ytd','oklog')" title="View YTD Ok-to-Log cases"><div class="k">&#9989; OkLog NOP</div><div id="ytdOkNop" class="v" style="color:#f57c00;">—</div></div>
-          <div class="met" onclick="empDrillPeriod('ytd','oklog')" title="View YTD Ok-to-Log cases"><div class="k">OkLog Prem</div><div id="ytdOkPrem" class="v sm" style="color:#d81b60;">—</div></div>
+          <div class="met" onclick="empDrillPeriod('ytd','total')" title="View YTD cases"><div class="k">Total · NOP / Prem</div><div id="ytdNop" class="v" style="color:#1e88e5;">—</div><div id="ytdPrem" class="vp" style="color:#00897b;">—</div></div>
+          <div class="met" onclick="empDrillPeriod('ytd','oklog')" title="View YTD Ok-to-Log cases"><div class="k">&#9989; Ok to Log · NOP / Prem</div><div id="ytdOkNop" class="v" style="color:#f57c00;">—</div><div id="ytdOkPrem" class="vp" style="color:#d81b60;">—</div></div>
         </div>
 
         <!-- MTD -->
         <div class="empBand" style="border-left:5px solid #2e7d32;">
           <div class="lbl" style="background:#f3faf4;"><div style="font-weight:800;color:#2e7d32;font-size:13px;">&#128198; MTD</div><div style="font-size:10px;color:#999;">Month · <span id="mtdRange">—</span></div></div>
-          <div class="met" onclick="empDrillPeriod('mtd','total')" title="View MTD cases"><div class="k">Total NOP</div><div id="mtdNop" class="v" style="color:#1e88e5;">—</div></div>
-          <div class="met" onclick="empDrillPeriod('mtd','total')" title="View MTD cases"><div class="k">Premium</div><div id="mtdPrem" class="v sm" style="color:#00897b;">—</div></div>
-          <div class="met" onclick="empDrillPeriod('mtd','oklog')" title="View MTD Ok-to-Log cases"><div class="k">&#9989; OkLog NOP</div><div id="mtdOkNop" class="v" style="color:#f57c00;">—</div></div>
-          <div class="met" onclick="empDrillPeriod('mtd','oklog')" title="View MTD Ok-to-Log cases"><div class="k">OkLog Prem</div><div id="mtdOkPrem" class="v sm" style="color:#d81b60;">—</div></div>
+          <div class="met" onclick="empDrillPeriod('mtd','total')" title="View MTD cases"><div class="k">Total · NOP / Prem</div><div id="mtdNop" class="v" style="color:#1e88e5;">—</div><div id="mtdPrem" class="vp" style="color:#00897b;">—</div></div>
+          <div class="met" onclick="empDrillPeriod('mtd','oklog')" title="View MTD Ok-to-Log cases"><div class="k">&#9989; Ok to Log · NOP / Prem</div><div id="mtdOkNop" class="v" style="color:#f57c00;">—</div><div id="mtdOkPrem" class="vp" style="color:#d81b60;">—</div></div>
         </div>
 
         <!-- FTD -->
         <div class="empBand" style="border-left:5px solid #e65100;">
           <div class="lbl" style="background:#fdf6ef;"><div style="font-weight:800;color:#e65100;font-size:13px;">&#128338; FTD</div><div style="font-size:10px;color:#999;">Today · <span id="ftdRange">—</span></div></div>
-          <div class="met" onclick="empDrillPeriod('ftd','total')" title="View today's cases"><div class="k">Total NOP</div><div id="ftdNop" class="v" style="color:#1e88e5;">—</div></div>
-          <div class="met" onclick="empDrillPeriod('ftd','total')" title="View today's cases"><div class="k">Premium</div><div id="ftdPrem" class="v sm" style="color:#00897b;">—</div></div>
-          <div class="met" onclick="empDrillPeriod('ftd','oklog')" title="View today's Ok-to-Log cases"><div class="k">&#9989; OkLog NOP</div><div id="ftdOkNop" class="v" style="color:#f57c00;">—</div></div>
-          <div class="met" onclick="empDrillPeriod('ftd','oklog')" title="View today's Ok-to-Log cases"><div class="k">OkLog Prem</div><div id="ftdOkPrem" class="v sm" style="color:#d81b60;">—</div></div>
+          <div class="met" onclick="empDrillPeriod('ftd','total')" title="View today's cases"><div class="k">Total · NOP / Prem</div><div id="ftdNop" class="v" style="color:#1e88e5;">—</div><div id="ftdPrem" class="vp" style="color:#00897b;">—</div></div>
+          <div class="met" onclick="empDrillPeriod('ftd','oklog')" title="View today's Ok-to-Log cases"><div class="k">&#9989; Ok to Log · NOP / Prem</div><div id="ftdOkNop" class="v" style="color:#f57c00;">—</div><div id="ftdOkPrem" class="vp" style="color:#d81b60;">—</div></div>
         </div>
 
       </div>
