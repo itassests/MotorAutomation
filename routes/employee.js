@@ -278,11 +278,15 @@ router.get('/dashboard', async (req, res, next) => {
       WHERE 1=1${DATE_SEL}${cl.full} AND b.agent_code IS NOT NULL AND b.agent_code <> ''
       GROUP BY b.agent_code;
 
-      -- 9) Month-on-month trend (NOP + premium per FY month; dimension filters
-      --    applied, but NOT the date selection so the full FY trend shows)
-      SELECT YEAR(b.cdate) AS yr, MONTH(b.cdate) AS mo, COUNT(*) AS nop, ISNULL(SUM(b.premium),0) AS premium
+      -- 9) Month-on-month trend (NOP + premium per BUSINESS month, which runs
+      --    2nd → 1st of next month — same as MTD; the business month of a date
+      --    is the calendar month of (date - 1 day)). Dimension filters applied,
+      --    date selection ignored so the full FY trend shows.
+      SELECT YEAR(DATEADD(DAY,-1,b.cdate)) AS yr, MONTH(DATEADD(DAY,-1,b.cdate)) AS mo,
+             COUNT(*) AS nop, ISNULL(SUM(b.premium),0) AS premium
       FROM #base b WHERE 1=1${cl.base}
-      GROUP BY YEAR(b.cdate), MONTH(b.cdate) ORDER BY YEAR(b.cdate), MONTH(b.cdate);
+      GROUP BY YEAR(DATEADD(DAY,-1,b.cdate)), MONTH(DATEADD(DAY,-1,b.cdate))
+      ORDER BY YEAR(DATEADD(DAY,-1,b.cdate)), MONTH(DATEADD(DAY,-1,b.cdate));
 
       DROP TABLE #base; DROP TABLE #hemp;`;
 
@@ -335,7 +339,12 @@ router.get('/dashboard', async (req, res, next) => {
       by_employee: empRows.map(r => ({ code: r.code, name: r.name || r.code, nop: Number(r.nop) || 0, premium: round(r.premium) })),
       by_branch: branchRows.map(r => ({ branch: r.branch, nop: Number(r.nop) || 0, premium: round(r.premium) })),
       by_agent: agentRows.map(r => ({ code: r.code, name: r.name || r.code, nop: Number(r.nop) || 0, premium: round(r.premium) })),
-      by_month: monthRows.map(r => ({ label: `${MON[(Number(r.mo) || 1) - 1]} ${r.yr}`, nop: Number(r.nop) || 0, premium: round(r.premium) })),
+      // Business months within the FY (drop the leading partial bucket — the
+      // 1-Apr cases that fall in the previous FY's March business month).
+      by_month: monthRows
+        .filter(r => (Number(r.yr) > Number(String(pr.fy_start || '').slice(0, 4)))
+                  || (Number(r.yr) === Number(String(pr.fy_start || '').slice(0, 4)) && Number(r.mo) >= 4))
+        .map(r => ({ label: `${MON[(Number(r.mo) || 1) - 1]} ${r.yr}`, nop: Number(r.nop) || 0, premium: round(r.premium) })),
       options: {
         verticals: uniq(oRows.map(r => r.vertical)),
         branches: uniq(oRows.map(r => r.branch)),
