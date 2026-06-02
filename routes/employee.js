@@ -49,8 +49,44 @@ const DECLARES = `
   DECLARE @mtd date = CASE WHEN DAY(@today) >= 2 THEN DATEFROMPARTS(YEAR(@today), MONTH(@today), 2)
                            ELSE DATEADD(MONTH, -1, DATEFROMPARTS(YEAR(@today), MONTH(@today), 2)) END;`;
 
-// hier (reporting tree) + base (one deduped row per TrackerNo, status-15 dropped,
-// all label columns resolved). Every query reads `FROM base WHERE rn = 1`.
+// Shared column list + joins for the two attribution paths (offline / online).
+const BASE_COLS = `
+      m.Id AS _id, m.TrackerNo,
+      CAST(m.CREATED_DATE AS date) AS cdate, m.CREATED_DATE AS created_dt,
+      m.NatureOfSale, m.LogStatusId, mis.POLICY_STATUS_ID AS policy_status_id,
+      CASE WHEN mt.PTrackerno IS NOT NULL THEN 1 ELSE 0 END AS in_txn,
+      f1.Name AS vertical, msb.Location AS branch, mssb.Sub_Location AS sub_branch,
+      ISNULL(r.IDVpos, r.UPIN_CODE) AS agent_code,
+      up.EmployeeCode AS employee_code, up.DisplayName AS employee_name,
+      f3.Name AS vehicle_type, f5.Name AS product_type, fn.Name AS channel, ff.Name AS status,
+      i.CompanyName AS insurer, p.FULLNAME_PROPOSER AS customer, mis.POLICY_NO AS policy_no,
+      md.VEHICLE_REGISTRATION_NO AS reg_no, md.RTO_Code AS rto, md.StateName AS state,
+      ISNULL(md.ANNUAL_PREMIUM, 0) AS premium`;
+const JOINS_HEAD = `
+    FROM TRN_PrarambhMain m WITH (NOLOCK)
+    INNER JOIN TRN_PrarambhMotorDetails md WITH (NOLOCK) ON md.PrarambhMainId = m.Id AND md.ISACTIVE = 1
+    LEFT JOIN TRN_PrarambhProposerDetails p WITH (NOLOCK) ON p.PrarambhMainId = m.Id AND p.ISACTIVE = 1
+    LEFT JOIN TRN_PrarambhReportedFields r WITH (NOLOCK) ON r.PrarambhMainId = m.Id AND r.ISACTIVE = 1
+    LEFT JOIN TRN_PrarambhMotorMISUpdation mis WITH (NOLOCK) ON mis.PrarambhMainId = m.Id AND mis.ISACTIVE = 1
+    LEFT JOIN RH_InsurerMast i WITH (NOLOCK) ON i.insid = r.InsurerId`;
+const JOINS_TAIL = `
+    LEFT JOIN MST_FieldMasters f1 WITH (NOLOCK) ON f1.MasterId = 4040 AND f1.Value = m.Vertical
+    LEFT JOIN MST_FieldMasters f3 WITH (NOLOCK) ON f3.MasterId = 9210 AND f3.Value = md.VEHICAL_TYPE_Id
+    LEFT JOIN MST_FieldMasters f5 WITH (NOLOCK) ON f5.MasterId = 9220 AND f5.Value = r.Product_Type_Id
+    LEFT JOIN MST_FieldMasters fn WITH (NOLOCK) ON fn.MasterId = 4030 AND fn.Value = m.NatureOfSale
+    LEFT JOIN MST_FieldMasters ff WITH (NOLOCK) ON ff.MasterId = 8050 AND ff.Value = m.FinalStatus
+    LEFT JOIN MST_SalesBranch msb WITH (NOLOCK) ON msb.id = r.SALES_BRANCH_Id
+    LEFT JOIN MST_SalesSubBranch mssb WITH (NOLOCK) ON mssb.id = r.SALES_SUB_BRANCH_Id
+    LEFT JOIN (SELECT DISTINCT PTrackerno FROM Beeinsured_v3_2.dbo.TRN_MotorTransactionForPrarambh WITH (NOLOCK)
+               WHERE PTrackerno IS NOT NULL AND PTrackerno <> 'DUMMY' AND TransactionDate >= @fy) mt ON mt.PTrackerno = m.TrackerNo`;
+const BASE_WHERE = `m.InsuranceType = 16 AND m.IsActive = 1
+      AND m.LogStatusId IS NOT NULL AND m.LogStatusId NOT IN (15, 16)   -- 15=dup, 16=Hold, NULL=in-process
+      AND CAST(m.CREATED_DATE AS date) BETWEEN @fy AND @today`;
+
+// hier (reporting tree) + base (one deduped row per TrackerNo). Attribution is
+// a UNION: offline cases match on m.ReportingEmployeeCode (fast, indexed); online
+// cases (no ReportingEmployeeCode) fall back to tmp_poscodes.referal_code keyed
+// on the case's POS/UPIN code. Every query reads `FROM #base WHERE rn = 1`.
 const CTES = `
   ;WITH hier AS (
     SELECT EmployeeCode, reportingmgremployeecode, CAST('|' + EmployeeCode + '|' AS VARCHAR(8000)) AS path
@@ -63,42 +99,25 @@ const CTES = `
     WHERE c.IsActive = 1 AND c.IsValid = 1 AND CHARINDEX('|' + c.EmployeeCode + '|', h.path) = 0
   ),
   base AS (
-    SELECT
-      m.TrackerNo,
-      CAST(m.CREATED_DATE AS date) AS cdate, m.CREATED_DATE AS created_dt,
-      m.NatureOfSale, m.LogStatusId, mis.POLICY_STATUS_ID AS policy_status_id,
-      CASE WHEN mt.PTrackerno IS NOT NULL THEN 1 ELSE 0 END AS in_txn,
-      f1.Name AS vertical, msb.Location AS branch, mssb.Sub_Location AS sub_branch,
-      ISNULL(r.IDVpos, r.UPIN_CODE) AS agent_code,
-      up.EmployeeCode AS employee_code, up.DisplayName AS employee_name,
-      f3.Name AS vehicle_type, f5.Name AS product_type, fn.Name AS channel, ff.Name AS status,
-      i.CompanyName AS insurer, p.FULLNAME_PROPOSER AS customer, mis.POLICY_NO AS policy_no,
-      md.VEHICLE_REGISTRATION_NO AS reg_no, md.RTO_Code AS rto, md.StateName AS state,
-      ISNULL(md.ANNUAL_PREMIUM, 0) AS premium,
-      ROW_NUMBER() OVER (PARTITION BY m.TrackerNo ORDER BY m.Id DESC) AS rn
-    FROM TRN_PrarambhMain m WITH (NOLOCK)
-    INNER JOIN TRN_PrarambhMotorDetails md WITH (NOLOCK) ON md.PrarambhMainId = m.Id AND md.ISACTIVE = 1
-    LEFT JOIN TRN_PrarambhProposerDetails p WITH (NOLOCK) ON p.PrarambhMainId = m.Id AND p.ISACTIVE = 1
-    LEFT JOIN TRN_PrarambhReportedFields r WITH (NOLOCK) ON r.PrarambhMainId = m.Id AND r.ISACTIVE = 1
-    LEFT JOIN TRN_PrarambhMotorMISUpdation mis WITH (NOLOCK) ON mis.PrarambhMainId = m.Id AND mis.ISACTIVE = 1
-    LEFT JOIN RH_InsurerMast i WITH (NOLOCK) ON i.insid = r.InsurerId
-    INNER JOIN (SELECT DISTINCT EmployeeCode FROM hier) hh ON hh.EmployeeCode = CONVERT(varchar(50), m.ReportingEmployeeCode)
-    LEFT JOIN BugNet_UserProfiles up WITH (NOLOCK) ON up.EmployeeCode = CONVERT(varchar(50), m.ReportingEmployeeCode)
-    LEFT JOIN MST_FieldMasters f1 WITH (NOLOCK) ON f1.MasterId = 4040 AND f1.Value = m.Vertical
-    LEFT JOIN MST_FieldMasters f3 WITH (NOLOCK) ON f3.MasterId = 9210 AND f3.Value = md.VEHICAL_TYPE_Id
-    LEFT JOIN MST_FieldMasters f5 WITH (NOLOCK) ON f5.MasterId = 9220 AND f5.Value = r.Product_Type_Id
-    LEFT JOIN MST_FieldMasters fn WITH (NOLOCK) ON fn.MasterId = 4030 AND fn.Value = m.NatureOfSale
-    LEFT JOIN MST_FieldMasters ff WITH (NOLOCK) ON ff.MasterId = 8050 AND ff.Value = m.FinalStatus
-    LEFT JOIN MST_SalesBranch msb WITH (NOLOCK) ON msb.id = r.SALES_BRANCH_Id
-    LEFT JOIN MST_SalesSubBranch mssb WITH (NOLOCK) ON mssb.id = r.SALES_SUB_BRANCH_Id
-    -- Online = tracker present in Beeinsured_v3_2 motor-transaction table (join
-    -- a deduped PTrackerno set once; #base materialisation runs this a single time)
-    LEFT JOIN (SELECT DISTINCT PTrackerno FROM Beeinsured_v3_2.dbo.TRN_MotorTransactionForPrarambh WITH (NOLOCK)
-               WHERE PTrackerno IS NOT NULL AND PTrackerno <> 'DUMMY') mt ON mt.PTrackerno = m.TrackerNo
-    WHERE m.InsuranceType = 16 AND m.IsActive = 1
-      -- exclude 15 (duplicates), 16 (Hold) and NULL (no log status / in-process)
-      AND m.LogStatusId IS NOT NULL AND m.LogStatusId NOT IN (15, 16)
-      AND CAST(m.CREATED_DATE AS date) BETWEEN @fy AND @today
+    SELECT u.*, ROW_NUMBER() OVER (PARTITION BY u.TrackerNo ORDER BY u._id DESC) AS rn
+    FROM (
+      -- A) cases with a ReportingEmployeeCode (offline + most business)
+      SELECT ${BASE_COLS}
+      ${JOINS_HEAD}
+      INNER JOIN (SELECT DISTINCT EmployeeCode FROM hier) hh ON hh.EmployeeCode = CONVERT(varchar(50), m.ReportingEmployeeCode)
+      LEFT JOIN BugNet_UserProfiles up WITH (NOLOCK) ON up.EmployeeCode = CONVERT(varchar(50), m.ReportingEmployeeCode)
+      ${JOINS_TAIL}
+      WHERE ${BASE_WHERE} AND m.ReportingEmployeeCode IS NOT NULL
+      UNION ALL
+      -- B) online cases (no ReportingEmployeeCode) → referring employee via POS code
+      SELECT ${BASE_COLS}
+      ${JOINS_HEAD}
+      INNER JOIN Beeinsured_v3_2.dbo.tmp_poscodes pc WITH (NOLOCK) ON pc.upincode = ISNULL(r.IDVpos, r.UPIN_CODE) AND pc.referal_code <> 'Direct'
+      INNER JOIN (SELECT DISTINCT EmployeeCode FROM hier) hh ON hh.EmployeeCode = pc.referal_code
+      LEFT JOIN BugNet_UserProfiles up WITH (NOLOCK) ON up.EmployeeCode = pc.referal_code
+      ${JOINS_TAIL}
+      WHERE ${BASE_WHERE} AND m.ReportingEmployeeCode IS NULL
+    ) u
   )`;
 
 const OPT = ' OPTION (MAXRECURSION 1000)';
