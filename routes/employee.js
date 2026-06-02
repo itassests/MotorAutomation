@@ -91,7 +91,8 @@ const CTES = `
     LEFT JOIN MST_SalesBranch msb WITH (NOLOCK) ON msb.id = r.SALES_BRANCH_Id
     LEFT JOIN MST_SalesSubBranch mssb WITH (NOLOCK) ON mssb.id = r.SALES_SUB_BRANCH_Id
     WHERE m.InsuranceType = 16 AND m.IsActive = 1
-      AND (m.LogStatusId IS NULL OR m.LogStatusId <> 15)          -- 15 = duplicates
+      -- exclude 15 (duplicates), 16 (Hold) and NULL (no log status / in-process)
+      AND m.LogStatusId IS NOT NULL AND m.LogStatusId NOT IN (15, 16)
       AND CAST(m.CREATED_DATE AS date) BETWEEN @fy AND @today
   )`;
 
