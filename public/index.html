@@ -3345,49 +3345,49 @@
         <button class="btn btn-primary btn-sm" onclick="loadEmployeeDashboard()">Search</button>
       </div>
 
-      <!-- KPI cards -->
+      <!-- KPI cards (colourful gradients) -->
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(190px,1fr)); gap:14px; margin-top:16px;">
-        <div class="card" style="text-align:center; border-left:4px solid #0082C8;">
-          <div style="font-size:12px;color:#888;text-transform:uppercase;">Total NOP</div>
-          <div id="empKpiNop" style="font-size:28px;font-weight:700;color:#00243E;">—</div></div>
-        <div class="card" style="text-align:center; border-left:4px solid #2e7d32;">
-          <div style="font-size:12px;color:#888;text-transform:uppercase;">Total Premium</div>
-          <div id="empKpiPrem" style="font-size:28px;font-weight:700;color:#1b5e20;">—</div></div>
-        <div class="card" style="text-align:center; border-left:4px solid #00897b;">
-          <div style="font-size:12px;color:#888;text-transform:uppercase;">Online</div>
-          <div id="empKpiOnline" style="font-size:22px;font-weight:700;color:#00897b;">—</div></div>
-        <div class="card" style="text-align:center; border-left:4px solid #8e24aa;">
-          <div style="font-size:12px;color:#888;text-transform:uppercase;">Offline</div>
-          <div id="empKpiOffline" style="font-size:22px;font-weight:700;color:#8e24aa;">—</div></div>
+        <div style="text-align:center; border-radius:12px; padding:18px 12px; color:#fff; box-shadow:0 4px 14px rgba(0,40,80,0.18); background:linear-gradient(135deg,#1e88e5,#00243e);">
+          <div style="font-size:12px;opacity:.85;text-transform:uppercase;letter-spacing:.5px;">&#128202; Total NOP</div>
+          <div id="empKpiNop" style="font-size:30px;font-weight:800;">—</div></div>
+        <div style="text-align:center; border-radius:12px; padding:18px 12px; color:#fff; box-shadow:0 4px 14px rgba(27,94,32,0.2); background:linear-gradient(135deg,#43a047,#1b5e20);">
+          <div style="font-size:12px;opacity:.85;text-transform:uppercase;letter-spacing:.5px;">&#128176; Total Premium</div>
+          <div id="empKpiPrem" style="font-size:30px;font-weight:800;">—</div></div>
+        <div style="text-align:center; border-radius:12px; padding:18px 12px; color:#fff; box-shadow:0 4px 14px rgba(0,137,123,0.2); background:linear-gradient(135deg,#26c6da,#00695c);">
+          <div style="font-size:12px;opacity:.85;text-transform:uppercase;letter-spacing:.5px;">&#127760; Online</div>
+          <div id="empKpiOnline" style="font-size:24px;font-weight:800;">—</div></div>
+        <div style="text-align:center; border-radius:12px; padding:18px 12px; color:#fff; box-shadow:0 4px 14px rgba(142,36,170,0.2); background:linear-gradient(135deg,#ab47bc,#4a148c);">
+          <div style="font-size:12px;opacity:.85;text-transform:uppercase;letter-spacing:.5px;">&#127970; Offline</div>
+          <div id="empKpiOffline" style="font-size:24px;font-weight:800;">—</div></div>
       </div>
 
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px;">
-        <div class="card">
-          <h3 style="font-size:14px;color:#00243E;">By Vehicle Type</h3>
+        <div class="card" style="border-top:4px solid #1e88e5;">
+          <h3 style="font-size:14px;color:#1565c0;">&#128663; By Vehicle Type <span style="font-size:11px;color:#999;font-weight:400;">(premium in ₹ Lakhs)</span></h3>
           <div class="table-wrap"><table>
-            <thead><tr><th>Vehicle Type</th><th style="text-align:right;">NOP</th><th style="text-align:right;">Premium</th></tr></thead>
+            <thead><tr style="background:#e3f2fd;"><th>Vehicle Type</th><th style="text-align:right;">NOP</th><th style="text-align:right;">Premium (L)</th></tr></thead>
             <tbody id="empVtBody"><tr><td colspan="3" class="no-data">—</td></tr></tbody>
           </table></div>
         </div>
-        <div class="card">
-          <h3 style="font-size:14px;color:#00243E;">By Employee <span style="font-size:11px;color:#999;font-weight:400;">(top contributors)</span></h3>
+        <div class="card" style="border-top:4px solid #43a047;">
+          <h3 style="font-size:14px;color:#2e7d32;">&#128104;&#8205;&#128188; By Employee <span style="font-size:11px;color:#999;font-weight:400;">(top contributors · ₹ Lakhs)</span></h3>
           <div class="table-wrap" style="max-height:260px;overflow:auto;"><table>
-            <thead><tr><th>Employee</th><th style="text-align:right;">NOP</th><th style="text-align:right;">Premium</th></tr></thead>
+            <thead><tr style="background:#e8f5e9;"><th>Employee</th><th style="text-align:right;">NOP</th><th style="text-align:right;">Premium (L)</th></tr></thead>
             <tbody id="empEmpBody"><tr><td colspan="3" class="no-data">—</td></tr></tbody>
           </table></div>
         </div>
       </div>
 
-      <div class="card" style="margin-top:16px;">
+      <div class="card" style="margin-top:16px; border-top:4px solid #ef6c00;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
-          <h3 style="font-size:14px;color:#00243E;margin:0;">Cases</h3>
+          <h3 style="font-size:14px;color:#e65100;margin:0;">&#128203; Cases <span style="font-size:11px;color:#999;font-weight:400;">(premium in ₹ Lakhs)</span></h3>
           <span id="empCaseCount" style="font-size:12px;color:#888;"></span>
         </div>
         <div class="table-wrap" style="margin-top:10px;"><table>
-          <thead><tr>
+          <thead><tr style="background:#fff3e0;">
             <th>Date</th><th>Employee</th><th>Agent</th><th>Vehicle</th><th>Insurer</th><th>Customer</th>
             <th>Policy No</th><th>Reg No</th><th>State</th><th style="text-align:center;">Channel</th>
-            <th style="text-align:right;">Premium</th><th>Status</th>
+            <th style="text-align:right;">Premium (L)</th><th>Status</th>
           </tr></thead>
           <tbody id="empCaseBody"><tr><td colspan="12" class="no-data">Loading…</td></tr></tbody>
         </table></div>
@@ -3947,7 +3947,8 @@
 
     // ============ EMPLOYEE BUSINESS DASHBOARD ============
     let _empState = { optsLoaded: false, cases: [] };
-    const _empInr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    // All amounts shown in Lakhs (₹ value / 100,000).
+    const _empInr = (n) => '₹' + (Number(n || 0) / 100000).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'L';
 
     function empClear() {
       ['empVertical','empBranch','empSubBranch','empEmployee','empAgent','empVt','empChannel'].forEach(id => {
@@ -3996,8 +3997,8 @@
         const s = r.summary;
         document.getElementById('empKpiNop').textContent = (s.nop || 0).toLocaleString('en-IN');
         document.getElementById('empKpiPrem').textContent = _empInr(s.premium);
-        document.getElementById('empKpiOnline').innerHTML = `${s.online_nop} <span style="font-size:12px;color:#888;">/ ${_empInr(s.online_premium)}</span>`;
-        document.getElementById('empKpiOffline').innerHTML = `${s.offline_nop} <span style="font-size:12px;color:#888;">/ ${_empInr(s.offline_premium)}</span>`;
+        document.getElementById('empKpiOnline').innerHTML = `${s.online_nop} <span style="font-size:12px;opacity:.8;">NOP · ${_empInr(s.online_premium)}</span>`;
+        document.getElementById('empKpiOffline').innerHTML = `${s.offline_nop} <span style="font-size:12px;opacity:.8;">NOP · ${_empInr(s.offline_premium)}</span>`;
         // Filter dropdowns — populate once (keep selection on refresh).
         empFillSelect('empVertical', r.options.verticals, _empState.optsLoaded);
         empFillSelect('empBranch', r.options.branches, _empState.optsLoaded);
@@ -4050,13 +4051,13 @@
     function empDownload() {
       const rows = _empState.cases || [];
       if (!rows.length) { showToast('Nothing to download', 'error'); return; }
-      const header = ['Date','Employee','Employee Code','Agent','Vehicle Type','Product','Insurer','Customer','Policy No','Reg No','RTO','State','Vertical','Branch','Sub Branch','Channel','Premium','Status'];
+      const header = ['Date','Employee','Employee Code','Agent','Vehicle Type','Product','Insurer','Customer','Policy No','Reg No','RTO','State','Vertical','Branch','Sub Branch','Channel','Premium (₹ Lakhs)','Status'];
       const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
       const lines = [header.map(esc).join(',')];
       for (const c of rows) {
         lines.push([c.created_date ? new Date(c.created_date).toLocaleDateString('en-IN') : '', c.employee_name, c.employee_code, c.agent_code,
           c.vehicle_type, c.product_type, c.insurer, c.customer, c.policy_no, c.reg_no, c.rto, c.state, c.vertical, c.branch, c.sub_branch,
-          c.is_online ? 'Online' : 'Offline', c.premium, c.status].map(esc).join(','));
+          c.is_online ? 'Online' : 'Offline', (Number(c.premium || 0) / 100000).toFixed(2), c.status].map(esc).join(','));
       }
       const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'business_dashboard.csv';
