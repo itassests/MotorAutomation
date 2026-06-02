@@ -168,12 +168,38 @@ router.get('/dashboard', async (req, res, next) => {
       ${JOINS} ${BASE_WHERE}${listP.clause}
       ORDER BY m.CREATED_DATE DESC${OPT}`;
 
-    const [sumR, vtR, empR, optR, listR] = await Promise.all([
+    // 6) Period buckets — YTD (entire FY: 1-Apr → today), MTD (the business
+    //    month runs 2nd → 1st, so from the most recent 2nd-of-month → today),
+    //    FTD (today). Respects the hierarchy + non-date filters; the date
+    //    windows are computed in SQL from the DB's current date.
+    const perP = prep(pool, root, from, to, q, true);
+    const periodsQ = `
+      DECLARE @today date = CAST(GETDATE() AS date);
+      DECLARE @fy date = DATEFROMPARTS(CASE WHEN MONTH(@today) >= 4 THEN YEAR(@today) ELSE YEAR(@today) - 1 END, 4, 1);
+      DECLARE @mtd date = CASE WHEN DAY(@today) >= 2 THEN DATEFROMPARTS(YEAR(@today), MONTH(@today), 2)
+                               ELSE DATEADD(MONTH, -1, DATEFROMPARTS(YEAR(@today), MONTH(@today), 2)) END;
+      ${CTE}
+      SELECT
+        CONVERT(varchar(10), @fy, 23) AS fy_start,
+        CONVERT(varchar(10), @mtd, 23) AS mtd_start,
+        CONVERT(varchar(10), @today, 23) AS today,
+        COUNT(*) AS ytd_nop, ISNULL(SUM(md.ANNUAL_PREMIUM),0) AS ytd_prem,
+        SUM(CASE WHEN CAST(m.CREATED_DATE AS date) >= @mtd THEN 1 ELSE 0 END) AS mtd_nop,
+        ISNULL(SUM(CASE WHEN CAST(m.CREATED_DATE AS date) >= @mtd THEN md.ANNUAL_PREMIUM ELSE 0 END),0) AS mtd_prem,
+        SUM(CASE WHEN CAST(m.CREATED_DATE AS date) = @today THEN 1 ELSE 0 END) AS ftd_nop,
+        ISNULL(SUM(CASE WHEN CAST(m.CREATED_DATE AS date) = @today THEN md.ANNUAL_PREMIUM ELSE 0 END),0) AS ftd_prem
+      ${JOINS}
+      WHERE m.InsuranceType = 16 AND m.IsActive = 1
+        AND CAST(m.CREATED_DATE AS date) BETWEEN @fy AND @today${perP.clause}
+      ${OPT}`;
+
+    const [sumR, vtR, empR, optR, listR, perR] = await Promise.all([
       sumP.rq.query(summaryQ),
       vtP.rq.query(vtQ),
       empP.rq.query(empQ),
       optP.rq.query(optionsQ),
       listP.rq.query(listQ),
+      perP.rq.query(periodsQ),
     ]);
 
     const s = sumR.recordset[0] || {};
@@ -182,8 +208,16 @@ router.get('/dashboard', async (req, res, next) => {
     const empMap = new Map();
     oRows.forEach(r => { if (r.emp_code) empMap.set(r.emp_code, r.emp_name || r.emp_code); });
 
+    const pr = perR.recordset[0] || {};
+    const periods = {
+      fy_start: pr.fy_start, mtd_start: pr.mtd_start, today: pr.today,
+      ytd: { nop: Number(pr.ytd_nop) || 0, premium: round(pr.ytd_prem), from: pr.fy_start, to: pr.today },
+      mtd: { nop: Number(pr.mtd_nop) || 0, premium: round(pr.mtd_prem), from: pr.mtd_start, to: pr.today },
+      ftd: { nop: Number(pr.ftd_nop) || 0, premium: round(pr.ftd_prem), from: pr.today, to: pr.today },
+    };
+
     res.json({
-      success: true, root, from, to,
+      success: true, root, from, to, periods,
       summary: {
         nop: Number(s.nop) || 0, premium: round(s.premium),
         online_nop: Number(s.online_nop) || 0, online_premium: round(s.online_premium),
