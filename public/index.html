@@ -1561,6 +1561,35 @@
           <span id="srGlobalUpliftStatus" style="font-size:12px; color:#0066cc;"></span>
         </div>
 
+        <!-- Volume-based uplift builder (for the picked agent) -->
+        <div id="srVolumeCard" style="display:none; background:#fffbe9; border:1px solid #f0e0a8; padding:12px 14px; border-radius:8px; margin:8px 0 12px;">
+          <div style="font-weight:700;color:#8a6d00;font-size:13px;margin-bottom:8px;">&#128202; Volume-Based Uplift
+            <span style="font-weight:400;color:#999;font-size:11px;">— reach a premium threshold in the window &rarr; extra outgoing %</span></div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:10px;">
+            <div class="form-group" style="margin:0;"><label style="font-size:11px;">Scope: Insurer</label><input id="srVolInsurer" placeholder="any (= overall)" style="width:130px;"></div>
+            <div class="form-group" style="margin:0;"><label style="font-size:11px;">Vehicle Type</label><input id="srVolVt" placeholder="any" style="width:110px;"></div>
+            <div class="form-group" style="margin:0;"><label style="font-size:11px;">State</label><input id="srVolState" placeholder="any" style="width:110px;"></div>
+            <div class="form-group" style="margin:0;"><label style="font-size:11px;">Window</label>
+              <select id="srVolWindow" onchange="srVolWindowChange()"><option value="cycle">This run / cycle</option><option value="month">Calendar month</option><option value="date_range">Date range</option></select></div>
+            <div id="srVolDates" class="form-group" style="margin:0; display:none;"><label style="font-size:11px;">From / To</label>
+              <span><input type="date" id="srVolFrom" style="width:130px;"> <input type="date" id="srVolTo" style="width:130px;"></span></div>
+            <div class="form-group" style="margin:0;"><label style="font-size:11px;">Apply</label>
+              <select id="srVolApply"><option value="per_policy">Per policy (+% each)</option><option value="overall">Overall payout (lump)</option></select></div>
+          </div>
+          <div style="margin-bottom:8px;">
+            <div style="font-size:12px; font-weight:600; color:#555; margin-bottom:4px;">Tiers <span style="font-weight:400;color:#999;">(premium ₹ from–to &rarr; uplift %)</span></div>
+            <div id="srTiers"></div>
+            <button class="btn btn-outline btn-sm" onclick="srAddTier()" style="margin-top:4px;">+ Add tier</button>
+          </div>
+          <div style="margin-bottom:10px;">
+            <div style="font-size:12px; font-weight:600; color:#555; margin-bottom:4px;">Exceptions <span style="font-weight:400;color:#999;">(matching cases excluded from threshold &amp; uplift)</span></div>
+            <div id="srExcl"></div>
+            <button class="btn btn-outline btn-sm" onclick="srAddExclusion()" style="margin-top:4px;">+ Add exception</button>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="srSaveVolumeRule()">Save volume rule</button>
+          <span id="srVolStatus" style="font-size:12px; color:#0066cc; margin-left:8px;"></span>
+        </div>
+
         <!-- Optional table filters (narrow the working set) -->
         <details style="margin:6px 0 12px;">
           <summary style="cursor:pointer; font-size:12px; color:#555;">Filter rules&hellip;</summary>
@@ -9916,6 +9945,9 @@
       // Reveal the global-uplift card now that an agent is chosen.
       document.getElementById('srGlobalCard').style.display = 'flex';
       document.getElementById('srGlobalCard').style.alignItems = 'center';
+      // Reveal + reset the volume-uplift builder for this agent.
+      document.getElementById('srVolumeCard').style.display = '';
+      srLoadVolumeBuilder(null);
       try {
         const r = await fetch(API + '/special-rates/preview?upincode=' + encodeURIComponent(agent.upincode));
         const j = await r.json();
@@ -9989,6 +10021,93 @@
         showToast('Global uplift removed', 'success');
         srPickAgent(a);
       } catch (e) { showToast('Remove failed: ' + e.message, 'error'); }
+    }
+
+    // ── Volume-based uplift builder ──────────────────────────────────────────
+    function srVolWindowChange() {
+      document.getElementById('srVolDates').style.display =
+        document.getElementById('srVolWindow').value === 'date_range' ? '' : 'none';
+    }
+    function srAddTier(t) {
+      t = t || {};
+      const d = document.createElement('div');
+      d.className = 'srTierRow';
+      d.style.cssText = 'display:flex; gap:6px; align-items:center; margin:3px 0;';
+      d.innerHTML = `₹<input type="number" class="t-min" placeholder="from" value="${t.premium_min ?? ''}" style="width:110px;">
+        – <input type="number" class="t-max" placeholder="to (blank = ∞)" value="${t.premium_max ?? ''}" style="width:120px;">
+        &rarr; <input type="number" step="0.05" class="t-up" placeholder="uplift" value="${t.uplift_pct ?? ''}" style="width:80px;"> %
+        <button class="btn btn-outline btn-sm" onclick="this.parentNode.remove()" style="color:#c62828;padding:1px 7px;">×</button>`;
+      document.getElementById('srTiers').appendChild(d);
+    }
+    function srAddExclusion(c) {
+      c = c || {};
+      const d = document.createElement('div');
+      d.className = 'srExclRow';
+      d.style.cssText = 'display:flex; gap:6px; align-items:center; margin:3px 0; flex-wrap:wrap;';
+      d.innerHTML = `<label style="font-size:11px;"><input type="checkbox" class="x-online" ${c.online ? 'checked' : ''}> Online</label>
+        <input class="x-ins" placeholder="Insurer" value="${escapeHtml(c.searchInsurer || '')}" style="width:120px;">
+        <input class="x-vt" placeholder="Vehicle Type" value="${escapeHtml(c.searchProduct || '')}" style="width:110px;">
+        <input class="x-state" placeholder="State" value="${escapeHtml(c.searchState || '')}" style="width:110px;">
+        <span style="font-size:11px;color:#999;">(any filled field; multiple = AND)</span>
+        <button class="btn btn-outline btn-sm" onclick="this.parentNode.remove()" style="color:#c62828;padding:1px 7px;">×</button>`;
+      document.getElementById('srExcl').appendChild(d);
+    }
+    // Populate the builder from an existing volume rule (edit), or reset it.
+    function srLoadVolumeBuilder(rule) {
+      document.getElementById('srTiers').innerHTML = '';
+      document.getElementById('srExcl').innerHTML = '';
+      const f = (rule && rule.filters) || {};
+      document.getElementById('srVolInsurer').value = f.searchInsurer || '';
+      document.getElementById('srVolVt').value = f.searchProduct || '';
+      document.getElementById('srVolState').value = f.searchState || '';
+      document.getElementById('srVolWindow').value = (rule && rule.window_type) || 'cycle';
+      document.getElementById('srVolApply').value = (rule && rule.apply_mode) || 'per_policy';
+      srVolWindowChange();
+      if (rule && rule.window_from) document.getElementById('srVolFrom').value = String(rule.window_from).slice(0, 10);
+      if (rule && rule.window_to)   document.getElementById('srVolTo').value = String(rule.window_to).slice(0, 10);
+      const tiers = (rule && rule.volume_tiers) || [];
+      if (tiers.length) tiers.forEach(srAddTier); else srAddTier();
+      ((rule && rule.exclusions) || []).forEach(srAddExclusion);
+      document.getElementById('srVolStatus').textContent = '';
+    }
+    async function srSaveVolumeRule() {
+      const a = _srState.agent;
+      if (!a) { showToast('Pick an agent first', 'error'); return; }
+      const tiers = [...document.querySelectorAll('#srTiers .srTierRow')].map(r => ({
+        premium_min: r.querySelector('.t-min').value,
+        premium_max: r.querySelector('.t-max').value,
+        uplift_pct:  r.querySelector('.t-up').value,
+      })).filter(t => t.uplift_pct !== '' && t.uplift_pct != null);
+      if (!tiers.length) { showToast('Add at least one tier with an uplift %', 'error'); return; }
+      const exclusions = [...document.querySelectorAll('#srExcl .srExclRow')].map(r => {
+        const c = {};
+        if (r.querySelector('.x-online').checked) c.online = true;
+        const ins = r.querySelector('.x-ins').value.trim(); if (ins) c.searchInsurer = ins;
+        const vt  = r.querySelector('.x-vt').value.trim();  if (vt)  c.searchProduct = vt;
+        const st  = r.querySelector('.x-state').value.trim(); if (st) c.searchState = st;
+        return c;
+      }).filter(c => Object.keys(c).length);
+      const filters = {};
+      const fi = document.getElementById('srVolInsurer').value.trim(); if (fi) filters.searchInsurer = fi;
+      const fv = document.getElementById('srVolVt').value.trim();      if (fv) filters.searchProduct = fv;
+      const fs = document.getElementById('srVolState').value.trim();   if (fs) filters.searchState = fs;
+      if (Object.keys(filters).length === 0) filters.searchScope = 'ALL';   // overall sentinel (matches everything)
+      const win = { type: document.getElementById('srVolWindow').value };
+      if (win.type === 'date_range') { win.from = document.getElementById('srVolFrom').value; win.to = document.getElementById('srVolTo').value; }
+      const body = {
+        upincode: a.upincode, pos_name: a.posfullname || null,
+        description: `[VolUplift ${a.upincode}] ${fi || fv || fs || 'overall'}`.slice(0, 500),
+        filters, volume_tiers: tiers, exclusions,
+        apply_mode: document.getElementById('srVolApply').value, window: win, force: true,
+      };
+      try {
+        const res = await fetch(API + '/special-rates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const j = await res.json();
+        if (!j.success) throw new Error(j.error || 'save failed');
+        document.getElementById('srVolStatus').textContent = `Saved (${j.action})`;
+        showToast('Volume rule saved', 'success');
+        loadSavedSpecialRates();
+      } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
     }
 
     function srClearAgent() {
