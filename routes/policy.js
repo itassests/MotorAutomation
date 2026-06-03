@@ -2483,6 +2483,17 @@ function filterRulesByPolicy(rules, params, _trace) {
       if (matches) score += 3;
     }
 
+    // Tata GCV: the niche segments "Trade Road Risk" / "Trailer" / "Harvester"
+    // carry NO weight band, so they bypass the tonnage gate above and hijack a
+    // normal truck (→ a ~2% rate instead of the 46-58% tonnage-band Package
+    // rate). Drop them unless the vehicle actually is that type.
+    if (matches && rule.insurer === 'tata_aig' && String(params.vehicleType || '').toUpperCase() === 'GCV') {
+      if (/trade\s*road\s*risk|trailer|harvester/i.test(String(seg || ''))) {
+        const hay = `${params.vehicleCategory || ''} ${params.model || ''} ${params.carrierType || ''}`.toLowerCase();
+        if (!/trailer|harvester|trade|road\s*risk|dealer/.test(hay)) matches = false;
+      }
+    }
+
     // Tonnage range encoded in segment text — e.g. "GCV4 2.5 To 3.5T",
     // "GCV4 upto 2.5T", "GCV4 44T+". Match when policy tonnage fits.
     // Skipped for MISC (see above).
