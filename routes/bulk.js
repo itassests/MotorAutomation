@@ -2071,6 +2071,24 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // (The grid's CD>80% rows — With-NCB 0.15 / Non-NCB Diesel 0.10 / Petrol 0.15 —
   // are not applied: Bajaj OD-discount isn't wired into params and every observed
   // MH/GJ 1801 car is ≤80% DTD. Revisit if a >80%-DTD MH/GJ 1801 car appears.)
+  // Bajaj GCV >43T (Gujarat) Comp rate fix. The ingested Gujarat "GCV4W more than
+  // 43T" COMP row is 0.195, but the operator uniformly pays 0.15 (= the Mumbai
+  // >43T COMP value — the representative national rate; Gujarat's 0.195 is the
+  // ingest outlier). Verified vs operator file (cycle 12+11): 28/28 GJ >43T Comp
+  // paid exactly 15, NONE at 19.5 → zero-regression. Scoped to Bajaj + GCV +
+  // "more than 43T" + COMP + GJ state (SATP >43T rows and other states untouched).
+  if (insurerSlug === 'bajaj_allianz' &&
+      String(params.vehicleType || '').toUpperCase() === 'GCV' &&
+      String(rtoStatePrefix(params.rtoCode) || '').toUpperCase() === 'GJ' &&
+      rules.length > 0) {
+    rules = rules.map(r =>
+      (/more than 43T/i.test(String(r.segment || '')) &&
+       /^COMP$/i.test(String(r.rate_type || '')) &&
+       Number(r.rate_value) > 0.15)
+        ? { ...r, rate_value: 0.15, _bajaj43tOverride: true }
+        : r);
+  }
+
   if (insurerSlug === 'bajaj_allianz' &&
       String(params.vehicleType || '').toUpperCase() === 'CAR' &&
       /-1801-/.test(String(params._policy_no || ''))) {
