@@ -1824,13 +1824,14 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
           excluded: us.excluded,
           no_rule: !us.matched_rule_id,
           // rate_match: true when within tolerance. Default ±0.5%, but Reliance
-          // uses ±1.0% — its operator tracker applies a ~1% Rewards/retention so the
-          // net paid rate is consistently ~1 below the grid we compute (per direction:
-          // "if 1 diff consider as match" — Reliance only). When we produce NO rule
-          // (our_rate null → zero commission) and the operator also paid zero, that's
-          // agreement (both decline) — count it as a match.
+          // AND Chola use ±1.0% — their operator trackers apply a ~1% Rewards/retention
+          // so the net paid rate is consistently ~1 below the grid we compute. Chola's
+          // file carries Rewards=0 yet still pays a notch under the published grid
+          // (e.g. GCCV 35→34, CAR 1000-1500cc 25→24), so per direction "Chola diff = 1
+          // consider as match". When we produce NO rule (our_rate null → zero commission)
+          // and the operator also paid zero, that's agreement (both decline) — a match.
           rate_match: (us.our_rate != null && theirRate != null)
-            ? Math.abs(us.our_rate - theirRate) <= (/reliance/i.test(us.insurer_slug || '') ? 1 : 0.5)
+            ? Math.abs(us.our_rate - theirRate) <= (/reliance|chola/i.test(us.insurer_slug || '') ? 1 : 0.5)
             : (us.our_rate == null && (theirRate == null || theirRate === 0)),
         });
       }
