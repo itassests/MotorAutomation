@@ -55,8 +55,12 @@ function validateTiers(raw) {
   const out = [];
   for (let i = 0; i < raw.length; i++) {
     const t = raw[i] || {};
-    if (t.override_margin_pct == null || isNaN(Number(t.override_margin_pct))) {
-      return { ok: false, error: `tier ${i + 1}: override_margin_pct required (number)` };
+    // A tier carries EITHER uplift_pct (volume-uplift: extra outgoing %) OR
+    // override_margin_pct (legacy: absolute margin to apply at this tier).
+    const hasUp = t.uplift_pct != null && t.uplift_pct !== '' && !isNaN(Number(t.uplift_pct));
+    const hasOv = t.override_margin_pct != null && t.override_margin_pct !== '' && !isNaN(Number(t.override_margin_pct));
+    if (!hasUp && !hasOv) {
+      return { ok: false, error: `tier ${i + 1}: uplift_pct (or override_margin_pct) required (number)` };
     }
     const pmin = t.premium_min != null && t.premium_min !== '' ? Number(t.premium_min) : null;
     const pmax = t.premium_max != null && t.premium_max !== '' ? Number(t.premium_max) : null;
@@ -65,9 +69,29 @@ function validateTiers(raw) {
     if (pmin != null && pmax != null && pmin > pmax) {
       return { ok: false, error: `tier ${i + 1}: premium_min > premium_max` };
     }
-    out.push({ premium_min: pmin, premium_max: pmax, override_margin_pct: Number(t.override_margin_pct) });
+    const tier = { premium_min: pmin, premium_max: pmax };
+    if (hasUp) tier.uplift_pct = Number(t.uplift_pct);
+    if (hasOv) tier.override_margin_pct = Number(t.override_margin_pct);
+    out.push(tier);
   }
   out.sort((a, b) => (a.premium_min ?? -Infinity) - (b.premium_min ?? -Infinity));
+  return { ok: true, normalised: out };
+}
+
+/** Validate an exclusions array — each item is a flexible condition object
+ *  (same filter vocab as scope: searchInsurer / searchProduct / searchState /
+ *  searchVehicleType / … plus { online: true }). Matching cases are excluded
+ *  from both the threshold AND the uplift. Returns { ok, error?, normalised }. */
+function validateExclusions(raw) {
+  if (raw == null) return { ok: true, normalised: [] };
+  if (!Array.isArray(raw)) return { ok: false, error: 'exclusions must be an array' };
+  const out = [];
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i];
+    if (!c || typeof c !== 'object' || Array.isArray(c)) return { ok: false, error: `exclusion ${i + 1}: must be an object` };
+    if (Object.keys(c).length === 0) continue;   // empty condition → skip
+    out.push(c);
+  }
   return { ok: true, normalised: out };
 }
 
@@ -220,15 +244,16 @@ router.get('/', async (req, res, next) => {
       SELECT id, upincode, pos_name, description, filters_json,
              override_margin_pct, volume_tiers_json,
              window_type, window_from, window_to,
+             exclusions_json, apply_mode, rule_kind,
              created_at, updated_at, created_by
       FROM special_rate_rules ${where}
       ORDER BY upincode, updated_at DESC`);
+    const safeJson = (s) => { try { return s ? JSON.parse(s) : null; } catch { return null; } };
     const rules = r.recordset.map(row => ({
       ...row,
-      filters: (() => { try { return JSON.parse(row.filters_json); } catch { return null; } })(),
-      volume_tiers: row.volume_tiers_json
-        ? (() => { try { return JSON.parse(row.volume_tiers_json); } catch { return null; } })()
-        : null,
+      filters: safeJson(row.filters_json),
+      volume_tiers: safeJson(row.volume_tiers_json),
+      exclusions: safeJson(row.exclusions_json) || [],
     }));
     res.json({ success: true, rules });
   } catch (err) { next(err); }
@@ -240,6 +265,7 @@ router.post('/', async (req, res, next) => {
     const {
       upincode, pos_name, description, filters,
       override_margin_pct, volume_tiers, window,
+      exclusions, apply_mode,
       force,
     } = req.body || {};
 
@@ -274,6 +300,12 @@ router.post('/', async (req, res, next) => {
     } else if (isNaN(Number(override_margin_pct))) {
       return res.status(400).json({ success: false, error: 'override_margin_pct must be numeric' });
     }
+    // Volume-uplift extras (only meaningful for tier rules).
+    const ex = validateExclusions(exclusions);
+    if (!ex.ok) return res.status(400).json({ success: false, error: ex.error });
+    const exclusionsJson = (hasTiers && ex.normalised.length) ? JSON.stringify(ex.normalised) : null;
+    const applyMode = hasTiers ? (String(apply_mode || '').toLowerCase() === 'overall' ? 'overall' : 'per_policy') : null;
+    const ruleKind  = hasTiers ? 'volume_uplift' : 'scope_override';
 
     const pool = await getPool();
     const existing = await pool.request()
@@ -300,7 +332,10 @@ router.post('/', async (req, res, next) => {
       .input('tiers',   sql.NVarChar(sql.MAX), normalisedTiers ? JSON.stringify(normalisedTiers) : null)
       .input('wtype',   sql.VarChar(20), win.type || null)
       .input('wfrom',   sql.Date, win.from || null)
-      .input('wto',     sql.Date, win.to   || null);
+      .input('wto',     sql.Date, win.to   || null)
+      .input('excl',    sql.NVarChar(sql.MAX), exclusionsJson)
+      .input('amode',   sql.VarChar(20), applyMode)
+      .input('rkind',   sql.VarChar(20), ruleKind);
 
     if (existing.recordset.length > 0 && force) {
       const id = existing.recordset[0].id;
@@ -311,6 +346,7 @@ router.post('/', async (req, res, next) => {
                     override_margin_pct = @flat,
                     volume_tiers_json = @tiers,
                     window_type = @wtype, window_from = @wfrom, window_to = @wto,
+                    exclusions_json = @excl, apply_mode = @amode, rule_kind = @rkind,
                     updated_at = GETDATE()
                 WHERE id = @id`);
       return res.json({ success: true, id, action: 'updated' });
@@ -320,10 +356,12 @@ router.post('/', async (req, res, next) => {
       .query(`INSERT INTO special_rate_rules
                 (upincode, pos_name, description, filters_json, filter_signature,
                  override_margin_pct, volume_tiers_json,
-                 window_type, window_from, window_to)
+                 window_type, window_from, window_to,
+                 exclusions_json, apply_mode, rule_kind)
               OUTPUT INSERTED.id
               VALUES (@upin, @pos, @desc, @filters, @sig,
-                      @flat, @tiers, @wtype, @wfrom, @wto)`);
+                      @flat, @tiers, @wtype, @wfrom, @wto,
+                      @excl, @amode, @rkind)`);
     res.json({ success: true, id: ins.recordset[0].id, action: 'created' });
   } catch (err) { next(err); }
 });

@@ -327,10 +327,13 @@ BEGIN
     filters_json        NVARCHAR(MAX) NOT NULL,
     filter_signature    NVARCHAR(500) NOT NULL,
     override_margin_pct DECIMAL(6,3)  NULL,
-    volume_tiers_json   NVARCHAR(MAX) NULL,
+    volume_tiers_json   NVARCHAR(MAX) NULL,   -- [{premium_min,premium_max,uplift_pct}|{…,override_margin_pct}]
     window_type         VARCHAR(20)   NULL,
     window_from         DATE          NULL,
     window_to           DATE          NULL,
+    exclusions_json     NVARCHAR(MAX) NULL,   -- volume-uplift: [condition,…] excluded from threshold + uplift
+    apply_mode          VARCHAR(20)   NULL,   -- volume-uplift: 'per_policy' | 'overall'
+    rule_kind           VARCHAR(20)   NULL,   -- 'scope_override' | 'volume_uplift'
     created_at          DATETIME      DEFAULT GETDATE(),
     updated_at          DATETIME      DEFAULT GETDATE(),
     created_by          NVARCHAR(100) DEFAULT 'Admin',
