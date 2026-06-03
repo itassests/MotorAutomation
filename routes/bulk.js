@@ -239,24 +239,26 @@ async function loadMarginRules(pool) {
 async function loadSpecialRulesByAgent(pool) {
   const r = await pool.request().query(
     `SELECT id, upincode, filters_json, override_margin_pct, volume_tiers_json,
-            window_type, window_from, window_to
+            window_type, window_from, window_to, exclusions_json, apply_mode, rule_kind
      FROM special_rate_rules WHERE active = 1`
   );
   const idx = new Map();
+  const safe = (s, dflt) => { try { return s ? JSON.parse(s) : dflt; } catch { return dflt; } };
   for (const row of r.recordset) {
     const key = String(row.upincode || '').trim().toUpperCase();
     if (!key) continue;
     if (!idx.has(key)) idx.set(key, []);
     idx.get(key).push({
       id: row.id,
-      filters: (() => { try { return JSON.parse(row.filters_json); } catch { return {}; } })(),
+      filters: safe(row.filters_json, {}),
       override_margin_pct: row.override_margin_pct == null ? null : Number(row.override_margin_pct),
-      volume_tiers: row.volume_tiers_json
-        ? (() => { try { return JSON.parse(row.volume_tiers_json); } catch { return null; } })()
-        : null,
+      volume_tiers: safe(row.volume_tiers_json, null),
       window_type: row.window_type,
       window_from: row.window_from,
       window_to:   row.window_to,
+      exclusions: safe(row.exclusions_json, []),
+      apply_mode: row.apply_mode || 'per_policy',
+      rule_kind: row.rule_kind || (row.volume_tiers_json ? 'volume_uplift' : 'scope_override'),
     });
   }
   return idx;
@@ -312,6 +314,147 @@ function _pickUplift(list, vt, insurerSlug) {
     if (score > bestScore) { bestScore = score; best = u; }
   }
   return best ? best.uplift : 0;
+}
+
+// ── Volume-based uplift ──────────────────────────────────────────────────────
+// Does a row match a flexible condition (scope or exclusion)? `online` is
+// handled here; everything else reuses the margin filter matcher.
+function _vuMatch(ctx, cond, isOnline) {
+  const c = { ...(cond || {}) };
+  const wantsOnline = c.online === true;
+  delete c.online;
+  if (wantsOnline && !isOnline) return false;
+  const hasOther = Object.keys(c).some(k => c[k] != null && c[k] !== '' && (!Array.isArray(c[k]) || c[k].length));
+  if (hasOther && !policyMatchesMargin(ctx.params, ctx.rtoInfo, c)) return false;
+  if (!hasOther && !wantsOnline) return false;   // empty condition matches nothing
+  return true;
+}
+
+// Is a row within the rule's window? cycle/null = whole run; date_range =
+// rule bounds; month = the row's date is in the current calendar month.
+function _vuInWindow(ctx, rule) {
+  const wt = String(rule.window_type || '').toLowerCase();
+  if (!wt || wt === 'cycle') return true;
+  const d = ctx.date ? new Date(ctx.date) : null;
+  if (!d || isNaN(d)) return false;
+  if (wt === 'date_range') {
+    if (rule.window_from && d < new Date(rule.window_from)) return false;
+    if (rule.window_to && d > new Date(rule.window_to)) return false;
+    return true;
+  }
+  if (wt === 'month') {
+    const now = new Date();
+    return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
+  }
+  return true;
+}
+
+/**
+ * Apply volume-based uplift rules across the computed rows (post-pass).
+ *  - Accumulate each agent's qualifying NET premium per rule (scope match,
+ *    not excluded, within window) → pick the tier → uplift %.
+ *  - per_policy: add the uplift % to each qualifying row's outgoing.
+ *  - overall:    one lump-sum (uplift% × accumulated) returned in the summary.
+ * Mutates rows + `totals`; returns a summary array. Strips _vu from all rows.
+ */
+async function applyVolumeUplift(rows, specialRulesByAgent, totals) {
+  const summary = [];
+  try {
+    // Gather active volume-uplift rules from the loaded special-rules map.
+    const volRules = [];
+    for (const [upin, list] of specialRulesByAgent.entries()) {
+      for (const sr of list) {
+        if (sr.rule_kind === 'volume_uplift' && Array.isArray(sr.volume_tiers) && sr.volume_tiers.length) {
+          volRules.push({ upin, sr });
+        }
+      }
+    }
+    if (!volRules.length) return summary;
+
+    // Load the online tracker set only if some rule references `online`.
+    let onlineSet = null;
+    const needsOnline = volRules.some(({ sr }) =>
+      (sr.exclusions || []).some(c => c && c.online === true) ||
+      (sr.filters && sr.filters.online === true));
+    if (needsOnline) {
+      try {
+        const bee = await getBeeinsuredPool();
+        const r = await bee.request().query(
+          `SELECT DISTINCT PTrackerno FROM dbo.TRN_MotorTransactionForPrarambh WITH (NOLOCK)
+           WHERE PTrackerno IS NOT NULL AND PTrackerno <> 'DUMMY'`);
+        onlineSet = new Set(r.recordset.map(x => String(x.PTrackerno).trim().toUpperCase()));
+      } catch (e) { console.error('[bulk] volume-uplift online set load failed:', e.message); onlineSet = new Set(); }
+    }
+    const isOnlineOf = (ctx) => onlineSet ? onlineSet.has(String(ctx.tracker || '').toUpperCase()) : false;
+
+    // Index rows by agent for quick scoping.
+    const byAgent = new Map();
+    for (const row of rows) {
+      if (!row._vu) continue;
+      const a = row._vu.agent;
+      if (!a) continue;
+      if (!byAgent.has(a)) byAgent.set(a, []);
+      byAgent.get(a).push(row);
+    }
+
+    const pickTier = (tiers, accum) => {
+      const matches = tiers.filter(t =>
+        (t.premium_min == null || accum >= t.premium_min) &&
+        (t.premium_max == null || accum <= t.premium_max));
+      // Highest applicable band (tiers are sorted ascending by min).
+      return matches.length ? matches[matches.length - 1] : null;
+    };
+
+    for (const { upin, sr } of volRules) {
+      const agentRows = byAgent.get(upin);
+      if (!agentRows || !agentRows.length) continue;
+      // Qualifying rows: scope match (empty scope = all) AND not excluded AND in window.
+      const scopeKeys = Object.keys(sr.filters || {}).filter(k => k !== 'online');
+      const qualifies = (row) => {
+        const ctx = row._vu;
+        const online = isOnlineOf(ctx);
+        if (scopeKeys.length && !_vuMatch(ctx, sr.filters, online)) return false;
+        if ((sr.exclusions || []).some(c => _vuMatch(ctx, c, online))) return false;
+        if (!_vuInWindow(ctx, sr)) return false;
+        return true;
+      };
+      const qualRows = agentRows.filter(qualifies);
+      if (!qualRows.length) continue;
+      const accum = qualRows.reduce((s, r) => s + (Number(r._vu.premiumBase) || 0), 0);
+      const tier = pickTier(sr.volume_tiers, accum);
+      const upliftPct = tier && tier.uplift_pct != null ? Number(tier.uplift_pct) : 0;
+      if (!(upliftPct > 0)) continue;
+
+      if (sr.apply_mode === 'overall') {
+        const amount = +(upliftPct / 100 * accum).toFixed(2);
+        totals.outgoing += amount;
+        summary.push({ upincode: upin, special_rate_id: sr.id, apply_mode: 'overall',
+          accumulated_premium: +accum.toFixed(2), uplift_pct: upliftPct, nop: qualRows.length, amount });
+      } else {
+        let delta = 0;
+        for (const row of qualRows) {
+          const pb = Number(row._vu.premiumBase) || 0;
+          const add = +(upliftPct / 100 * pb).toFixed(2);
+          row.outgoing = +((Number(row.outgoing) || 0) + add).toFixed(2);
+          row.savings  = +((Number(row.savings)  || 0) - add).toFixed(2);
+          row.outgoing_pct = +(((Number(row.outgoing_pct) || 0)) + upliftPct).toFixed(3);
+          row.volume_uplift_pct = upliftPct;
+          row.special_rate_source = 'volume_uplift';
+          row.special_rate_id = sr.id;
+          delta += add;
+        }
+        totals.outgoing += delta;
+        totals.savings  -= delta;
+        summary.push({ upincode: upin, special_rate_id: sr.id, apply_mode: 'per_policy',
+          accumulated_premium: +accum.toFixed(2), uplift_pct: upliftPct, nop: qualRows.length, amount: +delta.toFixed(2) });
+      }
+    }
+  } catch (e) {
+    console.error('[bulk] applyVolumeUplift failed:', e.message);
+  } finally {
+    for (const row of rows) { if (row._vu) delete row._vu; }   // never persist the context
+  }
+  return summary;
 }
 
 /**
@@ -2882,11 +3025,19 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
-  return buildOutputRow(policy, params, primary, rateVal, effectiveMatched, {
+  const _vuRow = buildOutputRow(policy, params, primary, rateVal, effectiveMatched, {
     premium_base: premiumBase,
     income, savings, outgoing,
     special: specialTag,
   }, _rateRecoveryNote, stmt, pr);
+  // Context for the volume-uplift post-pass (depends on per-agent totals, so it
+  // can't run per-policy). Stripped from every row before snapshot/return.
+  _vuRow._vu = {
+    agent: _aUpin, params, rtoInfo, premiumBase,
+    tracker: String(policy.TrackerNo || '').trim(),
+    date: policy.SubmissionDate || policy.CREATED_DATE || policy.OkaytoLogDate || null,
+  };
+  return _vuRow;
 }
 
 /**
@@ -3921,6 +4072,9 @@ async function runBulkCalculate(body) {
       }
     }
   }
+  // Volume-based uplift — post-pass over all rows (needs per-agent totals).
+  // Mutates rows + totals.outgoing/savings; strips the _vu context.
+  const volumeUplifts = await applyVolumeUplift(out, specialRulesByAgent, totals);
   totals.statement_amount = +totals.statement_amount.toFixed(2);
   totals.pr_net_total   = +totals.pr_net_total.toFixed(2);
   totals.pr_gross_total = +totals.pr_gross_total.toFixed(2);
@@ -3969,7 +4123,7 @@ async function runBulkCalculate(body) {
           switch (r.status) { case 'OK':totals2.status_ok++;break;case 'EX':totals2.status_ex++;break;case 'SCR':totals2.status_scr++;break;case 'CNR':totals2.status_cnr++;break; }
         }
         for (const k of Object.keys(totals2)) if (typeof totals2[k] === 'number') totals2[k] = +totals2[k].toFixed(2);
-        return { totals: totals2, rows: keep, processed: keep.length, total_count: totalCount, limit: cap, offset: skip, permanently_excluded: dropped };
+        return { totals: totals2, rows: keep, processed: keep.length, total_count: totalCount, limit: cap, offset: skip, permanently_excluded: dropped, volume_uplifts: volumeUplifts };
       }
     }
   } catch (e) { console.error('[bulk] permanent-exclude filter skipped:', e.message); }
@@ -3977,6 +4131,7 @@ async function runBulkCalculate(body) {
   return {
     totals, rows: out, processed: out.length,
     total_count: totalCount, limit: cap, offset: skip,
+    volume_uplifts: volumeUplifts,
   };
 }
 
