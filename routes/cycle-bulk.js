@@ -1652,7 +1652,13 @@ function saveReconFile(cycleId, filePath, originalName) {
 }
 
 /** Core comparison — shared by the upload route and the re-compare route. */
-async function compareTrackersCore(cycleId, filePath, fmt, res) {
+// Parse ?compare_cycles=11,12 (or body) → extra cycle ids (excluding primary).
+function parseCompareCycles(req, primary) {
+  const raw = String((req.query && req.query.compare_cycles) || (req.body && req.body.compare_cycles) || '');
+  return [...new Set(raw.split(',').map(s => parseInt(s, 10)).filter(n => Number.isInteger(n) && n !== primary))];
+}
+
+async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = []) {
       const pool = await getPool();
 
       // Parse the uploaded file. Operator workbooks may stack a group-label
@@ -1766,12 +1772,16 @@ async function compareTrackersCore(cycleId, filePath, fmt, res) {
       }
 
       // Load our cycle snapshot.
+      // Build `ours` from the primary cycle + any extra cycles requested, so a
+      // tracker booked in another cycle (e.g. the April-1st cycle) isn't flagged
+      // missing. Primary cycle ordered LAST so it wins if a tracker is in both.
+      const cmpIds = [...new Set([...(extraCycleIds || []), cycleId])].filter(n => Number.isInteger(n));
       const dbRows = await pool.request()
-        .input('cid', sql.Int, cycleId)
         .query(`SELECT id, policy_no, row_json,
                        rate_pct_override, margin_pct_override,
                        outgoing_pct_override, excluded, note
-                FROM cycle_bulk_rows WHERE cycle_id = @cid`);
+                FROM cycle_bulk_rows WHERE cycle_id IN (${cmpIds.join(',')})
+                ORDER BY CASE WHEN cycle_id = ${cycleId} THEN 1 ELSE 0 END`);
 
       const ours = new Map();   // tracker → { our_rate, policy_no, income, ... }
       for (const r of dbRows.recordset) {
@@ -1930,7 +1940,7 @@ router.post('/:cycleId(\\d+)/compare-trackers',
       const cycleId = Number(req.params.cycleId);
       saveReconFile(cycleId, req.file.path, req.file.originalname);
       const fmt = String((req.query && req.query.format) || '').toLowerCase();
-      await compareTrackersCore(cycleId, req.file.path, fmt, res);
+      await compareTrackersCore(cycleId, req.file.path, fmt, res, parseCompareCycles(req, cycleId));
     } catch (err) { next(err); }
   }
 );
@@ -1948,7 +1958,7 @@ router.post('/:cycleId(\\d+)/recompare',
           error: 'No previously uploaded file for this cycle — upload once first.' });
       }
       const fmt = String((req.query && req.query.format) || '').toLowerCase();
-      await compareTrackersCore(cycleId, entry.path, fmt, res);
+      await compareTrackersCore(cycleId, entry.path, fmt, res, parseCompareCycles(req, cycleId));
     } catch (err) { next(err); }
   }
 );

@@ -2371,6 +2371,10 @@
             <select id="rcCycle" style="min-width:280px; padding:7px;"></select>
           </div>
           <div>
+            <label style="display:block; font-size:12px; color:#555; margin-bottom:4px;" title="Trackers found in these cycles also count as matched (Ctrl/Cmd-click to multi-select)">Also match against (optional)</label>
+            <select id="rcExtraCycles" multiple size="3" style="min-width:230px; padding:4px;"></select>
+          </div>
+          <div>
             <label style="display:block; font-size:12px; color:#555; margin-bottom:4px;">Manual Compute File (.xlsx / .csv)</label>
             <input type="file" id="rcFile" accept=".xlsx,.xls,.csv">
           </div>
@@ -12730,6 +12734,11 @@
           (_cycles || []).map(c => `<option value="${c.id}">${escapeHtml(c.name)} (${escapeHtml(c.date_from)} → ${escapeHtml(c.date_to)})</option>`).join('');
         if (cur) sel.value = cur;
       }
+      // Populate the "also match against" multi-select with the same cycles.
+      const extra = document.getElementById('rcExtraCycles');
+      if (extra) {
+        extra.innerHTML = (_cycles || []).map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+      }
       const file = document.getElementById('rcFile');
       const updateBtn = async () => {
         document.getElementById('rcRunBtn').disabled = !(sel.value && file.files.length);
@@ -12751,6 +12760,14 @@
       updateBtn();
     }
 
+    // Extra cycles selected in "also match against", as a query string fragment.
+    function rcExtraCyclesQS(primary) {
+      const sel = document.getElementById('rcExtraCycles');
+      if (!sel) return '';
+      const ids = [...sel.selectedOptions].map(o => o.value).filter(v => v && v !== String(primary));
+      return ids.length ? ('?compare_cycles=' + ids.join(',')) : '';
+    }
+
     async function rcRecompare() {
       const cycleId = document.getElementById('rcCycle').value;
       if (!cycleId) { showToast('Pick a cycle', 'error'); return; }
@@ -12759,7 +12776,7 @@
       btn.disabled = true;
       status.textContent = 'Re-comparing against last uploaded file…';
       try {
-        const res = await fetch(API + '/cycle-bulk/' + cycleId + '/recompare', { method: 'POST' });
+        const res = await fetch(API + '/cycle-bulk/' + cycleId + '/recompare' + rcExtraCyclesQS(cycleId), { method: 'POST' });
         const j = await res.json();
         if (!res.ok || !j.success) throw new Error(j.error || ('HTTP ' + res.status));
         _rcData = j;
@@ -12789,7 +12806,7 @@
       try {
         const fd = new FormData();
         fd.append('file', file);
-        const res = await fetch(API + '/cycle-bulk/' + cycleId + '/compare-trackers', {
+        const res = await fetch(API + '/cycle-bulk/' + cycleId + '/compare-trackers' + rcExtraCyclesQS(cycleId), {
           method: 'POST', body: fd,
         });
         const j = await res.json();
