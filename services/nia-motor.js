@@ -38,9 +38,19 @@ function resolveNiaMotorRate(p) {
   let od = null, tp = null;          // commission legs (percent)
 
   if (vt === 'CAR' || vt === '4W' || vt === 'PC' || vt === 'PVT.CAR') {
+    // Regional OD-leg uplift: Maharashtra & Karnataka carry a HIGHER Pvt-Car
+    // OD-commission leg (30 vs the 20 base) on Package/Comp policies, so the
+    // operator pays 45 (30+15, 1-10yr) / 43 (30+12.5, >10yr) there versus the
+    // 35 / 32.5 base in every other state. Verified vs operator file (cycle
+    // 12+11): MH 50 uplifted / 5 base (the 5 = operator noise), KA 4 / 0; all
+    // other states (PB/UP/RJ/HR/TN/DL) stay at base. Scoped to the Comp legs —
+    // SAOD/SATP and the new-vehicle (age 0) bundled band keep the base legs so
+    // the already-matched 20→20 / 40→40 cases don't regress.
+    const stPfx = (String(p.rtoCode || '').toUpperCase().match(/^[A-Z]+/) || [''])[0];
+    const odComp = (stPfx === 'MH' || stPfx === 'KA') ? 30 : 20;
     if (age === 0)        { od = 25; tp = 15; }   // New vehicle – Bundled (1+3)
-    else if (age != null && age <= 10) { od = 20; tp = 15; } // 1–10 yr Package
-    else                  { od = 20; tp = 12.5; } // Above 10 yr
+    else if (age != null && age <= 10) { od = odComp; tp = 15; } // 1–10 yr Package
+    else                  { od = odComp; tp = 12.5; } // Above 10 yr
     if (isSaod) { od = (age != null && age > 10) ? 5 : 20; tp = null; }
     if (isTp)   { od = null; tp = 15; }            // Stand-Alone TP = 15 flat
   } else if (vt === 'TW' || vt === '2W') {
