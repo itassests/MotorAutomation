@@ -1934,6 +1934,27 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         : r);
   }
 
+  // Kotak MISC Tractor — Uttar Pradesh uniform top-tier. Kotak's tractor grid is
+  // district-tiered (0.30-0.475); within UP it splits western-UP/Kanpur-Lucknow
+  // (0.47-0.475) vs eastern-UP districts (0.40, e.g. Sultanpur/Jaunpur/Ayodhya/
+  // Ambedkar Nagar/Amethi/Barabanki). But the operator pays ~48 to ALL UP tractors
+  // — verified vs operator file (cycle 12+11): 6/6 western-UP (0.475) match 48,
+  // 12/12 eastern-UP (0.40) miss at 48. So the eastern-UP 0.40 tier is too low;
+  // bump every UP tractor COMP rule below 0.475 up to 0.475 (→47.5, within ±0.5 of
+  // 48). The already-0.475 western-UP rows are left alone (zero-regression). Scoped
+  // Kotak + MISC + Tractor + UP state; other states (no tractor data) untouched.
+  if (insurerSlug === 'kotak' &&
+      String(params.vehicleType || '').toUpperCase() === 'MISC' &&
+      String(rtoStatePrefix(params.rtoCode) || '').toUpperCase() === 'UP' &&
+      rules.length > 0) {
+    rules = rules.map(r =>
+      (/tractor/i.test(String(r.segment || '')) &&
+       /^COMP$/i.test(String(r.rate_type || '')) &&
+       Number(r.rate_value) < 0.475)
+        ? { ...r, rate_value: 0.475, _kotakUpTractorOverride: true }
+        : r);
+  }
+
   // Royal Sundaram EV STP grid (sheet "EV STP", region "All Geos"): a flat
   // standalone-TP commission for ELECTRIC vehicles, split by class —
   //   PCV 3-wheeler (= E-Rickshaw) 0.54 | PCV 4-wheeler 0.47 |
