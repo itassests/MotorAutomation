@@ -2904,6 +2904,12 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
 
   let rateVal = Number(primary.rate_value || 0);
   if (rateVal > 1) rateVal = rateVal / 100;
+  // Universal Sompo GCV — operator pays a uniform +1% over the grid (confirmed
+  // via file recon: every GCV rate is exactly our grid + 1%). Insurer+product
+  // scoped, applied to the resolved (non-zero) rate.
+  if (insurerSlug === 'universal_sompo' && String(params.vehicleType || '').toUpperCase() === 'GCV' && rateVal > 0) {
+    rateVal = +(rateVal + 0.01).toFixed(6);
+  }
   const premiumBase = premiumBaseFor(params, primary.rate_type);
   // OD+TP rates: when a rule carries SEPARATE OD and TP commission legs
   // (rule.od_rate / rule.tp_rate, as fractions), the commission is OD% applied
