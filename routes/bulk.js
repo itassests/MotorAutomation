@@ -1910,6 +1910,30 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     return buildOutputRow(policy, params, null, null, null, null, noteD, stmtD, prD);
   }
 
+  // Shriram TW Bike — Maharashtra rate-region fix. The Shriram Bike grid carries
+  // THREE overlapping Maharashtra region definitions (different source sheets,
+  // conflicting values): "MUMBAI (Excl MH-01,48)/GOA"=35, "ROM"=25, and
+  // "MUMBAI (Excl MH-01,48)/ROM/GOA"=20. Region resolution lands rural-MH bikes
+  // on plain "ROM" (25), but the operator pays 35 to ALL Maharashtra bikes —
+  // verified vs operator file (cycle 12+11): 21/21 MH bikes paid 35/40, NONE at
+  // 20/25, across rural districts (MH39/MH28/MH21/MH30/MH18) not just Mumbai. Bump
+  // every Bike PACK rule below 35 to 35 so whichever tenure variant pickPrimary
+  // selects carries the operator-correct rate. Scoped to Shriram + TW + Bike + MH
+  // state (Gujarat 38 and all other insurers untouched); zero-regression because
+  // no MH bike is paid 20/25 and an already-35 rule is left alone. SATP bike rows
+  // (SATP_SHRIRAM, separate cover) are NOT touched.
+  if (insurerSlug === 'shriram' &&
+      String(params.vehicleType || '').toUpperCase() === 'TW' &&
+      String(rtoStatePrefix(params.rtoCode) || '').toUpperCase() === 'MH' &&
+      rules.length > 0) {
+    rules = rules.map(r =>
+      (/bike/i.test(String(r.sub_type || r.segment || '')) &&
+       /PACK_SHRIRAM/i.test(String(r.rate_type || '')) &&
+       Number(r.rate_value) < 35)
+        ? { ...r, rate_value: 35, _mhBikeOverride: true }
+        : r);
+  }
+
   // Royal Sundaram EV STP grid (sheet "EV STP", region "All Geos"): a flat
   // standalone-TP commission for ELECTRIC vehicles, split by class —
   //   PCV 3-wheeler (= E-Rickshaw) 0.54 | PCV 4-wheeler 0.47 |
