@@ -3124,6 +3124,28 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     rules = [clone];
   }
 
+  // ---- Magma MISC construction-equipment → "CE Construction" segment ----
+  // Magma files MISC-D in two flavours: garbage vehicles and Construction
+  // Equipment ("CE Construction"). JCBs, excavators, loaders, graders, backhoes
+  // etc. are CONSTRUCTION equipment (USER-confirmed "JCB is part of construction")
+  // but they match the generic "MISC-D" segment (e.g. DL6/9560 JCB → MISC-D 0.21
+  // instead of CE Construction). Detect construction equipment by make/model and
+  // re-query the "CE Construction" segment; the highest-volume override below then
+  // picks the top slab (SATP Above 2L 0.20 for DL NCR = operator 20). Magma+MISC.
+  if (insurerSlug === 'magma_hdi' &&
+      ['MISC', 'MIS'].includes(String(params.vehicleType || '').toUpperCase())) {
+    const hay = `${params.make || ''} ${params.model || ''} ${params.vehicleCategory || ''}`.toUpperCase();
+    const isCE = /\bJCB\b|EXCAVAT|\bLOADER\b|BACKHOE|GRADER|\bDOZER\b|\bCRANE\b|FORK\s*LIFT|FORKLIFT|POCLAIN|BOBCAT|COMPACTOR|\bPAVER\b|\bCONSTRUCTION\b/.test(hay);
+    if (isCE) {
+      const ceKey = lookupKey + '||magmaCE';
+      let ceRules;
+      if (caches.lookup.has(ceKey)) ceRules = caches.lookup.get(ceKey);
+      else { ceRules = await lookupRates(pool, { ...baseLookup, segment: 'CE Construction' }); caches.lookup.set(ceKey, ceRules); }
+      const cePick = ceRules.filter(r => /CE\s*Construction/i.test(String(r.segment || '')) && Number(r.rate_value) > 0);
+      if (cePick.length > 0) rules = cePick;
+    }
+  }
+
   // ---- Magma always-highest volume-tier override ----
   // Magma's grids band the rate by a premium/IDV VOLUME slab ("Upto 2L"/"Above
   // 2L" for SATP; "Upto 5L"/"5L-18L"/"18L-30L"/"Above 30L" for Comp). The slab is
