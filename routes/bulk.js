@@ -3111,37 +3111,43 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
-  // ---- Oriental new-vehicle bundled (1+5) TW OD+TP sum ----
-  // Oriental's grid (image, USER-confirmed): a NEW two-wheeler sold as a Bundled
-  // Policy pays "20% on OD premium + 80% on TP Premium" for the 1st year. The two
-  // legs are ingested as TWO separate COMP_1+5 rows (rate_value 0.20 and 0.80,
-  // both age 0-0, segment "TW"). The operator's tracker reports the headline as the
-  // SUM of the legs (20+80 = 100), same convention as New India / National. But
-  // filterRulesByPolicy collapses COMP_1+5 to ONE surviving row, so the engine
-  // surfaced only one leg (0.20 = 20). Re-read both legs and sum: rate_value = 100
-  // (operator match); od_rate/tp_rate = the legs so income = 20%×OD + 80%×TP.
+  // ---- Oriental new-vehicle BUNDLED OD+TP sum (all vehicle types) ----
+  // Oriental's grid (image, USER-confirmed): a NEW vehicle sold as a Bundled Policy
+  // pays an OD-leg % on OD premium + a TP-leg % on TP premium for the 1st year, and
+  // the operator's tracker reports the headline as the SUM of the two legs (same
+  // convention as New India / National). Each bundled product is ingested as TWO
+  // separate rows under ONE bundled rate_type, both age 0-0:
+  //   TW  "New Bundled (1+5)"  COMP_1+5 = 0.20 (OD) + 0.80 (TP) → 100
+  //   CAR "New Bundled (1+3)"  COMP_1+3 = 0.30 (OD) + 0.50 (TP) →  80
+  // filterRulesByPolicy collapses each rate_type to ONE surviving row, so the engine
+  // surfaced only one leg (e.g. 0.20). USER rule: "all vehicle types where OD and TP
+  // are defined separately → apply OD + TP." This fires ONLY when the matched pool
+  // carries a bundled COMP_1+N rate_type (a genuine two-leg new-vehicle product) —
+  // regular Package (single COMP row) and Liability (SATP) policies are untouched, so
+  // the 36 Comp-package matches (operator pays COMP-only, e.g. CAR 15 / GCV 55) and
+  // the SATP/SAOD matches stay intact. Re-read both legs and sum.
   if (insurerSlug === 'oriental_insurance' &&
-      /^(TW|2W)$/.test(String(params.vehicleType || '').toUpperCase()) &&
       (Number(params.vehicleAge) || 0) === 0 &&
-      rules.some(r => /1\+5/.test(String(r.rate_type || '')))) {
+      rules.some(r => /^COMP_1\+\d/i.test(String(r.rate_type || '')))) {
     try {
-      const obKey = lookupKey + '||orientalTw15';
+      const bundledRt = String((rules.find(r => /^COMP_1\+\d/i.test(String(r.rate_type || ''))) || {}).rate_type || '').toUpperCase();
+      const obKey = lookupKey + '||orientalBundle:' + bundledRt;
       let obRules;
       if (caches.lookup.has(obKey)) obRules = caches.lookup.get(obKey);
       else { obRules = await lookupRates(pool, { ...baseLookup, ins_product: '', vehicle_age: null }); caches.lookup.set(obKey, obRules); }
       const legs = obRules
-        .filter(r => /COMP_1\+5/i.test(String(r.rate_type || '')))
+        .filter(r => String(r.rate_type || '').toUpperCase() === bundledRt)
         .map(r => Number(r.rate_value) || 0)
         .filter(v => v > 0);
       if (legs.length >= 2) {
         const sum   = legs.reduce((a, b) => a + b, 0);
-        const odLeg = Math.min(...legs);   // 20% OD leg
-        const tpLeg = Math.max(...legs);   // 80% TP leg
-        const base = rules.find(r => /1\+5/.test(String(r.rate_type || ''))) || rules[0];
-        const clone = { ...base, rate_type: base.rate_type || 'COMP_1+5',
+        const odLeg = Math.min(...legs);   // OD leg (smaller %)
+        const tpLeg = Math.max(...legs);   // TP leg (larger %)
+        const base = rules.find(r => String(r.rate_type || '').toUpperCase() === bundledRt) || rules[0];
+        const clone = { ...base, rate_type: base.rate_type || bundledRt,
           rate_value: +sum.toFixed(4), is_declined: 0,
           od_rate: +odLeg.toFixed(4), tp_rate: +tpLeg.toFixed(4),
-          segment: (base.segment || 'TW') + ' (Oriental 1+5 OD+TP)' };
+          segment: (base.segment || params.vehicleType || '') + ' (Oriental bundled OD+TP)' };
         rules = [clone, ...rules.filter(r => r !== base)];
       }
     } catch (_) { /* leave rules unchanged on any failure */ }
