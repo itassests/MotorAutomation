@@ -1406,7 +1406,23 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       else { gRules = await lookupRates(pool, { ...baseLookup, ins_product: 'Comp', region: '', cluster: '', region_list: null, sub_type: v }); caches.lookup.set(gKey, gRules); }
       const vN = v.replace(/[^A-Z0-9]/g, '');
       const gExact = gRules.filter(r => String(r.sub_type || '').toUpperCase().replace(/[^A-Z0-9]/g, '') === vN);
-      const gFiltered = gExact.length > 0 ? filterRulesByPolicy(gExact, params) : [];
+      // Minimal band + make filter — do NOT use filterRulesByPolicy here: it drops
+      // COMP rows for a TP-only policy (cover gate), but Kotak files GCV COMP-only
+      // and the operator pays that rate regardless of cover. Pick the weight band
+      // from tonnage; honour make-exclusion (rows are make="All" wildcard or a
+      // specific excluded make at 0%). Needs a tonnage to band — tonnage-less rows
+      // match no band and stay no-rule (acceptable).
+      const gTon = Number(params.tonnage);
+      const polMake = String(params.make || '').toUpperCase().replace(/[^A-Z]/g, '');
+      const gFiltered = (Number.isFinite(gTon) ? gExact.filter(r => {
+        const wmin = r.weight_band_min, wmax = r.weight_band_max;
+        if (wmin != null && !(gTon >= Number(wmin))) return false;
+        if (wmax != null && !(gTon <= Number(wmax))) return false;
+        const mk = String(r.make || '').toUpperCase();
+        if (mk && !/^(ALL|ANY|OTHERS?|)$/.test(mk) &&
+            mk.replace(/[^A-Z]/g, '') !== polMake) return false;
+        return true;
+      }) : []);
       if (gFiltered.length > 0) { rules = gFiltered; break; }
     }
   }
