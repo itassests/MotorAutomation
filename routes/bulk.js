@@ -1450,12 +1450,21 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       if (caches.lookup.has(iKey)) iRules = caches.lookup.get(iKey);
       else {
         iRules = await lookupRates(pool, { insurer: 'iffco_tokio', product: 'GCV',
-          region: stName, segment: 'GCV (Other than A1)', volume_tier: '3L-6L' });
+          region: stName, volume_tier: '3L-6L' });
         caches.lookup.set(iKey, iRules);
       }
-      const iPick = iRules.filter(r => /Other than A1/i.test(String(r.segment || '')) &&
-        /3L\s*-\s*6L/i.test(String(r.volume_tier || '')));
-      if (iPick.length > 0) { rules = [iPick[0]]; resolvedRegion = stName; params.resolvedRegion = stName; }
+      // The goods rate for a state lives under whichever zone segment is non-zero:
+      // "GCV (Public)" for A1 states (e.g. Tamil Nadu), "GCV (Other than A1)" for
+      // A2/A3/A4 states (e.g. Rajasthan). Take the middle (3L-6L) slab and pick the
+      // highest NON-ZERO goods rate across those segments — both land on 0.175.
+      const iPick = iRules.filter(r =>
+        /GCV \((Public|Other than A1|Private)\)/i.test(String(r.segment || '')) &&
+        /3L\s*-\s*6L/i.test(String(r.volume_tier || '')) &&
+        Number(r.rate_value) > 0);
+      if (iPick.length > 0) {
+        const best = iPick.reduce((a, b) => Number(b.rate_value) > Number(a.rate_value) ? b : a);
+        rules = [best]; resolvedRegion = stName; params.resolvedRegion = stName;
+      }
     }
   }
   }
