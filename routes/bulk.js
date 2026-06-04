@@ -3124,27 +3124,33 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     rules = [clone];
   }
 
-  // ---- Magma GCV "Above 2L" slab override ----
-  // Magma's GCV SATP grid splits by premium slab "Upto 2L" / "Above 2L". The slab
-  // is mis-selected from the (small) TP premium → "Upto 2L", but for GCV the
-  // operator always rates on the "Above 2L" slab (truck sum-insured is always
-  // > 2L). USER-confirmed: take the >2L rate for all cases. When the pool sits on
-  // an "Upto 2L" row, re-query the "Above 2L" row for the same segment and swap
-  // it in. Scoped Magma + GCV; the 8 such policies were ALL mismatched on Upto-2L
-  // (0 matched), so zero regression.
-  if (insurerSlug === 'magma_hdi' &&
-      String(params.vehicleType || '').toUpperCase() === 'GCV' &&
-      rules.some(r => /upto\s*2L/i.test(String(r.volume_tier || '')))) {
-    const upRule = rules.find(r => /upto\s*2L/i.test(String(r.volume_tier || '')));
-    const seg = String(upRule && upRule.segment || '');
-    const aKey = lookupKey + '||magmaAbove2L:' + seg;
-    let aRules;
-    if (caches.lookup.has(aKey)) aRules = caches.lookup.get(aKey);
-    else { aRules = await lookupRates(pool, { ...baseLookup, volume_tier: 'Above 2L' }); caches.lookup.set(aKey, aRules); }
-    const aPick = aRules.filter(r => /above\s*2L/i.test(String(r.volume_tier || '')) &&
-      String(r.segment || '') === seg && Number(r.rate_value) > 0);
-    if (aPick.length > 0) {
-      rules = rules.filter(r => !/upto\s*2L/i.test(String(r.volume_tier || ''))).concat([aPick[0]]);
+  // ---- Magma always-highest volume-tier override ----
+  // Magma's grids band the rate by a premium/IDV VOLUME slab ("Upto 2L"/"Above
+  // 2L" for SATP; "Upto 5L"/"5L-18L"/"18L-30L"/"Above 30L" for Comp). The slab is
+  // mis-selected from the (small) policy premium → the LOWEST tier, but the
+  // operator always rates on the HIGHEST volume tier. USER-confirmed: "always take
+  // higher volume in Magma." Re-query all volume tiers for the matched segment
+  // (same cover via baseLookup.ins_product) and swap in the highest-rate row.
+  // Scoped Magma + COMMERCIAL products (GCV/MISC/PCV) — for these the volume slab
+  // is premium/tonnage-based and the operator rates on the top slab. NOT Pvt-Car
+  // or TW: their volume band is discount/IDV-based and "always highest" over-rates
+  // (e.g. CAR 43 vs operator 28). Only acts when the pool sits on a volume-tier row.
+  if (insurerSlug === 'magma_hdi' && rules.length > 0 &&
+      ['GCV', 'MISC', 'MIS', 'PCV'].includes(String(params.vehicleType || '').toUpperCase()) &&
+      rules.some(r => String(r.volume_tier || '').trim() !== '')) {
+    const segRule = rules.find(r => String(r.volume_tier || '').trim() !== '');
+    const seg = String(segRule && segRule.segment || '');
+    const hvKey = lookupKey + '||magmaHiVol:' + seg;
+    let hvRules;
+    if (caches.lookup.has(hvKey)) hvRules = caches.lookup.get(hvKey);
+    else { hvRules = await lookupRates(pool, { ...baseLookup, volume_tier: '' }); caches.lookup.set(hvKey, hvRules); }
+    const cand = hvRules.filter(r => String(r.segment || '') === seg &&
+      String(r.volume_tier || '').trim() !== '' && Number(r.rate_value) > 0);
+    if (cand.length > 0) {
+      const best = cand.reduce((a, b) => Number(b.rate_value) > Number(a.rate_value) ? b : a);
+      if (Number(best.rate_value) > Number(segRule.rate_value || 0)) {
+        rules = rules.filter(r => !(String(r.segment || '') === seg && String(r.volume_tier || '').trim() !== '')).concat([best]);
+      }
     }
   }
 
