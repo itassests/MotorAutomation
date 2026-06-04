@@ -564,7 +564,7 @@ async function loadPrIndex(pool) {
   const r = await pool.request().query(
     `SELECT pr.policy_no, pr.vehicle_no, pr.od_premium, pr.addon_premium, pr.tp_premium,
             pr.net_amount, pr.gross_amount, pr.sum_insured, pr.ncb, pr.fuel_type, pr.cc,
-            pr.product, pr.raw_json,
+            pr.tonnage, pr.product, pr.raw_json,
             pr.upload_id, u.insurer_label, u.month, u.year
      FROM pr_rows pr
      INNER JOIN pr_uploads u ON u.id = pr.upload_id
@@ -1010,6 +1010,31 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       // checks key off the real GVW.
       params.tonnageMin = t;
       params.tonnageMax = t;
+    }
+  }
+
+  // Tonnage fallback #2 — Premium Register (pr_rows.tonnage). When the Prarambh
+  // GVW lookup above yields nothing (no mainId, or TRN row lacks GVW), the policy
+  // arrives with tonnage=null and every weight-banded GCV rule is filtered out
+  // (→ no rule / wrong band). The operator's PR file usually carries the
+  // registered GVW, so take it from there. Per product owner: "wherever tonnage
+  // is missing, take it from PR; if not found there, move on." Only fills a
+  // genuinely-missing/coarse value — a precise Prarambh GVW already set above is
+  // left intact.
+  if ((params.tonnage == null || params.tonnageCoarse) && prIndex && params._policy_no) {
+    const pkT = String(params._policy_no).trim().toUpperCase();
+    let prT = prIndex.get(pkT) || null;
+    if (!prT) {
+      for (const stripped of policyKeyVariants(params._policy_no)) {
+        prT = prIndex.get(stripped); if (prT) break;
+      }
+    }
+    const ton = prT && prT.tonnage != null ? Number(prT.tonnage) : null;
+    if (ton != null && Number.isFinite(ton) && ton > 0) {
+      params.tonnage = ton;
+      params.tonnageCoarse = false;
+      params.tonnageMin = ton;
+      params.tonnageMax = ton;
     }
   }
 
