@@ -1380,6 +1380,37 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // ---- Kotak GCV (LCV) exact-RTO override ----
+  // Kotak files GCV commission as COMP-only, keyed by sub_type=RTO code, in two
+  // duplicate segments — "LCV" (<7.5T: bands ≤2.5 / 2.5-3.5 / 3.5-7.5) and "GCV"
+  // (heavier bands) — with the band rate varying by RTO Category (e.g. HOWRAH
+  // WB11 = 45 / 42 / 35). There is NO TP rate, so a TP-only GCV (od=0) finds
+  // nothing under the TP lookup, and an unmapped RTO (WB11 has no Kotak
+  // rto_mapping) never region-matches the rows. Re-query by sub_type = the
+  // policy RTO with ins_product=Comp (so TP-only also gets the COMP rate the
+  // operator pays) and region cleared; the weight band then resolves from the
+  // Prarambh tonnage (Tonnes column). Scoped Kotak + GCV. Only replaces the pool
+  // when the exact-RTO query yields filtered rows (else leaves existing/no-rule).
+  if (insurerSlug === 'kotak' &&
+      String(params.vehicleType || '').toUpperCase() === 'GCV' &&
+      params.rtoCode) {
+    const grRaw = String(params.rtoCode).trim().toUpperCase().replace(/\s+/g, '');
+    const grVars = new Set([grRaw]);
+    const grM = grRaw.match(/^([A-Z]{2})0*(\d+)([A-Z]*)$/);
+    if (grM) { const [, st, num, suf] = grM; const n = String(parseInt(num, 10));
+      grVars.add(st + n + suf); grVars.add(st + n.padStart(2, '0') + suf); }
+    for (const v of grVars) {
+      const gKey = lookupKey + '||kotakGcvRto:' + v;
+      let gRules;
+      if (caches.lookup.has(gKey)) gRules = caches.lookup.get(gKey);
+      else { gRules = await lookupRates(pool, { ...baseLookup, ins_product: 'Comp', region: '', cluster: '', region_list: null, sub_type: v }); caches.lookup.set(gKey, gRules); }
+      const vN = v.replace(/[^A-Z0-9]/g, '');
+      const gExact = gRules.filter(r => String(r.sub_type || '').toUpperCase().replace(/[^A-Z0-9]/g, '') === vN);
+      const gFiltered = gExact.length > 0 ? filterRulesByPolicy(gExact, params) : [];
+      if (gFiltered.length > 0) { rules = gFiltered; break; }
+    }
+  }
+
   // SAOD second-pass — when SAOD-specific patterns yield 0 rules, retry as
   // Comp.  Per user's spec ("if SAOD has no rule, consider COMP for the
   // same combination") — Digit (and others) don't carry a dedicated SAOD
