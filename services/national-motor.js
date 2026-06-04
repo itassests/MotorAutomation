@@ -38,20 +38,20 @@ function resolveNationalMotorRate(p) {
 
   // National pays per the two Commission legs (OD, TP):
   //   SAOD → OD leg, SATP → TP leg.
-  //   Comp/Package → ALWAYS the SUM (OD + TP), including when the two legs are
-  //   equal. USER-confirmed (the grid is the source of truth): e.g. GCV >48T
-  //   Comp 1yr OD 2.5 + TP 2.5 = 5; CAR ≤10 20/20 = 40; GCV mid 15/15 = 30.
-  //   (An earlier "equal legs pay the single value" heuristic was wrong and is
-  //   removed — National sums the legs even where the operator file deviates.)
-  // out(od, tp) → { rate, od, tp }: `rate` is the headline (SAOD→OD leg,
-  // SATP→TP leg, Comp→OD+TP); `od`/`tp` are the per-leg commission % for the
-  // OD%-on-OD-premium + TP%-on-TP-premium income calc. For SATP the OD leg is 0
-  // (TP-only) and vice-versa.
+  //   Comp/Package → if the two legs are EQUAL, pay that single value; if they
+  //   DIFFER, pay the SUM (OD + TP). USER-confirmed across CAR (20/20→20),
+  //   PCV Taxi (20/15→35), GCV ≤3.5T (25/45→70), GCV mid (15/15→15), GCV
+  //   16.5-34T New (15/17.5→32.5). (The earlier premium-blend was wrong.)
+  // out(od, tp) → { rate, od, tp }: `rate` is the headline for operator
+  // rate-matching (SAOD→OD leg, SATP→TP leg, Comp→equal legs pay the single
+  // value, differing legs pay the SUM); `od`/`tp` are the per-leg commission %
+  // for the OD%-on-OD-premium + TP%-on-TP-premium income calc. For SATP the OD
+  // leg is 0 (TP-only) and vice-versa.
   const out = (od, tp) => {
     od = od || 0; tp = tp || 0;
     if (isSaod) return { rate: od, od, tp: 0 };
     if (isTp)   return { rate: tp, od: 0, tp };
-    return { rate: od + tp, od, tp };
+    return { rate: (od === tp ? od : od + tp), od, tp };
   };
 
   if (vt === 'CAR' || vt === '4W' || vt === 'PC' || vt === 'PVT.CAR') {
