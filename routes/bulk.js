@@ -2953,6 +2953,15 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     rules = [clone];
   }
 
+  // ---- All-insurer IDV gate ----
+  // USER-confirmed common rule (every insurer): when the vehicle IDV exceeds
+  // ₹50 lakh, do NOT apply any commission rule — high-value risks are referred /
+  // handled separately, so the engine must not auto-rate them. Clearing the pool
+  // routes the row through the no-primary path with a clear note (below). IDV is
+  // in rupees (50L = 5,000,000); exactly 50L is NOT blocked (strict >).
+  const idvOver50L = params.idv != null && Number(params.idv) > 5000000;
+  if (idvOver50L) rules = [];
+
   const primary = pickPrimaryRateRule(rules);
   if (!primary) {
     // Still try to surface the statement + PR amounts if we have them.
@@ -2994,6 +3003,11 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       why = `${initialSqlCount} SQL rule(s) found but none survived policy filter (age/fuel/make/seating/tonnage)`;
     } else if (!rtoInfo) {
       why = 'RTO not mapped — ' + (params.rtoCode || '(blank)') + ' has no region/cluster entry';
+    }
+    // All-insurer IDV gate takes precedence over any other no-rule reason.
+    if (idvOver50L) {
+      why = 'IDV > ₹50L — rule not applied (all-insurer rule)';
+      bits.push(`idv=${Math.round(Number(params.idv))}`);
     }
     why += ' — ' + bits.join(', ');
     // If the recovery block flagged this as declined-by-insurer, surface that
