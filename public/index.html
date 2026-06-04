@@ -2400,7 +2400,7 @@
 
       <!-- KPI summary -->
       <div id="rcKpis" class="card" style="display:none;">
-        <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:12px;">
+        <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:12px;">
           <div style="background:#f0f6ff; border-radius:8px; padding:12px; text-align:center;">
             <div style="font-size:12px; color:#555;">File Trackers</div>
             <div id="rcKpiExcel" style="font-size:22px; font-weight:600; color:#0a3d62;">—</div>
@@ -2424,6 +2424,10 @@
           <div style="background:#eafaf0; border-radius:8px; padding:12px; text-align:center;">
             <div style="font-size:12px; color:#555;">Rate Match / Mismatch</div>
             <div id="rcKpiRate" style="font-size:22px; font-weight:600; color:#1b5e20;">—</div>
+          </div>
+          <div style="background:#eef2ff; border-radius:8px; padding:12px; text-align:center;" title="Records you manually marked &quot;As per Grid&quot; — our rate is correct per the grid; the file figure is the deviation. Counted as matched.">
+            <div style="font-size:12px; color:#555;">As per Grid</div>
+            <div id="rcKpiGrid" style="font-size:22px; font-weight:600; color:#3949ab;">—</div>
           </div>
         </div>
       </div>
@@ -12703,6 +12707,7 @@
     let _rcView = 'rate';          // 'rate' | 'missOurs' | 'missExcel'
     let _rcIgnored = new Set();    // tracker keys the user ignored (persisted per cycle)
     let _rcIgnoreNotes = {};       // tracker -> { note, ts } reason captured on ignore (persisted per cycle)
+    let _rcGrid = new Set();       // tracker keys marked "As per Grid" — our rate is correct per the grid; the file figure is the operator deviation. Counts as matched. (persisted per cycle)
 
     // Ignores persist per cycle in localStorage so they survive Re-compare
     // and page reloads.
@@ -12714,15 +12719,22 @@
       const cid = document.getElementById('rcCycle').value || '0';
       return 'rx.reconcile.ignorenotes.' + cid;
     }
+    function rcGridKey() {
+      const cid = document.getElementById('rcCycle').value || '0';
+      return 'rx.reconcile.aspergrid.' + cid;
+    }
     function rcLoadIgnores() {
       try { _rcIgnored = new Set(JSON.parse(localStorage.getItem(rcIgnoreKey()) || '[]')); }
       catch (_) { _rcIgnored = new Set(); }
       try { _rcIgnoreNotes = JSON.parse(localStorage.getItem(rcNotesKey()) || '{}') || {}; }
       catch (_) { _rcIgnoreNotes = {}; }
+      try { _rcGrid = new Set(JSON.parse(localStorage.getItem(rcGridKey()) || '[]')); }
+      catch (_) { _rcGrid = new Set(); }
     }
     function rcSaveIgnores() {
       try { localStorage.setItem(rcIgnoreKey(), JSON.stringify([..._rcIgnored])); } catch (_) {}
       try { localStorage.setItem(rcNotesKey(), JSON.stringify(_rcIgnoreNotes)); } catch (_) {}
+      try { localStorage.setItem(rcGridKey(), JSON.stringify([..._rcGrid])); } catch (_) {}
     }
 
     function rcInit() {
@@ -12843,16 +12855,23 @@
       // of the matched were genuine mismatches folded in via Ignore, so the
       // count is transparent.
       const rc = _rcData.rate_comparison || [];
-      let matched = 0, unmatched = 0, ignored = 0;
+      let matched = 0, unmatched = 0, ignored = 0, grid = 0;
       for (const r of rc) {
         if (r.excluded) continue;
         const isIgnored = _rcIgnored.has(r.tracker);
+        const isGrid = _rcGrid.has(r.tracker);
         if (r.rate_match) matched++;
         else if (isIgnored) { matched++; ignored++; }   // ignored mismatch → counts as match
+        else if (isGrid)    { matched++; grid++; }       // "As per Grid" mismatch → our rate correct, counts as match
         else unmatched++;
       }
+      const tags = [];
+      if (ignored) tags.push(ignored + ' ignored');
+      if (grid)    tags.push(grid + ' as-per-grid');
       document.getElementById('rcKpiRate').textContent =
-        matched + ' / ' + unmatched + (ignored ? ' (' + ignored + ' ignored)' : '');
+        matched + ' / ' + unmatched + (tags.length ? ' (' + tags.join(', ') + ')' : '');
+      const gridEl = document.getElementById('rcKpiGrid');
+      if (gridEl) gridEl.textContent = grid;
     }
 
     function rcPopulateInsurers() {
@@ -12901,10 +12920,15 @@
       const body = document.getElementById('rcBody');
       const esc = (v) => v == null ? '' : escapeHtml(String(v));
       const ignoreBtn = (t) => `<button class="btn btn-sm btn-outline" style="padding:1px 8px;" onclick="rcIgnore('${escapeAttr(t)}')">Ignore</button>`;
+      const gridBtn = (t) => {
+        const on = _rcGrid.has(t);
+        return `<button class="btn btn-sm ${on ? 'btn-primary' : 'btn-outline'}" style="padding:1px 8px;${on ? 'background:#3949ab; border-color:#3949ab;' : ''}" title="${on ? 'Marked As per Grid — click to unmark' : 'Mark As per Grid — our rate is correct per the grid; the file figure is the operator deviation. Counts as matched.'}" onclick="rcToggleGrid('${escapeAttr(t)}')">${on ? '✓ As per Grid' : 'As per Grid'}</button>`;
+      };
       const rowActions = (r) => `<div style="display:flex; gap:4px; justify-content:center; flex-wrap:wrap;">`
         + `<button class="btn btn-sm btn-outline" style="padding:1px 8px;" title="Look up this policy (resolved RTO/region, matched rule, our vs file rate)" onclick="rcLookupPolicy('${escapeAttr(r.policy_no || r.tracker || '')}')">🔍</button>`
         + `<button class="btn btn-sm btn-outline" style="padding:1px 8px;" title="Open QC compare (PR vs Prarambh)" onclick="rcOpenQc('${escapeAttr(r.policy_no || '')}')">QC</button>`
         + `<button class="btn btn-sm btn-outline" style="padding:1px 8px;" title="Recompute this policy only" onclick="rcRecomputePolicy('${escapeAttr(r.policy_no || '')}', this)">↻ Rate</button>`
+        + gridBtn(r.tracker)
         + ignoreBtn(r.tracker)
         + `</div>`;
       const matchesFilters = (r) => {
@@ -12920,18 +12944,26 @@
         cols = ['Tracker', 'Policy No', 'Insurer', 'Our Rate %', 'File Rate %', 'Diff', 'Match', ''];
         rows = (_rcData.rate_comparison || []).filter(r => {
           if (!matchesFilters(r)) return false;
-          if (matchF === 'match' && !r.rate_match) return false;
-          if (matchF === 'mismatch' && r.rate_match) return false;
+          // "As per Grid" rows count as matched for the Show filter.
+          const effMatch = r.rate_match || _rcGrid.has(r.tracker);
+          if (matchF === 'match' && !effMatch) return false;
+          if (matchF === 'mismatch' && effMatch) return false;
           return true;
-        }).map(r => `<tr style="border-bottom:1px solid #eee; ${r.rate_match ? '' : 'background:#fff6f6;'}">
+        }).map(r => {
+          const isGrid = _rcGrid.has(r.tracker);
+          const bg = isGrid ? 'background:#eef2ff;' : (r.rate_match ? '' : 'background:#fff6f6;');
+          const matchCell = r.rate_match ? '✅'
+            : (isGrid ? '<span title="As per Grid — our rate accepted as correct" style="color:#3949ab; font-weight:600;">📋 Grid</span>' : '❌');
+          return `<tr style="border-bottom:1px solid #eee; ${bg}">
           <td style="padding:6px;">${esc(r.tracker)}</td>
           <td style="padding:6px;">${esc(r.policy_no)}</td>
           <td style="padding:6px;">${esc(r.insurer)}</td>
           <td style="padding:6px; text-align:right;">${r.our_rate ?? '—'}</td>
           <td style="padding:6px; text-align:right;">${r.their_rate ?? '—'}</td>
-          <td style="padding:6px; text-align:right; ${Math.abs(r.diff||0)>5?'color:#b71c1c; font-weight:600;':''}">${r.diff ?? '—'}</td>
-          <td style="padding:6px; text-align:center;">${r.rate_match ? '✅' : '❌'}</td>
-          <td style="padding:6px; text-align:center;">${rowActions(r)}</td></tr>`);
+          <td style="padding:6px; text-align:right; ${Math.abs(r.diff||0)>5 && !isGrid?'color:#b71c1c; font-weight:600;':''}">${r.diff ?? '—'}</td>
+          <td style="padding:6px; text-align:center;">${matchCell}</td>
+          <td style="padding:6px; text-align:center;">${rowActions(r)}</td></tr>`;
+        });
       } else if (_rcView === 'missOurs') {
         cols = ['Tracker', 'File Rate %', ''];
         rows = (_rcData.missing_in_our_data || []).filter(r => {
@@ -12981,7 +13013,9 @@
       body.innerHTML = rows.length ? rows.join('') :
         `<tr><td colspan="${cols.length}" style="padding:20px; text-align:center; color:#999;">No rows.</td></tr>`;
       document.getElementById('rcRowCount').textContent =
-        rows.length + ' rows' + (_rcIgnored.size ? ' · ' + _rcIgnored.size + ' ignored' : '');
+        rows.length + ' rows'
+        + (_rcGrid.size ? ' · ' + _rcGrid.size + ' as-per-grid' : '')
+        + (_rcIgnored.size ? ' · ' + _rcIgnored.size + ' ignored' : '');
     }
 
     /** Open the QC compare workspace for one recon-row policy. The recon row
@@ -13095,6 +13129,15 @@
       } catch (e) {
         out.innerHTML = `<div style="color:#b71c1c; font-size:13px;">Lookup failed: ${escapeHtml(e.message)}</div>`;
       }
+    }
+
+    // Toggle the "As per Grid" mark on a record — asserts our rate is correct per
+    // the grid (the file figure is the operator's deviation). Marked rows count as
+    // matched in the top KPIs. Persisted per cycle alongside ignores.
+    function rcToggleGrid(tracker) {
+      if (_rcGrid.has(tracker)) _rcGrid.delete(tracker);
+      else _rcGrid.add(tracker);
+      rcSaveIgnores(); rcRenderKpis(); rcRender();
     }
 
     function rcIgnore(tracker) {
