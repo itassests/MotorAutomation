@@ -1178,15 +1178,44 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       params.fuelType = 'Petrol';
     }
   }
-  // Magma GCV >40T: the >40T tonnage grid carries only low rates (~11.5-13%),
-  // but the operator rates these on the next-lower 20T-40T tonnage slab grid
-  // (USER-confirmed, e.g. MH22/4933 42T → "GCV 20T-40T Age>=5" 0.22, not >40T
-  // 0.12). Cap the tonnage just under 40 so the weight-band filter lands on the
-  // 20-40T segment (volume slab + age band still resolve normally).
+  // Magma GCV >40T: the >40T tonnage grid is split by cluster. In SOME regions it
+  // carries only anomalously-low placeholder rates (~0.08-0.13, e.g. NE6 0.08,
+  // WB 0.12) that the operator does NOT use — there the operator rates on the
+  // next-lower 20T-40T slab (USER-confirmed, e.g. MH22/4933 42T → "GCV 20T-40T
+  // Age>=5" 0.22, not >40T 0.12). But in OTHER regions the >40T band carries a
+  // PROPER rate the operator DOES use (e.g. MH1 >40T Comp 0.24 = operator 24).
+  // Rule (USER-confirmed): use the real >40T band when its rate is proper
+  // (>= 0.15); otherwise cap to 20-40T. We probe the region's >40T rate first.
   if (insurerSlug === 'magma_hdi' &&
       String(params.vehicleType || '').toUpperCase() === 'GCV' &&
       Number(params.tonnage) > 40) {
-    params.tonnage = 39;
+    let real40Proper = false;
+    try {
+      const reg40 = resolvedRegion || '';
+      const k40 = 'magma40T::' + reg40;
+      let r40;
+      if (caches.lookup.has(k40)) r40 = caches.lookup.get(k40);
+      else {
+        r40 = await lookupRates(pool, { insurer: 'magma_hdi', product: 'GCV', region: reg40 });
+        caches.lookup.set(k40, r40);
+      }
+      // Probe the >40T rate for THIS policy's cover only — a region can carry a
+      // proper SATP >40T (0.29) but an anomalously-low COMP >40T (0.14); taking
+      // the max across both would wrongly read "proper" and apply the low COMP
+      // rate (regressing Comp >40T trucks, e.g. MH22/5019). Match rate_type to
+      // the policy cover: Comp→COMP rows, TP/SAOD→SATP rows; unknown→either.
+      const ip = String(params.insProduct || '').toUpperCase();
+      const coverRe = ip === 'COMP' ? /COMP/i
+                    : (ip === 'TP' || ip === 'SAOD') ? /SATP|SAOD|^TP$|^ACT$/i
+                    : /./;
+      const max40 = Math.max(0, ...r40
+        .filter(r => />\s*40\s*T/i.test(String(r.segment || '')) &&
+                     coverRe.test(String(r.rate_type || '')))
+        .map(r => Number(r.rate_value) || 0));
+      real40Proper = max40 >= 0.15;
+    } catch (e) { /* probe failed → fall back to the cap (safe default) */ }
+    // Anomalously-low / unknown >40T rate → cap to the 20-40T slab.
+    if (!real40Proper) params.tonnage = 39;
   }
   params.resolvedRegion = resolvedRegion;
 
