@@ -2938,6 +2938,21 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     rules = [clone, ...rules.filter(r => r !== base)];
   }
 
+  // ---- Kotak PCV flat 65% ----
+  // USER-confirmed: Kotak pays a flat 65% on ALL PCV — no segment / seating /
+  // age / cover condition. The ingested grid carried only ONE PCV row, segment
+  // "School Bus" 0.65 (Pan India), so non-school-bus PCVs (e.g. a Maruti Omni
+  // passenger van, TP-only) matched no segment and fell through to no-rule.
+  // The operator file confirms 65 across Kotak PCV (school-bus AND others:
+  // 5/5 paid 65). Inject a 0.65 rule for any Kotak PCV so every PCV prices at
+  // 65; the school-bus rows already at 0.65 are unchanged (zero-regression).
+  if (insurerSlug === 'kotak' && String(params.vehicleType || '').toUpperCase() === 'PCV') {
+    const base = rules[0] || { insurer: insurerSlug, region: resolvedRegion || 'Pan India' };
+    const clone = { ...base, rate_type: base.rate_type || 'COMP', rate_value: 0.65,
+      is_declined: 0, segment: 'PCV (Kotak flat 65)' };
+    rules = [clone];
+  }
+
   const primary = pickPrimaryRateRule(rules);
   if (!primary) {
     // Still try to surface the statement + PR amounts if we have them.
