@@ -3124,6 +3124,30 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     rules = [clone];
   }
 
+  // ---- Magma GCV "Above 2L" slab override ----
+  // Magma's GCV SATP grid splits by premium slab "Upto 2L" / "Above 2L". The slab
+  // is mis-selected from the (small) TP premium → "Upto 2L", but for GCV the
+  // operator always rates on the "Above 2L" slab (truck sum-insured is always
+  // > 2L). USER-confirmed: take the >2L rate for all cases. When the pool sits on
+  // an "Upto 2L" row, re-query the "Above 2L" row for the same segment and swap
+  // it in. Scoped Magma + GCV; the 8 such policies were ALL mismatched on Upto-2L
+  // (0 matched), so zero regression.
+  if (insurerSlug === 'magma_hdi' &&
+      String(params.vehicleType || '').toUpperCase() === 'GCV' &&
+      rules.some(r => /upto\s*2L/i.test(String(r.volume_tier || '')))) {
+    const upRule = rules.find(r => /upto\s*2L/i.test(String(r.volume_tier || '')));
+    const seg = String(upRule && upRule.segment || '');
+    const aKey = lookupKey + '||magmaAbove2L:' + seg;
+    let aRules;
+    if (caches.lookup.has(aKey)) aRules = caches.lookup.get(aKey);
+    else { aRules = await lookupRates(pool, { ...baseLookup, volume_tier: 'Above 2L' }); caches.lookup.set(aKey, aRules); }
+    const aPick = aRules.filter(r => /above\s*2L/i.test(String(r.volume_tier || '')) &&
+      String(r.segment || '') === seg && Number(r.rate_value) > 0);
+    if (aPick.length > 0) {
+      rules = rules.filter(r => !/upto\s*2L/i.test(String(r.volume_tier || ''))).concat([aPick[0]]);
+    }
+  }
+
   // ---- All-insurer IDV gate ----
   // USER-confirmed common rule (every insurer): when the vehicle IDV exceeds
   // ₹50 lakh, do NOT apply any commission rule — high-value risks are referred /
