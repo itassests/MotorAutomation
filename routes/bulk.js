@@ -3162,7 +3162,17 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   if (insurerSlug === 'magma_hdi' && rules.length > 0 &&
       rules.some(r => String(r.volume_tier || '').trim() !== '')) {
     const segRule = rules.find(r => String(r.volume_tier || '').trim() !== '');
+    // "Always highest tier" applies to the SATP premium slabs (Upto 2L / Above 2L)
+    // for ALL products, and to Comp for COMMERCIAL vehicles (GCV/MISC/PCV are always
+    // high-value). It does NOT apply to Comp Pvt-Car / TW: those tiers are IDV-based
+    // (Upto 5L / … / Above 30L) and a modest car belongs in its real IDV band, not
+    // the top — e.g. MH24/724 Duster Comp should be "Upto 5L" 16.25 (≈ operator 16),
+    // not "Above 30L" 17. Skip the override for personal-vehicle Comp.
+    const _vt = String(params.vehicleType || '').toUpperCase();
+    const _isCommercial = ['GCV', 'MISC', 'MIS', 'PCV'].includes(_vt);
+    const _isSatpRule = /SATP|SAOD|ACT|^TP$/i.test(String(segRule && segRule.rate_type || ''));
     const seg = String(segRule && segRule.segment || '');
+    if (!(_isCommercial || _isSatpRule)) { /* personal Comp — keep IDV band */ } else {
     const hvKey = lookupKey + '||magmaHiVol:' + seg;
     let hvRules;
     if (caches.lookup.has(hvKey)) hvRules = caches.lookup.get(hvKey);
@@ -3183,6 +3193,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         const filtered = filterRulesByPolicy(topRows, params);
         if (filtered.length) rules = filtered;
       }
+    }
     }
   }
 
