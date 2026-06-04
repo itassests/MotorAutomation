@@ -1427,6 +1427,34 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // ---- IFFCO Tokio MISC → GCV middle-slab override ----
+  // USER-confirmed three facts: (1) iffco has NO separate MISC grid — Misc-D
+  // goods vehicles rate off the GCV grid; (2) iffco ships ZERO rto_mappings and
+  // its grid is purely STATE-based; (3) the per-state premium SLAB to apply is
+  // ALWAYS the middle "3L-6L" tier. So an iffco MISC policy → GCV "Other than A1"
+  // segment for the policy's STATE, "3L-6L" slab (e.g. RJ Misc-D "1512" → 0.175).
+  // Region is seeded from the RTO-state full name. Scoped iffco + MISC. This
+  // intentionally diverges from the operator file (which paid the Upto-3L 0.20
+  // slab) — grid-correctness over operator-match, USER-confirmed.
+  if (insurerSlug === 'iffco_tokio' &&
+      ['MISC', 'MIS'].includes(String(params.vehicleType || '').toUpperCase()) &&
+      params.rtoCode) {
+    const stName = (require('./policy').STATE_PREFIX_FULL || {})[rtoStatePrefix(params.rtoCode)];
+    if (stName) {
+      const iKey = lookupKey + '||iffcoMiscGcv:' + stName;
+      let iRules;
+      if (caches.lookup.has(iKey)) iRules = caches.lookup.get(iKey);
+      else {
+        iRules = await lookupRates(pool, { insurer: 'iffco_tokio', product: 'GCV',
+          region: stName, segment: 'GCV (Other than A1)', volume_tier: '3L-6L' });
+        caches.lookup.set(iKey, iRules);
+      }
+      const iPick = iRules.filter(r => /Other than A1/i.test(String(r.segment || '')) &&
+        /3L\s*-\s*6L/i.test(String(r.volume_tier || '')));
+      if (iPick.length > 0) { rules = [iPick[0]]; resolvedRegion = stName; params.resolvedRegion = stName; }
+    }
+  }
+
   // SAOD second-pass — when SAOD-specific patterns yield 0 rules, retry as
   // Comp.  Per user's spec ("if SAOD has no rule, consider COMP for the
   // same combination") — Digit (and others) don't carry a dedicated SAOD
