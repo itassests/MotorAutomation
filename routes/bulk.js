@@ -3191,21 +3191,10 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   if (insurerSlug === 'magma_hdi' && rules.length > 0 &&
       rules.some(r => String(r.volume_tier || '').trim() !== '')) {
     const segRule = rules.find(r => String(r.volume_tier || '').trim() !== '');
-    // "Always highest tier" applies to the SATP premium slabs (Upto 2L / Above 2L)
-    // for ALL products, and to Comp for COMMERCIAL vehicles (GCV/MISC/PCV are always
-    // high-value). It does NOT apply to Comp Pvt-Car / TW: those tiers are IDV-based
-    // (Upto 5L / … / Above 30L) and a modest car belongs in its real IDV band, not
-    // the top — e.g. MH24/724 Duster Comp should be "Upto 5L" 16.25 (≈ operator 16),
-    // not "Above 30L" 17. Skip the override for personal-vehicle Comp.
     const _vt = String(params.vehicleType || '').toUpperCase();
     const _isCommercial = ['GCV', 'MISC', 'MIS', 'PCV'].includes(_vt);
     const _isSatpRule = /SATP|SAOD|ACT|^TP$/i.test(String(segRule && segRule.rate_type || ''));
     const seg = String(segRule && segRule.segment || '');
-    if (!(_isCommercial || _isSatpRule)) { /* personal Comp — keep IDV band */ } else {
-    const hvKey = lookupKey + '||magmaHiVol:' + seg;
-    let hvRules;
-    if (caches.lookup.has(hvKey)) hvRules = caches.lookup.get(hvKey);
-    else { hvRules = await lookupRates(pool, { ...baseLookup, volume_tier: '' }); caches.lookup.set(hvKey, hvRules); }
     // Rank a volume tier so "Above N" > "X-N" (upper bound) > "Upto N".
     const tierRank = (vt) => {
       const s = String(vt || ''); let m;
@@ -3214,6 +3203,68 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       if ((m = s.match(/upto\s*(\d+)/i))) return parseInt(m[1], 10);
       return 0;
     };
+    if (!(_isCommercial || _isSatpRule)) {
+      // ---- Personal-vehicle (Pvt Car / TW) Comprehensive ----
+      // USER-confirmed: the operator rates these at the HIGHEST volume tier, on the
+      // grid selected by BUSINESS TYPE, then the fuel&NCB sub-row. Magma's Comp grid
+      // splits into NEW-BUSINESS bundled grids (COMP_1+1 = annual OD+TP, COMP_1+3 =
+      // multi-year TP) and a plain COMP renewal/rollover grid. (Our ingest stamped
+      // the _1+1/_1+3 grids vehicle_age 0-0 — that's the "1+1"/"1+3" tenure label
+      // mis-read as age, NOT a real new-vehicle age gate: e.g. DJ1/6551 is an age-4
+      // Used Rollover but BUSINESS_TYPE='New Business', and the operator used
+      // COMP_1+1. So we IGNORE the age band here and pick the grid by business type.)
+      //   New Business + annual TP  → COMP_1+1   (DJ1/6551 Petrol&NCB Above-30L 0.17 = op 17)
+      //   New Business + multi-yr TP→ COMP_1+3
+      //   Renewal / Rollover / other→ COMP       (plain age-agnostic renewal grid)
+      // MH24/724 (New Business, Diesel&NCB) → COMP_1+1 Above-30L 0.16 = operator 16.
+      const isNew = /NEW/i.test(String(params.businessType || ''));
+      const tb = String(policy._tenureBucket || '').trim();
+      const wantRt = !isNew ? 'COMP'
+                   : (tb === '1+5' || tb === '5+5') ? 'COMP_1+3'
+                   : 'COMP_1+1';
+      const pcKey = lookupKey + '||magmaPC:' + seg + ':' + wantRt;
+      let pcRules;
+      if (caches.lookup.has(pcKey)) pcRules = caches.lookup.get(pcKey);
+      // Clear vehicle_age (the _1+1/_1+3 grids carry a spurious 0-0 age band) and
+      // ins_product (so all COMP-family rate_types are returned), then pick by name.
+      else { pcRules = await lookupRates(pool, { ...baseLookup, volume_tier: '', ins_product: '', vehicle_age: null }); caches.lookup.set(pcKey, pcRules); }
+      let cand = pcRules.filter(r => String(r.segment || '') === seg &&
+        String(r.rate_type || '').toUpperCase() === wantRt &&
+        String(r.volume_tier || '').trim() !== '');
+      // Fuel: Pvt-Car rows split Diesel vs everything-else (Petrol grid also serves
+      // CNG/LPG/EV/Hybrid — no own row). TW may have no fuel split.
+      const pf = String(params.fuelType || '').toUpperCase();
+      if (cand.some(r => r.fuel_type)) {
+        const fuMatch = cand.filter(r => {
+          const rf = String(r.fuel_type || '').toUpperCase();
+          if (!rf) return true;
+          return /DIESEL/.test(rf) ? /DIESEL/.test(pf) : !/DIESEL/.test(pf);
+        });
+        if (fuMatch.length) cand = fuMatch;
+      }
+      // NCB sub-row: remarks carry "& NCB" vs "& Zero NCB" (COMP_1+3 has no split).
+      const hasNcb = Number(params.ncbPct || 0) > 0;
+      const ncbMatch = cand.filter(r => {
+        const rem = String(r.remarks || '');
+        if (!/ncb/i.test(rem)) return true;          // no NCB split → keep
+        const isZero = /zero\s*ncb/i.test(rem);
+        return hasNcb ? !isZero : isZero;
+      });
+      if (ncbMatch.length) cand = ncbMatch;
+      // Highest volume tier.
+      if (cand.length) {
+        const maxRank = Math.max(...cand.map(r => tierRank(r.volume_tier)));
+        const top = cand.filter(r => tierRank(r.volume_tier) === maxRank);
+        if (top.length) rules = top;
+      }
+    } else {
+    // "Always highest tier" for SATP premium slabs (all products) and COMMERCIAL
+    // Comp (GCV/MISC/PCV — always high-value). Pick the highest tier (NOT highest
+    // rate — within a tier are NCB/fuel sub-rows) and re-run filterRulesByPolicy.
+    const hvKey = lookupKey + '||magmaHiVol:' + seg;
+    let hvRules;
+    if (caches.lookup.has(hvKey)) hvRules = caches.lookup.get(hvKey);
+    else { hvRules = await lookupRates(pool, { ...baseLookup, volume_tier: '' }); caches.lookup.set(hvKey, hvRules); }
     const segRows = hvRules.filter(r => String(r.segment || '') === seg && String(r.volume_tier || '').trim() !== '');
     if (segRows.length) {
       const maxRank = Math.max(...segRows.map(r => tierRank(r.volume_tier)));
