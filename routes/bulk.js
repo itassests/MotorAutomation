@@ -3153,12 +3153,13 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // operator always rates on the HIGHEST volume tier. USER-confirmed: "always take
   // higher volume in Magma." Re-query all volume tiers for the matched segment
   // (same cover via baseLookup.ins_product) and swap in the highest-rate row.
-  // Scoped Magma + COMMERCIAL products (GCV/MISC/PCV) — for these the volume slab
-  // is premium/tonnage-based and the operator rates on the top slab. NOT Pvt-Car
-  // or TW: their volume band is discount/IDV-based and "always highest" over-rates
-  // (e.g. CAR 43 vs operator 28). Only acts when the pool sits on a volume-tier row.
+  // USER-confirmed for ALL Magma products (GCV/MISC/PCV/CAR/TW): the operator rates
+  // on the HIGHEST volume TIER. Pick the highest tier (NOT the highest rate — within
+  // a tier there are NCB/fuel sub-rows) and re-run filterRulesByPolicy so the right
+  // sub-row in that tier is selected. e.g. BR Pvt-Car SATP "Above 2L" (right sub-row
+  // 0.46) instead of "Upto 2L" 0.45. Only acts when the pool sits on a volume-tier
+  // row and a higher tier exists.
   if (insurerSlug === 'magma_hdi' && rules.length > 0 &&
-      ['GCV', 'MISC', 'MIS', 'PCV'].includes(String(params.vehicleType || '').toUpperCase()) &&
       rules.some(r => String(r.volume_tier || '').trim() !== '')) {
     const segRule = rules.find(r => String(r.volume_tier || '').trim() !== '');
     const seg = String(segRule && segRule.segment || '');
@@ -3166,12 +3167,21 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     let hvRules;
     if (caches.lookup.has(hvKey)) hvRules = caches.lookup.get(hvKey);
     else { hvRules = await lookupRates(pool, { ...baseLookup, volume_tier: '' }); caches.lookup.set(hvKey, hvRules); }
-    const cand = hvRules.filter(r => String(r.segment || '') === seg &&
-      String(r.volume_tier || '').trim() !== '' && Number(r.rate_value) > 0);
-    if (cand.length > 0) {
-      const best = cand.reduce((a, b) => Number(b.rate_value) > Number(a.rate_value) ? b : a);
-      if (Number(best.rate_value) > Number(segRule.rate_value || 0)) {
-        rules = rules.filter(r => !(String(r.segment || '') === seg && String(r.volume_tier || '').trim() !== '')).concat([best]);
+    // Rank a volume tier so "Above N" > "X-N" (upper bound) > "Upto N".
+    const tierRank = (vt) => {
+      const s = String(vt || ''); let m;
+      if ((m = s.match(/above\s*(\d+)/i))) return parseInt(m[1], 10) + 1e6;
+      if ((m = s.match(/(\d+)\s*L?\s*-\s*(\d+)/i))) return parseInt(m[2], 10);
+      if ((m = s.match(/upto\s*(\d+)/i))) return parseInt(m[1], 10);
+      return 0;
+    };
+    const segRows = hvRules.filter(r => String(r.segment || '') === seg && String(r.volume_tier || '').trim() !== '');
+    if (segRows.length) {
+      const maxRank = Math.max(...segRows.map(r => tierRank(r.volume_tier)));
+      if (maxRank > tierRank(segRule.volume_tier)) {
+        const topRows = segRows.filter(r => tierRank(r.volume_tier) === maxRank);
+        const filtered = filterRulesByPolicy(topRows, params);
+        if (filtered.length) rules = filtered;
       }
     }
   }
