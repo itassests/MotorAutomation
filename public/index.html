@@ -2381,6 +2381,7 @@
           <button class="btn btn-primary" id="rcRunBtn" onclick="rcRun()" disabled>Compare</button>
           <button class="btn btn-outline" id="rcRecompareBtn" onclick="rcRecompare()" disabled title="Re-run against the last uploaded file (use after a recompute)">Re-compare (last file)</button>
           <button class="btn btn-outline" id="rcXlsxBtn" onclick="rcDownloadXlsx()" disabled>Download XLSX</button>
+          <button class="btn btn-outline" id="rcReportBtn" onclick="rcDownloadReport()" disabled title="Customer report: Tracker, Insurer, OD/TP Rate, Margin, Outgoing Rate, Income & Outgoing amount, Operator Rate + Match — for the full month (include the other cycle via 'Also compare cycles').">Download Report</button>
         </div>
         <div id="rcStatus" style="margin-top:10px; font-size:13px; color:#666;"></div>
 
@@ -12798,6 +12799,7 @@
         document.getElementById('rcKpis').style.display = '';
         document.getElementById('rcResults').style.display = '';
         document.getElementById('rcXlsxBtn').disabled = false;
+        document.getElementById('rcReportBtn').disabled = false;
         rcSetView(_rcView || 'rate');
         status.textContent = 'Re-compared (last file) · Sheet "' + (j.detected_columns?.sheet || '?') + '".';
       } catch (e) {
@@ -12830,6 +12832,7 @@
         document.getElementById('rcKpis').style.display = '';
         document.getElementById('rcResults').style.display = '';
         document.getElementById('rcXlsxBtn').disabled = false;
+        document.getElementById('rcReportBtn').disabled = false;
         rcSetView('rate');
         status.textContent = 'Sheet "' + (j.detected_columns?.sheet || '?') +
           '" · Tracker col="' + (j.detected_columns?.tracker || '?') +
@@ -13189,6 +13192,23 @@
         const blob = await res.blob();
         triggerDownload(blob, 'cycle' + cycleId + '_reconcile_' + stampNow() + '.xlsx');
       } catch (e) { showToast('Download failed: ' + e.message, 'error'); }
+    }
+
+    // Customer-facing payout report (full month): Tracker, Insurer, OD/TP Rate,
+    // Rate, Operator Rate, Margin, Outgoing Rate, Income & Outgoing amount, Match.
+    // Uses the server's cached operator file for the cycle; include the other
+    // April cycle via the "Also compare cycles" multiselect so the month is whole.
+    async function rcDownloadReport() {
+      const cycleId = document.getElementById('rcCycle').value;
+      if (!cycleId) return;
+      try {
+        const qs  = rcExtraCyclesQS(cycleId);             // '?compare_cycles=11' or ''
+        const sep = qs ? '&' : '?';
+        const res = await fetch(API + '/cycle-bulk/' + cycleId + '/recompare' + qs + sep + 'format=report', { method: 'POST' });
+        if (!res.ok) throw new Error(await res.text());
+        const blob = await res.blob();
+        triggerDownload(blob, 'april_payout_report_' + stampNow() + '.xlsx');
+      } catch (e) { showToast('Report download failed: ' + e.message, 'error'); }
     }
 
     // ============ INIT ============

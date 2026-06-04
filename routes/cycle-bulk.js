@@ -1803,7 +1803,15 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
           insurer_slug: merged.insurer_slug || null,
           vehicle_type: merged.vehicle_type || null,
           our_rate: merged.rate_pct != null ? Number(merged.rate_pct) : null,
+          // OD/TP per-leg rates (as %), present only when the rule splits the
+          // commission into separate OD + TP legs (e.g. Oriental bundled,
+          // New India / National). null → single (non-split) rate.
+          od_rate: merged.od_rate != null ? +(Number(merged.od_rate) * 100).toFixed(3) : null,
+          tp_rate: merged.tp_rate != null ? +(Number(merged.tp_rate) * 100).toFixed(3) : null,
+          margin_pct:   merged.margin_pct   != null ? Number(merged.margin_pct)   : null,
+          outgoing_pct: merged.outgoing_pct != null ? Number(merged.outgoing_pct) : null,
           income: merged.income,
+          outgoing: merged.outgoing,
           premium_base: merged.premium_base,
           excluded: !!merged.excluded,
           matched_rule_id: merged.matched_rule_id,
@@ -1869,6 +1877,52 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
         rate_matched:        rate_comparison.filter(r => r.rate_match).length,
         rate_unmatched:      rate_comparison.filter(r => !r.rate_match).length,
       };
+
+      // ---- Customer-facing month report (fmt === 'report') ----
+      // One row per policy across the requested cycles (full month), with the
+      // OD/TP rate split (when the rule has separate legs), margin, outgoing rate,
+      // income & outgoing amounts, the operator's rate from the uploaded file, and
+      // a Match flag. Built from `ours` (every policy in the cycle) joined to the
+      // operator excelMap so policies absent from the file still appear (Operator
+      // Rate blank, Match = "Not in file").
+      if (fmt === 'report') {
+        const tol = (slug) => /reliance|chola/i.test(slug || '') ? 1 : 0.5;
+        const reportRows = [];
+        for (const [tracker, us] of ours.entries()) {
+          const theirRate = excelMap.has(tracker) ? excelMap.get(tracker) : null;
+          const inFile = excelMap.has(tracker);
+          let match;
+          if (!inFile) match = 'Not in file';
+          else if (us.our_rate != null && theirRate != null) {
+            match = Math.abs(us.our_rate - theirRate) <= tol(us.insurer_slug) ? 'Match' : 'No Match';
+          } else if (us.our_rate == null && (theirRate == null || theirRate === 0)) {
+            match = 'Match';
+          } else match = 'No Match';
+          reportRows.push({
+            'Tracker':            tracker,
+            'Insurer':            us.insurer,
+            'OD Rate %':          us.od_rate != null ? us.od_rate : '',
+            'TP Rate %':          us.tp_rate != null ? us.tp_rate : '',
+            'Rate %':             us.our_rate != null ? us.our_rate : '',
+            'Operator Rate %':    theirRate != null ? theirRate : '',
+            'Margin %':           us.margin_pct   != null ? us.margin_pct   : '',
+            'Outgoing Rate %':    us.outgoing_pct != null ? us.outgoing_pct : '',
+            'Income Amount':      us.income   != null ? us.income   : '',
+            'Outgoing Amount':    us.outgoing != null ? us.outgoing : '',
+            'Match':              match,
+          });
+        }
+        // Stable, user-friendly order: insurer, then tracker.
+        reportRows.sort((a, b) =>
+          String(a.Insurer || '').localeCompare(String(b.Insurer || '')) ||
+          String(a.Tracker || '').localeCompare(String(b.Tracker || '')));
+        const wbR = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wbR, XLSX.utils.json_to_sheet(reportRows), 'Report');
+        const bufR = XLSX.write(wbR, { type: 'buffer', bookType: 'xlsx' });
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="april_payout_report.xlsx"`);
+        return res.send(bufR);
+      }
 
       // CSV / XLSX download — fmt passed by the caller route.
       if (fmt === 'xlsx') {
