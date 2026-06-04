@@ -1469,6 +1469,35 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   }
   }
 
+  // ---- IFFCO Tokio TW state/slab override ----
+  // Same story as iffco GCV/MISC: ZERO rto_mappings, STATE-based grid. The TW
+  // grid is premium-slab keyed ("Upto 1L" / "Above 1L", COMP rate_type; a NULL
+  // SATP row sits at 0). No region → no rule, and SAOD/TP find nothing (COMP-only
+  // grid). When no region resolved, seed it from the RTO-state, pick the "TW"
+  // COMP rate for the premium slab (Upto 1L when net premium ≤ ₹1L, else Above
+  // 1L), cover-agnostic. e.g. TN23 Ola S1X SAOD → TN "TW" Upto-1L 0.175 = 17.5.
+  if (insurerSlug === 'iffco_tokio' &&
+      /^(TW|2W)$/.test(String(params.vehicleType || '').toUpperCase()) &&
+      !resolvedRegion && params.rtoCode) {
+    const stName = (require('./policy').STATE_PREFIX_FULL || {})[rtoStatePrefix(params.rtoCode)];
+    if (stName) {
+      const net = (Number(params.odPremium != null ? params.odPremium : params.od_premium) || 0) +
+                  (Number(params.tpPremium != null ? params.tpPremium : params.tp_premium) || 0);
+      const slab = net > 100000 ? 'Above 1L' : 'Upto 1L';
+      const tKey = lookupKey + '||iffcoTw:' + stName + ':' + slab;
+      let tRules;
+      if (caches.lookup.has(tKey)) tRules = caches.lookup.get(tKey);
+      else { tRules = await lookupRates(pool, { insurer: 'iffco_tokio', product: 'TW', region: stName, volume_tier: slab }); caches.lookup.set(tKey, tRules); }
+      const slabRe = new RegExp(slab.replace(/\s+/g, '\\s*'), 'i');
+      const tPick = tRules.filter(r => /^TW$/i.test(String(r.segment || '').trim()) &&
+        slabRe.test(String(r.volume_tier || '')) && Number(r.rate_value) > 0);
+      if (tPick.length > 0) {
+        const best = tPick.reduce((a, b) => Number(b.rate_value) > Number(a.rate_value) ? b : a);
+        rules = [best]; resolvedRegion = stName; params.resolvedRegion = stName;
+      }
+    }
+  }
+
   // SAOD second-pass — when SAOD-specific patterns yield 0 rules, retry as
   // Comp.  Per user's spec ("if SAOD has no rule, consider COMP for the
   // same combination") — Digit (and others) don't carry a dedicated SAOD
