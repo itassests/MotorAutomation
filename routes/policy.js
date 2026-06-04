@@ -1951,6 +1951,22 @@ function filterRulesByPolicy(rules, params, _trace) {
       } else if (ruleIsNcbPositive && policyHasNCB) {
         score += 8;                      // exact NCB 1-99 match
       }
+      // Finer NCB-RANGE gate: some grids split positive NCB into explicit bands
+      // — e.g. raheja Pvt Car "NCB 25-99% → 32", "NCB 20-24% → 28", "NCB = 0% →
+      // 19.5". The binary NCB=0 / NCB-1-99 logic above can't tell 25-99 from
+      // 20-24 (neither matches "NCB 1-99"), so both survive and dedup takes the
+      // higher rate. When the rule carries an explicit "NCB <lo>-<hi>%" range,
+      // drop it if the policy's NCB falls OUTSIDE it; boost an exact band match.
+      // OD-only (pure TP) policies skip NCB banding entirely (handled above).
+      if (matches && !policyIsPureTp) {
+        const rng = ncbText.match(/NCB\s*(\d+)\s*-\s*(\d+)\s*%/i);
+        if (rng) {
+          const lo = parseInt(rng[1], 10), hi = parseInt(rng[2], 10);
+          const pncb = params.ncbPct || 0;
+          if (pncb < lo || pncb > hi) matches = false;   // NCB outside this band → drop
+          else score += 10;                              // exact NCB-range match
+        }
+      }
     }
 
     // Shriram claim-status / tanker twins encoded in `remarks`. Several GCV
