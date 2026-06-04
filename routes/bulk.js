@@ -1481,16 +1481,32 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       !resolvedRegion && params.rtoCode) {
     const stName = (require('./policy').STATE_PREFIX_FULL || {})[rtoStatePrefix(params.rtoCode)];
     if (stName) {
-      const net = (Number(params.odPremium != null ? params.odPremium : params.od_premium) || 0) +
-                  (Number(params.tpPremium != null ? params.tpPremium : params.tp_premium) || 0);
+      const odP = Number(params.odPremium != null ? params.odPremium : params.od_premium) || 0;
+      const tpP = Number(params.tpPremium != null ? params.tpPremium : params.tp_premium) || 0;
+      const net = odP + tpP;
+      // Cover split (per the iffco TW grid): "Comp & SAOD" uses the COMP rows
+      // (17.5% on OD for the 0-1L slab, 20% on Net for Above-1L green states);
+      // "Stand Alone TP" uses the SATP row (2.5% green / 0% for the AS,MP,CG,RJ,UP,
+      // Rest-MH,KA,TN,KL group). State-group differences are already baked into the
+      // ingested per-state rows, so we only pick by cover + premium slab.
+      const isSatp = /^(TP|SATP|ACT|LIABILITY)$/i.test(String(params.insProduct || '')) ||
+                     (odP === 0 && tpP > 0);
       const slab = net > 100000 ? 'Above 1L' : 'Upto 1L';
-      const tKey = lookupKey + '||iffcoTw:' + stName + ':' + slab;
+      const tKey = lookupKey + '||iffcoTw:' + stName;
       let tRules;
       if (caches.lookup.has(tKey)) tRules = caches.lookup.get(tKey);
-      else { tRules = await lookupRates(pool, { insurer: 'iffco_tokio', product: 'TW', region: stName, volume_tier: slab }); caches.lookup.set(tKey, tRules); }
+      else { tRules = await lookupRates(pool, { insurer: 'iffco_tokio', product: 'TW', region: stName }); caches.lookup.set(tKey, tRules); }
+      const isTwSeg = r => /^TW$/i.test(String(r.segment || '').trim());
       const slabRe = new RegExp(slab.replace(/\s+/g, '\\s*'), 'i');
-      const tPick = tRules.filter(r => /^TW$/i.test(String(r.segment || '').trim()) &&
-        slabRe.test(String(r.volume_tier || '')) && Number(r.rate_value) > 0);
+      let tPick;
+      if (isSatp) {
+        // Standalone TP → the SATP-typed TW row (0 = group-B decline; 2.5 = green).
+        tPick = tRules.filter(r => isTwSeg(r) && /SATP/i.test(String(r.rate_type || '')));
+      } else {
+        // Comp & SAOD → the COMP row for the premium slab.
+        tPick = tRules.filter(r => isTwSeg(r) && /COMP/i.test(String(r.rate_type || '')) &&
+          slabRe.test(String(r.volume_tier || '')) && Number(r.rate_value) > 0);
+      }
       if (tPick.length > 0) {
         const best = tPick.reduce((a, b) => Number(b.rate_value) > Number(a.rate_value) ? b : a);
         rules = [best]; resolvedRegion = stName; params.resolvedRegion = stName;
