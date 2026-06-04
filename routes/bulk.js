@@ -1436,9 +1436,13 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // Region is seeded from the RTO-state full name. Scoped iffco + MISC. This
   // intentionally diverges from the operator file (which paid the Upto-3L 0.20
   // slab) — grid-correctness over operator-match, USER-confirmed.
-  if (insurerSlug === 'iffco_tokio' &&
-      ['MISC', 'MIS'].includes(String(params.vehicleType || '').toUpperCase()) &&
-      params.rtoCode) {
+  // Also rescues a genuine iffco GCV that found NO rule (unmapped RTO → no
+  // region): same state + "Other than A1" + 3L-6L slab. Gated on rules.length===0
+  // so an iffco GCV that DID resolve a region/rate is left untouched.
+  {
+  const iffVt = String(params.vehicleType || '').toUpperCase();
+  const iffEligible = ['MISC', 'MIS'].includes(iffVt) || (iffVt === 'GCV' && !resolvedRegion);
+  if (insurerSlug === 'iffco_tokio' && iffEligible && params.rtoCode) {
     const stName = (require('./policy').STATE_PREFIX_FULL || {})[rtoStatePrefix(params.rtoCode)];
     if (stName) {
       const iKey = lookupKey + '||iffcoMiscGcv:' + stName;
@@ -1453,6 +1457,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         /3L\s*-\s*6L/i.test(String(r.volume_tier || '')));
       if (iPick.length > 0) { rules = [iPick[0]]; resolvedRegion = stName; params.resolvedRegion = stName; }
     }
+  }
   }
 
   // SAOD second-pass — when SAOD-specific patterns yield 0 rules, retry as
