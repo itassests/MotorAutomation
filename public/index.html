@@ -13087,7 +13087,9 @@
       if (out && out.scrollIntoView) out.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       out.innerHTML = '<span style="color:#888; font-size:13px;">Looking up…</span>';
       try {
-        const j = await fetch(API + '/cycle-bulk/' + cycleId + '/policy/' + encodeURIComponent(key)).then(r => r.json());
+        // Search the same cycle set the recon used (primary + "also match
+        // against") so rows booked in an earlier cycle still resolve.
+        const j = await fetch(API + '/cycle-bulk/' + cycleId + '/policy/' + encodeURIComponent(key) + rcExtraCyclesQS(cycleId)).then(r => r.json());
         if (!j.success) throw new Error(j.error || 'lookup failed');
         if (!j.found) {
           out.innerHTML = `<div style="background:#fff8ec; border:1px solid #f0d9a8; border-radius:8px; padding:12px; font-size:13px; color:#a04a00;">No policy or tracker matching <strong>${escapeHtml(key)}</strong> in this cycle.</div>`;

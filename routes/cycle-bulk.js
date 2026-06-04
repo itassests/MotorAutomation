@@ -746,6 +746,13 @@ router.get('/:cycleId(\\d+)/policy/:policyNo', async (req, res, next) => {
     const cycleId = Number(req.params.cycleId);
     const key = String(req.params.policyNo || '').trim();
     if (!key) return res.status(400).json({ success: false, error: 'policy_no required' });
+    // Search the SAME cycle set the recon used — the primary cycle plus any
+    // "also match against" cycles (?compare_cycles=). A combined recon surfaces
+    // rows booked in an earlier cycle (e.g. April-1st), so a per-row lookup that
+    // only queried the primary cycle returned "not found" for those rows. Order
+    // primary FIRST so it wins when a policy exists in more than one cycle.
+    const extraCycleIds = parseCompareCycles(req, cycleId);
+    const cmpIds = [...new Set([cycleId, ...extraCycleIds])].filter(n => Number.isInteger(n));
     const r = await pool.request()
       .input('cid', sql.Int, cycleId)
       .input('k',   sql.NVarChar(200), key)
@@ -753,7 +760,8 @@ router.get('/:cycleId(\\d+)/policy/:policyNo', async (req, res, next) => {
                      rate_pct_override, margin_pct_override, outgoing_pct_override,
                      excluded, note
                 FROM cycle_bulk_rows
-               WHERE cycle_id = @cid AND (policy_no = @k OR tracker_no = @k)`);
+               WHERE cycle_id IN (${cmpIds.join(',')}) AND (policy_no = @k OR tracker_no = @k)
+               ORDER BY CASE WHEN cycle_id = @cid THEN 0 ELSE 1 END`);
     if (!r.recordset.length) {
       return res.json({ success: true, found: false, key });
     }
