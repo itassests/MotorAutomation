@@ -12922,9 +12922,9 @@
       const ignoreBtn = (t) => `<button class="btn btn-sm btn-outline" style="padding:1px 8px;" onclick="rcIgnore('${escapeAttr(t)}')">Ignore</button>`;
       const gridBtn = (t) => {
         const on = _rcGrid.has(t);
-        return `<button class="btn btn-sm ${on ? 'btn-primary' : 'btn-outline'}" style="padding:1px 8px;${on ? 'background:#3949ab; border-color:#3949ab;' : ''}" title="${on ? 'Marked As per Grid — click to unmark' : 'Mark As per Grid — our rate is correct per the grid; the file figure is the operator deviation. Counts as matched.'}" onclick="rcToggleGrid('${escapeAttr(t)}')">${on ? '✓ As per Grid' : 'As per Grid'}</button>`;
+        return `<button class="btn btn-sm ${on ? 'btn-primary' : 'btn-outline'}" style="padding:1px 8px; white-space:nowrap;${on ? 'background:#3949ab; border-color:#3949ab;' : ''}" title="${on ? 'Marked As per Grid — click to unmark' : 'Mark As per Grid — our rate is correct per the grid; the file figure is the operator deviation. Counts as matched.'}" onclick="rcToggleGrid('${escapeAttr(t)}')">${on ? '✓ Grid' : 'Grid'}</button>`;
       };
-      const rowActions = (r) => `<div style="display:flex; gap:4px; justify-content:center; flex-wrap:wrap;">`
+      const rowActions = (r) => `<div style="display:flex; gap:4px; justify-content:center; flex-wrap:nowrap; white-space:nowrap;">`
         + `<button class="btn btn-sm btn-outline" style="padding:1px 8px;" title="Look up this policy (resolved RTO/region, matched rule, our vs file rate)" onclick="rcLookupPolicy('${escapeAttr(r.policy_no || r.tracker || '')}')">🔍</button>`
         + `<button class="btn btn-sm btn-outline" style="padding:1px 8px;" title="Open QC compare (PR vs Prarambh)" onclick="rcOpenQc('${escapeAttr(r.policy_no || '')}')">QC</button>`
         + `<button class="btn btn-sm btn-outline" style="padding:1px 8px;" title="Recompute this policy only" onclick="rcRecomputePolicy('${escapeAttr(r.policy_no || '')}', this)">↻ Rate</button>`
