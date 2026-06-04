@@ -1879,20 +1879,20 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
       };
 
       // ---- Customer-facing month report (fmt === 'report') ----
-      // One row per policy across the requested cycles (full month), with the
-      // OD/TP rate split (when the rule has separate legs), margin, outgoing rate,
-      // income & outgoing amounts, the operator's rate from the uploaded file, and
-      // a Match flag. Built from `ours` (every policy in the cycle) joined to the
-      // operator excelMap so policies absent from the file still appear (Operator
-      // Rate blank, Match = "Not in file").
+      // One row per OPERATOR-FILE tracker (the uploaded file's universe — File
+      // Trackers count), joined to our computed values. Columns: OD/TP rate split
+      // (when the rule has separate legs), Rate, Operator Rate, Margin, Outgoing
+      // Rate, Income & Outgoing amounts, and a Match flag. A file tracker we didn't
+      // compute (Missing in Our Data) still appears — our columns blank, Match =
+      // "Missing in our data". This yields exactly the File-Trackers row count
+      // (= matched + missing-in-our-data).
       if (fmt === 'report') {
         const tol = (slug) => /reliance|chola/i.test(slug || '') ? 1 : 0.5;
         const reportRows = [];
-        for (const [tracker, us] of ours.entries()) {
-          const theirRate = excelMap.has(tracker) ? excelMap.get(tracker) : null;
-          const inFile = excelMap.has(tracker);
+        for (const [tracker, theirRate] of excelMap.entries()) {
+          const us = ours.get(tracker) || null;
           let match;
-          if (!inFile) match = 'Not in file';
+          if (!us) match = 'Missing in our data';
           else if (us.our_rate != null && theirRate != null) {
             match = Math.abs(us.our_rate - theirRate) <= tol(us.insurer_slug) ? 'Match' : 'No Match';
           } else if (us.our_rate == null && (theirRate == null || theirRate === 0)) {
@@ -1900,15 +1900,15 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
           } else match = 'No Match';
           reportRows.push({
             'Tracker':            tracker,
-            'Insurer':            us.insurer,
-            'OD Rate %':          us.od_rate != null ? us.od_rate : '',
-            'TP Rate %':          us.tp_rate != null ? us.tp_rate : '',
-            'Rate %':             us.our_rate != null ? us.our_rate : '',
+            'Insurer':            us ? us.insurer : '',
+            'OD Rate %':          us && us.od_rate != null ? us.od_rate : '',
+            'TP Rate %':          us && us.tp_rate != null ? us.tp_rate : '',
+            'Rate %':             us && us.our_rate != null ? us.our_rate : '',
             'Operator Rate %':    theirRate != null ? theirRate : '',
-            'Margin %':           us.margin_pct   != null ? us.margin_pct   : '',
-            'Outgoing Rate %':    us.outgoing_pct != null ? us.outgoing_pct : '',
-            'Income Amount':      us.income   != null ? us.income   : '',
-            'Outgoing Amount':    us.outgoing != null ? us.outgoing : '',
+            'Margin %':           us && us.margin_pct   != null ? us.margin_pct   : '',
+            'Outgoing Rate %':    us && us.outgoing_pct != null ? us.outgoing_pct : '',
+            'Income Amount':      us && us.income   != null ? us.income   : '',
+            'Outgoing Amount':    us && us.outgoing != null ? us.outgoing : '',
             'Match':              match,
           });
         }
