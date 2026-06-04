@@ -3111,6 +3111,42 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
+  // ---- Oriental new-vehicle bundled (1+5) TW OD+TP sum ----
+  // Oriental's grid (image, USER-confirmed): a NEW two-wheeler sold as a Bundled
+  // Policy pays "20% on OD premium + 80% on TP Premium" for the 1st year. The two
+  // legs are ingested as TWO separate COMP_1+5 rows (rate_value 0.20 and 0.80,
+  // both age 0-0, segment "TW"). The operator's tracker reports the headline as the
+  // SUM of the legs (20+80 = 100), same convention as New India / National. But
+  // filterRulesByPolicy collapses COMP_1+5 to ONE surviving row, so the engine
+  // surfaced only one leg (0.20 = 20). Re-read both legs and sum: rate_value = 100
+  // (operator match); od_rate/tp_rate = the legs so income = 20%×OD + 80%×TP.
+  if (insurerSlug === 'oriental_insurance' &&
+      /^(TW|2W)$/.test(String(params.vehicleType || '').toUpperCase()) &&
+      (Number(params.vehicleAge) || 0) === 0 &&
+      rules.some(r => /1\+5/.test(String(r.rate_type || '')))) {
+    try {
+      const obKey = lookupKey + '||orientalTw15';
+      let obRules;
+      if (caches.lookup.has(obKey)) obRules = caches.lookup.get(obKey);
+      else { obRules = await lookupRates(pool, { ...baseLookup, ins_product: '', vehicle_age: null }); caches.lookup.set(obKey, obRules); }
+      const legs = obRules
+        .filter(r => /COMP_1\+5/i.test(String(r.rate_type || '')))
+        .map(r => Number(r.rate_value) || 0)
+        .filter(v => v > 0);
+      if (legs.length >= 2) {
+        const sum   = legs.reduce((a, b) => a + b, 0);
+        const odLeg = Math.min(...legs);   // 20% OD leg
+        const tpLeg = Math.max(...legs);   // 80% TP leg
+        const base = rules.find(r => /1\+5/.test(String(r.rate_type || ''))) || rules[0];
+        const clone = { ...base, rate_type: base.rate_type || 'COMP_1+5',
+          rate_value: +sum.toFixed(4), is_declined: 0,
+          od_rate: +odLeg.toFixed(4), tp_rate: +tpLeg.toFixed(4),
+          segment: (base.segment || 'TW') + ' (Oriental 1+5 OD+TP)' };
+        rules = [clone, ...rules.filter(r => r !== base)];
+      }
+    } catch (_) { /* leave rules unchanged on any failure */ }
+  }
+
   // ---- Kotak MISD flat-rate override ----
   // USER-confirmed: Kotak's MISD (Miscellaneous-D) segment has only TWO payout
   // rates — Tractor = 47.5% (any tractor on the acceptable-RTO list; the sheet's
