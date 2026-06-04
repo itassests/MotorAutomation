@@ -1343,6 +1343,43 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // ---- Kotak Pvt-Car SATP exact-RTO (Category) override ----
+  // Kotak's Pvt-Car SATP rate is keyed by the EXACT RTO code in rule.sub_type,
+  // which encodes the Category × Fuel: GJ05 = Category-1 (Diesel/CNG/LPG 25%,
+  // Petrol 45%), GJ01/GJ11 = Category-2 (Diesel 10%, Petrol 35%). Kotak has no
+  // rto_mappings, so region mis-resolves (GJ05 Surat → "Ahmedabad") and the
+  // matcher pools the wrong RTO's rows (GJ01 Cat-2 → Diesel 10%) instead of the
+  // policy's own GJ05 Cat-1 row (25%). Re-query by sub_type = the policy's RTO
+  // code (region cleared) so the exact RTO's rows are pooled; the existing fuel
+  // + make-exclusion filter then lands the right cell. Scoped to Kotak + CAR +
+  // TP-only (Comp rates are NCB-banded, not per-RTO — left untouched).
+  if (insurerSlug === 'kotak' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR' &&
+      params.rtoCode &&
+      (/TP|SATP|ACT/i.test(String(baseLookup.ins_product || '')) ||
+       (Number(params.odPremium != null ? params.odPremium : params.od_premium) || 0) === 0)) {
+    const krRaw = String(params.rtoCode).trim().toUpperCase().replace(/\s+/g, '');
+    const krVars = new Set([krRaw]);
+    const krM = krRaw.match(/^([A-Z]{2})0*(\d+)([A-Z]*)$/);
+    if (krM) { const [, st, num, suf] = krM; const n = String(parseInt(num, 10));
+      krVars.add(st + n + suf); krVars.add(st + n.padStart(2, '0') + suf); }
+    for (const v of krVars) {
+      const kKey = lookupKey + '||kotakRto:' + v;
+      let kRules;
+      if (caches.lookup.has(kKey)) kRules = caches.lookup.get(kKey);
+      else { kRules = await lookupRates(pool, { ...baseLookup, region: '', cluster: '', region_list: null, sub_type: v }); caches.lookup.set(kKey, kRules); }
+      const vNorm = v.replace(/[^A-Z0-9]/g, '');
+      const kExact = kRules.filter(r => /SATP/i.test(String(r.rate_type || '')) &&
+        String(r.sub_type || '').toUpperCase().replace(/[^A-Z0-9]/g, '') === vNorm);
+      const kFiltered = kExact.length > 0 ? filterRulesByPolicy(kExact, params) : [];
+      if (kFiltered.length > 0) {
+        const kTypes = new Set(kFiltered.map(r => r.rate_type));
+        rules = rules.filter(r => !kTypes.has(r.rate_type)).concat(kFiltered);
+        break;
+      }
+    }
+  }
+
   // SAOD second-pass — when SAOD-specific patterns yield 0 rules, retry as
   // Comp.  Per user's spec ("if SAOD has no rule, consider COMP for the
   // same combination") — Digit (and others) don't carry a dedicated SAOD
