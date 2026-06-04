@@ -2648,7 +2648,18 @@ function filterRulesByPolicy(rules, params, _trace) {
     // CC-based segment matching for TW
     // Skip for Royal generic Bike/Scooter segments (CC qualifier is a label,
     // not a real restriction — see comment above on isRoyalGenericTw).
-    if (cc && matches && !isRoyalGenericTw) {
+    // GUARD: this treats a number after "<=" / ">" / "N-N" in the segment as a CC
+    // band. That's only valid for genuine CC-banded segments — TW grids ("MC <= 180",
+    // "MC>350") and PCV taxi CC bands ("PCVTAXI<=1000CC"). It must NOT fire on
+    // COMMERCIAL tonnage-band segments whose numbers are TONNES, e.g. TATA's GCV
+    // grid "GCV <= 2" / "GCV > 7.5 <= 12": there the "2"/"12" is a weight band, and
+    // reading it as a CC ceiling drops every GCV row for any cc>that-tonnage (a
+    // 694cc CNG Ace → cc 694 <= "2" false → all GCV bands dropped → falls to Misc).
+    // So only apply when the policy is a two-wheeler OR the segment carries an
+    // explicit CC / motorcycle marker.
+    const polIsTwForCc = /^(TW|2W)$/.test(String(params.vehicleType || '').toUpperCase());
+    const segHasCcCtx  = /\bCC\b/i.test(seg) || /\b(MC|BIKE|SCOOTER|MOPED|MOTOR\s*CYCLE|CUBIC)\b/i.test(seg);
+    if (cc && matches && !isRoyalGenericTw && (polIsTwForCc || segHasCcCtx)) {
       if (seg.includes('<=') || seg.includes('< ')) {
         // e.g. "MC <= 180"
         const ccMatch = seg.match(/(\d+)/);
