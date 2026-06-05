@@ -2572,6 +2572,20 @@ function filterRulesByPolicy(rules, params, _trace) {
       else if (segIsTrailer && !policyIsTrailer) matches = false;
     }
 
+    // ICICI CV New/Old vehicle-age gate. ICICI's CV grid ships "... New" (brand-new
+    // vehicle, age 0) and "... Old" (used, age >= 1) variants of a segment but
+    // ingests BOTH age-unbounded, so an old vehicle also matches "New" and pickPrimary
+    // can take its (often lower) rate — e.g. a 7-yr Mahindra SUPRO (SCV <2450) took
+    // "New" 0.34 instead of "Old" 0.60. Gate the segment's New/Old token on the
+    // policy's vehicle age. ICICI-scoped: other insurers use "New" for new-BUSINESS,
+    // not new-vehicle (e.g. Oriental "New Bundled").
+    if (matches && rule.insurer === 'icici_lombard' && params.vehicleAge != null) {
+      const segNew = /\bNew\b/i.test(seg);
+      const segOld = /\bOld\b/i.test(seg);
+      if (segNew && !segOld && params.vehicleAge > 0) matches = false;
+      else if (segOld && !segNew && params.vehicleAge < 1) matches = false;
+    }
+
     // Vehicle age band (redundant with SQL filter but defends against unbounded rows)
     if (matches && params.vehicleAge != null && (rule.vehicle_age_min != null || rule.vehicle_age_max != null)) {
       if (rule.vehicle_age_min != null && params.vehicleAge < rule.vehicle_age_min) matches = false;
