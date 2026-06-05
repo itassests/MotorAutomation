@@ -3096,6 +3096,22 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged */ }
   }
 
+  // ---- United India PCV 3-Wheeler override (MP 25% / Other 40%) ----
+  if (insurerSlug === 'united_india_insurance' &&
+      String(params.vehicleType || '').toUpperCase() === 'PCV') {
+    try {
+      const { resolveUnitedPcvRate } = require('../services/united-car');
+      const up = resolveUnitedPcvRate(params);
+      if (up != null) {
+        const base = rules.find(r => /PCV|3\s*W|RICK/i.test(String(r.segment || ''))) || rules[0]
+          || { insurer: insurerSlug, region: resolvedRegion || null, segment: 'PCV 3W' };
+        const clone = { ...base, rate_type: base.rate_type || 'COMP', rate_value: up,
+          is_declined: 0, segment: 'PCV 3W (United grid)' };
+        rules = [clone, ...rules.filter(r => r !== base)];
+      }
+    } catch (_) { /* leave rules unchanged */ }
+  }
+
   // ---- HDFC Two-Wheeler (Comp / TP) grid override ----
   // The TW grid ("Grid - Comp, TP only" sheet) was mis-ingested — Delhi-NCR got
   // conflated with Haryana (0.55 instead of 0.60) and Bike-Comp rows were dropped.

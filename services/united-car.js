@@ -108,4 +108,20 @@ function resolveUnitedGcvRate(params) {
   return null; // above 7.5T → not covered by Sub Annexure-2
 }
 
-module.exports = { resolveUnitedCarRate, resolveUnitedGcvRate, isPreferredRto };
+// ---- PCV 3-Wheeler override ----
+// United's "Three Wheeled (Passenger Carrying)" commission (all bands incl. EV):
+// Madhya Pradesh 25%, Other than above States 40%. 3W autos (Atul/Bajaj-RE/TVS-King/
+// Piaggio/e-rickshaw) in non-MP states should take 40% but the broad scorer lands on
+// the MP 25% row. Scoped to 3W passenger autos; returns null otherwise (no regression).
+function resolveUnitedPcvRate(params) {
+  if (String(params.vehicleType || '').toUpperCase() !== 'PCV') return null;
+  const hay = `${params.vehicleCategory || ''} ${params.model || ''} ${params.make || ''}`.toUpperCase();
+  const is3W = /\b3\s*WH|\b3W\b|RIKSHAW|RICKSHAW|E-?RICK|THREE\s*WH/.test(hay) ||
+    (Number(params.seatingCapacity) > 0 && Number(params.seatingCapacity) <= 4 &&
+      /ATUL|PIAGGIO|\bRE\b|TVS\s*KING|BAJAJ|MAHINDRA\s*ALFA|TREO/.test(hay));
+  if (!is3W) return null;
+  const st = norm(params.rtoCode).slice(0, 2);
+  return st === 'MP' ? 0.25 : 0.40;
+}
+
+module.exports = { resolveUnitedCarRate, resolveUnitedGcvRate, resolveUnitedPcvRate, isPreferredRto };
