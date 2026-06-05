@@ -86,4 +86,26 @@ function resolveUnitedCarRate(params) {
   return null;
 }
 
-module.exports = { resolveUnitedCarRate, isPreferredRto };
+// ---- GCV preferred-RTO override (Sub Annexure-2) ----
+// GCV from "excluded states" registered in specific preferred RTOs gets a higher
+// commission per GVW band: <=2000kg(UP)->57.5%, 2000-3500kg(UP/HR/TN/RJ)->50%,
+// 3500-7500kg(UP/HR/TN/RJ)->27.5%. RTO-based (like the Pvt-Car 40%). Returns the
+// band rate when the policy's RTO is listed for its tonnage band, else null
+// (leave the engine's existing rule — no regression on un-listed RTOs).
+const GCV_PREF = require('../config/united_gcv_pref.json');
+const GCV_BANDS = GCV_PREF.bands.map(b => ({ maxTonnes: b.maxTonnes, rate: b.rate, set: new Set(b.rtos.map(norm)) }));
+function resolveUnitedGcvRate(params) {
+  if (String(params.vehicleType || '').toUpperCase() !== 'GCV') return null;
+  const t = Number(params.tonnage);
+  if (!Number.isFinite(t) || t <= 0) return null;
+  const variants = rtoVariants(params.rtoCode);
+  for (const b of GCV_BANDS) {
+    if (t <= b.maxTonnes) {
+      if (variants.some(v => b.set.has(v))) return b.rate;
+      return null; // correct band, RTO not preferred → leave to engine
+    }
+  }
+  return null; // above 7.5T → not covered by Sub Annexure-2
+}
+
+module.exports = { resolveUnitedCarRate, resolveUnitedGcvRate, isPreferredRto };
