@@ -3496,6 +3496,22 @@ function filterRulesByPolicy(rules, params, _trace) {
         return true;
       });
     }
+    // Go Digit Pvt-Car: the '4W SATP' sheet (bare rate_type 'MAX_CD2', fuel×cc
+    // bands) is TP-ONLY, but its Diesel/Petrol SEGMENT match lets it outscore the
+    // blank-segment COMP_NCB row for a Comprehensive car — a Goa diesel Mercedes
+    // took SATP 'Diesel>1500' 0.505 instead of COMP_NCB 0.24 (=operator). When the
+    // policy is Comp/SAOD AND a COMP_*/SAOD_* leg is present in the pool, drop the
+    // '4W SATP' rows. Pool-aware: the SATP-only Good/Bad clusters (UP_Good, Mumbai,
+    // … — no Comp grid) have no COMP_* leg, so they keep SATP (no new No-Rule).
+    if (kept.length && kept[0].rule.insurer === 'go_digit' &&
+        String(params.vehicleType || '').toUpperCase() === 'CAR') {
+      const ipc = String(params.insProduct || '').toUpperCase();
+      if (ipc === 'COMP' || ipc === 'SAOD') {
+        const hasCompLeg = kept.some(s => /^(COMP|SAOD)[_\s]/i.test(s.rule.rate_type || ''));
+        if (hasCompLeg) kept = kept.filter(s => !/4W\s*SATP/i.test(s.rule.sheet_name || ''));
+      }
+    }
+
     if (_trace) _trace.push({ stage: 'final', count: kept.length,
       list: kept.map(s => ({ rt: s.rule.rate_type, seg: s.rule.segment, score: s.score })) });
 
