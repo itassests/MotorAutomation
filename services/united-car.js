@@ -42,12 +42,16 @@ function isPreferredRto(rtoCode) {
   if (/^KL\d+$/.test(n) && !KL_EXCEPT.has(n)) return true; // Kerala: all except KL15
   return false;
 }
-function isNew(bt) { return /^NEW/.test(String(bt || '').toUpperCase().trim()); }
-// Policy-type bucket: Bundled(1+3)=New comprehensive, Package=Renewal/Rollover comp.
-function policyBucket(ip, bt) {
+// "New" = a NEW VEHICLE (age 0), NOT "New Business". The source BUSINESS_TYPE_ID
+// says "New Business" even for a 10-yr-old used car (it means new policy/customer);
+// SUB_BUSINESS_TYPE_ID="Used Rollover" + AGE=10 is the truth. Bundled(1+3) is for a
+// brand-new vehicle (age 0); any aged vehicle is a Rollover → Package.
+function isNewVehicle(age) { return Number(age) === 0; }
+// Policy-type bucket: Bundled(1+3)=brand-new vehicle, Package=Renewal/Rollover.
+function policyBucket(ip, age) {
   if (ip === 'SAOD') return 'SAOD';
   if (ip === 'TP') return 'SATP';
-  return isNew(bt) ? 'BUNDLED' : 'PACKAGE'; // Comp / Package / 1+1 → by business type
+  return isNewVehicle(age) ? 'BUNDLED' : 'PACKAGE';
 }
 // Segment bucket (Non-Electric).
 function segBucket(fuel, cc, make) {
@@ -64,14 +68,14 @@ function resolveUnitedCarRate(params) {
   const fuel = String(params.fuelType || '').toUpperCase();
   const isEV = /ELECTRIC|\bEV\b|BATTERY/.test(fuel);
   const ip = String(params.insProduct || '').toUpperCase();
-  const bt = params.businessType;
-  const pol = policyBucket(ip, bt);
+  const age = params.vehicleAge;
+  const pol = policyBucket(ip, age);
 
   if (isEV) {
     if (pol === 'BUNDLED') return 0.275;
     if (pol === 'PACKAGE') return 0.17;
-    // SAOD / SATP electric: Brand-New 22.5%, Renewal/Rollover 17%
-    return isNew(bt) ? 0.225 : 0.17;
+    // SAOD / SATP electric: Brand-New (age 0) 22.5%, Renewal/Rollover 17%
+    return isNewVehicle(age) ? 0.225 : 0.17;
   }
 
   const seg = segBucket(fuel, params.cc, params.make);
