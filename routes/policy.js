@@ -1136,6 +1136,24 @@ function extractPolicyParams(policy) {
   const segment = get('SEGMENT') || get('Segment') || '';
   const cc = get('CC') || '';
   const registrationDate = get('DATE OF REGISTRATION') || get('REGISTRATION DATE') || '';
+
+  // Bundled tenure (1+1 / 1+3 / 1+5 …) — the rate_type for a Comprehensive policy is
+  // keyed by the OD-period and TP-period TENURE, NOT vehicle age or business type
+  // (a 10-yr-old Comp car is still 1+1). Read OD start/end + TP start/end dates and
+  // express as whole years → bundledTag "od+tp". 1+1 = annual comp (any age); 1+3 /
+  // 1+5 = long-term TP (genuinely new vehicles only).
+  const _years = (a, b) => {
+    if (!a || !b) return null;
+    const d1 = new Date(a), d2 = new Date(b);
+    if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return null;
+    const y = (d2 - d1) / (365.25 * 24 * 3600 * 1000);
+    return y > 0 ? Math.max(1, Math.round(y)) : null;
+  };
+  const odTenure = _years(get('POLICY START DATE') || get('OD START DATE') || get('OD_START_DATE') || get('OD_Start_Date'),
+                          get('POLICY END DATE') || get('OD END DATE') || get('OD_END_DATE') || get('OD_End_Date'));
+  const tpTenure = _years(get('TP POLICY START DATE') || get('TP_POLICY_START_DATE') || get('TP START DATE'),
+                          get('TP POLICY END DATE') || get('TP_POLICY_END_DATE') || get('TP END DATE'));
+  const bundledTag = (odTenure && tpTenure) ? `${odTenure}+${tpTenure}` : null;
   const vehicleSubModel = get('VEHICAL SUBMODAL') || '';
   const vehicleRegNo = (get('VEHICLE REGISTRATION NO') || get('VEHICLE REG NO') || get('VEHICLE NO') || get('REGISTRATION NO') || get('REG NO') || get('REGN NO') || get('VEHICLE REGISTRATION NUMBER') || '').toString().trim();
 
@@ -1337,6 +1355,10 @@ function extractPolicyParams(policy) {
     // OD/TP policy term dates (TRN_PrarambhMotorMISUpdation). Drives which
     // multi-year Comp grid the policy routes to. Null when unknown.
     policyTenure: get('_tenureBucket') || null,
+    // Bundled tenure read straight from OD/TP period dates (od+tp years), e.g.
+    // '1+1','1+3','1+5'. Authoritative selector for bundled COMP rate_types.
+    odTenure, tpTenure,
+    bundledTag: bundledTag || (get('_tenureBucket') || null),
   };
 }
 
@@ -2645,8 +2667,33 @@ function filterRulesByPolicy(rules, params, _trace) {
       else if (segOld && !segNew && params.vehicleAge < 1) matches = false;
     }
 
-    // Vehicle age band (redundant with SQL filter but defends against unbounded rows)
-    if (matches && params.vehicleAge != null && (rule.vehicle_age_min != null || rule.vehicle_age_max != null)) {
+    // Bundled-tenure gate. A bundled COMP rate_type ("COMP_1+1", "1+3_MAX_CD2",
+    // "COMP_1+5"…) is selected by the policy's OD+TP TENURE (from the dates), NOT
+    // vehicle age. Some grids mis-ingest the bundled row with a vehicle_age band of
+    // 0-0 (e.g. Magma "COMP_1+1" age 0-0) which would wrongly drop it for an aged
+    // Comp car — but a 10-yr Comp policy is still 1+1. So: when the rule's rate_type
+    // encodes a tenure and the policy's bundledTag is known, gate on the tenure
+    // match and SKIP the vehicle-age band for that rule.
+    // Insurer-scoped: only Magma mis-ingests the bundled row with a 0-0 age band
+    // that needs the tenure override. tata/icici/etc. already select their bundled
+    // tenure correctly, and a global gate disrupted them (-5 net), so restrict it.
+    const _tenureGateInsurers = new Set(['magma_hdi']);
+    const _rtTenure = (_tenureGateInsurers.has(rule.insurer))
+      ? (() => { const m = String(rule.rate_type || '').match(/(\d+)\s*\+\s*(\d+)/); return m ? `${+m[1]}+${+m[2]}` : null; })()
+      : null;
+    let _bundledSkipAge = false;
+    if (matches && _rtTenure) {
+      if (params.bundledTag) {
+        if (_rtTenure === params.bundledTag) { matches = true; score += 6; _bundledSkipAge = true; }
+        else matches = false;            // policy tenure ≠ this bundled row's tenure → drop
+      }
+      // bundledTag unknown → fall through to the existing age/leg gates unchanged.
+    }
+
+    // Vehicle age band (redundant with SQL filter but defends against unbounded rows).
+    // Skipped for a tenure-matched bundled rate_type (its 0-0 age band is a mis-
+    // ingestion; the tenure match above is authoritative).
+    if (matches && !_bundledSkipAge && params.vehicleAge != null && (rule.vehicle_age_min != null || rule.vehicle_age_max != null)) {
       if (rule.vehicle_age_min != null && params.vehicleAge < rule.vehicle_age_min) matches = false;
       if (matches && rule.vehicle_age_max != null && params.vehicleAge > rule.vehicle_age_max) matches = false;
     }
@@ -3045,6 +3092,18 @@ function filterRulesByPolicy(rules, params, _trace) {
           }
           // Bus policy (clean "…BUS…" category, non-route) must not take a Taxi row.
           else if (policyIsBus && !policyIsTaxi && segIsTaxi && !segIsBus && hasBusSeg) {
+            matches = false;
+          }
+          // Staff/School bus must take a dedicated BUS segment when one exists — not
+          // a generic "4W PCV > 6" / "PCV" passenger band. A "PCV-Staff Bus" (33-seat
+          // Tata bus) was landing on "4W PCV > 6" 5% instead of "Staff Bus" 62.5%
+          // because the generic band out-scored the +6 bus boost. Drop the non-Bus,
+          // non-Taxi PCV segments for a bus policy when a Bus segment is available.
+          // United-scoped: tata/others have their own School/Staff-bus handling that a
+          // global force disrupts (-2/-3 on tata's 128 buses); United needs it because
+          // its region never resolves so the generic band wins the broad pool.
+          else if (rule.insurer === 'united_india_insurance' &&
+                   policyIsBus && !policyIsTaxi && !segIsBus && !segIsTaxi && hasBusSeg) {
             matches = false;
           }
         }
