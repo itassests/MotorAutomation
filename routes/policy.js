@@ -3107,6 +3107,25 @@ function filterRulesByPolicy(rules, params, _trace) {
       }
     }
 
+    // ICICI sub-cluster rows: the CV grid prices some cells by an RTO SUB-CLUSTER
+    // (GJ1/GJ2/AP1…) that the ingest stored in rule.make (make="GJ1" → 0.55,
+    // make="GJ2" → 0.45, make="" → OTHERS 0). That's NOT a manufacturer, so the
+    // make gate below would wrongly drop it (policy make "M&M" ≠ "GJ1") and only the
+    // OTHERS=0 survives. Resolve the policy's sub-cluster (services/icici-cv-zone,
+    // from the cluster master keyed by band+city+make-category) and keep the row
+    // whose make === that sub-cluster; the make="" OTHERS row stays as fallback and
+    // the matched sub-cluster outscores it. Unresolved → drop the coded rows (OTHERS
+    // wins = prior behaviour, no regression).
+    let _iciciSubRow = false;
+    if (matches && rule.insurer === 'icici_lombard' && rule.make) {
+      const _zone = require('../services/icici-cv-zone');
+      if (_zone.isSubClusterCode(rule.make)) {
+        _iciciSubRow = true;
+        if (params._iciciSubCluster === undefined) params._iciciSubCluster = _zone.resolveIciciSubCluster(params) || null;
+        if (!params._iciciSubCluster || String(rule.make).trim().toUpperCase() !== params._iciciSubCluster) matches = false;
+        else score += 8;
+      }
+    }
     // Make matching from rule.make field — "All" / "Any" / "*" / blank = wildcard,
     // "Others" = catch-all fallback (kept with low priority).
     //
@@ -3116,7 +3135,7 @@ function filterRulesByPolicy(rules, params, _trace) {
     // that category in vehicleCategory (e.g. "MISC - D - Loader"). So for MISC
     // policies we match rule.make tokens against the category keyword, not the
     // manufacturer name.
-    if (matches && rule.make) {
+    if (matches && rule.make && !_iciciSubRow) {
       const ruleMake = (rule.make || '').toUpperCase();
       const primaryMake = (make || '').split(/\s+/)[0];
       const isWildcard = ruleMake === 'ALL' || ruleMake === 'ANY' || ruleMake === '*' || ruleMake === '';
