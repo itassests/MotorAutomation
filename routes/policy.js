@@ -3106,6 +3106,27 @@ function filterRulesByPolicy(rules, params, _trace) {
                    policyIsBus && !policyIsTaxi && !segIsBus && !segIsTaxi && hasBusSeg) {
             matches = false;
           }
+          // United PCV-TAXI cars ("PCV-TAXI (4-6)STR" / "(7-10)STR") are 4-wheeler
+          // passenger cabs (<=10 seats). United prices them under the seat-banded
+          // "4W PCV > 6" PCC<=10 band (=20% in most states), NOT the "Taxi" segment
+          // (15%/25%) and NOT "2W PCV" (10%). The engine was landing on 2W PCV /
+          // Taxi and under-rating (our 10/15/25 vs operator 20). In the whole
+          // United PCV set the operator NEVER pays the Taxi-segment rate — taxi
+          // cabs always take the 4W-PCV band — so drop 2W/3W PCV and Taxi rows for
+          // a taxi-cab and boost the 4W PCV seat-banded segment so it wins. Scoped
+          // to United (magma/iffco/national/oriental/zuno reuse the same 2W/3W/4W
+          // PCV labels with their own grids — a global drop would regress them).
+          if (rule.insurer === 'united_india_insurance' && policyIsTaxi && !policyIsRickshaw) {
+            const segIs2wOr3wPcv = /\b[23]\s*W\s*PCV\b/i.test(seg);
+            const segIsFourWPcv  = /\b4\s*W\s*PCV\b/i.test(seg);
+            // 2W/3W PCV are never correct for a 4-wheeler cab → hard-drop.
+            // Boost 4W PCV ABOVE the Taxi segment (+12 vs Taxi's +8) rather than
+            // dropping Taxi — so the seat-banded 4W-PCV band wins whenever it
+            // matches, but Taxi survives as a fallback if (for some region/seat)
+            // no 4W-PCV row resolves, avoiding a no-rule strand (e.g. BG1/1268).
+            if (segIs2wOr3wPcv) matches = false;
+            else if (segIsFourWPcv) score += 12;
+          }
         }
         // PCV catch-all: source category not reliable — let scoring pick
         // the best segment.  segHasVehicleHint adds a small bonus when

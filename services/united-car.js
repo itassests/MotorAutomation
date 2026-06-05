@@ -80,6 +80,13 @@ function resolveUnitedCarRate(params) {
 
   const seg = segBucket(fuel, params.cc, params.make);
   // Preferred-RTO 40% override — all segments EXCEPT diesel<=1500.
+  // NOTE: this fires for TP-only policies too, by design. We TRIED gating it on
+  // odPremium===0 (genuine standalone-TP, since the 40% is a NET=OD+TP city
+  // incentive) but it's NET-NEGATIVE: the operator is inconsistent on TP-only
+  // preferred-RTO cars — it paid 40% to 7 of 8 identical Delhi/TN bucket-C
+  // TP-only cars and 20% to exactly one (DL10/6455 Maruti EECO DL09). No policy
+  // attribute separates them, so the OD-gate fixed 1 and broke 7 (net -5).
+  // Keeping the broad override (matches 7/8); DL10/6455 is an operator outlier.
   if (seg !== 'A' && isPreferredRto(params.rtoCode)) return 0.40;
 
   if (pol === 'SAOD') return 0.12;
