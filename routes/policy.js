@@ -2594,6 +2594,24 @@ function filterRulesByPolicy(rules, params, _trace) {
       }
     }
 
+    // Go Digit TW 180-350cc make split: the band is split into Royal Enfield
+    // ("MC_180-350_RE") vs everyone else ("MC_180-350_Other than RE") in the
+    // SEGMENT TEXT — both rows carry a blank make column, so without this gate
+    // they tie and pickPrimary grabs the (pricier) RE row (a Honda Hornet 184cc
+    // took RE 1+1 0.52 instead of "Other than RE" 0.30 = operator). Gate on
+    // whether the policy is a Royal Enfield. Go Digit-scoped.
+    if (matches && rule.insurer === 'go_digit' && /\bRE\b|_RE\b|OTHER\s*THAN\s*RE/i.test(seg)) {
+      const segOtherThanRE = /OTHER\s*THAN\s*RE/i.test(seg);
+      const segIsRE = !segOtherThanRE && /\bRE\b|_RE\b/i.test(seg);
+      if (segOtherThanRE || segIsRE) {
+        const policyIsRE = /ROYAL\s*ENFIELD|ENFIELD/i.test(String(make || '')) ||
+          /\bBULLET\b|\bCLASSIC\b|\bMETEOR\b|HIMALAYAN|INTERCEPTOR|CONTINENTAL\s*GT|\bHUNTER\b|THUNDERBIRD|\bSCRAM\b|SHOTGUN|\bGUERRILLA\b/i.test(`${make} ${model}`);
+        if (segIsRE && !policyIsRE) matches = false;        // non-RE bike must not take the RE row
+        else if (segOtherThanRE && policyIsRE) matches = false; // RE bike must not take "Other than RE"
+        else score += 5;
+      }
+    }
+
     // Segment-named body type. Some grids (ICICI) split a tonnage band by body in
     // the SEGMENT TEXT — "MHCV 12-20T Truck" / "... Tipper" / "... Tanker" /
     // "... Trailer" / "... Tipper/ Dumper" — rather than in the rate_type prefix
