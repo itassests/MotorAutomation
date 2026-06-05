@@ -1624,6 +1624,33 @@ function tenureToBucket(t) {
 }
 
 /**
+ * Parse a VEHICLE-AGE range out of a rule's segment text. Go Digit encodes the
+ * age band only in the segment string (the age columns are null), e.g.
+ *   "PCV3W non-diesel Age 3-5"     → { min: 3,  max: 5 }
+ *   "PCV3W non-diesel Age 6+"      → { min: 6,  max: 99 }
+ *   "PCV3W non-diesel Age 0"       → { min: 0,  max: 0 }
+ *   "PCV3W non-diesel Age 0 & 1"   → { min: 0,  max: 1 }
+ *   "Tractor 1+ age" / "0 age"     → reversed word order
+ *   "Tractor Age 1-10 years"       → { min: 1,  max: 10 }
+ * Returns null when the segment carries no age token (so callers leave matching
+ * unchanged). Used to gate which age band a policy's vehicleAge falls into —
+ * without it, all three bands match equally and pickPrimary grabs an arbitrary
+ * (often the cheapest) one (a 7-yr auto took "Age 3-5" 9.5% not "Age 6+" 65%).
+ */
+function extractSegmentAgeRange(seg) {
+  const s = String(seg || '');
+  if (!/age/i.test(s)) return null;
+  let m;
+  if ((m = s.match(/age\s*(\d+)\s*[-–]\s*(\d+)/i))) return { min: +m[1], max: +m[2] };
+  if ((m = s.match(/age\s*(\d+)\s*&\s*(\d+)/i)))    return { min: +m[1], max: +m[2] };
+  if ((m = s.match(/age\s*(\d+)\s*\+/i)))           return { min: +m[1], max: 99 };
+  if ((m = s.match(/(\d+)\s*\+\s*age/i)))           return { min: +m[1], max: 99 };
+  if ((m = s.match(/age\s*(\d+)\b/i)))              return { min: +m[1], max: +m[1] };
+  if ((m = s.match(/(\d+)\s*age/i)))                return { min: +m[1], max: +m[1] };
+  return null;
+}
+
+/**
  * Parse a tonnage range out of a rule's segment text.
  *   "GCV4 2.5 To 3.5T"   → { min: 2.5, max: 3.5 }
  *   "GCV4 upto 2.5T"     → { min: 0,   max: 2.5 }
@@ -2550,6 +2577,20 @@ function filterRulesByPolicy(rules, params, _trace) {
         const overlaps = !(policyHi < segTonRange.min || policyLo > segTonRange.max);
         if (!overlaps) matches = false;
         else score += 5;
+      }
+    }
+
+    // Vehicle-age band encoded in segment text (Go Digit). The age columns are
+    // null for these rows — the band lives only in the segment string ("Age 3-5",
+    // "Age 6+", "Age 0"). Drop a rule whose age band excludes the policy's
+    // vehicleAge so the correct band wins (a 7-yr auto must take "Age 6+" 65%,
+    // not the cheaper "Age 3-5" 9.5%). Go Digit-scoped — only it ships age-banded
+    // segments; the 3 other "…age…" segments elsewhere are "Garbage" false hits.
+    if (matches && rule.insurer === 'go_digit' && params.vehicleAge != null) {
+      const segAge = extractSegmentAgeRange(seg);
+      if (segAge) {
+        if (params.vehicleAge < segAge.min || params.vehicleAge > segAge.max) matches = false;
+        else score += 4;
       }
     }
 
