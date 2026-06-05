@@ -1192,6 +1192,34 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
     if (!resolvedRegion && fullState) resolvedRegion = fullState;
   }
+  // United India GCV funnel: 0 rto_mappings → region never resolves, and a 3W/light
+  // goods category often has a null Tonnes field. Two funnel steps so the existing
+  // weight-band + state lookup can fire deterministically:
+  //   (1) region = registration STATE NAME (from the RTO prefix),
+  //   (2) tonnage = derived from the CATEGORY text ("GCV - 4W 2.5-3.5Tn",
+  //       "GCV - 4W Upto 2.5Tn", "GCV - 4W Above 40Tn") when Tonnes is null.
+  // GCV-scoped (PCV/TW handled separately); include_null_region keeps national rows.
+  let unitedGcvFunnel = false;
+  if (insurerSlug === 'united_india_insurance') {
+    const P = require('./policy');
+    const SPF = P.STATE_PREFIX_FULL || {};
+    const stateName = SPF[rtoStatePrefix(params.rtoCode)] || params._stateName || '';
+    // Region = registration STATE NAME for ALL United products (it ships 0 rto_mappings).
+    if (!resolvedRegion && stateName) { resolvedRegion = stateName; unitedGcvFunnel = true; }
+    if (String(params.vehicleType || '').toUpperCase() === 'GCV' && params.tonnage == null) {
+      // Take the tonnage NUMBER from the category and let it fall into whatever
+      // weight band it lands in (e.g. 2.5 → the 2-3.5 band). Keep it simple — one
+      // value, mapped by the normal band gate. "X-YTn" → the in-between value,
+      // "Upto XTn" → X, "Above XTn" → X.
+      const cat = String(params.vehicleCategory || '');
+      let m, t = null;
+      if ((m = cat.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*Tn/i))) { t = (+m[1] + +m[2]) / 2; }
+      else if ((m = cat.match(/Upto\s*(\d+(?:\.\d+)?)\s*Tn/i))) { t = +m[1]; }
+      else if ((m = cat.match(/Above\s*(\d+(?:\.\d+)?)\s*Tn/i))) { t = (+m[1]) + 1; }
+      if (t != null) { params.tonnage = t; params.tonnageMin = t; params.tonnageMax = t; params.tonnageCoarse = false; }
+    }
+  }
+
   // Shriram private-car fuel bucketing: the grid files only PRIVATE CAR PETROL
   // and PRIVATE CAR DIESEL — there is NO CNG/LPG private-car row. Per product
   // owner:
@@ -1290,7 +1318,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     ins_product: params.insProduct || '',
     // Shriram: state-name region filter must still surface national
     // (NULL/'' region = "PAN INDIA") rows.
-    include_null_region: insurerSlug === 'shriram',
+    include_null_region: insurerSlug === 'shriram' || unitedGcvFunnel,
     // Shriram: match the verbose card labels by substring tokens (overrides
     // region/cluster when present).
     ...(shriramRegionTokens
