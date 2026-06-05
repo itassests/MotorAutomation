@@ -31,6 +31,7 @@ const { getPrarambhUatPool } = require('../db/prarambh-uat-connection');
 const { getBeeinsuredPool } = require('../db/beeinsured-connection');
 const { lookupRates, resolveRTO, rtoProductFor } = require('../services/rate-lookup');
 const { determinePremium } = require('../services/calculator');
+const { reconcileParamsWithPR } = require('../services/pr-reconcile');
 const policyRouter = require('./policy');
 
 // Bajaj RTO-code → district-region map. Bajaj's rate_rules carry district-level
@@ -564,7 +565,7 @@ async function loadPrIndex(pool) {
   const r = await pool.request().query(
     `SELECT pr.policy_no, pr.vehicle_no, pr.od_premium, pr.addon_premium, pr.tp_premium,
             pr.net_amount, pr.gross_amount, pr.sum_insured, pr.ncb, pr.fuel_type, pr.cc,
-            pr.tonnage, pr.product, pr.raw_json,
+            pr.tonnage, pr.seating, pr.product, pr.raw_json,
             pr.upload_id, u.insurer_label, u.month, u.year
      FROM pr_rows pr
      INNER JOIN pr_uploads u ON u.id = pr.upload_id
@@ -922,6 +923,36 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // Nil-Dep (zero-dep) cover flag from Prarambh_Live (1=Yes / 2=No), stamped on
   // the row by the bulk pre-fetch. Drives Royal GCV Comp_NilDep vs Comp_NoNilDep.
   if (policy._depreciation != null) params._depreciation = Number(policy._depreciation);
+
+  // PR (Premium Register) reconciliation — the operator's own export is the
+  // authoritative source for the key rating factors. When a PR row matches (by
+  // policy_no, with stripped-variant + vehicle-no fallback), PR wins for CC,
+  // NCB, FuelType, Tonnage, Seating and Product wherever it carries a valid
+  // value (fixes e.g. a 100cc bike whose Prarambh CC is the 1998 MFG year).
+  // Runs before every downstream gate so the corrected params propagate.
+  //
+  // Exclusions: Royal's PR export carries NO cc (so it gains nothing from the
+  // override that drives the gains elsewhere), and overriding its fuel/seating/
+  // NCB interacts with Royal's heavily-tuned grids to lose 2 matches with zero
+  // offsetting gain (verified: full reconcile 376 vs no-reconcile 378, no single
+  // factor isolates it). Skip Royal until per-factor handling is justified.
+  const PR_RECONCILE_EXCLUDE = new Set(['royal_sundaram']);
+  if (prIndex && !PR_RECONCILE_EXCLUDE.has(insurerSlug) && (params._policy_no || params.vehicleRegNo)) {
+    let prMatch = null;
+    if (params._policy_no) {
+      const pk = String(params._policy_no).trim().toUpperCase();
+      prMatch = prIndex.get(pk) || null;
+      if (!prMatch) for (const v of policyKeyVariants(params._policy_no)) { prMatch = prIndex.get(v); if (prMatch) break; }
+    }
+    if (!prMatch && params.vehicleRegNo && prIndex._byVehicle && prIndex._normVeh) {
+      const vk = prIndex._normVeh(params.vehicleRegNo);
+      if (vk && vk.length >= 6) prMatch = prIndex._byVehicle.get(vk) || null;
+    }
+    if (prMatch) {
+      const ch = reconcileParamsWithPR(params, prMatch);
+      if (ch) params._prReconciled = ch;
+    }
+  }
 
   // Royal Pvt-Car Comp grid bands its payout by OD discount (stored in
   // rate_rules.volume_tier: "Upto 20" / "20-50" / "50-60" / "60-70" / ">70").
