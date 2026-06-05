@@ -12,14 +12,41 @@
  * resolve; caller leaves matching unchanged). The policy.js make-gate then keeps
  * the rate row whose make === resolved sub-cluster (or the make="" OTHERS fallback).
  */
-let ZONE = null, RTO_CITY = null;
+let ZONE = null, RTO_CITY = null, ZONE_ALT = null;
+// Connector-insensitive city form: drop the literal "AND" token so the RTO
+// master's spelling ("DADRANAGARHAVELI", "DAMANDIU") joins the cluster file's
+// ("DADRAANDNAGARHAVELI", "DAMANANDDIU"). Applied to BOTH sides, so even an
+// accidental mid-word strip transforms identically and still matches.
+const andless = s => String(s || '').replace(/AND/g, '');
 function load() {
   if (ZONE) return;
   try { ZONE = require('../config/icici_cv_zone.json'); } catch (_) { ZONE = {}; }
   try { RTO_CITY = require('../config/icici_rto_city.json'); } catch (_) { RTO_CITY = {}; }
+  // Build an AND-stripped alias index (fallback only; original keys win).
+  ZONE_ALT = {};
+  for (const k in ZONE) {
+    const i1 = k.indexOf('|'), i2 = k.indexOf('|', i1 + 1);
+    if (i1 < 0 || i2 < 0) continue;
+    const city = k.slice(i1 + 1, i2), alt = andless(city);
+    if (alt === city) continue;
+    const ak = k.slice(0, i1 + 1) + alt + k.slice(i2);
+    if (ZONE_ALT[ak] === undefined) ZONE_ALT[ak] = ZONE[k];
+  }
 }
 
 const norm = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+// RTO-code padding variants: bulk may pass the unpadded form (DD1, GJ8) it used
+// for the rto_mapping lookup, while RTO_CITY is keyed by the master's padded
+// spelling (DD01, GJ08). Try both so the zone join survives either form.
+function rtoVariants(code) {
+  const c = norm(code);
+  const m = c.match(/^([A-Z]+)(\d+)$/);
+  if (!m) return [c];
+  const letters = m[1], n = parseInt(m[2], 10);
+  const out = [c, letters + n, letters + String(n).padStart(2, '0')];
+  return [...new Set(out)];
+}
 
 // (make, model, vehicleType) → the cluster-master make-category bucket.
 function makeCategory(make, model, vt) {
@@ -63,10 +90,17 @@ function resolveIciciSubCluster(params) {
   const bk = bandKey(params.vehicleType, params.tonnage);
   if (!bk) return null;
   const cat = makeCategory(params.make, params.model, params.vehicleType);
-  const rto = norm(params.rtoCode);
-  const cities = (RTO_CITY[rto] || []);
+  const cities = [];
+  for (const v of rtoVariants(params.rtoCode)) {
+    if (RTO_CITY[v]) for (const c of RTO_CITY[v]) if (!cities.includes(c)) cities.push(c);
+  }
   for (const city of cities) {
     const sub = ZONE[bk + '|' + city + '|' + cat];
+    if (sub) return sub;
+  }
+  // Connector-insensitive retry (handles "DADRANAGARHAVELI" ↔ "DADRAANDNAGARHAVELI").
+  for (const city of cities) {
+    const sub = ZONE_ALT[bk + '|' + andless(city) + '|' + cat];
     if (sub) return sub;
   }
   return null;
