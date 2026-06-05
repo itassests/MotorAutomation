@@ -1,0 +1,15 @@
+{
+  "_comment": "United India Sub Annexure-3: preferred-city RTOs eligible for 40% Private Car commission (all segments EXCEPT diesel<=1500cc). Kerala = all KL RTOs except KL15 (handled by keralaAllExcept).",
+  "rtos": [
+    "TN01","TN02","TN03","TN04","TN05","TN06","TN07","TN09","TN10","TN11","TN12","TN13","TN14","TN18","TN22","TN85",
+    "DL01","DL02","DL03","DL04","DL05","DL06","DL07","DL08","DL09","DL10","DL11","DL12","DL13",
+    "KA01","KA02","KA03","KA04","KA05","KA09","KA12","KA41","KA50","KA51","KA52","KA53","KA57","KA58","KA59",
+    "MH01","MH02","MH03","MH47","MH48","MH12","MH14","MH53","MH54",
+    "GJ01","GJ27","GJ38","GJ05","GJ06",
+    "AP09","AP10","AP31","AP32","AP33","AP34","AP39","AP40",
+    "TS08","TS09","TS10","TS11","TS12","TS13","TS14",
+    "TG08","TG09","TG10","TG11","TG12","TG13","TG14",
+    "RJ14","RJ45","RJ60"
+  ],
+  "keralaAllExcept": ["KL15"]
+}

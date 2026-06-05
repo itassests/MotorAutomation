@@ -3055,6 +3055,28 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
+  // ---- United India PRIVATE CAR grid override ----
+  // United's Pvt-Car commission is CC × fuel × make × policy-type PLUS a preferred-
+  // city-RTO 40% override (Sub Annexure-3) — NOT region-based. The PDF-sourced
+  // rules were mis-parsed (region=RTO code, no make), so CAR mis-rated (our 5 vs
+  // operator 40). services/united-car.js computes the rate % directly from params;
+  // clone it onto the pool so it wins. Returns null when it can't decide → leave
+  // the engine's existing rule (no regression on un-handled shapes).
+  if (insurerSlug === 'united_india_insurance' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR') {
+    try {
+      const { resolveUnitedCarRate } = require('../services/united-car');
+      const ur = resolveUnitedCarRate(params);
+      if (ur != null) {
+        const base = rules.find(r => /CAR|PVT/i.test(String(r.segment || ''))) || rules[0]
+          || { insurer: insurerSlug, region: resolvedRegion || null, segment: 'Pvt Car' };
+        const clone = { ...base, rate_type: base.rate_type || 'COMP', rate_value: ur,
+          is_declined: 0, segment: 'Pvt Car (United grid)' };
+        rules = [clone, ...rules.filter(r => r !== base)];
+      }
+    } catch (_) { /* leave rules unchanged */ }
+  }
+
   // ---- HDFC Two-Wheeler (Comp / TP) grid override ----
   // The TW grid ("Grid - Comp, TP only" sheet) was mis-ingested — Delhi-NCR got
   // conflated with Haryana (0.55 instead of 0.60) and Bike-Comp rows were dropped.
