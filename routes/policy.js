@@ -1664,6 +1664,35 @@ function extractSegmentTonnageRange(seg) {
       return { min: parseFloat(m[1]), max: Infinity };
     }
   }
+  // kg-based GVW bands — the "GVW" suffix means the numbers are KILOGRAMS, so
+  // divide by 1000 to get tonnes. Covers ICICI ("SCV <2450 GVW", "SCV >= 2450
+  // GVW") and Shriram ("GCCV HCV 12001 TO 20000 GVW", "GCCV LCV UPTO 2000 GVW",
+  // "ABOVE 2001 GVW TO 2800 GVW", "Above 50000 GVW"). Without this a 16T truck
+  // text-matched a "<2450 GVW" (<2.45T) small-vehicle segment because the band
+  // was unparsed → no tonnage gate. Numbers are 3-6 digits (kg).
+  if (/GVW/i.test(s)) {
+    const kg = (x) => parseFloat(x) / 1000;
+    // Range: "12001 TO 20000 GVW", "2001-2800 GVW", "ABOVE 2001 GVW TO 2800 GVW".
+    if ((m = s.match(/(\d{3,6})\s*(?:GVW)?\s*(?:to|-)\s*(\d{3,6})\s*GVW/i))) {
+      return { min: kg(m[1]), max: kg(m[2]) };
+    }
+    // Lower-open: "UPTO 2000 GVW", "<2450 GVW", "BELOW 2450 GVW".
+    if ((m = s.match(/(?:upto|up\s*to|<\s*=?|below)\s*(\d{3,6})\s*GVW/i))) {
+      return { min: 0, max: kg(m[1]) };
+    }
+    // Upper-open: "Above 50000 GVW", ">= 2450 GVW". SCV (Small Commercial Vehicle)
+    // is GVW < 3.5T by definition, so a ">=" SCV band caps at 3.5T (a heavy truck
+    // must NOT fall into an SCV segment); other "Above N GVW" bands are open.
+    if ((m = s.match(/(?:above|>\s*=?)\s*(\d{3,6})\s*GVW/i))) {
+      return { min: kg(m[1]), max: /\bSCV\b/i.test(s) ? 3.5 : Infinity };
+    }
+  }
+  // ">N T" / ">NT" open band anywhere in the text — e.g. ICICI "MHCV >40T Truck",
+  // go_digit "GCV4 >12T", Magma "GCV > 40T", Royal "GCV >45T". (Range forms like
+  // "12-20T" are caught by the first regex above, so this only fires on open ">N".)
+  if ((m = s.match(/>\s*(\d+(?:\.\d+)?)\s*Tn?\b/i))) {
+    return { min: parseFloat(m[1]), max: Infinity };
+  }
   return null;
 }
 
@@ -2522,6 +2551,25 @@ function filterRulesByPolicy(rules, params, _trace) {
         if (!overlaps) matches = false;
         else score += 5;
       }
+    }
+
+    // Segment-named body type. Some grids (ICICI) split a tonnage band by body in
+    // the SEGMENT TEXT — "MHCV 12-20T Truck" / "... Tipper" / "... Tanker" /
+    // "... Trailer" / "... Tipper/ Dumper" — rather than in the rate_type prefix
+    // (Go Digit, gated above). A regular haulage truck must take the "Truck" sub-
+    // segment, NOT the Tipper/Tanker/Trailer ones (which otherwise win arbitrarily,
+    // often at a 0 rate — e.g. a 16T Eicher Pro 2114 landing on "MHCV 12-20T Tipper"
+    // = 0 instead of "Truck" = 0.25). Hard-drop a body-specific segment when the
+    // policy isn't that body; "Truck"/plain is the default. Commercial only.
+    if (matches && _isCommercialVeh &&
+        /\b(?:GCV|SCV|LCV|MHCV|HCV|MCV|GCCV)\b/i.test(String(seg || ''))) {
+      const segIsTipper  = /\b(?:TIPPER|DUMPER)\b/i.test(seg);
+      const segIsTanker  = /\bTANKER\b/i.test(seg);
+      const segIsTrailer = /\bTRAILER\b/i.test(seg);
+      const policyIsTrailer = /\bTRAILER\b/.test(_bodyText) || /\bTRAILER\b/i.test(carrier);
+      if (segIsTipper && !policyIsDumperBody) matches = false;
+      else if (segIsTanker && !policyIsTankerBody) matches = false;
+      else if (segIsTrailer && !policyIsTrailer) matches = false;
     }
 
     // Vehicle age band (redundant with SQL filter but defends against unbounded rows)
@@ -3464,6 +3512,7 @@ module.exports = router;
 module.exports.extractPolicyParams  = extractPolicyParams;
 module.exports.resolveInsurerSlug   = resolveInsurerSlug;
 module.exports.filterRulesByPolicy  = filterRulesByPolicy;
+module.exports.extractSegmentTonnageRange = extractSegmentTonnageRange;
 module.exports.CLUSTER_STATE_MAP    = CLUSTER_STATE_MAP;
 module.exports.STATE_REGION_MAP     = STATE_REGION_MAP;
 module.exports.rtoStatePrefix       = rtoStatePrefix;
