@@ -1815,15 +1815,31 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
           premium_base: merged.premium_base,
           excluded: !!merged.excluded,
           matched_rule_id: merged.matched_rule_id,
+          // High-value referral: no-rule purely because IDV > ₹50L (all-insurer
+          // gate). Counted on its own card and kept OUT of the mismatch list.
+          idv_over_50l: merged.idv_over_50l === true || merged.idv_over_50l === 'true' || merged.idv_over_50l === 1,
         });
       }
 
       // Set differences.
       const missing_in_our_data = [];
       const rate_comparison = [];
+      // High-value referrals: no-rule because IDV > ₹50L. These are correct
+      // behaviour (not mismatches), so they get their own list + count card and
+      // are excluded from rate_comparison entirely.
+      const idv_referrals = [];
       for (const [tracker, theirRate] of excelMap.entries()) {
         const us = ours.get(tracker);
         if (!us) { missing_in_our_data.push({ tracker, their_rate: theirRate }); continue; }
+        // IDV > ₹50L no-rule → high-value referral, not a mismatch. Pull it out.
+        if (us.idv_over_50l && us.our_rate == null) {
+          idv_referrals.push({
+            tracker, policy_no: us.policy_no, insurer: us.insurer,
+            insurer_slug: us.insurer_slug, vehicle_type: us.vehicle_type,
+            their_rate: theirRate, note: 'IDV > ₹50L — rule not applied (all-insurer rule)',
+          });
+          continue;
+        }
         const diff = (us.our_rate != null && theirRate != null)
           ? +(us.our_rate - theirRate).toFixed(3)
           : null;
@@ -1876,6 +1892,8 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
         // Rate match within ±0.5% tolerance (the UI's match/un-match split).
         rate_matched:        rate_comparison.filter(r => r.rate_match).length,
         rate_unmatched:      rate_comparison.filter(r => !r.rate_match).length,
+        // High-value referrals (IDV > ₹50L) — excluded from matched/unmatched above.
+        idv_referral_count:  idv_referrals.length,
       };
 
       // ---- Customer-facing month report (fmt === 'report') ----
@@ -1990,6 +2008,7 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
         missing_in_our_data,
         missing_in_excel,
         rate_comparison,
+        idv_referrals,
       });
 }
 

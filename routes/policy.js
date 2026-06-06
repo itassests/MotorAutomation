@@ -3377,6 +3377,19 @@ function filterRulesByPolicy(rules, params, _trace) {
       }
     }
 
+    // TATA PCV School Bus → Corporate owner variant. TATA files each bus seat-band
+    // as two segments differing only by an owner suffix — "..._Individual" and
+    // "..._Corporate" (e.g. ROM "PCV Bus School > 50": Individual 0.60 vs Corporate
+    // 0.62), SAME rate_type. A school bus is institution-owned, so it takes the
+    // _Corporate rate. Boost _Corporate / penalise _Individual so the Corporate row
+    // wins the byType collapse. tata-scoped (this segment-suffix convention is
+    // tata-only); boost-not-drop so a region carrying only one variant still resolves.
+    if (matches && rule.insurer === 'tata_aig' &&
+        /SCHOOL\s*BUS/i.test(vehicleCategory) && /SCHOOL/i.test(seg)) {
+      if (/_CORPORATE\b/i.test(seg))       score += 8;
+      else if (/_INDIVIDUAL\b/i.test(seg)) score -= 8;
+    }
+
     // Owner-class sub_type triplet (Go Digit School & Staff Bus grid): the SAME
     // School Bus row is filed three times, differing only by sub_type —
     // "School" (institution-owned, higher rate) vs "Company" / "Individual"

@@ -629,8 +629,19 @@ async function loadPrIndex(pool) {
     if (!row.policy_no) continue;
     const key = String(row.policy_no).trim().toUpperCase();
     const existing = idx.get(key);
-    if (!existing || (row.year > existing.year)
-      || (row.year === existing.year && row.month > existing.month)) {
+    // Precedence: most-recent upload (year, then month) wins. On a SAME-upload
+    // tie (duplicate policy_no rows in one upload — e.g. an OD-leg line with a
+    // blank/zero NCB beside the real PACKAGE line), prefer the row carrying a
+    // non-zero NCB so reconcile doesn't clobber a valid source NCB with a stale
+    // 0. (Tata 6206177570: upload 19 had ncb=0 AND ncb=20 rows; the 0 was
+    // winning purely on DB row order, dropping the car from the NCB-1-99 28%
+    // band to the NCB=0 19.5% band.)
+    const sameUpload = existing && row.year === existing.year && row.month === existing.month;
+    const better = !existing
+      || (row.year > existing.year)
+      || (row.year === existing.year && row.month > existing.month)
+      || (sameUpload && (Number(existing.ncb) || 0) === 0 && (Number(row.ncb) || 0) > 0);
+    if (better) {
       idx.set(key, row);
     }
     // Index by vehicle_no — most-recent year/month wins (same precedence
@@ -3748,6 +3759,11 @@ function buildOutputRow(policy, params, rule, rateVal, marginRule, nums, note, s
     // compliance reason at a glance (Compliance requires IDV ≤ ₹50L for
     // non-TP policies).
     idv: _idv > 0 ? _idv : null,
+    // True when the all-insurer IDV > ₹50L gate cleared the rule pool — these
+    // rows are intentionally no-rule (high-value referral), NOT real mismatches.
+    // Mirrors the gate condition (params.idv > 50L) exactly. The recon screen
+    // counts these on a dedicated card and excludes them from the mismatch list.
+    idv_over_50l: params.idv != null && Number(params.idv) > 5000000,
     matched_rule_id:  rule ? rule.id : null,
     matched_sheet:    rule ? rule.sheet_name : null,
     matched_segment:  rule ? rule.segment : null,
