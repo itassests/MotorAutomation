@@ -1923,9 +1923,18 @@ function filterRulesByPolicy(rules, params, _trace) {
     return isCompCommission && r.rate_value != null && _bodyAllowsRt(rt)
         && _ageWithinRule(r) && _weightWithinRule(r);
   });
+  // Go Digit prices Comprehensive (COMP_*_CD2) and TP (SATP_*) as SEPARATE
+  // commission columns; a Comprehensive policy must take the COMP rate ONLY and
+  // must NOT borrow the (much higher) SATP_MAX rate when its COMP cell is empty.
+  // When go_digit's COMP_MAX is null (an age-band ingestion gap, e.g. GJ 20-40T
+  // 6+yrs), the aged-SATP fallback was landing on SATP_MAX 45% instead of
+  // no-COMP — a large over-rate. Disable the fallback for go_digit (user rule:
+  // COMP product → COMP rate, SATP → TP only). Other insurers keep the fallback.
+  const _poolInsurer = rules.length ? rules[0].insurer : null;
   const allowAgedSatpFallback = _isCommercialVeh
     && String(params.insProduct || '').toUpperCase() === 'COMP'
-    && !_hasUsableComp;
+    && !_hasUsableComp
+    && _poolInsurer !== 'go_digit';
 
   // Score each rule by how well its segment matches the policy
   const scored = rules.map(rule => {
@@ -2964,7 +2973,11 @@ function filterRulesByPolicy(rules, params, _trace) {
         /\bTRACTOR\b/i.test(model) ||
         (policyIsMiscType && TRACTOR_MAKES.test(`${make} ${model}`) &&
           !NON_TRACTOR_MISC.test(`${make} ${model} ${vehicleCategory}`));
-      const policyIsRickshaw = /RIKSHAW|RICKSHAW|E[-\s]?RICK|E[-\s]?RIK|\b3W\b|TREO|PCV3W?/i.test(vehicleCategory + ' ' + model);
+      // \bALFA\b catches the Mahindra Alfa — a 3-wheeler goods/passenger auto the
+      // source frequently mis-labels "GCV-4W". (Model "ALFA"; an Alfa Romeo car is
+      // vehicleType CAR with a specific model name, so it never reaches this GCV/PCV
+      // 3W gate.)
+      const policyIsRickshaw = /RIKSHAW|RICKSHAW|E[-\s]?RICK|E[-\s]?RIK|\b3W\b|TREO|\bALFA\b|PCV3W?/i.test(vehicleCategory + ' ' + model);
 
       // (a) Exclusive drops — rule segment declares non-matching category.
       //
@@ -3069,6 +3082,15 @@ function filterRulesByPolicy(rules, params, _trace) {
             // only true non-commercial categories (TAXI/BUS/PCV-only).
             const segIsCommercial = /\bSCV\b|\bLCV\b|\bMCV\b|\bHCV\b|\bMHCV\b|\bGCV\b|\bGCCV\b|\bGOODS\b|\bCARGO\b|\bTRUCK\b|\bTIPPER\b|\bDUMPER\b|\bTANKER\b|\bTRAILER\b|GVW\b|\d+\s*T\b|UPTO\s*\d|ABOVE\s*\d/i.test(seg);
             if (!CAT_KEYWORDS.RICKSHAW.test(seg) && !segIsCommercial) matches = false;
+            // go_digit ships a dedicated GCV3 (3-wheeler) catalogue, so a 3W cargo
+            // (Mahindra Alfa / Treo Zor, Piaggio Ape Xtra, Atul) must take the GCV3
+            // rate — NOT a GCV4 tonnage band, which prices a 4-wheeler truck far
+            // higher (Alfa: GCV3 "Good UP" 25% vs GCV4 "upto 1.6T 6+" 60%). When a
+            // GCV3 segment is in the pool, drop the GCV4 bands so GCV3 wins.
+            else if (rule.insurer === 'go_digit' && hasDedicatedRickshawSeg
+                     && !CAT_KEYWORDS.RICKSHAW.test(seg) && /GCV\s*4/i.test(seg)) {
+              matches = false;
+            }
           } else if (!CAT_KEYWORDS.RICKSHAW.test(seg)) matches = false;
         } else if (policyIsTaxi && !policyIsPcv) {
           // Pvt-Car-classified taxis (rare) — require Taxi segment.
