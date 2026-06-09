@@ -125,8 +125,17 @@ function maxTp(cell) {
 function resolveFgCvRate(params, gvw) {
   const region = resolveRegion(params.rtoCode);
   if (!region) return undefined;
-  const wc = weightCategory(params, gvw);
+  let wc = weightCategory(params, gvw);
   if (!wc) return undefined;
+  // Mahindra Bolero has a DEDICATED FG GCV line — a distinct (usually higher) TP
+  // outflow than the generic GVW weight band (e.g. J&K Bolero TP 0.55 vs Below-3.5T
+  // TP 0.25). When the policy is a Bolero GCV and the region carries a BOLERO cell,
+  // use it instead of the weight band. Region without a BOLERO cell → falls through
+  // to the weight band unchanged (no regression).
+  if (String(params.vehicleType || '').toUpperCase() === 'GCV') {
+    const hay = (String(params.make || '') + ' ' + String(params.model || '')).toUpperCase();
+    if (/\bBOLERO\b/.test(hay) && grid()[region] && grid()[region]['BOLERO']) wc = 'BOLERO';
+  }
   const cell = grid()[region] && grid()[region][wc];
   if (!cell) return undefined;
   if (cell.operate === false) return null;             // FG declines this cell
@@ -139,7 +148,11 @@ function resolveFgCvRate(params, gvw) {
   if (ip === 'TP' || ip === 'SATP') return tp != null ? { rate: tp, od: 0, tp } : undefined;
   if (ip === 'SAOD') return od != null ? { rate: od, od, tp: 0 } : undefined;   // OD leg only
   if (od == null || tp == null) return undefined;
-  return { rate: +(od + tp).toFixed(4), od, tp };           // Comprehensive = OD + TP
+  // Comprehensive headline = OD + TP, EXCEPT when the two legs are equal — then the
+  // operator reports the SINGLE rate, not the doubled sum (same convention as
+  // nia-motor / Oriental bundled: od===tp → od). income stays leg-based (od×OD + tp×TP).
+  const rate = (od === tp) ? +od.toFixed(4) : +(od + tp).toFixed(4);
+  return { rate, od, tp };
 }
 
 module.exports = { resolveFgCvRate, resolveRegion, weightCategory };

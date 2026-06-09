@@ -82,9 +82,14 @@ function resolveNiaMotorRate(p) {
     return null;                                      // unknown — not handled
   }
 
-  let rate = 0;
-  if (od != null) rate += od;
-  if (tp != null) rate += tp;
+  // Headline = OD + TP when the two legs DIFFER; when they are EQUAL the operator
+  // reports the single value (not the doubled sum) — per product owner: "OD + TP if
+  // OD and TP are not same, otherwise only one." e.g. School/Institutional Bus
+  // 60/60 → 60, GCV ≤2000 (age>0) 50/50 → 50. Single-leg covers (SAOD/SATP) report
+  // that one leg. (income still = OD%×OD-prem + TP%×TP-prem via the per-leg od/tp.)
+  let rate;
+  if (od != null && tp != null) rate = (od === tp) ? od : (od + tp);
+  else rate = (od != null) ? od : (tp != null ? tp : 0);
   // rate = summed headline (for operator rate-match); od/tp = per-leg commission
   // (% ) so income = OD%×OD-premium + TP%×TP-premium. Null leg → 0 (SATP/SAOD).
   return { rate, od: od || 0, tp: tp || 0 };

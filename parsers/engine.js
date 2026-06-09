@@ -63,6 +63,38 @@ function parseSheet(sheetData, sheetConfig, meta) {
 }
 
 /**
+ * Find a workbook sheet by CONTENT signature — robust to sheet-name changes AND
+ * shifting title rows (operators rename sheets and prepend notes every month).
+ * `signature` is an array of header-cell tokens that must ALL appear (as
+ * case-insensitive substrings) in the SAME row within the first `scanRows` rows.
+ * Returns { sheetName, headerRow } for the best (widest header) unused match, or
+ * null. Used when a config sheet entry declares `content_signature`, so the
+ * config no longer depends on the literal sheet name.
+ */
+function findSheetByContent(workbook, signature, scanRows, usedSheets) {
+  const XLSX = require('xlsx');
+  const toks = (signature || []).map((t) => String(t).toLowerCase().replace(/\s+/g, ' ').trim()).filter(Boolean);
+  if (!toks.length) return null;
+  const used = usedSheets || new Set();
+  let best = null;
+  for (const sn of workbook.SheetNames) {
+    if (used.has(sn)) continue;
+    const data = XLSX.utils.sheet_to_json(workbook.Sheets[sn], { header: 1, defval: '' });
+    const limit = Math.min(scanRows || 20, data.length);
+    for (let i = 0; i < limit; i++) {
+      const cells = (data[i] || []).map((c) => String(c).toLowerCase().replace(/\s+/g, ' ').trim());
+      const hit = toks.every((t) => cells.some((c) => c.includes(t)));
+      if (hit) {
+        const score = (data[i] || []).filter(Boolean).length;
+        if (!best || score > best.score) best = { sheetName: sn, headerRow: i, score };
+        break;   // first matching row in this sheet
+      }
+    }
+  }
+  return best;
+}
+
+/**
  * Parse an entire workbook file using an insurer config that defines
  * which sheets to process and how.
  *
@@ -110,6 +142,9 @@ async function parseWorkbook(filePath, insurerConfig) {
   // referenced from every band sheet) can stash data here via a
   // preprocessWorkbook hook.
   const workbookMeta = {};
+  // Sheets already claimed by a config entry — so content-signature matching
+  // doesn't bind two entries to the same sheet.
+  const usedSheets = new Set();
   for (const sheetEntry of sheetsConfig) {
     const layout = sheetEntry.layout;
     const engine = layout && engines[layout];
@@ -155,7 +190,21 @@ async function parseWorkbook(filePath, insurerConfig) {
     // sheet "Pvtcar" to match "RTO-PvtCar Mapper", etc. Configs that need
     // fuzz must declare it via name_pattern.
     const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
-    let actualSheetName = workbook.SheetNames.find(s => s === sheetName);
+    let actualSheetName = null;
+    let contentHeaderRow = null;
+    // CONTENT-FIRST matching: when the config declares `content_signature`, pick
+    // the sheet (and its real header row) by the columns it contains, NOT its
+    // name. This survives monthly sheet renames + prepended title rows. Falls
+    // through to name matching only if no content match is found.
+    if (sheetEntry.content_signature) {
+      const hit = findSheetByContent(workbook, sheetEntry.content_signature, sheetEntry.content_scan_rows || 20, usedSheets);
+      if (hit) {
+        actualSheetName = hit.sheetName;
+        contentHeaderRow = hit.headerRow;
+        console.log(`[RateExtract] Sheet "${sheetName}" → matched "${actualSheetName}" (row ${hit.headerRow}) via content signature.`);
+      }
+    }
+    if (!actualSheetName) actualSheetName = workbook.SheetNames.find(s => s === sheetName);
     if (!actualSheetName) {
       const target = norm(sheetName);
       actualSheetName = workbook.SheetNames.find(s => norm(s) === target);
@@ -181,6 +230,15 @@ async function parseWorkbook(filePath, insurerConfig) {
       console.log(
         `[RateExtract] Sheet "${sheetName}" → matched "${actualSheetName}" via fuzzy lookup.`
       );
+    }
+
+    usedSheets.add(actualSheetName);
+    // Content-matched sheets carry the REAL header-row index (title rows shift
+    // it each month) — override the config's fixed header_row / data_start_row so
+    // the layout engine reads the right rows regardless of how many notes precede.
+    if (contentHeaderRow != null) {
+      sheetConfig.header_row = contentHeaderRow;
+      sheetConfig.data_start_row = contentHeaderRow + 1;
     }
 
     const worksheet = workbook.Sheets[actualSheetName];

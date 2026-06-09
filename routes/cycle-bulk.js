@@ -1659,6 +1659,22 @@ function saveReconFile(cycleId, filePath, originalName) {
   try { fs.writeFileSync(RECON_CACHE_PATH, JSON.stringify(c, null, 2)); } catch (_) { /* noop */ }
 }
 
+// Current billing month = 1–30 April 2026 (per product owner). A row whose
+// POLICY_ISSUED_DATE falls in this window is a CURRENT case; everything else —
+// an earlier issue date, OR an unknown/unparseable date — is an "Old Case".
+// POLICY_ISSUED_DATE (tmp_PrarambhData) is a "DD-Mon-YY" string (e.g. "16-Apr-26")
+// or occasionally a Date. Returns true only when provably April 2026.
+function isCurrentBillingMonth(v) {
+  if (v == null || v === '') return false;
+  if (v instanceof Date && !isNaN(v)) return v.getFullYear() === 2026 && v.getMonth() === 3;
+  const s = String(v).trim();
+  let m = s.match(/^(\d{1,2})[-\/\s]([A-Za-z]{3})[A-Za-z]*[-\/\s](\d{2,4})$/);  // 16-Apr-26 / 16-April-2026
+  if (m) { let yr = +m[3]; if (yr < 100) yr += 2000; return m[2].toLowerCase() === 'apr' && yr === 2026; }
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);  // ISO 2026-04-16
+  if (m) return m[1] === '2026' && m[2] === '04';
+  return false;
+}
+
 /** Core comparison — shared by the upload route and the re-compare route. */
 // Parse ?compare_cycles=11,12 (or body) → extra cycle ids (excluding primary).
 function parseCompareCycles(req, primary) {
@@ -1749,6 +1765,9 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
       for (let c = totalRateColIdx - 1; c >= 0; c--) {
         if (normHeader(headers[c]) === 'rewards' || normHeader(headers[c]).includes('reward')) { rewardsColIdx = c; break; }
       }
+      // File's "Total Expected Commission" AMOUNT column (for the side-by-side
+      // income comparison). Optional — null when the file doesn't carry it.
+      const expCommColIdx = idxOf(['totalexpectedcommission', 'totalexpectedcomm', 'expectedcommission', 'expectedcomm', 'totalexpcomm']);
       if (trackerColIdx < 0 || totalRateColIdx < 0) {
         return res.status(400).json({
           success: false,
@@ -1766,7 +1785,14 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
         //            else assume already in %.
         return n <= 1 ? +(n * 100).toFixed(3) : +n.toFixed(3);
       };
+      // Plain amount parser (commission figures, not rates) — strip ₹/commas.
+      const parseAmount = (v) => {
+        if (v == null || v === '') return null;
+        const n = Number(String(v).replace(/[,%₹\s]/g, ''));
+        return Number.isFinite(n) ? +n.toFixed(2) : null;
+      };
       const excelMap = new Map();
+      const excelCommMap = new Map();   // tracker → file's Total Expected Commission (amount)
       for (const r of dataRows) {
         const t = String(r[trackerColIdx] || '').trim();
         if (!t) continue;
@@ -1777,6 +1803,7 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
         let rate = total;
         if (total != null && rewards != null) rate = +(total - rewards).toFixed(3);
         excelMap.set(t, rate);
+        if (expCommColIdx >= 0) excelCommMap.set(t, parseAmount(r[expCommColIdx]));
       }
 
       // Load our cycle snapshot.
@@ -1813,6 +1840,8 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
           income: merged.income,
           outgoing: merged.outgoing,
           premium_base: merged.premium_base,
+          // Statement's total commission (from the uploaded statement match).
+          statement_amount: merged.statement_amount != null ? Number(merged.statement_amount) : null,
           excluded: !!merged.excluded,
           matched_rule_id: merged.matched_rule_id,
           // High-value referral: no-rule purely because IDV > ₹50L (all-insurer
@@ -1853,6 +1882,9 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
           their_rate: theirRate,
           diff,
           income: us.income,
+          // Side-by-side commission amounts: file's expected, statement's total, our income.
+          file_expected_comm: excelCommMap.has(tracker) ? excelCommMap.get(tracker) : null,
+          statement_commission: us.statement_amount,
           excluded: us.excluded,
           no_rule: !us.matched_rule_id,
           // rate_match: true when within tolerance. Default ±0.5%, but Reliance
@@ -1879,6 +1911,43 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
       // Sort the rate comparison by |diff| desc so largest mismatches surface first.
       rate_comparison.sort((a, b) => Math.abs(b.diff || 0) - Math.abs(a.diff || 0));
 
+      // ---- Issue-month classification — EXCLUDE "Old Cases" from the comparison ----
+      // Per product owner: rows whose POLICY_ISSUED_DATE is outside the current
+      // 1–30 April 2026 window (or unknown) are "Old Cases" and must be IGNORED
+      // from the rate comparison entirely — they are NOT counted as matched or
+      // mismatched. They are pulled out into `old_cases` (their own bucket + card),
+      // mirroring the IDV-referral handling, so every match/mismatch stat below
+      // reflects ONLY current-month business. POLICY_ISSUED_DATE lives in
+      // tmp_PrarambhData (Prarambh UAT), keyed by TrackerNo, as a "DD-Mon-YY"
+      // string. If UAT is unreachable, classification is skipped (nothing excluded).
+      const old_cases = [];
+      try {
+        const uat = await getPrarambhUatPool();
+        const idRows = await uat.request().query(
+          `SELECT TrackerNo, POLICY_ISSUED_DATE FROM tmp_PrarambhData WHERE POLICY_ISSUED_DATE IS NOT NULL`);
+        const issueByTracker = new Map();
+        for (const r of idRows.recordset) {
+          const t = String(r.TrackerNo || '').trim();
+          if (t && !issueByTracker.has(t)) issueByTracker.set(t, r.POLICY_ISSUED_DATE);
+        }
+        const issueOf = (r) => {
+          const iss = issueByTracker.get(String(r.tracker).trim()) || null;
+          return iss == null ? null : (iss instanceof Date ? iss.toISOString().slice(0, 10) : String(iss));
+        };
+        // Partition rate_comparison: keep current-month rows, divert old ones.
+        const currentRows = [];
+        for (const r of rate_comparison) {
+          const iss = issueByTracker.get(String(r.tracker).trim()) || null;
+          r.issue_date = issueOf(r);
+          if (isCurrentBillingMonth(iss)) { r.is_old_case = false; currentRows.push(r); }
+          else { r.is_old_case = true; old_cases.push(r); }
+        }
+        rate_comparison.length = 0;
+        rate_comparison.push(...currentRows);
+        // Tag the missing-in-file rows too (informational only — not in stats).
+        for (const r of missing_in_excel) r.is_old_case = !isCurrentBillingMonth(issueByTracker.get(String(r.tracker).trim()) || null);
+      } catch (_) { /* UAT down → no exclusion, comparison unchanged */ }
+
       const summary = {
         excel_total:               excelMap.size,
         cycle_total:               ours.size,
@@ -1894,6 +1963,11 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
         rate_unmatched:      rate_comparison.filter(r => !r.rate_match).length,
         // High-value referrals (IDV > ₹50L) — excluded from matched/unmatched above.
         idv_referral_count:  idv_referrals.length,
+        // "Old Cases" — EXCLUDED from the comparison (issued outside 1–30 April
+        // 2026, or unknown). matched_count / rate_matched / rate_unmatched above
+        // now reflect ONLY current-month business.
+        old_case_count:      old_cases.length,
+        current_case_count:  rate_comparison.length,
       };
 
       // ---- Customer-facing month report (fmt === 'report') ----
@@ -2009,6 +2083,7 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
         missing_in_excel,
         rate_comparison,
         idv_referrals,
+        old_cases,
       });
 }
 

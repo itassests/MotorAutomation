@@ -7,9 +7,26 @@
     "Robinhood*",
     "SATP_Business*",
     "SATP Grid*",
-    "SATP Commission*"
+    "SATP Commission*",
+    "CV*Grid*",
+    "Private*Car*",
+    "*Comp*Grid*"
   ],
   "sheets": [
+    {
+      "_comment": "CV Comprehensive base grid — CONTENT-matched (sheet name & title rows change monthly). Region (RTO-Statename) x Segment (GCV3W/GCV4W...) -> Comprehensive %. IRDA = IRDA-default decline marker. No file_pattern: binds to any Bajaj file whose content carries these headers.",
+      "name": "CV Comp (content)",
+      "content_signature": ["final rto state", "segment", "comprehensive"],
+      "layout": "flat_table",
+      "product": "GCV",
+      "config": {
+        "header_row": 7,
+        "data_start_row": 8,
+        "column_map": { "region": 3, "segment": 2, "rate_value": 5, "remarks": 6 },
+        "rate_type": "COMP",
+        "decline_markers": ["IRDA", "Declined", "No change", "Local grid"]
+      }
+    },
     {
       "_comment": "Bajaj TW Comp & SAOD.xlsx — Agency 2W Comprehensive grid (1802). State × monthly GWP volume bands (0-50K / 50K-1L / 1-2L / 2-3L / 3L+) + Max Scooter band. Note 2: Bajaj/Vespa/Jawa/RE rollover -5%. Note 9: IRDA = OEM 22.5% / non-OEM 17.5% on OD. Cells like '5% on OD & 0% on TP' split into two rules.",
       "name": "Agency 2W Grid - 1802",

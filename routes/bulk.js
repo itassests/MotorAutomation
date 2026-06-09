@@ -617,6 +617,11 @@ async function loadPrIndex(pool) {
     row.pr_key_city  = prField(obj, 'Key_City_Group');
     row.pr_city      = prField(obj, 'City', 'CityName', 'VEHICLE CITY');
     row.pr_state     = prField(obj, 'State', 'StateName', 'STATE NAME');
+    // Policy/risk start (inception) date — authoritative fallback for the Bajaj
+    // policy-start-date rate-card selection when tmp_PrarambhData.POLICY_START_DATE
+    // is null/garbage. PR carries it as RISK_INC_DATE / OD_Start_Date.
+    row.pr_start_date = prField(obj, 'RISK_INC_DATE', 'OD_Start_Date', 'od_start_date',
+                                'POLICY_START_DATE', 'Risk_Inception_Date', 'RISK INCEPTION DATE');
     delete row.raw_json;             // keep index rows lean after extraction
   }
   const idx = new Map();
@@ -1169,6 +1174,32 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     const fam = US_SR[rtoStatePrefix(params.rtoCode)];
     if (fam && fam.length) resolvedRegion = fam[0];
   }
+  // Zuno: has ZERO rto_mappings, so region never resolves and every car falls to
+  // the "Pan India (doable RTOs)" bucket — where the NCB=0 override pays a flat 15%.
+  // Zuno files Pvt-Car rates per FULL STATE NAME (Delhi / Uttar Pradesh / Punjab /
+  // Haryana / Maharashtra …), and the regional Comp rate (e.g. North/UP = 28%) is a
+  // FLAT rate (the "NCB 1-99" in remarks is informational, not a gate). Resolve the
+  // region from the RTO state prefix (labels match STATE_PREFIX_FULL exactly) so the
+  // policy lands on its own state's rate instead of Pan-India 15%. USER-confirmed flat
+  // North rate. (City-RTO refinements — Mumbai/Pune/Bengaluru — take the state rate.)
+  // A NEW car (vehicle age 0, non-TP) takes Zuno's "Pvt new car business / New
+  // Vehicle Business" grid = 30% filed under region "All doable RTO's" (COMP_1+3,
+  // age 0-0) — applies REGARDLESS of state and REGARDLESS of tenure (the rule says
+  // "New Vehicle", so gate on AGE only, not 1+1 vs 1+3). USER-confirmed (funnel).
+  // Resolve age-0 to that region directly so the 30% is the primary (and the
+  // Pan-India NCB=0 15% floor — a different region — is NOT pooled). Non-new cars
+  // (age > 0) resolve to their STATE for the regional Rollover/Renewal rate.
+  if (insurerSlug === 'zuno' && !resolvedRegion && params.rtoCode) {
+    const _age0 = (Number(params.vehicleAge) || 0) === 0;
+    const _pureTp = /^(TP|SATP|ACT)$/i.test(String(params.insProduct || ''));
+    if (_age0 && !_pureTp) {
+      resolvedRegion = "All doable RTO's";
+    } else {
+      const SPF = require('./policy').STATE_PREFIX_FULL || {};
+      const st = SPF[rtoStatePrefix(params.rtoCode)];
+      if (st) resolvedRegion = st;
+    }
+  }
   // Kotak: has ZERO rto_mappings, and its GCV grid is keyed PER RTO CODE — the
   // GCV-segment rows carry region = the RTO code itself (e.g. region='HR38',
   // sub_type='HR38'), one row per tonnage band. With no rto_mapping the region
@@ -1229,6 +1260,18 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       else if ((m = cat.match(/Above\s*(\d+(?:\.\d+)?)\s*Tn/i))) { t = (+m[1]) + 1; }
       if (t != null) { params.tonnage = t; params.tonnageMin = t; params.tonnageMax = t; params.tonnageCoarse = false; }
     }
+  }
+
+  // Oriental GCV 3-wheeler: a 3W goods auto (Piaggio Ape / Bajaj RE) is ALWAYS the
+  // lightest GVW band (<=2000kg / 0-2T = Row14 55%). Don't band 3W by GVW/tonnage —
+  // the source GVW is routinely null or garbage (one APE XTRA LD had a 2-3.5T value
+  // while the identical model elsewhere had none). Force tonnage into the 0-2T band
+  // so the standard weight gate keeps Row14 and drops heavier bands. All Oriental
+  // Ape/RE 3W = 55. Oriental + GCV + 3W scoped (zero effect elsewhere).
+  if (insurerSlug === 'oriental_insurance' &&
+      String(params.vehicleType || '').toUpperCase() === 'GCV' &&
+      /\b3\s*W\b|3\s*WHEEL|THREE\s*WHEEL/i.test(String(params.vehicleCategory || ''))) {
+    params.tonnage = 1; params.tonnageMin = 1; params.tonnageMax = 1; params.tonnageCoarse = false;
   }
 
   // Shriram private-car fuel bucketing: the grid files only PRIVATE CAR PETROL
@@ -1319,6 +1362,32 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     if (isEcartCat && isElec && !productList.includes('PCV')) productList.push('PCV');
   }
 
+  // Bajaj: select the rate-card GENERATION effective for the POLICY START DATE —
+  // a May-start policy takes the May card if one is loaded, else falls back to
+  // April (the latest card whose effective_from ≤ start date; earliest if none is
+  // yet effective). Scoped to Bajaj per product owner; other insurers are NOT
+  // date-filtered here (chola/reliance/royal/sbi carry multiple effective-from
+  // generations that must keep coexisting). All-April currently → no-op until a
+  // May Bajaj card is uploaded.
+  let _bajajEffDate;
+  if (insurerSlug === 'bajaj_allianz') {
+    // Always pass an effective_date so the generation filter ALWAYS runs (else a
+    // null/garbage start date leaves April+May rules mixed → pickPrimary grabs the
+    // wrong generation). Prefer POLICY_START_DATE, fall back to issue date, then to
+    // a far-past sentinel → which makes the filter fall back to the EARLIEST (April)
+    // card. So unknown-date / historical policies stay on April; only a genuine
+    // start date ≥ 1-May routes to May.
+    const _en = require('../services/enablers');
+    const sd = policy.POLICY_START_DATE || policy['POLICY_START_DATE'] || null;
+    // Fallback chain (per product owner): POLICY_START_DATE → PR risk-inception/
+    // OD-start date → POLICY_ISSUED_DATE → far-past sentinel (→ earliest/April card).
+    const _pr = (prIndex && params._policy_no) ? prIndex.get(String(params._policy_no).trim().toUpperCase()) : null;
+    _bajajEffDate = _en.toIso(sd)
+                 || _en.toIso(_pr && _pr.pr_start_date)
+                 || _en.toIso(policy.POLICY_ISSUED_DATE)
+                 || '2000-01-01';
+  }
+
   const baseLookup = {
     insurer: insurerSlug,
     product: productList,
@@ -1327,6 +1396,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     vehicle_age: params.vehicleAge,
     fuel_type: productIsTw ? '' : (params.fuelType || ''),
     ins_product: params.insProduct || '',
+    ...(_bajajEffDate ? { effective_date: _bajajEffDate } : {}),
     // Shriram: state-name region filter must still surface national
     // (NULL/'' region = "PAN INDIA") rows.
     include_null_region: insurerSlug === 'shriram' || unitedGcvFunnel,
@@ -1339,7 +1409,26 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     // RTO CODE in sub_type (region = city, e.g. region='AMETHI' sub_type='UP36').
     // Kotak has 0 rto_mappings so region never resolves; an empty region matches
     // ALL regions, and the sub_type filter then narrows to the policy's RTO.
-    ...(insurerSlug === 'kotak' && ['MISC', 'MIS'].includes(policyType) && params.rtoCode
+    // Kotak: MISC is always RTO-keyed. CAR/TW are RTO-keyed ONLY for SATP (TP) —
+    // their Comp rate is NCB-banded (region/NCB level, sub_type-NULL), so gating a
+    // Comp policy by RTO wrongly strands it. Gate CAR/TW only for TP/SATP/ACT or
+    // OD=0 (matches the Kotak Pvt-Car SATP override's scope). Fixes WB-68/KA-34
+    // SATP picking a random district's 35% without breaking Comp matching.
+    ...(insurerSlug === 'kotak' && params.rtoCode && (
+          ['MISC', 'MIS'].includes(policyType)
+          || (['CAR', '4W', 'PC', 'TW', '2W'].includes(policyType) &&
+              (/TP|SATP|ACT/i.test(String(params.insProduct || '')) ||
+               (Number(params.odPremium != null ? params.odPremium : params.od_premium) || 0) === 0))
+        )
+      ? { sub_type: String(params.rtoCode).toUpperCase().replace(/[^A-Z0-9]/g, '') }
+      : {}),
+    // Bajaj TW "RTO Based Payouts" grid is keyed by RTO CODE in sub_type (UP17=Bagpat,
+    // UP80=Agra, UP81=Aligarh…). Without gating sub_type the lookup returns ALL ~46
+    // district rows for the region and pickPrimary grabs an ARBITRARY district's rate
+    // (e.g. a UP-81/Aligarh scooter wrongly took Bagpat's 0.20). Gate sub_type to the
+    // policy's RTO code so only the correct district matches (UP81 → IRDA scooter
+    // 17.5/22.5). sub_type-NULL/'' rows (state defaults) still survive as fallback.
+    ...(insurerSlug === 'bajaj_allianz' && productIsTw && params.rtoCode
       ? { sub_type: String(params.rtoCode).toUpperCase().replace(/[^A-Z0-9]/g, '') }
       : {}),
   };
@@ -1356,6 +1445,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     rl: baseLookup.region_list || null,
     rm: baseLookup.region_match_mode || null,
     st: baseLookup.sub_type || null,
+    ed: baseLookup.effective_date || null,
   });
   let rules;
   if (caches.lookup.has(lookupKey)) {
@@ -1407,6 +1497,29 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       }
       rules = next;
     }
+  }
+
+  // ---- Liberty CAR NCB band (remarks-encoded) ----
+  // Liberty's CAR OD grid splits SAOD (and some Comp) rows by NCB in the REMARKS text
+  // ("SOD WO NCB (…)" = the WITHOUT-NCB rate, e.g. 0.195; "SOD NCB (…)" = the WITH-NCB
+  // rate, e.g. 0.235) — NOT a column, so both rows survive and pickPrimary takes the
+  // higher (with-NCB) one even for a zero-NCB policy (UP3/4592 NCB=0 → wrongly 23.5%
+  // instead of 19.5%). Gate per rate_type: NCB>0 → keep "NCB" rows / drop "WO NCB";
+  // NCB==0 → keep "WO NCB" / drop "NCB". Only fires when BOTH variants exist for a
+  // rate_type (so fuel-banded or single-row rate_types are untouched). Liberty+CAR.
+  if (insurerSlug === 'liberty_videocon' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR' && rules.length) {
+    const hasNcb = Number(params.ncbPct) > 0;
+    const isWoNcb = r => /W\/?O\s*NCB|WITHOUT\s*NCB|NON[\s_-]*NCB/i.test(String(r.remarks || ''));
+    const isWithNcb = r => /\bNCB\b/i.test(String(r.remarks || '')) && !isWoNcb(r);
+    const byRt = {};
+    for (const r of rules) (byRt[r.rate_type] = byRt[r.rate_type] || []).push(r);
+    const next = [];
+    for (const arr of Object.values(byRt)) {
+      if (arr.some(isWoNcb) && arr.some(isWithNcb)) next.push(...arr.filter(hasNcb ? isWithNcb : isWoNcb));
+      else next.push(...arr);
+    }
+    rules = next;
   }
 
   if (rules.length > 0) rules = filterRulesByPolicy(rules, params);
@@ -2415,11 +2528,13 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     const compRules = rules.filter(r => /^COMP$/i.test(String(r.rate_type || '')));
     if (inMhGj && compRules.length > 0) {
       const ncb = Number(params.ncbPct) || 0;
+      // Per product owner: a NEW vehicle (VEHICLE AGE = 0) is rated as WITH-NCB.
+      const isNew = (Number(params.vehicleAge) || 0) === 0;
       const fu  = String(params.fuelType || '').toUpperCase();
       const isPetrol = /PETROL/.test(fu);          // PETROL or PETROL/CNG → petrol family
       const isHev    = /ELECTRIC|HYBRID|\bHEV\b|BATTERY/.test(fu);
       let target;
-      if (ncb > 0)       target = 0.45;            // With NCB (any fuel / HEV)
+      if (ncb > 0 || isNew) target = 0.45;         // With NCB (incl. new vehicle) — any fuel
       else if (isHev)    target = 0.10;            // Without NCB, HEV
       else if (isPetrol) target = 0.45;            // Without NCB, Petrol
       else               target = 0.10;            // Without NCB, Diesel / CNG / other
@@ -2442,7 +2557,9 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       // split is really an OD-discount band, which isn't wired for Bajaj — hence
       // the narrow NCB>0 proxy + Rajasthan-only scope.
       const ncb = Number(params.ncbPct) || 0;
-      if (ncb > 0) {
+      // Per product owner: a NEW vehicle (VEHICLE AGE = 0) is rated as WITH-NCB → 0.30 row.
+      const isNew = (Number(params.vehicleAge) || 0) === 0;
+      if (ncb > 0 || isNew) {
         const clone = { ...compRules[0], rate_value: 0.30,
                         sheet_name: compRules[0].sheet_name,
                         segment: 'Pvt Car Comprehensive (Rajasthan With-NCB)' };
@@ -2464,7 +2581,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       const isPetrol = /PETROL/.test(fu);
       const isHev    = /ELECTRIC|HYBRID|\bHEV\b|BATTERY/.test(fu);
       const ncb  = Number(params.ncbPct) || 0;
-      const isNew = /NEW/i.test(String(params.businessType || ''));
+      const isNew = (Number(params.vehicleAge) || 0) === 0;   // new vehicle = age 0
       let target;
       if (isPetrol || isHev)   target = 0.30;          // Petrol / EV-Hybrid (NCB or not)
       else if (ncb > 0 || isNew) target = 0.30;        // Non-petrol, With-NCB / New Business
@@ -2592,6 +2709,50 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on failure */ }
   }
 
+  // ---- SBI Pvt-Car SATP MH-N null-CC-band decline ----
+  // SBI's MH-N (Nagpur/Vidarbha) Pvt-Car SATP grid declines whole CC bands — cc 0-1000 is
+  // ENTIRELY null = declined (operator their=0: MH22/4900 cc998, 4973/4988 cc796, all MH-N).
+  // The generic engine, finding MH-N's own cc band null, borrows another region's rate (even
+  // a Mumbai 52% for cc796). SCOPED to cluster MH-N + CAR + Liability: query MH-N's OWN
+  // current-card SATP rate for the policy's cc band; if MH-N has ZERO non-null rate there →
+  // DECLINE (no-rule). Bands where MH-N IS rated (cc1001-1500/1501+, where many policies are
+  // operator-paid 39-45) keep the engine's rate untouched → no regression.
+  if (insurerSlug === 'sbi_general' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR' &&
+      (Number(params.odPremium) === 0 || /^(TP|SATP|ACT)$/i.test(String(params.insProduct || ''))) &&
+      rtoInfo && /^MH\s*-\s*N$/i.test(String(rtoInfo.cluster || '')) && rules.length) {
+    try {
+      const cc = Number(params.cc) || 0;
+      // Map policy fuel → SBI fuel_type column value (the MH-N grid declines cc1001-1500
+      // for Diesel/CNG/LPG but pays Petrol/EV/Hybrid — fuel must gate the decline).
+      const _f = String(params.fuelType || '').toUpperCase();
+      const fuelCol = /DIESEL/.test(_f) ? 'Diesel' : /PETROL/.test(_f) ? 'Petrol' :
+        /CNG/.test(_f) ? 'CNG' : /LPG/.test(_f) ? 'LPG' :
+        /ELECTRIC|\bEV\b|BATTERY/.test(_f) ? 'EV' : /HYBRID/.test(_f) ? 'Hybrid' : null;
+      const satpRule = rules.find(r => /SATP/i.test(String(r.rate_type || '')) && /Pvt\s*Car/i.test(String(r.segment || '')));
+      if (satpRule && cc > 0) {
+        const mnKey = lookupKey + '||sbiMhnSatp:' + cc + ':' + (fuelCol || '');
+        let hasRate;
+        if (caches.lookup.has(mnKey)) hasRate = caches.lookup.get(mnKey);
+        else {
+          const mr = await pool.request().input('cc', sql.Int, cc).input('fuel', sql.NVarChar(20), fuelCol)
+            .query(`SELECT TOP 1 rr.rate_value FROM rate_rules rr JOIN rate_cards rc ON rr.rate_card_id = rc.id
+                    WHERE rr.insurer='sbi_general' AND rr.region='MH - N' AND rr.segment LIKE '%Pvt Car%SATP%'
+                      AND rr.rate_type='SATP' AND rr.rate_value IS NOT NULL
+                      AND rr.cc_band_min <= @cc AND rr.cc_band_max >= @cc
+                      AND (@fuel IS NULL OR rr.fuel_type = @fuel)
+                      AND (rr.remarks IS NULL OR rr.remarks NOT LIKE '%IRDA%')`);
+          hasRate = mr.recordset.length > 0;
+          caches.lookup.set(mnKey, hasRate);
+        }
+        if (!hasRate) {
+          rules = [{ ...satpRule, rate_value: 0, is_declined: 1,
+            segment: (satpRule.segment || 'Pvt Car SATP') + ' (SBI MH-N ≤CC declined)' }];
+        }
+      }
+    } catch (_) { /* leave rules unchanged on failure */ }
+  }
+
   // ---- SBI GCV MH cluster rollup (MH-N / MH-P → MH-Rest) ----
   // SBI's rto_mappings split Maharashtra into clusters MH-M / MH-N / MH-P /
   // MH-Rest, but the SBI GCV grid only carries MH-M and MH-Rest rows — so an
@@ -2644,7 +2805,12 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       String(params.vehicleType || '').toUpperCase() === 'GCV' &&
       rtoInfo && /^MH\b/i.test(String(rtoInfo.cluster || '')) && rules.length) {
     try {
-      const segRule = rules.find(r => /^(MH - M|MH - Rest|RO Maharashtra)$/i.test(String(r.region || ''))
+      // Accept the Maharashtra REGION ALIASES too (the SBI GCV grid stores rows under raw
+      // labels "Pune" / "Mumbai" / "Navi Mumbai" / "Maharashtra" that alias to MH-M/MH-Rest).
+      // Without these a Nagpur (MH-N) GCV that matched the "Pune" alias 0.675 never got routed
+      // to its correct MH-Rest 0.65 (MH22/5010 etc. their=65). tgtReg is still driven by the
+      // rto-master cluster (MH-M = Mumbai metro, else MH-Rest), so the alias only enables the find.
+      const segRule = rules.find(r => /^(MH - M|MH - Rest|RO Maharashtra|Pune|Mumbai|Navi\s*Mumbai|Maharashtra)$/i.test(String(r.region || ''))
         && /GCV/i.test(String(r.segment || ''))
         && !/GCV\s*3\s*W/i.test(String(r.segment || '')));
       if (segRule) {
@@ -2655,21 +2821,71 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
           .input('reg', sql.NVarChar(100), tgtReg)
           .input('seg', sql.NVarChar(200), segRule.segment)
           .input('rt',  sql.NVarChar(50), String(segRule.rate_type || 'COMP'))
-          .input('sub', sql.NVarChar(100), tgtSub);
+          .input('sub', sql.NVarChar(100), tgtSub)
+          .input('age', sql.Int, Number(params.vehicleAge) || 0);
         let wtClause = '';
         if (segRule.weight_band_min != null && segRule.weight_band_max != null) {
           reqM.input('wmin', sql.Float, segRule.weight_band_min);
           reqM.input('wmax', sql.Float, segRule.weight_band_max);
           wtClause = ' AND weight_band_min=@wmin AND weight_band_max=@wmax';
         }
+        // Respect the vehicle-AGE band: the MH-Rest GCV rows are age-banded (age 1-5
+        // max 0.21 vs age 6-99 max 0.29). The MAX must stay WITHIN the policy's age
+        // band (operator pays the top VOLUME tier of that age band) — taking MAX across
+        // all ages over-rated an age-4 truck at the age-6+ 0.29 (MH1/2411 their=21).
         const mr = await reqM.query(`SELECT MAX(rate_value) AS mx FROM rate_rules
           WHERE insurer LIKE '%sbi%' AND region=@reg AND segment=@seg
             AND rate_type=@rt AND sub_type=@sub AND rate_value IS NOT NULL${wtClause}
+            AND (vehicle_age_min IS NULL OR vehicle_age_min <= @age)
+            AND (vehicle_age_max IS NULL OR vehicle_age_max >= @age)
             AND (remarks IS NULL OR remarks NOT LIKE '%IRDA%')`);
         const mx = mr.recordset[0] && mr.recordset[0].mx;
         if (mx != null && (mx !== segRule.rate_value || segRule.region !== tgtReg)) {
           const clone = { ...segRule, rate_value: mx, region: tgtReg, sub_type: tgtSub,
             segment: segRule.segment + ' (SBI ' + tgtReg + '/' + tgtSub + ')' };
+          rules = [clone, ...rules.filter(r => r !== segRule)];
+        }
+      }
+    } catch (_) { /* leave rules unchanged on failure */ }
+  }
+
+  // ---- SBI PCV (taxi/bus) Mumbai-metro sub routing ----
+  // SBI's PCV region "MH - M" COMBINES Mumbai (sub_type "Mumbai metro") and Pune
+  // (sub_type "Maharashtra"); the RTO-master cluster distinguishes them — MH-M = Mumbai
+  // metro (MH01/02/06/43/47…), MH-P = Pune (MH12/14). For a Mumbai RTO the engine matched
+  // the cheaper Pune sub ("Maharashtra" SATP cc0-999 0.37) instead of "Mumbai metro" (0.53
+  // — MH20/6872 MH06 their=53). Route the sub by cluster (MH-M → Mumbai metro) and take the
+  // band MAX within the same cc + age band. SBI + PCV + cluster MH-M scoped; Pune (MH-P)
+  // keeps its "Maharashtra" sub untouched.
+  if (insurerSlug === 'sbi_general' &&
+      String(params.vehicleType || '').toUpperCase() === 'PCV' &&
+      rtoInfo && /^MH\s*-\s*M$/i.test(String(rtoInfo.cluster || '')) && rules.length) {
+    try {
+      const segRule = rules.find(r => /^MH - M$/i.test(String(r.region || '')) &&
+        /Taxi|PCV|Bus/i.test(String(r.segment || '')));
+      if (segRule) {
+        const reqP = pool.request()
+          .input('reg', sql.NVarChar(100), segRule.region)
+          .input('seg', sql.NVarChar(200), segRule.segment)
+          .input('rt', sql.NVarChar(50), String(segRule.rate_type || 'SATP'))
+          .input('sub', sql.NVarChar(100), 'Mumbai metro')
+          .input('age', sql.Int, Number(params.vehicleAge) || 0);
+        let ccClause = '';
+        if (segRule.cc_band_min != null && segRule.cc_band_max != null) {
+          reqP.input('ccmin', sql.Int, segRule.cc_band_min);
+          reqP.input('ccmax', sql.Int, segRule.cc_band_max);
+          ccClause = ' AND cc_band_min=@ccmin AND cc_band_max=@ccmax';
+        }
+        const mr = await reqP.query(`SELECT MAX(rate_value) AS mx FROM rate_rules
+          WHERE insurer LIKE '%sbi%' AND region=@reg AND segment=@seg AND rate_type=@rt
+            AND sub_type=@sub AND rate_value IS NOT NULL${ccClause}
+            AND (vehicle_age_min IS NULL OR vehicle_age_min <= @age)
+            AND (vehicle_age_max IS NULL OR vehicle_age_max >= @age)
+            AND (remarks IS NULL OR remarks NOT LIKE '%IRDA%')`);
+        const mx = mr.recordset[0] && mr.recordset[0].mx;
+        if (mx != null && (mx !== segRule.rate_value || segRule.sub_type !== 'Mumbai metro')) {
+          const clone = { ...segRule, rate_value: mx, sub_type: 'Mumbai metro',
+            segment: segRule.segment + ' (SBI MH-M/Mumbai metro)' };
           rules = [clone, ...rules.filter(r => r !== segRule)];
         }
       }
@@ -2870,8 +3086,10 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       String(params.vehicleType || '').toUpperCase() === 'CAR' &&
       String(params.insProduct || '').toUpperCase() === 'COMP' && rules.length) {
     try {
+      // Haryana (HR) has no own Chola Pvt-Car region — it takes the PB (Punjab) grid
+      // (USER-confirmed).
       const ST2REG = { GJ:'GJ', MH:'MH/GA', GA:'MH/GA', AP:'AP/TS', TS:'AP/TS', TG:'AP/TS',
-        KA:'KA', DL:'DL', TN:'TN', RJ:'RJ', PB:'PB', HP:'HP', UP:'UP', OD:'OD', OR:'OD',
+        KA:'KA', DL:'DL', TN:'TN', RJ:'RJ', PB:'PB', HR:'PB', HP:'HP', UP:'UP', OD:'OD', OR:'OD',
         JH:'JH', JK:'JK', MP:'MP', WB:'WB', UK:'UK', UA:'UK', CG:'CG', BR:'BH', AN:'AN',
         AS:'AS/ML/TR/AR/NL', ML:'AS/ML/TR/AR/NL', TR:'AS/ML/TR/AR/NL', AR:'AS/ML/TR/AR/NL', NL:'AS/ML/TR/AR/NL' };
       const code = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -2896,6 +3114,104 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
           const clone = { ...base, rate_type: 'PACK', rate_value: mx, region: reg,
             sub_type: 'PC [PACK]', segment: ccBand + ' (Chola CAR)' };
           rules = [clone, ...rules.filter(r => r !== base)];
+        }
+      }
+    } catch (_) { /* leave rules unchanged on failure */ }
+  }
+
+  // ---- Chola tractor (1_TRAC) region + NEW/RENEWAL resolver ----
+  // Chola files tractor rates in the GCV grid (segment 1_TRAC[NEW]/[RENEWAL], sub_type
+  // MSV, PACK), region-banded (BH=Bihar 0.44, AP 0.45, …). Tractors arrive vehicleType=
+  // MISC (not GCV) so the Chola GCV resolver below skips them; and Chola has sparse
+  // rto_mappings (no BR), so region resolves null → the generic engine grabs an arbitrary
+  // region's tractor row (BH2/6073 BR27 → AP [NEW] 0.45 vs the correct Bihar 0.44).
+  // Resolve region from the RTO state-prefix (same scheme as Chola GCV) and pick [NEW]
+  // (age 0) or [RENEWAL] (age>=1 — a used/registered vehicle, regardless of a misleading
+  // "New Business" type). Chola + tractor scoped; unresolved prefix → keep engine rule.
+  if (insurerSlug === 'chola_ms' &&
+      /\bTRACTOR\b/i.test(`${params.vehicleCategory || ''} ${params.model || ''}`)) {
+    try {
+      const TREG = { GJ: 'GJ', MH: 'Mumbai/GA/Pune/Central MH', GA: 'Mumbai/GA/Pune/Central MH',
+        AP: 'AP', TS: 'TS', TG: 'TS', KA: 'KA', DL: 'DL', TN: 'TN-Chennai', RJ: 'RJ', PB: 'PB',
+        HP: 'HP', UP: 'UP', OD: 'OD', OR: 'OD', JH: 'JH', JK: 'JK', MP: 'MP', WB: 'WB', UK: 'UK',
+        UA: 'UK', CG: 'CG', BR: 'BH', AN: 'AN', AS: 'AS/ML/TR/AR/NL/SK', ML: 'AS/ML/TR/AR/NL/SK',
+        TR: 'AS/ML/TR/AR/NL/SK', AR: 'AS/ML/TR/AR/NL/SK', NL: 'AS/ML/TR/AR/NL/SK', SK: 'AS/ML/TR/AR/NL/SK' };
+      const code = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const reg = TREG[code.slice(0, 2)];
+      if (reg) {
+        const band = (Number(params.vehicleAge) || 0) < 1 ? 'NEW' : 'RENEWAL';
+        const trKey = lookupKey + '||cholaTrac:' + reg + ':' + band;
+        let trRows;
+        if (caches.lookup.has(trKey)) trRows = caches.lookup.get(trKey);
+        else {
+          // Scope to the CURRENT card (latest effective_from): Chola carries multiple
+          // card generations (e.g. WB [RENEWAL] = 0.375 on the stale Mar-2025 card 40 vs
+          // 0.2/0.325 on the Apr-2026 cards). Order by effective_from DESC so the stale
+          // higher rate is excluded, then take the region's top current-card rate.
+          const trSql = (segParam) => `SELECT TOP 1 rr.rate_value FROM rate_rules rr
+              JOIN rate_cards rc ON rr.rate_card_id = rc.id
+              WHERE rr.insurer='chola_ms' AND rr.region=@reg AND rr.segment LIKE ${segParam}
+                AND rr.rate_value > 0 ORDER BY rc.effective_from DESC, rr.rate_value DESC`;
+          trRows = (await pool.request().input('reg', sql.NVarChar(60), reg)
+            .input('seg', '%TRAC[[]' + band + ']%').query(trSql('@seg'))).recordset;
+          // fallback: region has no band-specific tractor row → try the other band
+          if (!trRows.length) {
+            const other = band === 'NEW' ? 'RENEWAL' : 'NEW';
+            trRows = (await pool.request().input('reg', sql.NVarChar(60), reg)
+              .input('seg', '%TRAC[[]' + other + ']%').query(trSql('@seg'))).recordset;
+          }
+          caches.lookup.set(trKey, trRows);
+        }
+        if (trRows[0]) {
+          const base = rules[0] || { insurer: insurerSlug };
+          const clone = { ...base, rate_type: 'PACK', rate_value: Number(trRows[0].rate_value),
+            is_declined: 0, region: reg, sub_type: 'MSV', segment: '1_TRAC[' + band + '] (Chola ' + reg + ')' };
+          rules = [clone];
+        }
+      }
+    } catch (_) { /* leave rules unchanged on failure */ }
+  }
+
+  // ---- Chola excavator / construction-equipment (JCB) region resolver ----
+  // Chola's excavator (2_EXCAVATOR — JCB/backhoe) rate is region-banded (PACK = Comp,
+  // ACT = Liability), current-card: GJ/MH/etc 0.30, KA/UP 0.175, MP/RJ 0 (declined), and
+  // some regions carry NO ACT row at all (Liability declined there). Tractors/excavators
+  // arrive vehicleType=MISC → region resolves null → the generic engine grabs an arbitrary
+  // region's rate AND can mis-pick a GCV CC-band segment ("3_4W_GT_1500CC" 12.5%) over the
+  // EXCAVATOR segment when CC>1500 (MH23/9363 UP JCB → 12.5 vs UP PACK 17.5 their=18).
+  // Resolve region, pick the EXCAVATOR rate for the policy's cover (ACT if Liability/od=0,
+  // else PACK) from the CURRENT card; rate 0 or no-row → decline. Chola + JCB/excavator.
+  if (insurerSlug === 'chola_ms' &&
+      (/\bJCB\b|EXCAVATOR|BACKHOE/i.test(`${params.vehicleCategory || ''} ${params.model || ''}`) ||
+        rules.some(r => /EXCAVATOR/i.test(String(r.segment || ''))))) {
+    try {
+      const CEREG = { GJ: 'GJ', MH: 'Mumbai/GA/Pune/Central MH', GA: 'Mumbai/GA/Pune/Central MH',
+        AP: 'AP', TS: 'TS', TG: 'TS', KA: 'KA', DL: 'DL', TN: 'TN-Chennai', RJ: 'RJ', PB: 'PB',
+        HP: 'HP', UP: 'UP', OD: 'OD', OR: 'OD', JH: 'JH', JK: 'JK', MP: 'MP', WB: 'WB', UK: 'UK',
+        UA: 'UK', CG: 'CG', BR: 'BH', AN: 'AN', AS: 'AS/ML/TR/AR/NL/SK', ML: 'AS/ML/TR/AR/NL/SK',
+        TR: 'AS/ML/TR/AR/NL/SK', AR: 'AS/ML/TR/AR/NL/SK', NL: 'AS/ML/TR/AR/NL/SK', SK: 'AS/ML/TR/AR/NL/SK' };
+      const code = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const reg = CEREG[code.slice(0, 2)];
+      if (reg) {
+        const cover = (Number(params.odPremium) === 0 || /^(TP|SATP|ACT)$/i.test(String(params.insProduct || ''))) ? 'ACT' : 'PACK';
+        const ceKey = lookupKey + '||cholaCe:' + reg + ':' + cover;
+        let ceRows;
+        if (caches.lookup.has(ceKey)) ceRows = caches.lookup.get(ceKey);
+        else {
+          ceRows = (await pool.request().input('reg', sql.NVarChar(60), reg).input('rt', sql.NVarChar(10), cover)
+            .query(`SELECT TOP 1 rr.rate_value FROM rate_rules rr JOIN rate_cards rc ON rr.rate_card_id = rc.id
+                    WHERE rr.insurer='chola_ms' AND rr.region=@reg AND rr.segment LIKE '%EXCAVATOR%'
+                      AND rr.rate_type=@rt ORDER BY rc.effective_from DESC, rr.rate_value DESC`)).recordset;
+          caches.lookup.set(ceKey, ceRows);
+        }
+        const base = rules[0] || { insurer: insurerSlug };
+        const rv = ceRows[0] ? Number(ceRows[0].rate_value) : null;
+        if (rv == null || rv === 0) {
+          // no current-card excavator rate for this region+cover (or explicit 0) → decline
+          rules = [{ ...base, rate_value: 0, is_declined: 1, segment: '2_EXCAVATOR (Chola ' + reg + ' ' + cover + ' — declined)' }];
+        } else {
+          rules = [{ ...base, rate_type: cover, rate_value: rv, is_declined: 0,
+            region: reg, sub_type: 'MSV', segment: '2_EXCAVATOR (Chola ' + reg + ')' }];
         }
       }
     } catch (_) { /* leave rules unchanged on failure */ }
@@ -3135,6 +3451,66 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged */ }
   }
 
+  // ---- United PCV route bus → seating-banded "4W PCV > 6 passengers" grid ----
+  // United rates route/stage buses as ordinary "4W PCV > 6" passenger vehicles, banded by
+  // SEATING (PCC) × fuel × region (PCC<=10 / 10-20 / 20-30 / 30-40 / 40-50 / 50-60 / >60,
+  // EV = "PCC>20 (Electric)"). The global route-bus decline drops them to no-rule, AND the
+  // PCC band lives in rate_text (not a column) so the right band must be parsed. Re-query
+  // the "4W PCV > 6" segment for the region and pick the row whose PCC band contains the
+  // policy seating and whose fuel matches (All Fuel for the ≤20 bands; Diesel/Petrol/CNG
+  // for ≥20; Electric for EV). USER-confirmed: JK1/840 (21-seat diesel, J&K) → 10%.
+  // United + PCV + route-bus scoped; rate applies to OD & TP (single rate on net).
+  if (insurerSlug === 'united_india_insurance' &&
+      String(params.vehicleType || '').toUpperCase() === 'PCV' &&
+      /\bROUTE\s*BUS\b|\bSTAGE\s*CARR?IAGE\b|\bCONTRACT\s*CARR?IAGE\b/i.test(String(params.vehicleCategory || ''))) {
+    const seat = Number(params.seatingCapacity) || 0;
+    const fuel = String(params.fuelType || '').toUpperCase();
+    const isEV = /ELECTRIC|\bEV\b|BATTERY/.test(fuel);
+    if (seat > 6) {
+      const busKey = lookupKey + '||unitedPcvBus';
+      let busRules;
+      if (caches.lookup.has(busKey)) busRules = caches.lookup.get(busKey);
+      else { busRules = await lookupRates(pool, { ...baseLookup, segment: '4W PCV > 6' }); caches.lookup.set(busKey, busRules); }
+      const fuelTok = /DIESEL/.test(fuel) ? 'DIESEL' : (/CNG|LPG/.test(fuel) ? 'CNG' : (/PETROL/.test(fuel) ? 'PETROL' : null));
+      const bandHit = (txt) => {
+        const t = String(txt || ''); let m;
+        if ((m = t.match(/(\d+)\s*<\s*PCC\s*<=\s*(\d+)/i))) return seat > +m[1] && seat <= +m[2];
+        if ((m = t.match(/PCC\s*<=\s*(\d+)/i))) return seat <= +m[1];
+        if ((m = t.match(/PCC\s*>\s*(\d+)/i))) return seat > +m[1];
+        return false;
+      };
+      const fuelHit = (txt) => {
+        const t = String(txt || '');
+        if (isEV) return /ELECTRIC/i.test(t);
+        if (/ELECTRIC/i.test(t)) return false;
+        return /ALL\s*FUEL/i.test(t) || (fuelTok && new RegExp('\\(' + fuelTok + '\\)', 'i').test(t));
+      };
+      const cand = busRules.filter(r => Number(r.rate_value) >= 0 && bandHit(r.rate_text) && fuelHit(r.rate_text));
+      if (cand.length > 0) rules = [{ ...cand[0], segment: 'PCV 4W >6 (United seating grid)' }];
+    }
+  }
+
+  // ---- United India GCV E-Cart / E-Rickshaw → 3W-PCV rate (MP 25% / Other 40%) ----
+  // A goods e-rickshaw / e-cart ("E-Rikshaw-Good Carrying", "E CART", "E RICKSHAW") is a
+  // 3-wheeler electric vehicle; United rates it like its 3W PASSENGER auto (Three Wheeled
+  // (Passenger Carrying): MP 25%, other states 40%) — NOT the generic small-GCV GVW band
+  // (<=2000kg 20%) the engine landed on, and NOT the stale "E-Cart" 50% segment row.
+  // Operator-confirmed: DL5/6771 (E CART, UP37) their=40. (Mirrors the Shriram pattern —
+  // GCV e-carts must search the 3W/PCV rate.) United+GCV+e-cart scoped.
+  if (insurerSlug === 'united_india_insurance' &&
+      String(params.vehicleType || '').toUpperCase() === 'GCV') {
+    const hay = `${params.vehicleCategory || ''} ${params.model || ''} ${params.make || ''}`.toUpperCase();
+    if (/E-?\s*CART|E-?\s*RICK|RIKSHAW|RICKSHAW/.test(hay)) {
+      const st = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 2);
+      const ecRate = st === 'MP' ? 0.25 : 0.40;
+      const base = rules.find(r => /GCV|E-?CART|RICK/i.test(String(r.segment || ''))) || rules[0]
+        || { insurer: insurerSlug, region: resolvedRegion || null, segment: 'GCV' };
+      const clone = { ...base, rate_type: base.rate_type || 'COMP', rate_value: ecRate,
+        is_declined: 0, segment: 'GCV E-Cart (United 3W rate)' };
+      rules = [clone, ...rules.filter(r => r !== base)];
+    }
+  }
+
   // ---- United India PCV 3-Wheeler override (MP 25% / Other 40%) ----
   if (insurerSlug === 'united_india_insurance' &&
       String(params.vehicleType || '').toUpperCase() === 'PCV') {
@@ -3280,6 +3656,58 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
+  // ---- Bajaj PCV Staff Bus: COMP(OD-leg) + SATP(TP-leg) premium-weighted blend ----
+  // Bajaj files the bus commission as TWO legs by rate_type: COMP = OD-leg %, SATP =
+  // TP-leg % (e.g. Gujarat "Staff Bus SC>10" COMP 0.25 / SATP 0.53). A Comprehensive
+  // bus is ~99% TP premium, so the operator's effective commission = the premium-
+  // weighted blend (COMP×OD + SATP×TP)/net ≈ the SATP rate (~53 Gujarat/Mumbai, ~48
+  // Pune). The engine was picking the flat COMP 0.25 (=25) — GJ10/1463 our 25 vs op 52.
+  // USER-confirmed: use the region's OWN SATP. The two legs are sometimes filed under
+  // DIFFERENT region labels (COMP under "GUJARAT", SATP under "GUJARAT, Daman & Diu,
+  // Dadra & Nagar Haveli"), so the SATP is fetched by a STATE-TOKEN region match, not
+  // the resolved region. Comp/Package only — SATP-only (Liability) buses already take
+  // the SATP leg directly; the 0.025 residual SATP is excluded by the rate floor.
+  if (insurerSlug === 'bajaj_allianz' &&
+      String(params.vehicleType || '').toUpperCase() === 'PCV' &&
+      /^COMP/i.test(String(params.insProduct || ''))) {
+    const compBus = rules.find(r => /Staff\s*Bus/i.test(String(r.segment || '')) &&
+                                     String(r.rate_type || '').toUpperCase() === 'COMP');
+    const odP = Number(params.odPremium) || 0;
+    const tpP = Number(params.tpPremium) || 0;
+    const net = odP + tpP;
+    if (compBus && net > 0) {
+      try {
+        const seg = compBus.segment;
+        const stTok = String(resolvedRegion || '').trim().split(/[\s,]+/)[0] || '';   // GUJARAT / PUNE / MUMBAI…
+        const sbKey = lookupKey + '||bajajBusSatp:' + seg + ':' + stTok;
+        let satpRows;
+        if (caches.lookup.has(sbKey)) satpRows = caches.lookup.get(sbKey);
+        else {
+          satpRows = (await pool.request()
+            .input('seg', seg).input('tok', '%' + stTok + '%')
+            .query(`SELECT TOP 1 rate_value FROM rate_rules
+                    WHERE insurer='bajaj_allianz' AND product='PCV' AND segment=@seg
+                      AND rate_type='SATP' AND rate_value > 0.3 AND region LIKE @tok
+                    ORDER BY rate_value DESC`)).recordset;
+          caches.lookup.set(sbKey, satpRows);
+        }
+        const satp = satpRows[0] ? Number(satpRows[0].rate_value) : null;
+        const comp = Number(compBus.rate_value) || 0;
+        if (satp != null) {
+          const blend = (comp * odP + satp * tpP) / net;
+          // Operator reports the headline as the FLOORED integer percent (52.78 and
+          // 52.91 both → 52, not rounded to 53), so floor the blend to whole-percent
+          // for the rate-match headline; od_rate/tp_rate keep the true legs for income.
+          const headline = Math.floor(blend * 100) / 100;
+          const clone = { ...compBus, rate_value: +headline.toFixed(4), is_declined: 0,
+            od_rate: +comp.toFixed(4), tp_rate: +satp.toFixed(4),
+            segment: (compBus.segment || '') + ' (Bajaj bus OD+TP)' };
+          rules = [clone, ...rules.filter(r => r !== compBus)];
+        }
+      } catch (_) { /* leave rules unchanged on any failure */ }
+    }
+  }
+
   // ---- Kotak MISD flat-rate override ----
   // USER-confirmed: Kotak's MISD (Miscellaneous-D) segment has only TWO payout
   // rates — Tractor = 47.5% (any tractor on the acceptable-RTO list; the sheet's
@@ -3320,6 +3748,60 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     const clone = { ...base, rate_type: base.rate_type || 'COMP', rate_value: 0.65,
       is_declined: 0, segment: 'PCV (Kotak flat 65)' };
     rules = [clone];
+  }
+
+  // ---- Oriental Ambulance → dedicated "Ambulance" segment ----
+  // Oriental's grid has a SEPARATE Ambulance segment (Package 20% / Liability 10%)
+  // distinct from the generic MISC-D (Package 12.5% / Liability 8%). Ambulances
+  // arrive vehicleType=MISC with vehicleCategory "MISC - D - Ambulance" — the
+  // "MISC - D" prefix matches the generic MISC-D segment and (both rows being
+  // make-null) the generic row wins the byType COMP slot before pickPrimary sees
+  // the higher Ambulance rate. Detect AMBULANCE in category/model and keep ONLY the
+  // Ambulance-segment rows so the dedicated rate wins. Oriental + MISC scoped; real
+  // MISC-D earthmovers/transit-mixers (no AMBULANCE token) are untouched.
+  if (insurerSlug === 'oriental_insurance' &&
+      ['MISC', 'MIS'].includes(String(params.vehicleType || '').toUpperCase())) {
+    const hay = `${params.make || ''} ${params.model || ''} ${params.vehicleCategory || ''}`.toUpperCase();
+    if (/\bAMBULANCE\b/.test(hay)) {
+      // Re-query fresh — the earlier filterRulesByPolicy byType collapse already
+      // dropped the Ambulance COMP row in favour of the make-null MISC-D row.
+      const ambKey = lookupKey + '||orientalAmb';
+      let ambRules;
+      if (caches.lookup.has(ambKey)) ambRules = caches.lookup.get(ambKey);
+      else { ambRules = await lookupRates(pool, { ...baseLookup, segment: 'Ambulance' }); caches.lookup.set(ambKey, ambRules); }
+      const ambPick = ambRules.filter(r => /AMBULANCE/i.test(String(r.segment || '')) && Number(r.rate_value) > 0);
+      if (ambPick.length > 0) {
+        // Respect the policy cover (COMP vs SATP) via filterRulesByPolicy.
+        const ambFiltered = filterRulesByPolicy(ambPick, params);
+        rules = ambFiltered.length > 0 ? ambFiltered : ambPick;
+      }
+    }
+  }
+
+  // ---- Oriental MISC Package OD+TP legs ----
+  // Oriental's MISC Package rates (MISC-D, "MISC - D - Others", Ambulance) are TWO-
+  // legged: a distinct OD-leg % and TP-leg % encoded in rate_text ("OD 0.125 TP 0.08"),
+  // ingested as two COMP rows — the byType collapse keeps only ONE leg and applies it
+  // flat to net premium (over/under-charging). USER-confirmed ("MISC others .. its
+  // OD + TP"): commission = OD%×OD-prem + TP%×TP-prem, headline = OD+TP summed
+  // (Oriental/NIA convention; when legs are equal the sum collapses to the single rate,
+  // e.g. Ambulance OD0.2/TP0.2 → 20). Parse the surviving COMP row's rate_text and
+  // attach od_rate/tp_rate so income (bulk.js ~L3729) is leg-based. Oriental+MISC+COMP;
+  // SATP/Liability (single TP leg) is untouched.
+  if (insurerSlug === 'oriental_insurance' &&
+      ['MISC', 'MIS'].includes(String(params.vehicleType || '').toUpperCase())) {
+    const compRule = rules.find(r => /^COMP/i.test(String(r.rate_type || '')));
+    const m = compRule && String(compRule.rate_text || '').match(/OD\s*([\d.]+)\s*TP\s*([\d.]+)/i);
+    if (compRule && m) {
+      const odLeg = parseFloat(m[1]), tpLeg = parseFloat(m[2]);
+      if (odLeg > 0 && tpLeg > 0) {
+        const headline = (odLeg === tpLeg) ? odLeg : +(odLeg + tpLeg).toFixed(4);
+        const clone = { ...compRule, rate_value: headline,
+          od_rate: +odLeg.toFixed(4), tp_rate: +tpLeg.toFixed(4),
+          segment: (compRule.segment || '') + ' (Oriental MISC OD+TP)' };
+        rules = [clone, ...rules.filter(r => r !== compRule)];
+      }
+    }
   }
 
   // ---- Magma MISC construction-equipment → "CE Construction" segment ----
@@ -3446,16 +3928,40 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
-  // ---- All-insurer IDV gate ----
-  // USER-confirmed common rule (every insurer): when the vehicle IDV exceeds
-  // ₹50 lakh, do NOT apply any commission rule — high-value risks are referred /
-  // handled separately, so the engine must not auto-rate them. Clearing the pool
-  // routes the row through the no-primary path with a clear note (below). IDV is
-  // in rupees (50L = 5,000,000); exactly 50L is NOT blocked (strict >).
-  const idvOver50L = params.idv != null && Number(params.idv) > 5000000;
+  // ---- IDV gate DISABLED ----
+  // Per product owner ("ignore IDV and apply"): commission rules are applied
+  // REGARDLESS of IDV. (Previously a >₹50L IDV cleared the pool as a high-value
+  // referral; that proved wrong — the operator pays commission on high-IDV vehicles,
+  // e.g. National MISC-D trailers and commercial fleets.) Kept as a named constant
+  // (always false) so the downstream no-rule note / output flag references still resolve.
+  const idvOver50L = false;
   if (idvOver50L) rules = [];
 
-  const primary = pickPrimaryRateRule(rules);
+  let primary = pickPrimaryRateRule(rules);
+  // ---- Enabler / special-payout override ----
+  // A criteria-scoped enabler deal (segment + make + transaction + RTO location +
+  // date window) overrides the policy's income rate to the deal's COA% — REGARDLESS
+  // of the base grid, and even when no base rule matched (the deal itself is the
+  // rate). Only matching policies change; every other policy keeps the system rate.
+  // Criteria-only (no IMD/agent link) per product owner; COA → income rate.
+  let _enablerHit = null;
+  if (caches && caches.enablers && caches.enablers.length && !idvOver50L) {
+    _enablerHit = require('../services/enablers').pickEnablerOverride(params, caches.enablers, {
+      issueDate: policy.POLICY_ISSUED_DATE || policy['POLICY_ISSUED_DATE'] || null,
+      rtoCity: (rtoInfo && (rtoInfo.city || rtoInfo.region)) || null,
+      cluster: (rtoInfo && rtoInfo.cluster) || null,
+    });
+  }
+  if (_enablerHit && _enablerHit.coa_pct != null) {
+    primary = { ...(primary || {}),
+      id: primary ? primary.id : null,
+      rate_value: Number(_enablerHit.coa_pct) / 100,
+      od_rate: null, tp_rate: null,                 // flat COA — no OD/TP leg split
+      rate_type: (primary && primary.rate_type) || 'ENABLER',
+      segment: 'Enabler COA — ' + (_enablerHit.rto_location || _enablerHit.segment || 'deal'),
+      sheet_name: 'enabler:' + (_enablerHit.deal_id || _enablerHit.id),
+      _enabler_id: _enablerHit.id };
+  }
   if (!primary) {
     // Still try to surface the statement + PR amounts if we have them.
     let stmt = null, pr = null;
@@ -3759,11 +4265,9 @@ function buildOutputRow(policy, params, rule, rateVal, marginRule, nums, note, s
     // compliance reason at a glance (Compliance requires IDV ≤ ₹50L for
     // non-TP policies).
     idv: _idv > 0 ? _idv : null,
-    // True when the all-insurer IDV > ₹50L gate cleared the rule pool — these
-    // rows are intentionally no-rule (high-value referral), NOT real mismatches.
-    // Mirrors the gate condition (params.idv > 50L) exactly. The recon screen
-    // counts these on a dedicated card and excludes them from the mismatch list.
-    idv_over_50l: params.idv != null && Number(params.idv) > 5000000,
+    // IDV gate disabled ("ignore IDV and apply") — nothing is referred on IDV, so this
+    // is always false. The recon "IDV > 50L" referral card consequently shows 0.
+    idv_over_50l: false,
     matched_rule_id:  rule ? rule.id : null,
     matched_sheet:    rule ? rule.sheet_name : null,
     matched_segment:  rule ? rule.segment : null,
@@ -3970,7 +4474,7 @@ async function runBulkCalculate(body) {
     'BASE_OD_PREMIUM','NET_OD_PREMIUM','NET_LIABILITY_PREMIUM',
     'PREMIUM_WITHOUT_GST','ADD_ON_PREMIUM','Addon_Premium',
     'ANNUAL_PREMIUM','NCB','OD_DISCOUNT',
-    'BUSINESS_TYPE_ID','SubmissionDate','City','BooKedLocation',
+    'BUSINESS_TYPE_ID','SubmissionDate','POLICY_ISSUED_DATE','POLICY_START_DATE','City','BooKedLocation',
     // Proposer name — used to infer Corporate vs Individual ownership (PCV
     // bus rates split on this; a company-style name → Corporate, else Individual).
     'FULLNAME_PROPOSER',
@@ -4279,6 +4783,10 @@ async function runBulkCalculate(body) {
   const specialRulesByAgent = await loadSpecialRulesByAgent(pool);
   // Per-agent global uplift map — fallback when no per-row override hits.
   const globalUpliftByAgent = await loadGlobalUpliftsByAgent(pool);
+  // Enabler / special-payout overrides — criteria-scoped COA% income-rate
+  // overrides from uploaded enabler emails (segment + make + transaction + RTO
+  // location + date window). Empty array when none active.
+  const enablerOverrides = await require('../services/enablers').loadEnablerOverrides(pool);
   // Statement index — policy_no → amount (+ period) from active uploads.
   const statementIndex = await loadStatementIndex(pool);
   // Premium Register index — policy_no → PR amounts from active pr_rows.
@@ -4599,7 +5107,7 @@ async function runBulkCalculate(body) {
   // Per-run caches — cleared after the batch finishes. RTOs and rate-lookup
   // parameter tuples repeat heavily across policies from the same insurer,
   // so this typically eliminates 90%+ of the per-row DB calls.
-  const caches = { rto: new Map(), lookup: new Map(), tonnageById: new Map() };
+  const caches = { rto: new Map(), lookup: new Map(), tonnageById: new Map(), enablers: enablerOverrides };
 
   const allRows = rowsResult.recordset;
 

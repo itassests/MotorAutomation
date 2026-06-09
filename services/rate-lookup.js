@@ -325,7 +325,12 @@ async function lookupRates(pool, params) {
   const limit = Number.isFinite(params.limit) && params.limit > 0 ? Math.floor(params.limit) : 0;
   const topClause = limit > 0 ? `TOP ${limit} ` : '';
 
-  let query = `SELECT ${topClause}rr.* FROM rate_rules rr`;
+  // LEFT JOIN rate_cards so each rule carries its card's effective_from — used by
+  // the optional effective-date generation filter below (policy-start-date rate
+  // selection). The join is cheap (rate_cards is tiny) and adds no filtering on
+  // its own, so existing callers are unaffected.
+  let query = `SELECT ${topClause}rr.*, rc.effective_from AS _eff_from FROM rate_rules rr` +
+              ` LEFT JOIN rate_cards rc ON rr.rate_card_id = rc.id`;
   if (conditions.length > 0) {
     query += ` WHERE ${conditions.join(' AND ')}`;
   }
@@ -345,7 +350,32 @@ async function lookupRates(pool, params) {
     DESC`;
 
   const result = await request.query(query);
-  const rules = result.recordset;
+  let rules = result.recordset;
+
+  // ---- Effective-date (policy-start-date) generation filter ----
+  // When the caller passes `effective_date` (a policy's start date), select the
+  // rate-card GENERATION effective for that date: among the matched rules' cards,
+  // keep the one with the LATEST effective_from that is ≤ the start date. If NO
+  // card is yet effective on that date (policy predates the earliest card), fall
+  // back to the EARLIEST card. Rules with no card date (_eff_from NULL) are always
+  // kept. This is per-call (i.e. per product/region), so different products can sit
+  // on different generations. e.g. start 1-May-2026 → May card if loaded, else April.
+  if (params.effective_date) {
+    const eff = String(params.effective_date).slice(0, 10);
+    const iso = (d) => d == null ? null : (d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10));
+    const dated = rules.filter((r) => r._eff_from);
+    if (dated.length) {
+      const cands = dated.filter((r) => iso(r._eff_from) <= eff);
+      let target = '';
+      if (cands.length) {
+        for (const r of cands) { const v = iso(r._eff_from); if (v > target) target = v; }   // latest ≤ start
+      } else {
+        target = iso(dated[0]._eff_from);
+        for (const r of dated) { const v = iso(r._eff_from); if (v < target) target = v; }    // earliest (fallback)
+      }
+      rules = rules.filter((r) => !r._eff_from || iso(r._eff_from) === target);
+    }
+  }
 
   // Attach conditional_rates for conditional rules
   const conditionalRuleIds = rules

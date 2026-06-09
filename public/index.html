@@ -956,6 +956,21 @@
           </table>
         </div>
       </div>
+
+      <!-- ===== Enabler / Special Payout (email upload) ===== -->
+      <div class="card" id="enablerCard" style="margin-top:18px;">
+        <h2><span class="icon">&#9993;</span> Enabler / Special Payout (Email)</h2>
+        <p style="color:#666; font-size:13px; margin-top:-6px;">Upload an insurer enabler email (<b>.eml</b> / <b>.msg</b>). The <b>COA%</b> becomes the income rate for policies matching the deal (segment + make + transaction + RTO location + date window). <b>Only matching policies change</b> — all other rates stay the same.</p>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:10px 0;">
+          <input type="file" id="enablerFile" accept=".eml,.msg" class="form-control" style="max-width:320px;">
+          <button class="btn btn-primary btn-sm" onclick="enablerParse()">Parse Email</button>
+          <button class="btn btn-outline btn-sm" onclick="loadEnablers()">Refresh</button>
+          <span id="enablerMsg" style="font-size:12px; color:#888;"></span>
+        </div>
+        <div id="enablerPreview" style="display:none; border:1px solid #cfe3ff; border-radius:8px; padding:12px; margin-bottom:14px; background:#f7fbff;"></div>
+        <h3 style="font-size:14px; margin:12px 0 6px;">Active Enabler Deals</h3>
+        <div id="enablerList" style="font-size:13px;">Loading…</div>
+      </div>
     </div>
 
     <!-- ============ MANAGE RATE CARDS PANEL ============ -->
@@ -2401,7 +2416,7 @@
 
       <!-- KPI summary -->
       <div id="rcKpis" class="card" style="display:none;">
-        <div style="display:grid; grid-template-columns:repeat(8,1fr); gap:12px;">
+        <div style="display:grid; grid-template-columns:repeat(9,1fr); gap:12px;">
           <div style="background:#f0f6ff; border-radius:8px; padding:12px; text-align:center;">
             <div style="font-size:12px; color:#555;">File Trackers</div>
             <div id="rcKpiExcel" style="font-size:22px; font-weight:600; color:#0a3d62;">—</div>
@@ -2434,6 +2449,10 @@
             <div style="font-size:12px; color:#555;">IDV &gt; 50L (Referred)</div>
             <div id="rcKpiIdv" style="font-size:22px; font-weight:600; color:#6a1b9a;">—</div>
           </div>
+          <div style="background:#f4f4f5; border-radius:8px; padding:12px; text-align:center; cursor:pointer;" onclick="rcSetView('oldcases')" title="EXCLUDED from the comparison — Policy Issue Date outside 1–30 April 2026 (or unknown). Click to view these backdated / old-month cases.">
+            <div style="font-size:12px; color:#555;">Old Cases (excluded)</div>
+            <div id="rcKpiOld" style="font-size:22px; font-weight:600; color:#616161;">—</div>
+          </div>
         </div>
       </div>
 
@@ -2443,6 +2462,7 @@
           <button class="rcView btn btn-sm btn-primary" data-view="rate"      onclick="rcSetView('rate')">Rate Comparison</button>
           <button class="rcView btn btn-sm btn-outline"  data-view="missOurs" onclick="rcSetView('missOurs')">Missing in Our Data</button>
           <button class="rcView btn btn-sm btn-outline"  data-view="missExcel"onclick="rcSetView('missExcel')">Missing in File</button>
+          <button class="rcView btn btn-sm btn-outline"  data-view="oldcases" onclick="rcSetView('oldcases')">Old Cases</button>
           <button class="rcView btn btn-sm btn-outline"  data-view="ignored"  onclick="rcSetView('ignored')">Ignored</button>
           <span style="flex:1;"></span>
           <label style="font-size:12px; color:#555;">Insurer:</label>
@@ -2453,7 +2473,8 @@
           <select id="rcMatchFilter" style="padding:6px;" onchange="rcRender()">
             <option value="all">All</option>
             <option value="match">Rate Match only</option>
-            <option value="mismatch">Rate Mismatch only</option>
+            <option value="mismatch">Rate Mismatch only (excl. Grid)</option>
+            <option value="grid">As per Grid only</option>
           </select>
           <input type="text" id="rcSearch" placeholder="Search tracker / policy…" style="padding:6px; min-width:200px;" oninput="rcRender()">
           <button class="btn btn-sm btn-outline" onclick="rcClearIgnores()">Clear Ignores</button>
@@ -3790,6 +3811,7 @@
         tab.classList.add('active');
         document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
         if (tab.dataset.tab === 'admin') adminLoad();
+        if (tab.dataset.tab === 'upload' && typeof loadEnablers === 'function') loadEnablers();
         if (tab.dataset.tab === 'agent-view') loadAgentView();
         if (tab.dataset.tab === 'employee-view') loadEmployeeDashboard();
         if (tab.dataset.tab === 'masters' && !_mInsurersLoaded) loadMasterInsurers();
@@ -8043,6 +8065,98 @@
     }
 
     // ============ MANAGE RATE CARDS ============
+    // ============ ENABLER / SPECIAL PAYOUT (email upload) ============
+    let _enablerDraft = null;
+    async function enablerParse() {
+      const f = document.getElementById('enablerFile').files[0];
+      const msg = document.getElementById('enablerMsg');
+      if (!f) { msg.textContent = 'Choose a .eml / .msg file first'; return; }
+      msg.textContent = 'Parsing…';
+      const fd = new FormData(); fd.append('file', f);
+      try {
+        const j = await (await fetch('/api/enablers/parse', { method: 'POST', body: fd })).json();
+        if (!j.success) { msg.textContent = 'Parse failed: ' + (j.error || ''); return; }
+        _enablerDraft = j; msg.textContent = 'Parsed — review & save below.';
+        enablerRenderPreview(j);
+      } catch (e) { msg.textContent = 'Error: ' + e.message; }
+    }
+    function _enF(label, id, val, type) { return '<div class="field"><div class="label">' + label + '</div><input id="' + id + '" type="' + (type || 'text') + '" value="' + esc(val == null ? '' : val) + '" class="form-control" style="height:30px; font-size:12px;"></div>'; }
+    function _enChk(label, id, val) { return '<div class="field"><div class="label">' + label + '</div><input id="' + id + '" type="checkbox" ' + (val ? 'checked' : '') + ' style="width:18px; height:18px; margin-top:4px;"></div>'; }
+    function _enRow(rw, i) {
+      const v = (x) => esc(x == null ? '' : x);
+      return '<tr style="border-bottom:1px solid #eee;">'
+        + '<td style="padding:3px;"><input id="enr_rto_' + i + '" value="' + v(rw.rto_location) + '" class="form-control" style="height:26px; font-size:12px;"></td>'
+        + '<td><input id="enr_txn_' + i + '" value="' + v(rw.transaction_type) + '" class="form-control" style="height:26px; font-size:12px;"></td>'
+        + '<td><input id="enr_make_' + i + '" value="' + v(rw.make) + '" class="form-control" style="height:26px; font-size:12px;"></td>'
+        + '<td><input id="enr_coa_' + i + '" value="' + v(rw.coa_pct) + '" class="form-control" style="height:26px; width:70px; font-size:12px;"></td>'
+        + '<td><input id="enr_disc_' + i + '" value="' + v(rw.discount_pct) + '" class="form-control" style="height:26px; width:70px; font-size:12px;"></td>'
+        + '<td style="text-align:center;"><span style="cursor:pointer; color:#c00; font-weight:700;" onclick="this.closest(\'tr\').remove()">&times;</span></td></tr>';
+    }
+    function enablerRenderPreview(j) {
+      const h = j.header || {}, rows = j.rows || [];
+      let html = '<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin-bottom:10px;">'
+        + _enF('IMD / Deal', 'en_imd', h.imd_code) + _enF('Segment', 'en_seg', h.segment)
+        + _enF('Vehicle Type', 'en_vt', h.vehicle_type) + _enChk('3W', 'en_3w', h.is_3w) + _enChk('Electric', 'en_ev', h.is_electric)
+        + _enF('Window From', 'en_from', h.window_from, 'date') + _enF('Window To', 'en_to', h.window_to, 'date') + '</div>';
+      html += '<table style="width:100%; border-collapse:collapse; font-size:12px;"><thead><tr style="background:#eaf3ff;">'
+        + '<th style="padding:5px; text-align:left;">RTO Location</th><th>Transaction</th><th>Make</th><th>COA %</th><th>Discount %</th><th></th></tr></thead><tbody id="enRows">';
+      rows.forEach((rw, i) => { html += _enRow(rw, i); });
+      html += '</tbody></table>';
+      html += '<div style="margin-top:10px;"><button class="btn btn-primary btn-sm" onclick="enablerSave()">Save Deal</button> '
+        + '<button class="btn btn-outline btn-sm" onclick="document.getElementById(\'enablerPreview\').style.display=\'none\'">Cancel</button> '
+        + '<span style="font-size:11px; color:#888; margin-left:8px;">COA % is applied as the income rate to matching policies only.</span></div>';
+      const box = document.getElementById('enablerPreview'); box.innerHTML = html; box.style.display = '';
+    }
+    async function enablerSave() {
+      const get = (id) => { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
+      const chk = (id) => { const e = document.getElementById(id); return e && e.checked ? 1 : null; };
+      const header = { imd_code: get('en_imd'), deal_id: get('en_imd'), segment: get('en_seg'), vehicle_type: get('en_vt'),
+        is_3w: chk('en_3w'), is_electric: chk('en_ev'), window_from: get('en_from') || null, window_to: get('en_to') || null };
+      const rows = [];
+      const n = (_enablerDraft && _enablerDraft.rows ? _enablerDraft.rows.length : 0);
+      for (let i = 0; i < n; i++) {
+        if (!document.getElementById('enr_rto_' + i)) continue;   // row was removed
+        const txn = get('enr_txn_' + i);
+        rows.push({ rto_location: get('enr_rto_' + i), transaction_type: txn, is_new: /NEW/i.test(txn) ? 1 : null,
+          make: get('enr_make_' + i), coa_pct: get('enr_coa_' + i), discount_pct: get('enr_disc_' + i) });
+      }
+      const msg = document.getElementById('enablerMsg'); msg.textContent = 'Saving…';
+      try {
+        const j = await (await fetch('/api/enablers/save', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ header, rows, source_file: (_enablerDraft && _enablerDraft.filename) || null }) })).json();
+        if (!j.success) { msg.textContent = 'Save failed: ' + (j.error || ''); return; }
+        msg.textContent = 'Saved ' + j.inserted + ' rows (' + j.deal_id + ').';
+        document.getElementById('enablerPreview').style.display = 'none';
+        document.getElementById('enablerFile').value = ''; loadEnablers();
+      } catch (e) { msg.textContent = 'Error: ' + e.message; }
+    }
+    async function loadEnablers() {
+      const box = document.getElementById('enablerList'); if (!box) return;
+      try {
+        const j = await (await fetch('/api/enablers')).json();
+        const rows = j.rows || [];
+        if (!rows.length) { box.innerHTML = '<span style="color:#999;">No active enabler deals.</span>'; return; }
+        const groups = {}; rows.forEach(r => { (groups[r.deal_id] = groups[r.deal_id] || []).push(r); });
+        let html = '';
+        for (const deal of Object.keys(groups)) {
+          const list = groups[deal], h = list[0];
+          html += '<div style="border:1px solid #e0e0e0; border-radius:6px; padding:8px 10px; margin-bottom:8px;">'
+            + '<div style="display:flex; justify-content:space-between; align-items:center;"><div><b>' + esc(deal) + '</b> &mdash; ' + esc(h.segment || '')
+            + (h.is_3w ? ' · 3W' : '') + (h.is_electric ? ' · EV' : '') + (h.window_from ? (' · ' + esc(h.window_from) + ' → ' + esc(h.window_to)) : '') + '</div>'
+            + '<button class="btn btn-outline btn-sm" onclick="enablerDeactivateDeal(\'' + esc(deal) + '\')">Remove Deal</button></div>'
+            + '<table style="width:100%; border-collapse:collapse; font-size:12px; margin-top:6px;"><tr style="color:#888;"><td>RTO</td><td>Make</td><td>Txn</td><td>COA %</td><td>Disc %</td></tr>';
+          list.forEach(r => { html += '<tr><td>' + esc(r.rto_location || '(any)') + '</td><td>' + esc(r.make || '(any)') + '</td><td>' + esc(r.transaction_type || '-') + '</td><td><b>' + esc(r.coa_pct) + '</b></td><td>' + esc(r.discount_pct == null ? '-' : r.discount_pct) + '</td></tr>'; });
+          html += '</table></div>';
+        }
+        box.innerHTML = html;
+      } catch (e) { box.innerHTML = '<span style="color:#c00;">Error: ' + esc(e.message) + '</span>'; }
+    }
+    async function enablerDeactivateDeal(deal) {
+      if (!confirm('Remove enabler deal ' + deal + '? Matching policies will revert to the system rate.')) return;
+      await fetch('/api/enablers/deal/' + encodeURIComponent(deal) + '/deactivate', { method: 'POST' });
+      loadEnablers();
+    }
+
     let _allRateCards = [];
     async function loadRateCards() {
       try {
@@ -12857,6 +12971,7 @@
       document.getElementById('rcKpiMissOurs').textContent  = s.missing_in_our_data_count ?? '—';
       document.getElementById('rcKpiMissExcel').textContent = s.missing_in_excel_count ?? '—';
       { const _idvEl = document.getElementById('rcKpiIdv'); if (_idvEl) _idvEl.textContent = s.idv_referral_count ?? 0; }
+      { const _oldEl = document.getElementById('rcKpiOld'); if (_oldEl) _oldEl.textContent = s.old_case_count ?? 0; }
       // Rate matched / unmatched — recompute on the client so that any tracker
       // the user has marked "Ignore" counts as a MATCH (not a mismatch).
       // Excluded rows are left out of both tallies. `ignored` tracks how many
@@ -12949,29 +13064,50 @@
       };
       let rows = [], cols = [];
       if (_rcView === 'rate') {
-        cols = ['Tracker', 'Policy No', 'Insurer', 'Our Rate %', 'File Rate %', 'Diff', 'Match', ''];
+        cols = ['Tracker', 'Policy No', 'Insurer', 'Our Rate %', 'File Rate %', 'Diff', 'File Exp. Comm', 'Statement Comm', 'Income (System)', 'Match', ''];
         rows = (_rcData.rate_comparison || []).filter(r => {
           if (!matchesFilters(r)) return false;
           // "As per Grid" rows count as matched for the Show filter.
-          const effMatch = r.rate_match || _rcGrid.has(r.tracker);
+          const isGridRow = _rcGrid.has(r.tracker);
+          const effMatch = r.rate_match || isGridRow;
           if (matchF === 'match' && !effMatch) return false;
           if (matchF === 'mismatch' && effMatch) return false;
+          // "As per Grid only" — show exclusively the rows the user flagged as grid-correct.
+          if (matchF === 'grid' && !isGridRow) return false;
           return true;
         }).map(r => {
           const isGrid = _rcGrid.has(r.tracker);
           const bg = isGrid ? 'background:#eef2ff;' : (r.rate_match ? '' : 'background:#fff6f6;');
           const matchCell = r.rate_match ? '✅'
             : (isGrid ? '<span title="As per Grid — our rate accepted as correct" style="color:#3949ab; font-weight:600;">📋 Grid</span>' : '❌');
+          const oldTag = r.is_old_case === true
+            ? ` <span title="Issued outside 1–30 Apr 2026 (or unknown)${r.issue_date ? ' — '+esc(r.issue_date) : ''}" style="font-size:10px; background:#e0e0e0; color:#555; border-radius:3px; padding:1px 4px; vertical-align:middle;">OLD</span>`
+            : '';
           return `<tr style="border-bottom:1px solid #eee; ${bg}">
-          <td style="padding:6px;">${esc(r.tracker)}</td>
+          <td style="padding:6px;">${esc(r.tracker)}${oldTag}</td>
           <td style="padding:6px;">${esc(r.policy_no)}</td>
           <td style="padding:6px;">${esc(r.insurer)}</td>
           <td style="padding:6px; text-align:right;">${r.our_rate ?? '—'}</td>
           <td style="padding:6px; text-align:right;">${r.their_rate ?? '—'}</td>
           <td style="padding:6px; text-align:right; ${Math.abs(r.diff||0)>5 && !isGrid?'color:#b71c1c; font-weight:600;':''}">${r.diff ?? '—'}</td>
+          <td style="padding:6px; text-align:right; color:#a04a00;">${r.file_expected_comm != null ? Number(r.file_expected_comm).toLocaleString('en-IN') : '—'}</td>
+          <td style="padding:6px; text-align:right; color:#00695c;">${r.statement_commission != null ? Number(r.statement_commission).toLocaleString('en-IN') : '—'}</td>
+          <td style="padding:6px; text-align:right; color:#1b5e20; font-weight:600;">${r.income != null ? Number(r.income).toLocaleString('en-IN') : '—'}</td>
           <td style="padding:6px; text-align:center;">${matchCell}</td>
           <td style="padding:6px; text-align:center;">${rowActions(r)}</td></tr>`;
         });
+      } else if (_rcView === 'oldcases') {
+        // Old Cases — EXCLUDED from the rate comparison (issued outside 1–30 Apr 2026,
+        // or unknown). Shown here for reference only; they don't affect match stats.
+        cols = ['Tracker', 'Policy No', 'Insurer', 'Issue Date', 'Our Rate %', 'File Rate %', 'Diff'];
+        rows = (_rcData.old_cases || []).filter(matchesFilters).map(r => `<tr style="border-bottom:1px solid #eee; background:#fafafa;">
+          <td style="padding:6px;">${esc(r.tracker)}</td>
+          <td style="padding:6px;">${esc(r.policy_no)}</td>
+          <td style="padding:6px;">${esc(r.insurer)}</td>
+          <td style="padding:6px;">${esc(r.issue_date) || '—'}</td>
+          <td style="padding:6px; text-align:right;">${r.our_rate ?? '—'}</td>
+          <td style="padding:6px; text-align:right;">${r.their_rate ?? '—'}</td>
+          <td style="padding:6px; text-align:right;">${r.diff ?? '—'}</td></tr>`);
       } else if (_rcView === 'missOurs') {
         cols = ['Tracker', 'File Rate %', ''];
         rows = (_rcData.missing_in_our_data || []).filter(r => {
@@ -13236,6 +13372,7 @@
       })();
       loadInsurers();
       loadRateCards();
+      if (typeof loadEnablers === 'function') loadEnablers();
       loadSavedMargins();
       populateMarginDefineInsurerDropdown();
       populateMarginCoverageInsurerDropdown();

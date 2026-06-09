@@ -79,6 +79,7 @@ app.use('/api/company-margins', companyMarginRoutes);
 app.use('/api/recon', reconRoutes);
 app.use('/api/agent', require('./routes/agent'));
 app.use('/api/employee', require('./routes/employee'));
+app.use('/api/enablers', require('./routes/enablers'));
 
 // Health check
 app.get('/api/health', (req, res) => {

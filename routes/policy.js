@@ -1988,8 +1988,13 @@ function filterRulesByPolicy(rules, params, _trace) {
       // Positive-NCB token: a bare NCB keyword that is NOT a non-NCB qualifier
       // (go_digit COMP_NCB, ICICI "NCB:GT0", tata "NCB:NCB").
       const rtIsNcb = !rtIsNonNcb && /\bNCB\b|_NCB(_|$)/.test(rtU);
-      if (rtIsNonNcb && policyHasNCB) matches = false;
-      else if (rtIsNcb && !policyHasNCB) matches = false;
+      // Per product owner (Bajaj): a NEW vehicle (VEHICLE AGE = 0) has no prior NCB
+      // (NCB=0) but must be rated as WITH-NCB — its first policy takes the with-NCB
+      // commission tier, not the non-NCB tier. Based on vehicle age, NOT business type.
+      const _effHasNCB = policyHasNCB ||
+        (rule.insurer === 'bajaj_allianz' && (Number(params.vehicleAge) || 0) === 0);
+      if (rtIsNonNcb && _effHasNCB) matches = false;
+      else if (rtIsNcb && !_effHasNCB) matches = false;
     }
 
     // Special-body rate_type gate (Go Digit HCV grid). DUMPER_/OIL_TANKER_/
@@ -2024,15 +2029,28 @@ function filterRulesByPolicy(rules, params, _trace) {
       // NCB=0 OD override) are irrelevant: drop the explicit NCB=0 override
       // so it can't beat the real SATP/TP rate, and skip NCB band matching.
       const policyIsPureTp = String(params.insProduct || '').toUpperCase() === 'TP';
+      // Zuno "flat North" (USER, DL10/6283 UP-15): in the North states the regional
+      // Pvt-Car Comp rate (e.g. 28%) is FLAT — it applies regardless of NCB, so a
+      // zero-NCB car must NOT be knocked down to the Pan-India "NCB = 0 → 15%" floor.
+      // For these regions: keep the regional "NCB 1-99" row even for NCB=0, and drop
+      // the Pan-India NCB=0 override so it can't win.
+      const _zunoNorthFlat = rule.insurer === 'zuno' && !policyIsPureTp &&
+        /^(UTTAR PRADESH|DELHI|PUNJAB|HARYANA|CHANDIGARH)$/i.test(String(params.resolvedRegion || ''));
+      // Zuno NEW vehicle (age 0, USER GJ4/32801): the "New Vehicle Business" 30% grid
+      // applies (gate on AGE only) — the Pan-India "NCB=0 → 15%" floor must NOT win
+      // (a new car is NCB=0 by definition but isn't a no-NCB renewal). Drop the override.
+      const _zunoNewVehicle = rule.insurer === 'zuno' && !policyIsPureTp &&
+        (Number(params.vehicleAge) || 0) === 0;
       if (policyIsPureTp) {
         if (ruleIsNcbZeroOverride) matches = false;   // OD-only override — not a TP rate
         // else: leave TP rules untouched (no NCB filtering for TP)
       } else if (ruleIsNcbZero && policyHasNCB) {
         matches = false;                 // NCB=0 rule, but policy has NCB → drop
       } else if (ruleIsNcbPositive && !policyHasNCB) {
-        matches = false;                 // NCB 1-99 rule, but policy is zero-NCB → drop
+        if (!_zunoNorthFlat && !_zunoNewVehicle) matches = false;   // keep regional/new-vehicle rate
       } else if (ruleIsNcbZeroOverride && !policyHasNCB) {
-        score += 20;                     // canonical zero-NCB override → wins dedup
+        if (_zunoNorthFlat || _zunoNewVehicle) matches = false;    // North flat / new vehicle → drop 15% floor
+        else score += 20;               // canonical zero-NCB override → wins dedup
       } else if (ruleIsNcbZero && !policyHasNCB) {
         score += 8;                      // exact NCB=0 match (remark-level)
       } else if (ruleIsNcbPositive && policyHasNCB) {
@@ -2956,6 +2974,12 @@ function filterRulesByPolicy(rules, params, _trace) {
       // policy lands no-rule, matching the operator's decline. Must NOT match
       // "School Bus" / "Staff Bus" (which the operator does pay).
       const policyIsRouteBus = /\bROUTE\s*BUS\b|\bSTAGE\s*CARR?IAGE\b|\bCONTRACT\s*CARR?IAGE\b/i.test(vehicleCategory);
+      // Oriental rule (USER): a LARGE route bus (>17 seat) is paid as a SCHOOL BUS
+      // (60% Package / 45% Liability). Declared at this wider scope so the route-bus
+      // decline AND the downstream School-vs-Non-School / bus-exclusivity gates can
+      // all honour the exception. (Small ≤17-seat route buses stay 6-17 pax 15%.)
+      const _orientalSchoolRouteBus = rule.insurer === 'oriental_insurance' && policyIsRouteBus &&
+        Number(params.seatingCapacity) > 17;
       // Tractor detection. vehicleCategory is often blank for tractors (they
       // arrive as vehicleType=MISC with only make/model). Recognise the word
       // TRACTOR in category or model, and — for a MISC-type policy — a known
@@ -2968,7 +2992,11 @@ function filterRulesByPolicy(rules, params, _trace) {
       // keyword so make-based detection doesn't misroute e.g. Mahindra "Earth
       // Master" (backhoe), "Truxo" (pickup) or Eicher "Pro 6028" (truck) to
       // the tractor rate.
-      const NON_TRACTOR_MISC = /EARTH\s*MASTER|BACKHOE|\bLOADER\b|\bJCB\b|EXCAVATOR|\bCRANE\b|DOZER|DUMPER|TIPPER|FORKLIFT|\bTRUXO\b|\bPRO\s*\d|\bDOST\b|GRADER|ROLLER|\bPAVER\b|COMPACTOR/i;
+      // Also exclude pickups / SUVs built by tractor makes (Mahindra Bolero MaxX
+      // Pickup "BOL MAXX PUP", Scorpio, Pik-Up, Camper, Imperio; Tata Xenon) — these
+      // are goods/passenger vehicles, NOT tractors. Real tractors are model-numbered
+      // (SWARAJ 735, MF 241, ARJUN 605, EICHER 380) so none carry these keywords.
+      const NON_TRACTOR_MISC = /EARTH\s*MASTER|BACKHOE|\bLOADER\b|\bJCB\b|EXCAVATOR|\bCRANE\b|DOZER|DUMPER|TIPPER|FORKLIFT|\bTRUXO\b|\bPRO\s*\d|\bDOST\b|GRADER|ROLLER|\bPAVER\b|COMPACTOR|BOLERO|\bMAXX\b|\bPUP\b|PICK\s*-?\s*UP|PICKUP|PIK[\s-]*UP|SCORPIO|\bCAMPER\b|IMPERIO|XENON|\bSUV\b/i;
       const policyIsTractor = /\bTRACTOR\b/i.test(vehicleCategory) ||
         /\bTRACTOR\b/i.test(model) ||
         (policyIsMiscType && TRACTOR_MAKES.test(`${make} ${model}`) &&
@@ -2995,7 +3023,22 @@ function filterRulesByPolicy(rules, params, _trace) {
       // EXCEPTION: IFFCO Tokio DOES pay route buses (the PCV grid rates them as
       // ordinary buses/PCV; operator paid the middle 3L-6L 0.175), so don't
       // decline them for IFFCO — let the normal bus/PCV segment matching apply.
-      if (policyIsRouteBus && rule.insurer !== 'iffco_tokio') { matches = false; }
+      // Oriental ALSO pays small route/stage-carriage buses — but as ordinary
+      // "4W PCV 6-17 pax" minibuses (operator rated 13-seat route buses at 15%,
+      // NOT School/Staff Bus 60%, NOT declined). Only the 7-17 seat band is a
+      // known-payable minibus; larger route buses stay declined (no operator
+      // evidence — keep the safe default). For the payable minibus, keep ONLY the
+      // seat-banded 6-17 pax segment so it can't borrow School/Staff Bus (60),
+      // 3W PCV (35) or 2W PCV (10) via the +6 bus boost / max-rate pick.
+      const _orientalMiniRouteBus = rule.insurer === 'oriental_insurance' && policyIsRouteBus &&
+        Number(params.seatingCapacity) >= 7 && Number(params.seatingCapacity) <= 17;
+      // LARGER Oriental route buses (>17 seat) are rated as SCHOOL BUS (_orientalSchoolRouteBus,
+      // declared above). Keep ONLY the School Bus segment so it can't borrow the generic
+      // >36-pax (5%) / 17-36-pax (7.5%) bands or Staff Bus via the +6 bus boost / max-rate
+      // pick. (≤17 seat still → 6-17 pax 15% via _orientalMiniRouteBus.)
+      if (policyIsRouteBus && rule.insurer !== 'iffco_tokio' && !_orientalMiniRouteBus && !_orientalSchoolRouteBus) { matches = false; }
+      if (_orientalMiniRouteBus && !/6-17/i.test(seg)) { matches = false; }
+      if (_orientalSchoolRouteBus && !/School\s*Bus/i.test(seg)) { matches = false; }
       if (matches && CAT_KEYWORDS.TAXI.test(seg) && !policyIsTaxi) {
         if (policyIsTw || policyIsGcv) matches = false;
         // PCV / CAR: keep, no score change — let other filters (seating /
@@ -3012,13 +3055,15 @@ function filterRulesByPolicy(rules, params, _trace) {
         // which trivially pass when tonnage is null.
         score += 12;
         // Honour [NEW] / [RENEWAL] bracket on Chola's "1_TRAC[...]" segments.
+        // AGE is authoritative (USER: "based on Vehicle Age, not Business Type"): a
+        // vehicle aged >=1 (registered, used) is a RENEWAL/rollover even when the source
+        // BUSINESS_TYPE says "New Business" (= a newly-written policy on a used vehicle,
+        // e.g. SUB_BUSINESS_TYPE "Used Rollover"). Only a genuinely new (age 0) vehicle is [NEW].
         const segIsNewVar = /\[NEW\]/i.test(seg);
         const segIsRenewVar = /\[RENEW(AL)?\]|\[ROLLOVER\]/i.test(seg);
-        const bt = (params.businessType || '').toUpperCase();
-        const policyIsNewBiz = bt === 'NEW' || bt === 'NEW BUSINESS';
-        const policyIsRenewBiz = bt === 'RENEWAL' || bt === 'ROLLOVER';
-        if (segIsNewVar && policyIsRenewBiz) matches = false;
-        else if (segIsRenewVar && policyIsNewBiz) matches = false;
+        const policyIsNewVeh = (Number(params.vehicleAge) || 0) < 1;
+        if (segIsNewVar && !policyIsNewVeh) matches = false;
+        else if (segIsRenewVar && policyIsNewVeh) matches = false;
       }
       // Tractor policy: drop GCV weight-band / bus segments that would
       // otherwise win on tie when tonnage is null (Chola tractor rows have
@@ -3214,7 +3259,14 @@ function filterRulesByPolicy(rules, params, _trace) {
           if (policyIsSchool && segSchool)        score += 8;
           else if (policyIsSchool && segNonSchool) matches = false;
           else if (!policyIsSchool && segNonSchool) score += 4;
-          else if (!policyIsSchool && segSchool)   matches = false;
+          // Oriental large route bus (>17 seat) is forced to the School Bus rate
+          // (USER rule) even though its category is "Route Bus" not "School Bus".
+          // Inlined with the route-bus regex (this gate is in a different block scope
+          // than the route-bus block, so policyIsRouteBus/_orientalSchoolRouteBus are
+          // out of scope; vehicleCategory/rule/params ARE in scope here).
+          else if (!policyIsSchool && segSchool &&
+                   !(rule.insurer === 'oriental_insurance' && Number(params.seatingCapacity) > 17 &&
+                     /\bROUTE\s*BUS\b|\bSTAGE\s*CARR?IAGE\b|\bCONTRACT\s*CARR?IAGE\b/i.test(vehicleCategory))) matches = false;
         }
       }
       // (2b) Bus-type exclusivity. A "School & Staff Bus" grid carries only
@@ -3229,7 +3281,12 @@ function filterRulesByPolicy(rules, params, _trace) {
           const polStaffBus  = /STAFF\s*BUS/i.test(vehicleCategory);
           const polSchoolBus = /SCHOOL\s*BUS/i.test(vehicleCategory);
           if (segStaffBus && !polStaffBus)        matches = false;
-          else if (segSchoolBus && !polSchoolBus) matches = false;
+          // Oriental large route bus → School Bus exception (USER rule): keep the
+          // School Bus rows even though the policy category is "Route Bus". Inlined
+          // route-bus regex (out-of-scope flag — see School-vs-Non-School gate above).
+          else if (segSchoolBus && !polSchoolBus &&
+                   !(rule.insurer === 'oriental_insurance' && Number(params.seatingCapacity) > 17 &&
+                     /\bROUTE\s*BUS\b|\bSTAGE\s*CARR?IAGE\b|\bCONTRACT\s*CARR?IAGE\b/i.test(vehicleCategory))) matches = false;
         }
       }
       // (3) Seating band encoded in segment ("12 to 15", "16 to 30",
@@ -3277,6 +3334,14 @@ function filterRulesByPolicy(rules, params, _trace) {
     // whose make === that sub-cluster; the make="" OTHERS row stays as fallback and
     // the matched sub-cluster outscores it. Unresolved → drop the coded rows (OTHERS
     // wins = prior behaviour, no regression).
+    // United "E-Cart" segment is for 3-wheeler e-carts / e-rickshaws ONLY. A 4-wheeler
+    // electric GCV (e.g. Tata Ace EV, "GCV - 4W Upto 2.5Tn") must NOT borrow the E-Cart
+    // rate — it otherwise wins dedup as the only electric-friendly row (50% > the generic
+    // small-GCV band). Drop E-Cart unless the policy is genuinely an e-cart / e-rickshaw / 3W.
+    if (matches && rule.insurer === 'united_india_insurance' && /E-?\s*CART/i.test(seg)) {
+      const ecHay = `${vehicleCategory} ${model} ${make}`.toUpperCase();
+      if (!/E-?\s*CART|E-?\s*RICK|RIKSHAW|RICKSHAW|\b3\s*W\b|3\s*WHEEL/.test(ecHay)) matches = false;
+    }
     let _iciciSubRow = false;
     if (matches && rule.insurer === 'icici_lombard' && rule.make) {
       const _zone = require('../services/icici-cv-zone');
