@@ -13047,12 +13047,8 @@
         else if (isGrid)    { matched++; grid++; }       // "As per Grid" mismatch → our rate correct, counts as match
         else unmatched++;
       }
-      const tags = [];
-      if (verified) tags.push(verified + ' verified');
-      if (ignored) tags.push(ignored + ' ignored');
-      if (grid)    tags.push(grid + ' as-per-grid');
       document.getElementById('rcKpiRate').textContent =
-        matched + ' / ' + unmatched + (tags.length ? ' (' + tags.join(', ') + ')' : '');
+        matched + ' / ' + unmatched;
       const gridEl = document.getElementById('rcKpiGrid');
       if (gridEl) gridEl.textContent = grid;
       const verEl = document.getElementById('rcKpiVerified');
