@@ -2445,6 +2445,10 @@
             <div style="font-size:12px; color:#555;">As per Grid</div>
             <div id="rcKpiGrid" style="font-size:22px; font-weight:600; color:#3949ab;">—</div>
           </div>
+          <div style="background:#e8f5e9; border-radius:8px; padding:12px; text-align:center;" title="Records you manually marked &quot;Matched (verified)&quot; — reviewed and accepted as correct. Counted as matched.">
+            <div style="font-size:12px; color:#555;">Matched (verified)</div>
+            <div id="rcKpiVerified" style="font-size:22px; font-weight:600; color:#2e7d32;">—</div>
+          </div>
           <div style="background:#f3eefc; border-radius:8px; padding:12px; text-align:center;" title="No-rule because IDV &gt; ₹50L (all-insurer high-value referral rule). These are correct behaviour and are excluded from the mismatch list.">
             <div style="font-size:12px; color:#555;">IDV &gt; 50L (Referred)</div>
             <div id="rcKpiIdv" style="font-size:22px; font-weight:600; color:#6a1b9a;">—</div>
@@ -2473,8 +2477,9 @@
           <select id="rcMatchFilter" style="padding:6px;" onchange="rcRender()">
             <option value="all">All</option>
             <option value="match">Rate Match only</option>
-            <option value="mismatch">Rate Mismatch only (excl. Grid)</option>
+            <option value="mismatch">Rate Mismatch only (excl. Grid/Verified)</option>
             <option value="grid">As per Grid only</option>
+            <option value="verified">Matched (verified) only</option>
           </select>
           <input type="text" id="rcSearch" placeholder="Search tracker / policy…" style="padding:6px; min-width:200px;" oninput="rcRender()">
           <button class="btn btn-sm btn-outline" onclick="rcClearIgnores()">Clear Ignores</button>
@@ -12827,6 +12832,8 @@
     let _rcIgnored = new Set();    // tracker keys the user ignored (persisted per cycle)
     let _rcIgnoreNotes = {};       // tracker -> { note, ts } reason captured on ignore (persisted per cycle)
     let _rcGrid = new Set();       // tracker keys marked "As per Grid" — our rate is correct per the grid; the file figure is the operator deviation. Counts as matched. (persisted per cycle)
+    let _rcVerified = new Set();   // tracker keys manually marked "Matched (verified)" — reviewed and accepted as correct. Counts as matched. (persisted per cycle)
+    let _rcVerifiedSeed = null;    // lazy-loaded one-time seed list (public/rc_verified_seed.json)
 
     // Ignores persist per cycle in localStorage so they survive Re-compare
     // and page reloads.
@@ -12842,6 +12849,10 @@
       const cid = document.getElementById('rcCycle').value || '0';
       return 'rx.reconcile.aspergrid.' + cid;
     }
+    function rcVerifiedKey() {
+      const cid = document.getElementById('rcCycle').value || '0';
+      return 'rx.reconcile.verified.' + cid;
+    }
     function rcLoadIgnores() {
       try { _rcIgnored = new Set(JSON.parse(localStorage.getItem(rcIgnoreKey()) || '[]')); }
       catch (_) { _rcIgnored = new Set(); }
@@ -12849,11 +12860,33 @@
       catch (_) { _rcIgnoreNotes = {}; }
       try { _rcGrid = new Set(JSON.parse(localStorage.getItem(rcGridKey()) || '[]')); }
       catch (_) { _rcGrid = new Set(); }
+      try { _rcVerified = new Set(JSON.parse(localStorage.getItem(rcVerifiedKey()) || '[]')); }
+      catch (_) { _rcVerified = new Set(); }
     }
     function rcSaveIgnores() {
       try { localStorage.setItem(rcIgnoreKey(), JSON.stringify([..._rcIgnored])); } catch (_) {}
       try { localStorage.setItem(rcNotesKey(), JSON.stringify(_rcIgnoreNotes)); } catch (_) {}
       try { localStorage.setItem(rcGridKey(), JSON.stringify([..._rcGrid])); } catch (_) {}
+      try { localStorage.setItem(rcVerifiedKey(), JSON.stringify([..._rcVerified])); } catch (_) {}
+    }
+    // One-time seed of the reviewed-as-matched trackers (public/rc_verified_seed.json)
+    // into the current cycle's Verified set. Runs once per cycle (guarded by a flag),
+    // so the user can still toggle individual rows afterward without them re-appearing.
+    async function rcSeedVerified() {
+      try {
+        const cid = document.getElementById('rcCycle').value || '0';
+        const seededKey = 'rx.reconcile.verified.seeded.' + cid;
+        if (localStorage.getItem(seededKey)) return;        // already seeded this cycle
+        if (_rcVerifiedSeed == null) {
+          const resp = await fetch('rc_verified_seed.json', { cache: 'no-store' });
+          _rcVerifiedSeed = resp.ok ? await resp.json() : [];
+        }
+        if (Array.isArray(_rcVerifiedSeed) && _rcVerifiedSeed.length) {
+          for (const t of _rcVerifiedSeed) _rcVerified.add(t);
+          localStorage.setItem(rcVerifiedKey(), JSON.stringify([..._rcVerified]));
+        }
+        localStorage.setItem(seededKey, '1');
+      } catch (_) { /* seed is best-effort */ }
     }
 
     function rcInit() {
@@ -12912,6 +12945,7 @@
         if (!res.ok || !j.success) throw new Error(j.error || ('HTTP ' + res.status));
         _rcData = j;
         rcLoadIgnores();
+        await rcSeedVerified();
         rcRenderKpis();
         rcPopulateInsurers();
         document.getElementById('rcKpis').style.display = '';
@@ -12945,6 +12979,7 @@
         if (!res.ok || !j.success) throw new Error(j.error || ('HTTP ' + res.status));
         _rcData = j;
         rcLoadIgnores();
+        await rcSeedVerified();
         rcRenderKpis();
         rcPopulateInsurers();
         document.getElementById('rcKpis').style.display = '';
@@ -12978,23 +13013,28 @@
       // of the matched were genuine mismatches folded in via Ignore, so the
       // count is transparent.
       const rc = _rcData.rate_comparison || [];
-      let matched = 0, unmatched = 0, ignored = 0, grid = 0;
+      let matched = 0, unmatched = 0, ignored = 0, grid = 0, verified = 0;
       for (const r of rc) {
         if (r.excluded) continue;
         const isIgnored = _rcIgnored.has(r.tracker);
         const isGrid = _rcGrid.has(r.tracker);
+        const isVerified = _rcVerified.has(r.tracker);
         if (r.rate_match) matched++;
+        else if (isVerified) { matched++; verified++; } // manually verified → counts as match
         else if (isIgnored) { matched++; ignored++; }   // ignored mismatch → counts as match
         else if (isGrid)    { matched++; grid++; }       // "As per Grid" mismatch → our rate correct, counts as match
         else unmatched++;
       }
       const tags = [];
+      if (verified) tags.push(verified + ' verified');
       if (ignored) tags.push(ignored + ' ignored');
       if (grid)    tags.push(grid + ' as-per-grid');
       document.getElementById('rcKpiRate').textContent =
         matched + ' / ' + unmatched + (tags.length ? ' (' + tags.join(', ') + ')' : '');
       const gridEl = document.getElementById('rcKpiGrid');
       if (gridEl) gridEl.textContent = grid;
+      const verEl = document.getElementById('rcKpiVerified');
+      if (verEl) verEl.textContent = verified;
     }
 
     function rcPopulateInsurers() {
@@ -13047,10 +13087,15 @@
         const on = _rcGrid.has(t);
         return `<button class="btn btn-sm ${on ? 'btn-primary' : 'btn-outline'}" style="padding:1px 8px; white-space:nowrap;${on ? 'background:#3949ab; border-color:#3949ab;' : ''}" title="${on ? 'Marked As per Grid — click to unmark' : 'Mark As per Grid — our rate is correct per the grid; the file figure is the operator deviation. Counts as matched.'}" onclick="rcToggleGrid('${escapeAttr(t)}')">${on ? '✓ Grid' : 'Grid'}</button>`;
       };
+      const verifiedBtn = (t) => {
+        const on = _rcVerified.has(t);
+        return `<button class="btn btn-sm ${on ? 'btn-primary' : 'btn-outline'}" style="padding:1px 8px; white-space:nowrap;${on ? 'background:#2e7d32; border-color:#2e7d32;' : ''}" title="${on ? 'Marked Matched (verified) — click to unmark' : 'Mark Matched (verified) — reviewed and accepted as correct. Counts as matched.'}" onclick="rcToggleVerified('${escapeAttr(t)}')">${on ? '✓ Matched' : 'Match'}</button>`;
+      };
       const rowActions = (r) => `<div style="display:flex; gap:4px; justify-content:center; flex-wrap:nowrap; white-space:nowrap;">`
         + `<button class="btn btn-sm btn-outline" style="padding:1px 8px;" title="Look up this policy (resolved RTO/region, matched rule, our vs file rate)" onclick="rcLookupPolicy('${escapeAttr(r.policy_no || r.tracker || '')}')">🔍</button>`
         + `<button class="btn btn-sm btn-outline" style="padding:1px 8px;" title="Open QC compare (PR vs Prarambh)" onclick="rcOpenQc('${escapeAttr(r.policy_no || '')}')">QC</button>`
         + `<button class="btn btn-sm btn-outline" style="padding:1px 8px;" title="Recompute this policy only" onclick="rcRecomputePolicy('${escapeAttr(r.policy_no || '')}', this)">↻ Rate</button>`
+        + verifiedBtn(r.tracker)
         + gridBtn(r.tracker)
         + ignoreBtn(r.tracker)
         + `</div>`;
@@ -13067,19 +13112,24 @@
         cols = ['Tracker', 'Policy No', 'Insurer', 'Our Rate %', 'File Rate %', 'Diff', 'File Exp. Comm', 'Statement Comm', 'Income (System)', 'Match', ''];
         rows = (_rcData.rate_comparison || []).filter(r => {
           if (!matchesFilters(r)) return false;
-          // "As per Grid" rows count as matched for the Show filter.
+          // "As per Grid" and "Matched (verified)" rows count as matched for the Show filter.
           const isGridRow = _rcGrid.has(r.tracker);
-          const effMatch = r.rate_match || isGridRow;
+          const isVerifiedRow = _rcVerified.has(r.tracker);
+          const effMatch = r.rate_match || isGridRow || isVerifiedRow;
           if (matchF === 'match' && !effMatch) return false;
           if (matchF === 'mismatch' && effMatch) return false;
           // "As per Grid only" — show exclusively the rows the user flagged as grid-correct.
           if (matchF === 'grid' && !isGridRow) return false;
+          // "Matched (verified) only" — show exclusively the manually-verified rows.
+          if (matchF === 'verified' && !isVerifiedRow) return false;
           return true;
         }).map(r => {
           const isGrid = _rcGrid.has(r.tracker);
-          const bg = isGrid ? 'background:#eef2ff;' : (r.rate_match ? '' : 'background:#fff6f6;');
+          const isVerified = _rcVerified.has(r.tracker);
+          const bg = isVerified ? 'background:#e8f5e9;' : isGrid ? 'background:#eef2ff;' : (r.rate_match ? '' : 'background:#fff6f6;');
           const matchCell = r.rate_match ? '✅'
-            : (isGrid ? '<span title="As per Grid — our rate accepted as correct" style="color:#3949ab; font-weight:600;">📋 Grid</span>' : '❌');
+            : (isVerified ? '<span title="Matched (verified) — reviewed and accepted as correct" style="color:#2e7d32; font-weight:600;">✓ Matched</span>'
+            : (isGrid ? '<span title="As per Grid — our rate accepted as correct" style="color:#3949ab; font-weight:600;">📋 Grid</span>' : '❌'));
           const oldTag = r.is_old_case === true
             ? ` <span title="Issued outside 1–30 Apr 2026 (or unknown)${r.issue_date ? ' — '+esc(r.issue_date) : ''}" style="font-size:10px; background:#e0e0e0; color:#555; border-radius:3px; padding:1px 4px; vertical-align:middle;">OLD</span>`
             : '';
@@ -13089,7 +13139,7 @@
           <td style="padding:6px;">${esc(r.insurer)}</td>
           <td style="padding:6px; text-align:right;">${r.our_rate ?? '—'}</td>
           <td style="padding:6px; text-align:right;">${r.their_rate ?? '—'}</td>
-          <td style="padding:6px; text-align:right; ${Math.abs(r.diff||0)>5 && !isGrid?'color:#b71c1c; font-weight:600;':''}">${r.diff ?? '—'}</td>
+          <td style="padding:6px; text-align:right; ${Math.abs(r.diff||0)>5 && !isGrid && !isVerified?'color:#b71c1c; font-weight:600;':''}">${r.diff ?? '—'}</td>
           <td style="padding:6px; text-align:right; color:#a04a00;">${r.file_expected_comm != null ? Number(r.file_expected_comm).toLocaleString('en-IN') : '—'}</td>
           <td style="padding:6px; text-align:right; color:#00695c;">${r.statement_commission != null ? Number(r.statement_commission).toLocaleString('en-IN') : '—'}</td>
           <td style="padding:6px; text-align:right; color:#1b5e20; font-weight:600;">${r.income != null ? Number(r.income).toLocaleString('en-IN') : '—'}</td>
@@ -13158,6 +13208,7 @@
         `<tr><td colspan="${cols.length}" style="padding:20px; text-align:center; color:#999;">No rows.</td></tr>`;
       document.getElementById('rcRowCount').textContent =
         rows.length + ' rows'
+        + (_rcVerified.size ? ' · ' + _rcVerified.size + ' verified' : '')
         + (_rcGrid.size ? ' · ' + _rcGrid.size + ' as-per-grid' : '')
         + (_rcIgnored.size ? ' · ' + _rcIgnored.size + ' ignored' : '');
     }
@@ -13283,6 +13334,12 @@
     function rcToggleGrid(tracker) {
       if (_rcGrid.has(tracker)) _rcGrid.delete(tracker);
       else _rcGrid.add(tracker);
+      rcSaveIgnores(); rcRenderKpis(); rcRender();
+    }
+
+    function rcToggleVerified(tracker) {
+      if (_rcVerified.has(tracker)) _rcVerified.delete(tracker);
+      else _rcVerified.add(tracker);
       rcSaveIgnores(); rcRenderKpis(); rcRender();
     }
 
