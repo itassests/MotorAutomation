@@ -12834,6 +12834,7 @@
     let _rcGrid = new Set();       // tracker keys marked "As per Grid" — our rate is correct per the grid; the file figure is the operator deviation. Counts as matched. (persisted per cycle)
     let _rcVerified = new Set();   // tracker keys manually marked "Matched (verified)" — reviewed and accepted as correct. Counts as matched. (persisted per cycle)
     let _rcVerifiedSeed = null;    // lazy-loaded one-time seed list (public/rc_verified_seed.json)
+    let _rcGridSeed = null;        // lazy-loaded one-time seed list (public/rc_grid_seed.json)
 
     // Ignores persist per cycle in localStorage so they survive Re-compare
     // and page reloads.
@@ -12884,6 +12885,25 @@
         if (Array.isArray(_rcVerifiedSeed) && _rcVerifiedSeed.length) {
           for (const t of _rcVerifiedSeed) _rcVerified.add(t);
           localStorage.setItem(rcVerifiedKey(), JSON.stringify([..._rcVerified]));
+        }
+        localStorage.setItem(seededKey, '1');
+      } catch (_) { /* seed is best-effort */ }
+    }
+    // One-time seed of the reviewed "As per Grid" trackers (public/rc_grid_seed.json)
+    // into the current cycle's Grid set. Same one-time-per-cycle semantics as the
+    // Verified seed above.
+    async function rcSeedGrid() {
+      try {
+        const cid = document.getElementById('rcCycle').value || '0';
+        const seededKey = 'rx.reconcile.aspergrid.seeded.' + cid;
+        if (localStorage.getItem(seededKey)) return;       // already seeded this cycle
+        if (_rcGridSeed == null) {
+          const resp = await fetch('rc_grid_seed.json', { cache: 'no-store' });
+          _rcGridSeed = resp.ok ? await resp.json() : [];
+        }
+        if (Array.isArray(_rcGridSeed) && _rcGridSeed.length) {
+          for (const t of _rcGridSeed) _rcGrid.add(t);
+          localStorage.setItem(rcGridKey(), JSON.stringify([..._rcGrid]));
         }
         localStorage.setItem(seededKey, '1');
       } catch (_) { /* seed is best-effort */ }
@@ -12946,6 +12966,7 @@
         _rcData = j;
         rcLoadIgnores();
         await rcSeedVerified();
+        await rcSeedGrid();
         rcRenderKpis();
         rcPopulateInsurers();
         document.getElementById('rcKpis').style.display = '';
@@ -12980,6 +13001,7 @@
         _rcData = j;
         rcLoadIgnores();
         await rcSeedVerified();
+        await rcSeedGrid();
         rcRenderKpis();
         rcPopulateInsurers();
         document.getElementById('rcKpis').style.display = '';
