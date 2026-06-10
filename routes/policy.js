@@ -1665,12 +1665,20 @@ function tenureToBucket(t) {
  */
 function extractSegmentAgeRange(seg) {
   const s = String(seg || '');
-  if (!/age/i.test(s)) return null;
+  if (!/age|year/i.test(s)) return null;
   let m;
   if ((m = s.match(/age\s*(\d+)\s*[-–]\s*(\d+)/i))) return { min: +m[1], max: +m[2] };
   if ((m = s.match(/age\s*(\d+)\s*&\s*(\d+)/i)))    return { min: +m[1], max: +m[2] };
   if ((m = s.match(/age\s*(\d+)\s*\+/i)))           return { min: +m[1], max: 99 };
   if ((m = s.match(/(\d+)\s*\+\s*age/i)))           return { min: +m[1], max: 99 };
+  // "N to M years" / "N+ years" / ">N years" / "N years" — Go Digit tractor & 3W bands
+  // encode age in the segment text (no "age" token): "Tractor 0 years" / "1 to 5 years"
+  // / "6+ years" / ">10 years" (pairs with "1-10 years"). ">N" = strictly above N (N+1..99).
+  if ((m = s.match(/[>＞]\s*=?\s*(\d+)\s*years?/i)))         return { min: /=/.test(m[0]) ? +m[1] : +m[1] + 1, max: 99 };
+  if ((m = s.match(/(\d+)\s*(?:to|[-–])\s*(\d+)\s*years?/i))) return { min: +m[1], max: +m[2] };
+  if ((m = s.match(/(\d+)\s*\+\s*years?/i)))                 return { min: +m[1], max: 99 };
+  if ((m = s.match(/greater\s+than\s+(\d+)\s*years?/i)))     return { min: +m[1] + 1, max: 99 };
+  if ((m = s.match(/(\d+)\s*years?/i)))                      return { min: +m[1], max: +m[1] };
   if ((m = s.match(/age\s*(\d+)\b/i)))              return { min: +m[1], max: +m[1] };
   if ((m = s.match(/(\d+)\s*age/i)))                return { min: +m[1], max: +m[1] };
   return null;
