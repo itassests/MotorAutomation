@@ -26,6 +26,18 @@ async function loadFleetOverrides(pool) {
 
 const up = (v) => String(v == null ? '' : v).toUpperCase().trim();
 
+// Normalise a customer/company name for matching: canonicalise the common entity
+// suffix variants (PRIVATE↔PVT, LIMITED↔LTD, COMPANY↔CO) and strip punctuation, so
+// "Century Cargo Carrier Pvt Ltd" matches "CENTURY CARGO CARRIER PRIVATE LIMITED".
+const normName = (v) => up(v)
+  .replace(/\bPRIVATE\b/g, 'PVT')
+  .replace(/\bLIMITED\b/g, 'LTD')
+  .replace(/\bCOMPANY\b/g, 'CO')
+  .replace(/\bAND\b/g, '&')
+  .replace(/[.,'"\-_/()]/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
 /**
  * Does this policy match a fleet override row?
  * @param params       extractPolicyParams output
@@ -36,10 +48,11 @@ function policyMatchesFleet(params, ov, insurerSlug) {
   // Insurer must match (canonical slug compare; tolerate core-name overlap).
   const a = up(insurerSlug), b = up(ov.insurer_slug);
   if (b && a !== b && !a.includes(b) && !b.includes(a)) return false;
-  // Customer name — the fleet's customer_name must appear in the policy proposer name.
-  const cust = up(ov.customer_name);
+  // Customer name — the fleet's customer_name must appear in the policy proposer name
+  // (entity-suffix-normalised, so Pvt Ltd / Private Limited variants all match).
+  const cust = normName(ov.customer_name);
   if (!cust) return false;                           // a fleet with no customer is meaningless
-  if (!up(params.proposerName).includes(cust)) return false;
+  if (!normName(params.proposerName).includes(cust)) return false;
   // Optional vehicle-type narrowing.
   if (ov.vehicle_type && up(params.vehicleType) !== up(ov.vehicle_type)) return false;
   return true;
