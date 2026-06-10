@@ -460,6 +460,42 @@
           <button class="btn btn-primary btn-sm" id="downloadMasterBtn" style="display:none">Download as Master Excel</button>
         </div>
       </div>
+
+      <!-- ===== Fleet Rate (per-customer flat rate) — below Upload Rate Card ===== -->
+      <div class="card" id="fleetCard" style="margin-top:18px;">
+        <h2><span class="icon">&#128666;</span> Fleet Rate (per customer)</h2>
+        <p style="color:#666; font-size:13px; margin-top:-6px;">Set a <b>flat rate</b> for a fleet customer. Every policy of the selected insurer whose <b>customer (proposer) name</b> contains the entered name gets this rate, regardless of the grid. Example: insurer = New India, customer = <b>XYZ Ltd</b>, rate = <b>30%</b> &rarr; all New India policies for XYZ Ltd are rated 30%.</p>
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin:12px 0;">
+          <div class="form-group" style="margin:0;">
+            <label style="font-size:12px; color:#555;">Insurer *</label><br>
+            <select id="fleetInsurer" class="form-control" style="min-width:200px;"><option value="">-- Select Insurer --</option></select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label style="font-size:12px; color:#555;">Fleet name</label><br>
+            <input type="text" id="fleetName" class="form-control" placeholder="e.g. XYZ Logistics deal" style="min-width:200px;">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label style="font-size:12px; color:#555;">Customer name *</label><br>
+            <input type="text" id="fleetCustomer" class="form-control" placeholder="e.g. XYZ Ltd" style="min-width:220px;">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label style="font-size:12px; color:#555;">Vehicle type</label><br>
+            <select id="fleetVehType" class="form-control" style="min-width:120px;">
+              <option value="">All</option><option value="CAR">Pvt car</option><option value="TW">TW</option>
+              <option value="GCV">GCV</option><option value="PCV">PCV</option><option value="MISC">MISC</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label style="font-size:12px; color:#555;">Rate % *</label><br>
+            <input type="number" id="fleetRate" class="form-control" placeholder="30" step="0.5" min="0" max="100" style="width:90px;">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="fleetSave()" style="height:36px;">Add Fleet Rate</button>
+          <button class="btn btn-outline btn-sm" onclick="loadFleets()" style="height:36px;">Refresh</button>
+          <span id="fleetMsg" style="font-size:12px; color:#888;"></span>
+        </div>
+        <h3 style="font-size:14px; margin:12px 0 6px;">Active Fleet Rates</h3>
+        <div id="fleetList" style="font-size:13px;">Loading…</div>
+      </div>
     </div>
 
     <!-- ============ SEARCH PANEL ============ -->
@@ -970,42 +1006,6 @@
         <div id="enablerPreview" style="display:none; border:1px solid #cfe3ff; border-radius:8px; padding:12px; margin-bottom:14px; background:#f7fbff;"></div>
         <h3 style="font-size:14px; margin:12px 0 6px;">Active Enabler Deals</h3>
         <div id="enablerList" style="font-size:13px;">Loading…</div>
-      </div>
-
-      <!-- ===== Fleet Rate (per-customer flat rate) ===== -->
-      <div class="card" id="fleetCard" style="margin-top:18px;">
-        <h2><span class="icon">&#128666;</span> Fleet Rate (per customer)</h2>
-        <p style="color:#666; font-size:13px; margin-top:-6px;">Set a <b>flat rate</b> for a fleet customer. Every policy of the selected insurer whose <b>customer (proposer) name</b> contains the entered name gets this rate, regardless of the grid. Example: insurer = New India, customer = <b>XYZ Ltd</b>, rate = <b>30%</b> &rarr; all New India policies for XYZ Ltd are rated 30%.</p>
-        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin:12px 0;">
-          <div class="form-group" style="margin:0;">
-            <label style="font-size:12px; color:#555;">Insurer *</label><br>
-            <select id="fleetInsurer" class="form-control" style="min-width:200px;"><option value="">-- Select Insurer --</option></select>
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label style="font-size:12px; color:#555;">Fleet name</label><br>
-            <input type="text" id="fleetName" class="form-control" placeholder="e.g. XYZ Logistics deal" style="min-width:200px;">
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label style="font-size:12px; color:#555;">Customer name *</label><br>
-            <input type="text" id="fleetCustomer" class="form-control" placeholder="e.g. XYZ Ltd" style="min-width:220px;">
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label style="font-size:12px; color:#555;">Vehicle type</label><br>
-            <select id="fleetVehType" class="form-control" style="min-width:120px;">
-              <option value="">All</option><option value="CAR">Pvt car</option><option value="TW">TW</option>
-              <option value="GCV">GCV</option><option value="PCV">PCV</option><option value="MISC">MISC</option>
-            </select>
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label style="font-size:12px; color:#555;">Rate % *</label><br>
-            <input type="number" id="fleetRate" class="form-control" placeholder="30" step="0.5" min="0" max="100" style="width:90px;">
-          </div>
-          <button class="btn btn-primary btn-sm" onclick="fleetSave()" style="height:36px;">Add Fleet Rate</button>
-          <button class="btn btn-outline btn-sm" onclick="loadFleets()" style="height:36px;">Refresh</button>
-          <span id="fleetMsg" style="font-size:12px; color:#888;"></span>
-        </div>
-        <h3 style="font-size:14px; margin:12px 0 6px;">Active Fleet Rates</h3>
-        <div id="fleetList" style="font-size:13px;">Loading…</div>
       </div>
     </div>
 
