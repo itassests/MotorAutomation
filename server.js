@@ -80,6 +80,7 @@ app.use('/api/recon', reconRoutes);
 app.use('/api/agent', require('./routes/agent'));
 app.use('/api/employee', require('./routes/employee'));
 app.use('/api/enablers', require('./routes/enablers'));
+app.use('/api/fleets', require('./routes/fleets'));
 
 // Health check
 app.get('/api/health', (req, res) => {

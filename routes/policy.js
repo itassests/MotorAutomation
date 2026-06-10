@@ -1314,6 +1314,10 @@ function extractPolicyParams(policy) {
     tonnageCoarse,
     carrierType,
     businessType,
+    // Customer / proposer name — used by Fleet rate overrides (a per-customer
+    // flat rate for all that customer's vehicles, scoped to an insurer).
+    proposerName: (get('FULL NAME') || get('PROPOSER NAME') || get('FULLNAME_PROPOSER') ||
+                   get('CONTACT PERSON') || '').toString().trim(),
     // Corporate vs Individual ownership — inferred from the proposer name.
     // PCV bus rate cards split rates on this (e.g. TATA: "_Corporate" 31% vs
     // "_Individual" 40%). A company-style name → Corporate, else Individual.

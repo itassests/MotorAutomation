@@ -3962,6 +3962,27 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       sheet_name: 'enabler:' + (_enablerHit.deal_id || _enablerHit.id),
       _enabler_id: _enablerHit.id };
   }
+
+  // ---- Fleet rate override ----
+  // A per-customer fleet deal (insurer + customer/proposer name, optional vehicle type)
+  // overrides the income rate to a FLAT rate for every matching policy — regardless of
+  // the base grid, and even when no base rule matched. Most-specific customer-name match
+  // wins. Takes final precedence (after the base rule and the enabler).
+  let _fleetHit = null;
+  if (caches && caches.fleets && caches.fleets.length && !idvOver50L) {
+    _fleetHit = require('../services/fleets').pickFleetOverride(params, caches.fleets, insurerSlug);
+  }
+  if (_fleetHit && _fleetHit.rate_pct != null) {
+    primary = { ...(primary || {}),
+      id: primary ? primary.id : null,
+      rate_value: Number(_fleetHit.rate_pct) / 100,
+      od_rate: null, tp_rate: null,                 // flat fleet rate — no OD/TP leg split
+      rate_type: (primary && primary.rate_type) || 'FLEET',
+      segment: 'Fleet — ' + (_fleetHit.fleet_name || _fleetHit.customer_name || 'deal'),
+      sheet_name: 'fleet:' + _fleetHit.id,
+      _fleet_id: _fleetHit.id };
+  }
+
   if (!primary) {
     // Still try to surface the statement + PR amounts if we have them.
     let stmt = null, pr = null;
@@ -4787,6 +4808,8 @@ async function runBulkCalculate(body) {
   // overrides from uploaded enabler emails (segment + make + transaction + RTO
   // location + date window). Empty array when none active.
   const enablerOverrides = await require('../services/enablers').loadEnablerOverrides(pool);
+  // Fleet overrides — per-customer flat rate scoped to an insurer (e.g. "XYZ Ltd" → 30%).
+  const fleetOverrides = await require('../services/fleets').loadFleetOverrides(pool);
   // Statement index — policy_no → amount (+ period) from active uploads.
   const statementIndex = await loadStatementIndex(pool);
   // Premium Register index — policy_no → PR amounts from active pr_rows.
@@ -5107,7 +5130,7 @@ async function runBulkCalculate(body) {
   // Per-run caches — cleared after the batch finishes. RTOs and rate-lookup
   // parameter tuples repeat heavily across policies from the same insurer,
   // so this typically eliminates 90%+ of the per-row DB calls.
-  const caches = { rto: new Map(), lookup: new Map(), tonnageById: new Map(), enablers: enablerOverrides };
+  const caches = { rto: new Map(), lookup: new Map(), tonnageById: new Map(), enablers: enablerOverrides, fleets: fleetOverrides };
 
   const allRows = rowsResult.recordset;
 

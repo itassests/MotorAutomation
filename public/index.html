@@ -971,6 +971,42 @@
         <h3 style="font-size:14px; margin:12px 0 6px;">Active Enabler Deals</h3>
         <div id="enablerList" style="font-size:13px;">Loading…</div>
       </div>
+
+      <!-- ===== Fleet Rate (per-customer flat rate) ===== -->
+      <div class="card" id="fleetCard" style="margin-top:18px;">
+        <h2><span class="icon">&#128666;</span> Fleet Rate (per customer)</h2>
+        <p style="color:#666; font-size:13px; margin-top:-6px;">Set a <b>flat rate</b> for a fleet customer. Every policy of the selected insurer whose <b>customer (proposer) name</b> contains the entered name gets this rate, regardless of the grid. Example: insurer = New India, customer = <b>XYZ Ltd</b>, rate = <b>30%</b> &rarr; all New India policies for XYZ Ltd are rated 30%.</p>
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin:12px 0;">
+          <div class="form-group" style="margin:0;">
+            <label style="font-size:12px; color:#555;">Insurer *</label><br>
+            <select id="fleetInsurer" class="form-control" style="min-width:200px;"><option value="">-- Select Insurer --</option></select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label style="font-size:12px; color:#555;">Fleet name</label><br>
+            <input type="text" id="fleetName" class="form-control" placeholder="e.g. XYZ Logistics deal" style="min-width:200px;">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label style="font-size:12px; color:#555;">Customer name *</label><br>
+            <input type="text" id="fleetCustomer" class="form-control" placeholder="e.g. XYZ Ltd" style="min-width:220px;">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label style="font-size:12px; color:#555;">Vehicle type</label><br>
+            <select id="fleetVehType" class="form-control" style="min-width:120px;">
+              <option value="">All</option><option value="CAR">Pvt car</option><option value="TW">TW</option>
+              <option value="GCV">GCV</option><option value="PCV">PCV</option><option value="MISC">MISC</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label style="font-size:12px; color:#555;">Rate % *</label><br>
+            <input type="number" id="fleetRate" class="form-control" placeholder="30" step="0.5" min="0" max="100" style="width:90px;">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="fleetSave()" style="height:36px;">Add Fleet Rate</button>
+          <button class="btn btn-outline btn-sm" onclick="loadFleets()" style="height:36px;">Refresh</button>
+          <span id="fleetMsg" style="font-size:12px; color:#888;"></span>
+        </div>
+        <h3 style="font-size:14px; margin:12px 0 6px;">Active Fleet Rates</h3>
+        <div id="fleetList" style="font-size:13px;">Loading…</div>
+      </div>
     </div>
 
     <!-- ============ MANAGE RATE CARDS PANEL ============ -->
@@ -3817,6 +3853,7 @@
         document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
         if (tab.dataset.tab === 'admin') adminLoad();
         if (tab.dataset.tab === 'upload' && typeof loadEnablers === 'function') loadEnablers();
+        if (tab.dataset.tab === 'upload' && typeof loadFleets === 'function') loadFleets();
         if (tab.dataset.tab === 'agent-view') loadAgentView();
         if (tab.dataset.tab === 'employee-view') loadEmployeeDashboard();
         if (tab.dataset.tab === 'masters' && !_mInsurersLoaded) loadMasterInsurers();
@@ -6180,6 +6217,12 @@
         allInsurers.forEach(ins => {
           uploadSel.innerHTML += `<option value="${ins.slug}" data-id="${ins.id}">${ins.name}</option>`;
         });
+        // Fleet-rate insurer dropdown shares the same master insurer list.
+        const fleetSel = document.getElementById('fleetInsurer');
+        if (fleetSel) {
+          fleetSel.innerHTML = '<option value="">-- Select Insurer --</option>'
+            + allInsurers.map(ins => `<option value="${ins.slug}">${ins.name}</option>`).join('');
+        }
       } catch (e) {
         console.error('Failed to load all insurers:', e);
         showToast('Failed to load insurer list', 'error');
@@ -8160,6 +8203,57 @@
       if (!confirm('Remove enabler deal ' + deal + '? Matching policies will revert to the system rate.')) return;
       await fetch('/api/enablers/deal/' + encodeURIComponent(deal) + '/deactivate', { method: 'POST' });
       loadEnablers();
+    }
+
+    // ============ FLEET RATES (per-customer flat rate) ============
+    async function fleetSave() {
+      const msg = document.getElementById('fleetMsg');
+      const body = {
+        insurer_slug: document.getElementById('fleetInsurer').value,
+        fleet_name:   document.getElementById('fleetName').value,
+        customer_name:document.getElementById('fleetCustomer').value,
+        vehicle_type: document.getElementById('fleetVehType').value,
+        rate_pct:     document.getElementById('fleetRate').value,
+      };
+      if (!body.insurer_slug) { msg.style.color = '#c00'; msg.textContent = 'Select an insurer.'; return; }
+      if (!String(body.customer_name).trim()) { msg.style.color = '#c00'; msg.textContent = 'Enter a customer name.'; return; }
+      if (body.rate_pct === '' || isNaN(Number(body.rate_pct))) { msg.style.color = '#c00'; msg.textContent = 'Enter a numeric rate %.'; return; }
+      msg.style.color = '#888'; msg.textContent = 'Saving…';
+      try {
+        const j = await (await fetch('/api/fleets/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
+        if (!j.success) throw new Error(j.error || 'Save failed');
+        msg.style.color = '#2e7d32'; msg.textContent = 'Saved. Re-compute a cycle to apply.';
+        document.getElementById('fleetName').value = '';
+        document.getElementById('fleetCustomer').value = '';
+        document.getElementById('fleetRate').value = '';
+        loadFleets();
+      } catch (e) { msg.style.color = '#c00'; msg.textContent = 'Error: ' + e.message; }
+    }
+    async function loadFleets() {
+      const box = document.getElementById('fleetList'); if (!box) return;
+      try {
+        const j = await (await fetch('/api/fleets')).json();
+        const rows = j.fleets || [];
+        if (!rows.length) { box.innerHTML = '<span style="color:#999;">No active fleet rates.</span>'; return; }
+        let html = '<table style="width:100%; border-collapse:collapse; font-size:13px;"><tr style="color:#888; text-align:left;">'
+          + '<th style="padding:4px 8px;">Insurer</th><th style="padding:4px 8px;">Fleet</th><th style="padding:4px 8px;">Customer</th><th style="padding:4px 8px;">Vehicle</th><th style="padding:4px 8px; text-align:right;">Rate %</th><th></th></tr>';
+        rows.forEach(r => {
+          html += '<tr style="border-top:1px solid #eee;">'
+            + '<td style="padding:4px 8px;">' + esc(r.insurer_slug) + '</td>'
+            + '<td style="padding:4px 8px;">' + esc(r.fleet_name || '-') + '</td>'
+            + '<td style="padding:4px 8px;"><b>' + esc(r.customer_name) + '</b></td>'
+            + '<td style="padding:4px 8px;">' + esc(r.vehicle_type || 'All') + '</td>'
+            + '<td style="padding:4px 8px; text-align:right; color:#1b5e20; font-weight:600;">' + esc(r.rate_pct) + '</td>'
+            + '<td style="padding:4px 8px; text-align:right;"><button class="btn btn-outline btn-sm" onclick="fleetDeactivate(' + r.id + ')">Remove</button></td></tr>';
+        });
+        html += '</table>';
+        box.innerHTML = html;
+      } catch (e) { box.innerHTML = '<span style="color:#c00;">Error: ' + esc(e.message) + '</span>'; }
+    }
+    async function fleetDeactivate(id) {
+      if (!confirm('Remove this fleet rate? Matching policies revert to the system rate.')) return;
+      await fetch('/api/fleets/' + id + '/deactivate', { method: 'POST' });
+      loadFleets();
     }
 
     let _allRateCards = [];
