@@ -1407,12 +1407,16 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     // start date ≥ 1-May routes to May.
     const _en = require('../services/enablers');
     const sd = policy.POLICY_START_DATE || policy['POLICY_START_DATE'] || null;
-    // Fallback chain (per product owner): POLICY_START_DATE → PR risk-inception/
-    // OD-start date → POLICY_ISSUED_DATE → far-past sentinel (→ earliest/April card).
+    // Fallback chain: POLICY_ISSUED_DATE → POLICY_START_DATE → PR risk-inception/
+    // OD-start → far-past sentinel (→ earliest/April card). ISSUE date FIRST:
+    // Bajaj pays commission by the BOOKING month's grid, not the risk-start month —
+    // 79 WB SATP bikes issued 30-Apr with risk-start 02-May were paid the April
+    // card's 47.5 (operator 48), not the 1-May card's 50.5 we matched via start
+    // date. (Same -2.5 April-vs-May delta across other regions: 67.5→65, 55.5→53.)
     const _pr = (prIndex && params._policy_no) ? prIndex.get(String(params._policy_no).trim().toUpperCase()) : null;
-    _bajajEffDate = _en.toIso(sd)
+    _bajajEffDate = _en.toIso(policy.POLICY_ISSUED_DATE)
+                 || _en.toIso(sd)
                  || _en.toIso(_pr && _pr.pr_start_date)
-                 || _en.toIso(policy.POLICY_ISSUED_DATE)
                  || '2000-01-01';
   }
 
