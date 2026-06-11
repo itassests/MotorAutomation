@@ -18,10 +18,29 @@
  * pending a confirmed High-End definition). SATP (TP-only) is out of scope → null.
  */
 
-let GRID = null;
+let GRID = null, HIGH = null;
 function load() {
   if (GRID) return;
   try { GRID = require('../config/reliance_car_grid.json'); } catch (_) { GRID = {}; }
+  try { HIGH = require('../config/reliance_high_end.json'); } catch (_) { HIGH = { wholeHigh: [], mixedHigh: {} }; }
+}
+
+const normMM = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+// Is this car in Reliance's "HIGH END" Pvt-Car segment (sheet "PVT car Segment",
+// MAKE+MODEL → VEHICLE_SEGMENT)? 16 makes are wholly high-end (match by make);
+// the rest are mixed and need a model match.
+function isHighEnd(make, model) {
+  load();
+  const mk = normMM(make), md = normMM(model);
+  if (!mk) return false;
+  if ((HIGH.wholeHigh || []).includes(mk)) return true;
+  const models = (HIGH.mixedHigh || {})[mk];
+  if (!models) return false;
+  return models.some(hm => {
+    const h = normMM(hm);
+    return h.length >= 3 && (md === h || md.startsWith(h) || md.includes(h));
+  });
 }
 
 // Resolved region / RTO-state → grid region-group key. Region string wins (it already
@@ -67,6 +86,11 @@ function resolveRelianceCarRate(params, resolvedRegion) {
   const mk   = String(params.make || '').toUpperCase();
   const dieselEv = /DIESEL|ELECTRIC|\bEV\b|BATTERY/.test(fuel) || /\bEV\b|ELECTRIC/.test(mk);
   if (tp < 1) {                                  // SAOD (OD-only)
+    // NOTE: the "PVT car Segment" HIGH-END classification does NOT cleanly drive the
+    // SAOD rate — operator data shows high-end-segment cars (Audi Q5, BMW X5, BYD Seal)
+    // paid the NON-high-end 30%, others 20% (likely Extended Warranty), only a few the
+    // high-end 17.5%. So we default to non-high-end (30%), which matches the majority.
+    // isHighEnd() is kept available for when the real High-End-SAOD trigger is confirmed.
     return { rate: G.nonHighEndSaod / 100, label: `Reliance PvtCar ${g} SAOD (non-high-end)` };
   }
   // Comprehensive (OD + TP)

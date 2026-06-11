@@ -3946,7 +3946,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // resolver returns null → pool untouched. SAOD high-end & Extended-Warranty (20%) are
   // intentionally left as default (operator data showed no clean luxury-SAOD rule).
   if (insurerSlug === 'reliance' && String(params.vehicleType || '').toUpperCase() === 'CAR') {
-    const _relCar = require('../services/reliance-car').resolveRelianceCarRate(params, resolvedRegion);
+    const _relCar = require('../services/reliance-car').resolveRelianceCarRate(params, params.resolvedRegion || resolvedRegion);
     if (_relCar) {
       const _base = rules[0] || {};
       const _rt = (Number(params.tpPremium) || 0) < 1 ? 'SAOD' : 'COMP';

@@ -1,0 +1,112 @@
+{
+ "wholeHigh": [
+  "AUDI",
+  "BENTLEY",
+  "BMW",
+  "FERRARI",
+  "HUMMER",
+  "JAGUAR",
+  "LAMBORGHINI",
+  "LANDROVER",
+  "LEXUS",
+  "MASERATI",
+  "MERCEDESBENZ",
+  "MINI",
+  "PORSCHE",
+  "ROLLSROYCE",
+  "SSANGYONGMOTOR",
+  "VOLVO"
+ ],
+ "mixedHigh": {
+  "BYD": [
+   "SEAL"
+  ],
+  "CHEVROLET": [
+   "CAPTIVA",
+   "CRUZE"
+  ],
+  "FIAT": [
+   "500"
+  ],
+  "FORD": [
+   "ENDEAVOUR",
+   "MUSTANG"
+  ],
+  "HONDA": [
+   "ACCORD"
+  ],
+  "HYUNDAI": [
+   "ELANTRA",
+   "NEOFLUIDICELANTRA",
+   "SANTAFE",
+   "SONATA",
+   "SONATAEMBERA",
+   "TERRACAN"
+  ],
+  "JEEP": [
+   "GRANDCHEROKEE",
+   "MERIDIAN",
+   "WRANGLER"
+  ],
+  "KIAMOTORS": [
+   "EV6"
+  ],
+  "MAHINDRA": [
+   "ALTURAS"
+  ],
+  "MARUTISUZUKI": [
+   "KIZASHI"
+  ],
+  "MITSUBISHI": [
+   "MONTERO",
+   "OUTLANDER",
+   "PAJERO",
+   "PAJEROSPORT"
+  ],
+  "NISSAN": [
+   "370Z",
+   "DATSUN",
+   "TEANA",
+   "XTRAIL"
+  ],
+  "RENAULT": [
+   "FLUENCE",
+   "KOLEOS"
+  ],
+  "SKODA": [
+   "LAURA",
+   "OCTAVIA",
+   "OCTAVIACOMBI",
+   "SUPERB",
+   "YETI"
+  ],
+  "SMLISUZU": [
+   "MUX"
+  ],
+  "TOYOTA": [
+   "ALPHARD",
+   "ARISTO",
+   "CAMRY",
+   "CELICA",
+   "COROLLA",
+   "COROLLAALTIS",
+   "ESTIMA",
+   "FORTUNER",
+   "LANDCRUISER",
+   "LANDCRUISERPRADO",
+   "LEXUS",
+   "PRIUS",
+   "SERA",
+   "VELLFIRE"
+  ],
+  "VOLKSWAGEN": [
+   "BEETLE",
+   "CARAVELLE",
+   "GTI",
+   "JETTA",
+   "PASSAT",
+   "TIGUAN",
+   "TOUAREG"
+  ]
+ }
+}
