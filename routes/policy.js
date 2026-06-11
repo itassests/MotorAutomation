@@ -1490,9 +1490,12 @@ function mapVehicleType(vehicleText) {
   const vt = vehicleText.toUpperCase().trim().replace(/[._\-]+/g, ' ').replace(/\s+/g, ' ');
 
   if (vt.includes('TWO WHEELER') || vt.includes('2 WHEELER') || vt.includes('2W') || vt.includes('BIKE') || vt.includes('SCOOTER') || vt.includes('SCOOTY') || vt.startsWith('TW ') || vt === 'TW') return 'TW';
-  if (vt.includes('PRIVATE CAR') || vt.includes('PVT CAR') || vt.includes('MOTOR CAR') || vt.includes('4 WHEELER') || vt.includes('4W') || vt === 'CAR') return 'CAR';
+  // GCV/PCV BEFORE the CAR check: commercial categories like "GCV - 4W 12-20Tn" /
+  // "PCV - 4W Upto 2.5Tn" contain "4W" and were wrongly mapping to CAR (Royal NL01
+  // EA1920 trucks no-ruled as cars; TATA LPT trucks rated on the Pvt-Car grid).
   if (vt.includes('GCV') || vt.includes('GOODS CARRYING') || vt.includes('COMMERCIAL VEHICLE') || vt.includes('TRUCK') || vt.includes('LCV') || vt.includes('HCV')) return 'GCV';
   if (vt.includes('PCV') || vt.includes('PASSENGER') || vt.includes('BUS') || vt.includes('TAXI') || vt.includes('AUTO')) return 'PCV';
+  if (vt.includes('PRIVATE CAR') || vt.includes('PVT CAR') || vt.includes('MOTOR CAR') || vt.includes('4 WHEELER') || vt.includes('4W') || vt === 'CAR') return 'CAR';
   if (vt.includes('MISCELLANEOUS') || vt.includes('MISC') || vt.includes('CE') || vt.includes('TRACTOR')) return 'MISC';
 
   return vt;
