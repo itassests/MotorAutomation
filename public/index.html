@@ -489,7 +489,8 @@
             <label style="font-size:12px; color:#555;">Rate % *</label><br>
             <input type="number" id="fleetRate" class="form-control" placeholder="30" step="0.5" min="0" max="100" style="width:90px;">
           </div>
-          <button class="btn btn-primary btn-sm" onclick="fleetSave()" style="height:36px;">Add Fleet Rate</button>
+          <button class="btn btn-primary btn-sm" id="fleetSaveBtn" onclick="fleetSave()" style="height:36px;">Add Fleet Rate</button>
+          <button class="btn btn-outline btn-sm" id="fleetCancelBtn" onclick="fleetCancelEdit()" style="height:36px; display:none;">Cancel</button>
           <button class="btn btn-outline btn-sm" onclick="loadFleets()" style="height:36px;">Refresh</button>
           <span id="fleetMsg" style="font-size:12px; color:#888;"></span>
         </div>
@@ -8206,6 +8207,8 @@
     }
 
     // ============ FLEET RATES (per-customer flat rate) ============
+    let _fleetEditId = null;   // id of the fleet row currently being edited, else null
+    let _fleetRows = [];       // last-loaded rows, for populating the edit form
     async function fleetSave() {
       const msg = document.getElementById('fleetMsg');
       const body = {
@@ -8219,21 +8222,44 @@
       if (!String(body.customer_name).trim()) { msg.style.color = '#c00'; msg.textContent = 'Enter a customer name.'; return; }
       if (body.rate_pct === '' || isNaN(Number(body.rate_pct))) { msg.style.color = '#c00'; msg.textContent = 'Enter a numeric rate %.'; return; }
       msg.style.color = '#888'; msg.textContent = 'Saving…';
+      const url = _fleetEditId ? ('/api/fleets/' + _fleetEditId + '/update') : '/api/fleets/save';
       try {
-        const j = await (await fetch('/api/fleets/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
+        const j = await (await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
         if (!j.success) throw new Error(j.error || 'Save failed');
-        msg.style.color = '#2e7d32'; msg.textContent = 'Saved. Re-compute a cycle to apply.';
-        document.getElementById('fleetName').value = '';
-        document.getElementById('fleetCustomer').value = '';
-        document.getElementById('fleetRate').value = '';
+        msg.style.color = '#2e7d32'; msg.textContent = (_fleetEditId ? 'Updated.' : 'Saved.') + ' Re-compute a cycle to apply.';
+        fleetCancelEdit();   // clears the form + resets edit mode
         loadFleets();
       } catch (e) { msg.style.color = '#c00'; msg.textContent = 'Error: ' + e.message; }
+    }
+    function fleetEdit(id) {
+      const r = _fleetRows.find(x => x.id === id); if (!r) return;
+      _fleetEditId = id;
+      document.getElementById('fleetInsurer').value = r.insurer_slug || '';
+      document.getElementById('fleetName').value = r.fleet_name || '';
+      document.getElementById('fleetCustomer').value = r.customer_name || '';
+      document.getElementById('fleetVehType').value = r.vehicle_type || '';
+      document.getElementById('fleetRate').value = (r.rate_pct != null ? r.rate_pct : '');
+      document.getElementById('fleetSaveBtn').textContent = 'Update Fleet Rate';
+      document.getElementById('fleetCancelBtn').style.display = '';
+      const msg = document.getElementById('fleetMsg');
+      msg.style.color = '#888'; msg.textContent = 'Editing fleet #' + id + '…';
+      document.getElementById('fleetCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    function fleetCancelEdit() {
+      _fleetEditId = null;
+      document.getElementById('fleetName').value = '';
+      document.getElementById('fleetCustomer').value = '';
+      document.getElementById('fleetRate').value = '';
+      document.getElementById('fleetVehType').value = '';
+      document.getElementById('fleetSaveBtn').textContent = 'Add Fleet Rate';
+      document.getElementById('fleetCancelBtn').style.display = 'none';
     }
     async function loadFleets() {
       const box = document.getElementById('fleetList'); if (!box) return;
       try {
         const j = await (await fetch('/api/fleets')).json();
         const rows = j.fleets || [];
+        _fleetRows = rows;
         if (!rows.length) { box.innerHTML = '<span style="color:#999;">No active fleet rates.</span>'; return; }
         let html = '<table style="width:100%; border-collapse:collapse; font-size:13px;"><tr style="color:#888; text-align:left;">'
           + '<th style="padding:4px 8px;">Insurer</th><th style="padding:4px 8px;">Fleet</th><th style="padding:4px 8px;">Customer</th><th style="padding:4px 8px;">Vehicle</th><th style="padding:4px 8px; text-align:right;">Rate %</th><th></th></tr>';
@@ -8244,7 +8270,7 @@
             + '<td style="padding:4px 8px;"><b>' + escapeHtml(String(r.customer_name)) + '</b></td>'
             + '<td style="padding:4px 8px;">' + escapeHtml(String(r.vehicle_type || 'All')) + '</td>'
             + '<td style="padding:4px 8px; text-align:right; color:#1b5e20; font-weight:600;">' + escapeHtml(String(r.rate_pct)) + '</td>'
-            + '<td style="padding:4px 8px; text-align:right;"><button class="btn btn-outline btn-sm" onclick="fleetDeactivate(' + r.id + ')">Remove</button></td></tr>';
+            + '<td style="padding:4px 8px; text-align:right; white-space:nowrap;"><button class="btn btn-outline btn-sm" onclick="fleetEdit(' + r.id + ')">Edit</button> <button class="btn btn-outline btn-sm" onclick="fleetDeactivate(' + r.id + ')">Remove</button></td></tr>';
         });
         html += '</table>';
         box.innerHTML = html;

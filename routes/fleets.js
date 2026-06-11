@@ -56,6 +56,37 @@ router.post('/save', express.json({ limit: '256kb' }), async (req, res, next) =>
   } catch (e) { next(e); }
 });
 
+// ---- Update one fleet deal ----
+router.post('/:id/update', express.json({ limit: '256kb' }), async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ success: false, error: 'Bad id' });
+    const b = req.body || {};
+    const insurer = String(b.insurer_slug || '').trim();
+    const customer = String(b.customer_name || '').trim();
+    const rate = b.rate_pct != null && b.rate_pct !== '' ? Number(b.rate_pct) : null;
+    if (!insurer) return res.status(400).json({ success: false, error: 'Insurer is required' });
+    if (!customer) return res.status(400).json({ success: false, error: 'Customer name is required' });
+    if (rate == null || !Number.isFinite(rate)) return res.status(400).json({ success: false, error: 'A numeric rate % is required' });
+    const pool = await getPool();
+    const r = await pool.request()
+      .input('id', sql.Int, id)
+      .input('insurer_slug', sql.NVarChar, insurer)
+      .input('fleet_name', sql.NVarChar, String(b.fleet_name || '').trim() || null)
+      .input('customer_name', sql.NVarChar, customer)
+      .input('vehicle_type', sql.NVarChar, String(b.vehicle_type || '').trim() || null)
+      .input('rate_pct', sql.Decimal(7, 3), rate)
+      .input('note', sql.NVarChar, String(b.note || '').trim() || null)
+      .query(
+        `UPDATE fleet_overrides
+            SET insurer_slug = @insurer_slug, fleet_name = @fleet_name, customer_name = @customer_name,
+                vehicle_type = @vehicle_type, rate_pct = @rate_pct, note = @note
+          WHERE id = @id AND active = 1`);
+    if (!r.rowsAffected || !r.rowsAffected[0]) return res.status(404).json({ success: false, error: 'Fleet rate not found' });
+    res.json({ success: true, id });
+  } catch (e) { next(e); }
+});
+
 // ---- Soft-delete one fleet deal ----
 router.post('/:id/deactivate', async (req, res, next) => {
   try {
