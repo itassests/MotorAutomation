@@ -3937,6 +3937,29 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   const idvOver50L = false;
   if (idvOver50L) rules = [];
 
+  // ---- Reliance Pvt-Car Comp & SAOD grid (effective 1 Apr 2026) ----
+  // User-supplied fuel/product grid the ingested card (468) missed: Comprehensive
+  // is Petrol/CNG/LPG = 30% everywhere / Diesel-EV = region 5-10%; SAOD non-high-end
+  // = 30%. Authoritative for Reliance CAR COMP/SAOD, so the computed rate REPLACES the
+  // pool (diesel-EV's LOWER rate must win, not pickPrimary's MAX) and also rescues the
+  // no-rule cars (city-region like "SURAT" had no CAR rule). SATP / unknown region →
+  // resolver returns null → pool untouched. SAOD high-end & Extended-Warranty (20%) are
+  // intentionally left as default (operator data showed no clean luxury-SAOD rule).
+  if (insurerSlug === 'reliance' && String(params.vehicleType || '').toUpperCase() === 'CAR') {
+    const _relCar = require('../services/reliance-car').resolveRelianceCarRate(params, resolvedRegion);
+    if (_relCar) {
+      const _base = rules[0] || {};
+      const _rt = (Number(params.tpPremium) || 0) < 1 ? 'SAOD' : 'COMP';
+      rules = [{ ..._base,
+        id: _base.id || -7301,
+        insurer: 'reliance', product: 'CAR',
+        region: String(resolvedRegion || _base.region || ''),
+        segment: _relCar.label, sub_type: '', make: 'All', fuel_type: null,
+        rate_type: _rt, rate_value: _relCar.rate,
+        rate_text: _relCar.label, remarks: 'Reliance Apr26 Comp&SAOD grid' }];
+    }
+  }
+
   let primary = pickPrimaryRateRule(rules);
   // ---- Enabler / special-payout override ----
   // A criteria-scoped enabler deal (segment + make + transaction + RTO location +

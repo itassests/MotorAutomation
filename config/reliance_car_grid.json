@@ -1,0 +1,18 @@
+{
+  "_comment": "Reliance Pvt-Car Comp & SAOD grid, effective 1 April 2026 (FY26-27). Per region: petrolCom (Petrol/CNG/LPG Comprehensive, HEV+nonHEV), dieselEvCom (Diesel/EV Comprehensive), highEndSaod, nonHighEndSaod, extWarranty. Obsolete models = declined.",
+  "MUM_PUN_GOA":   {"petrolCom":30,"dieselEvCom":10,"highEndSaod":22.5,"nonHighEndSaod":30,"extWarranty":20},
+  "REST_MAH":      {"petrolCom":30,"dieselEvCom":10,"highEndSaod":22.5,"nonHighEndSaod":30,"extWarranty":20},
+  "GUJARAT":       {"petrolCom":30,"dieselEvCom":10,"highEndSaod":22.5,"nonHighEndSaod":30,"extWarranty":20},
+  "MP":            {"petrolCom":30,"dieselEvCom":5, "highEndSaod":12.5,"nonHighEndSaod":30,"extWarranty":20},
+  "BLR_HYD":       {"petrolCom":30,"dieselEvCom":10,"highEndSaod":22.5,"nonHighEndSaod":30,"extWarranty":20},
+  "REST_KA_TS_AP": {"petrolCom":30,"dieselEvCom":5, "highEndSaod":22.5,"nonHighEndSaod":30,"extWarranty":20},
+  "KERALA":        {"petrolCom":30,"dieselEvCom":5, "highEndSaod":22.5,"nonHighEndSaod":30,"extWarranty":20},
+  "TN":            {"petrolCom":30,"dieselEvCom":5, "highEndSaod":17.5,"nonHighEndSaod":30,"extWarranty":20},
+  "DELHI":         {"petrolCom":30,"dieselEvCom":10,"highEndSaod":17.5,"nonHighEndSaod":30,"extWarranty":20},
+  "PUN_HP_JK":     {"petrolCom":30,"dieselEvCom":7.5,"highEndSaod":17.5,"nonHighEndSaod":30,"extWarranty":20},
+  "UP_HR_RAJ":     {"petrolCom":30,"dieselEvCom":5, "highEndSaod":12.5,"nonHighEndSaod":30,"extWarranty":20},
+  "NE_OD_CG":      {"petrolCom":30,"dieselEvCom":10,"highEndSaod":22.5,"nonHighEndSaod":30,"extWarranty":20},
+  "BIH_JHK":       {"petrolCom":30,"dieselEvCom":10,"highEndSaod":22.5,"nonHighEndSaod":30,"extWarranty":20},
+  "KOLKATA":       {"petrolCom":30,"dieselEvCom":10,"highEndSaod":22.5,"nonHighEndSaod":30,"extWarranty":20},
+  "WB":            {"petrolCom":30,"dieselEvCom":10,"highEndSaod":22.5,"nonHighEndSaod":30,"extWarranty":20}
+}
