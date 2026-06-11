@@ -5124,6 +5124,23 @@ async function runBulkCalculate(body) {
           else _prodFromPrem++;
         }
       }
+      // Premium-composition sanity override: a policy with NO OD premium and a
+      // real TP premium CANNOT be SAOD (SAOD = OD-only) or Comprehensive — the
+      // TRN/source product code is wrong (e.g. TATA UP1/15044: TRN said SAOD for
+      // a TP-only bike → matched the HOM|SAOD 20% instead of HOM|SATP 36% =
+      // operator). Force Liability so it routes to the SATP/TP rates. One-way
+      // override only (the reverse — Comp with tp=0 — is a legitimate bundled
+      // long-term-TP renewal shape, left untouched).
+      {
+        const odc = (parseFloat(r.NET_OD_PREMIUM) || 0) || (parseFloat(r.BASE_OD_PREMIUM) || 0);
+        const tpc = parseFloat(r.NET_LIABILITY_PREMIUM) || 0;
+        const curP = String(r.ProductTypeName || r['PRODUCT TYPE'] || '').toUpperCase();
+        if (odc <= 0 && tpc > 0 && /SAOD|STANDALONE|OWN\s*DAMAGE|COMP|PACKAGE/.test(curP) && !/TP|THIRD|LIABILITY|SATP/.test(curP)) {
+          r.ProductTypeName = 'Liability';
+          r['PRODUCT TYPE'] = 'Liability';
+          r['PolicyType'] = 'Liability';
+        }
+      }
     }
 
     // (B5) Tenure bucket — derived from OD/TP policy-term dates
