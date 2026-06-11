@@ -8197,7 +8197,7 @@
           html += '</table></div>';
         }
         box.innerHTML = html;
-      } catch (e) { box.innerHTML = '<span style="color:#c00;">Error: ' + esc(e.message) + '</span>'; }
+      } catch (e) { box.innerHTML = '<span style="color:#c00;">Error: ' + escapeHtml(String(e && e.message || e)) + '</span>'; }
     }
     async function enablerDeactivateDeal(deal) {
       if (!confirm('Remove enabler deal ' + deal + '? Matching policies will revert to the system rate.')) return;
@@ -8239,16 +8239,16 @@
           + '<th style="padding:4px 8px;">Insurer</th><th style="padding:4px 8px;">Fleet</th><th style="padding:4px 8px;">Customer</th><th style="padding:4px 8px;">Vehicle</th><th style="padding:4px 8px; text-align:right;">Rate %</th><th></th></tr>';
         rows.forEach(r => {
           html += '<tr style="border-top:1px solid #eee;">'
-            + '<td style="padding:4px 8px;">' + esc(r.insurer_slug) + '</td>'
-            + '<td style="padding:4px 8px;">' + esc(r.fleet_name || '-') + '</td>'
-            + '<td style="padding:4px 8px;"><b>' + esc(r.customer_name) + '</b></td>'
-            + '<td style="padding:4px 8px;">' + esc(r.vehicle_type || 'All') + '</td>'
-            + '<td style="padding:4px 8px; text-align:right; color:#1b5e20; font-weight:600;">' + esc(r.rate_pct) + '</td>'
+            + '<td style="padding:4px 8px;">' + escapeHtml(String(r.insurer_slug)) + '</td>'
+            + '<td style="padding:4px 8px;">' + escapeHtml(String(r.fleet_name || '-')) + '</td>'
+            + '<td style="padding:4px 8px;"><b>' + escapeHtml(String(r.customer_name)) + '</b></td>'
+            + '<td style="padding:4px 8px;">' + escapeHtml(String(r.vehicle_type || 'All')) + '</td>'
+            + '<td style="padding:4px 8px; text-align:right; color:#1b5e20; font-weight:600;">' + escapeHtml(String(r.rate_pct)) + '</td>'
             + '<td style="padding:4px 8px; text-align:right;"><button class="btn btn-outline btn-sm" onclick="fleetDeactivate(' + r.id + ')">Remove</button></td></tr>';
         });
         html += '</table>';
         box.innerHTML = html;
-      } catch (e) { box.innerHTML = '<span style="color:#c00;">Error: ' + esc(e.message) + '</span>'; }
+      } catch (e) { box.innerHTML = '<span style="color:#c00;">Error: ' + escapeHtml(String(e && e.message || e)) + '</span>'; }
     }
     async function fleetDeactivate(id) {
       if (!confirm('Remove this fleet rate? Matching policies revert to the system rate.')) return;
