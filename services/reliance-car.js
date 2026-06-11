@@ -86,12 +86,14 @@ function resolveRelianceCarRate(params, resolvedRegion) {
   const mk   = String(params.make || '').toUpperCase();
   const dieselEv = /DIESEL|ELECTRIC|\bEV\b|BATTERY/.test(fuel) || /\bEV\b|ELECTRIC/.test(mk);
   if (tp < 1) {                                  // SAOD (OD-only)
-    // NOTE: the "PVT car Segment" HIGH-END classification does NOT cleanly drive the
-    // SAOD rate — operator data shows high-end-segment cars (Audi Q5, BMW X5, BYD Seal)
-    // paid the NON-high-end 30%, others 20% (likely Extended Warranty), only a few the
-    // high-end 17.5%. So we default to non-high-end (30%), which matches the majority.
-    // isHighEnd() is kept available for when the real High-End-SAOD trigger is confirmed.
-    return { rate: G.nonHighEndSaod / 100, label: `Reliance PvtCar ${g} SAOD (non-high-end)` };
+    // High-End SAOD (region 12.5-22.5%) vs Non-High-End (30%), per the "PVT car Segment"
+    // sheet (MAKE+MODEL → VEHICLE_SEGMENT = HIGH END). USER-confirmed: High-End SAOD is
+    // 17.5/22.5, never 30 — so where the operator paid a high-end car 30, that's the
+    // operator's error and we apply the grid-correct high-end rate.
+    const hi = isHighEnd(params.make, params.model);
+    return hi
+      ? { rate: G.highEndSaod / 100,    label: `Reliance PvtCar ${g} SAOD (high-end)` }
+      : { rate: G.nonHighEndSaod / 100, label: `Reliance PvtCar ${g} SAOD (non-high-end)` };
   }
   // Comprehensive (OD + TP)
   const r = dieselEv ? G.dieselEvCom : G.petrolCom;
