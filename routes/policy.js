@@ -2729,6 +2729,30 @@ function filterRulesByPolicy(rules, params, _trace) {
       // bundledTag unknown → fall through to the existing age/leg gates unchanged.
     }
 
+    // Go Digit CAR bundled-vs-annual tenure routing. Go Digit's Pvt-Car grid has BOTH
+    // annual rate_types (COMP_NCB / COMP_NON_NCB) AND long-term bundled ones (1+3_CD2 /
+    // 3+3_CD2) in the same region, coexisting in the pool — so the annual rate (higher)
+    // wins on max-pick even for a 3-year bundle (GJ10/1512 3+3 took COMP_NON_NCB 22% vs
+    // 3+3_CD2 19.5%=operator 20). Route by the policy's OD+TP tenure (bundledTag from the
+    // dates): a multi-year bundle keeps ONLY its matching bundled rate (drops annual + the
+    // other bundle); an annual/unknown policy drops the bundled rate_types. STRICTLY
+    // CAR-scoped — GCV/TW/PCV use "COMP_MAX_CD2" etc. which would falsely match /^COMP/
+    // (that over-broad scope regressed go_digit -83; CAR-only is safe).
+    if (matches && rule.insurer === 'go_digit' &&
+        /^(CAR|4W|PC)$/i.test(String(params.vehicleType || ''))) {
+      const _rt = String(rule.rate_type || '').toUpperCase();
+      const _tm = _rt.match(/(\d+)\s*\+\s*(\d+)/);
+      const _rtTen = _tm ? `${+_tm[1]}+${+_tm[2]}` : null;        // "1+3" / "3+3"
+      const _isAnnualComp = /^COMP_(?:NON_)?NCB\b/.test(_rt);    // CAR annual: COMP_NCB / COMP_NON_NCB
+      const _polBundled = !!(params.bundledTag && params.bundledTag !== '1+1');
+      if (_rtTen) {
+        if (!_polBundled || _rtTen !== params.bundledTag) matches = false;  // bundled row, non-matching policy → drop
+        else { score += 8; _bundledSkipAge = true; }
+      } else if (_isAnnualComp && _polBundled) {
+        matches = false;                                          // annual Comp row for a bundled policy → drop
+      }
+    }
+
     // Vehicle age band (redundant with SQL filter but defends against unbounded rows).
     // Skipped for a tenure-matched bundled rate_type (its 0-0 age band is a mis-
     // ingestion; the tenure match above is authoritative).

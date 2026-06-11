@@ -4496,6 +4496,9 @@ async function runBulkCalculate(body) {
     'PREMIUM_WITHOUT_GST','ADD_ON_PREMIUM','Addon_Premium',
     'ANNUAL_PREMIUM','NCB','OD_DISCOUNT',
     'BUSINESS_TYPE_ID','SubmissionDate','POLICY_ISSUED_DATE','POLICY_START_DATE','City','BooKedLocation',
+    // OD/TP period dates → odTenure/tpTenure → bundledTag ("1+1"/"1+3"/"3+3"); used by the
+    // go_digit CAR bundled-vs-annual tenure routing (3+3 new car → 3+3_CD2, not annual).
+    'OD_Start_Date','OD_End_Date','TP_POLICY_START_DATE','TP_POLICY_END_DATE',
     // Proposer name — used to infer Corporate vs Individual ownership (PCV
     // bus rates split on this; a company-style name → Corporate, else Individual).
     'FULLNAME_PROPOSER',
