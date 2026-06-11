@@ -565,7 +565,7 @@ async function loadPrIndex(pool) {
   const r = await pool.request().query(
     `SELECT pr.policy_no, pr.vehicle_no, pr.od_premium, pr.addon_premium, pr.tp_premium,
             pr.net_amount, pr.gross_amount, pr.sum_insured, pr.ncb, pr.fuel_type, pr.cc,
-            pr.tonnage, pr.seating, pr.product, pr.raw_json,
+            pr.tonnage, pr.seating, pr.product, pr.region, pr.raw_json,
             pr.upload_id, u.insurer_label, u.month, u.year
      FROM pr_rows pr
      INNER JOIN pr_uploads u ON u.id = pr.upload_id
@@ -967,6 +967,9 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     if (prMatch) {
       const ch = reconcileParamsWithPR(params, prMatch);
       if (ch) params._prReconciled = ch;
+      // Booking-location city from PR (e.g. THANE) — used for TATA new-vehicle
+      // cluster resolution where the RTO is a "NEW" placeholder.
+      params._prRegion = prMatch.region || null;
     }
   }
 
@@ -1329,6 +1332,31 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (e) { /* probe failed → fall back to the cap (safe default) */ }
     // Anomalously-low / unknown >40T rate → cap to the 20-40T slab.
     if (!real40Proper) params.tonnage = 39;
+  }
+
+  // ---- TATA: NEW-vehicle cluster from BOOKING LOCATION ----
+  // A NEW vehicle (vehicle_no "NEW" / age 0) has no real RTO yet, so the RTO-based
+  // region is a placeholder and mis-resolves (e.g. generic "Rest of Maharashtra" 41%
+  // when the operator rates the Mumbai-metro cluster 58-61%). USER-confirmed: for
+  // TATA new vehicles ONLY, resolve the cluster from the PR booking location (THANE→
+  // MUMBAI, MOTI NAGAR→DELHI; major cities match directly). Unknown rest-of-state
+  // cities (Nashik/Himmatnagar) aren't in the city set → fall back to the RTO region.
+  if (insurerSlug === 'tata_aig' && params._prRegion &&
+      (params.vehicleAge === 0 || String(params.vehicleRegNo || '').trim().toUpperCase() === 'NEW')) {
+    const TATA_BOOKING_ALIAS = {
+      'THANE': 'MUMBAI', 'NAVI MUMBAI': 'MUMBAI', 'KALYAN': 'MUMBAI', 'PANVEL': 'MUMBAI',
+      'MOTI NAGAR': 'DELHI', 'MOTINAGAR': 'DELHI',
+    };
+    const TATA_CITY_REGIONS = new Set(['MUMBAI', 'PUNE', 'NAGPUR', 'SURAT', 'AHMEDABAD',
+      'DELHI', 'HYDERABAD', 'BANGALORE', 'CHENNAI', 'KOLKATA', 'JAIPUR', 'INDORE',
+      'RAJKOT', 'VADODARA', 'COIMBATORE', 'BHUBANESHWAR', 'CHANDIGARH', 'GOA',
+      'VIJAYWADA', 'VISHAKAPATNAM']);
+    const bl = String(params._prRegion).toUpperCase().trim();
+    const mapped = TATA_BOOKING_ALIAS[bl] || bl;
+    if (TATA_CITY_REGIONS.has(mapped)) {
+      resolvedRegion = mapped;
+      params._tataBookingRegion = mapped;
+    }
   }
   params.resolvedRegion = resolvedRegion;
 
