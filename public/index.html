@@ -13542,6 +13542,7 @@
       loadInsurers();
       loadRateCards();
       if (typeof loadEnablers === 'function') loadEnablers();
+      if (typeof loadFleets === 'function') loadFleets();
       loadSavedMargins();
       populateMarginDefineInsurerDropdown();
       populateMarginCoverageInsurerDropdown();
