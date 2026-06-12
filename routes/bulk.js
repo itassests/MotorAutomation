@@ -3140,7 +3140,10 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         JH:'JH', JK:'JK', MP:'MP', WB:'WB', UK:'UK', UA:'UK', CG:'CG', BR:'BH', AN:'AN',
         AS:'AS/ML/TR/AR/NL', ML:'AS/ML/TR/AR/NL', TR:'AS/ML/TR/AR/NL', AR:'AS/ML/TR/AR/NL', NL:'AS/ML/TR/AR/NL' };
       const code = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-      const reg = ST2REG[code.slice(0, 2)];
+      // UP16 (Noida) takes Chola's "UP- East" grid, not plain UP — USER-confirmed
+      // (DL7/14263 Creta diesel NCB-0: operator paid the UP-East 1000-1500 base 25,
+      // plain-UP base is 20; neighbouring UP14/15/17 verified on plain UP).
+      const reg = code.startsWith('UP16') ? 'UP- East' : ST2REG[code.slice(0, 2)];
       if (reg) {
         const cc = Number(params.cc) || 0;
         const ccBand = cc > 0 && cc <= 1000 ? 'UPTO 1000 CC'
