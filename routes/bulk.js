@@ -4007,6 +4007,26 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // ---- Shriram Pvt-Car explicit-NCB-row preference ----
+  // Shriram prices Pvt-Car cells as NCB / Without-NCB twins (in remarks), plus
+  // unbanded make-special rows ("Only HONDA & HYUNDAI & KIA manufacture only",
+  // PACK_SHRIRAM_OD). The NCB scoring can't cross rate_types, so the unbanded
+  // 32.5 OD row beat the exact "Without NCB Except Maruti ALTO/SWIFT" 20 for an
+  // NCB-0 aged i20 (PJ2/4799, operator 20). USER-confirmed: NCB-0 renewals take
+  // the Without-NCB row. Aged (>=1) NCB-0 cars with an explicit Without-NCB row
+  // in the pool drop unbanded siblings; new cars (age 0) keep the special rows.
+  if (insurerSlug === 'shriram' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR' &&
+      (Number(params.ncbPct) || 0) === 0 &&
+      (Number(params.vehicleAge) || 0) >= 1 && rules.length > 1) {
+    const hasWithoutNcb = rules.some(r => /\bwithout\s*ncb\b/i.test(String(r.remarks || '')));
+    if (hasWithoutNcb) {
+      rules = rules.filter(r => /\bncb\b/i.test(String(r.remarks || '')) === true
+        ? true : !/PACK_SHRIRAM_OD|SAOD_SHRIRAM_OD/i.test(String(r.rate_type || '')))
+        .filter(r => !(/\bncb\s*cases\b/i.test(String(r.remarks || '')) && !/without/i.test(String(r.remarks || ''))));
+    }
+  }
+
   // ---- Zuno Pvt-Car SAOD routing ----
   // Zuno keeps its only CAR-SAOD rates OUTSIDE the regional grids: "All doable
   // RTO'S" SAOD 24% (NCB 1-99) and the Pan-India "NCB = 0 → 15%" floor. A
