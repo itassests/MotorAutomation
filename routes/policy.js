@@ -2026,6 +2026,19 @@ function filterRulesByPolicy(rules, params, _trace) {
       matches = false;
     }
 
+    // SBI alias-row UT gate. The SBI ingest cloned some cluster rows as aliases
+    // for the union territories (rate_text "(alias for DADRA AND NAGAR HAVELI…" /
+    // "(alias for Daman & Diu…") carrying LOWER tier rates than the genuine
+    // cluster family. USER-confirmed (GJ7/34584 Innova SAOD, GJ05/Surat): the
+    // Gujarat car must take the real "Ahmedabad, Baroda & Surat" family
+    // (Above-25L 27 = operator), not the Dadra alias 25. Alias rows apply ONLY
+    // to DD/DN-registered policies.
+    if (matches && rule.insurer === 'sbi_general' &&
+        /alias for\s+(DADRA|DAMAN)/i.test(String(rule.rate_text || ''))) {
+      const _st = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2);
+      if (_st !== 'DD' && _st !== 'DN') matches = false;
+    }
+
     // Special-body rate_type gate (Go Digit HCV grid). DUMPER_/OIL_TANKER_/
     // GAS_TANKER_ rates apply only to the matching body. A regular goods
     // carrier must price off the plain (non-prefixed) rate, never the
