@@ -3993,6 +3993,58 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // ---- Zuno Pvt-Car SAOD routing ----
+  // Zuno keeps its only CAR-SAOD rates OUTSIDE the regional grids: "All doable
+  // RTO'S" SAOD 24% (NCB 1-99) and the Pan-India "NCB = 0 → 15%" floor. A
+  // Gujarat (etc.) SAOD car finds no regional SAOD rule, the SAOD-as-Comp pass
+  // borrows the regional COMP 28%, and the zunoCandidates fallback never fires
+  // (pool non-empty) — so ALL Zuno SAOD cars over-rated at 28 (operator: NCB-0
+  // → 15, NCB-positive → 24). Route them to the real SAOD rows. (The 12 cars
+  // the operator paid 19.5/20 = the OD-disc ≥85% override — discount data is
+  // blank in tmp and Zuno has no PR matches, so they land on 24 = closer.)
+  const _zunoTpEnd = new Date(policy.TP_POLICY_END_DATE != null ? policy.TP_POLICY_END_DATE : NaN);
+  const _zunoHasLiveTp = !isNaN(_zunoTpEnd.getTime()) && _zunoTpEnd.getFullYear() > 2000;
+  const _zunoIsNew = (Number(params.vehicleAge) || 0) === 0 ||
+                     String(params.vehicleRegNo || '').trim().toUpperCase() === 'NEW';
+  // North states keep the regional flat rate for NCB=0 (USER-confirmed, DL10/6283) —
+  // the Pan-India NCB=0 floor must not be forced there.
+  const _zunoNorth = /^(UTTAR PRADESH|DELHI|PUNJAB|HARYANA|CHANDIGARH)$/i.test(String(params.resolvedRegion || resolvedRegion || ''));
+  if (insurerSlug === 'zuno' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR' && !_zunoIsNew) {
+    // Zuno keeps its CAR SAOD rate ("All doable RTO'S" SAOD 24, NCB 1-99) and the
+    // Pan-India "NCB = 0 → 15" floor OUTSIDE the regional grids, and the regional
+    // match keeps the zero-rule fallback from ever pooling them. Operator logic
+    // (verified GJ, 38 cars): no live TP leg (epoch TP_POLICY_END_DATE, raw
+    // NET_LIABILITY=0 — params.tpPremium is unreliable: the Net−OD fallback
+    // manufactures a phantom TP) → true SAOD → NCB>0 = 24, NCB=0 = 15 floor;
+    // live TP leg (genuine Package) → NCB>0 = regional Comp (28), NCB=0 = 15
+    // floor (the floor is a COMP override and applies to Package too, except
+    // the North-flat states).
+    const _zunoTrueSaod = String(params.insProduct || '').toUpperCase() === 'SAOD' ||
+      ((Number(params.odPremium) || 0) > 0 &&
+       (parseFloat(policy.NET_LIABILITY_PREMIUM) || 0) < 1 && !_zunoHasLiveTp);
+    const ncb = Number(params.ncbPct) || 0;
+    if (_zunoTrueSaod || (ncb === 0 && !_zunoNorth)) {
+      const zKey = 'zuno||carSaodRows';
+      let zRows;
+      if (caches.lookup.has(zKey)) zRows = caches.lookup.get(zKey);
+      else {
+        const zq = await pool.request().query(
+          `SELECT * FROM rate_rules WHERE insurer = 'zuno' AND product = 'CAR' AND rate_value IS NOT NULL
+             AND (rate_type = 'SAOD' OR (sub_type = 'NCB=0' AND region LIKE 'Pan India%'))`);
+        zRows = zq.recordset || [];
+        caches.lookup.set(zKey, zRows);
+      }
+      const floorRow = zRows.find(r => String(r.sub_type || '') === 'NCB=0');
+      const saodRow  = zRows.find(r => String(r.rate_type) === 'SAOD');
+      let pick = null;
+      if (ncb === 0 && !_zunoNorth) pick = floorRow || (
+        _zunoTrueSaod ? saodRow : null);                  // NCB=0 → 15 floor (SAOD & Package alike)
+      else if (_zunoTrueSaod && ncb > 0) pick = saodRow;  // true SAOD, NCB>0 → 24
+      if (pick) rules = [pick];
+    }
+  }
+
   let primary = pickPrimaryRateRule(rules);
   // ---- Enabler / special-payout override ----
   // A criteria-scoped enabler deal (segment + make + transaction + RTO location +
