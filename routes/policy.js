@@ -2012,6 +2012,15 @@ function filterRulesByPolicy(rules, params, _trace) {
       else if (rtIsNcb && !_effHasNCB) matches = false;
     }
 
+    // ICICI Used-Car rows apply only to NO-NCB cases. USER-confirmed (UP4/10403,
+    // MG Hector diesel NCB 45): a used car WITH NCB>0 takes the regular
+    // "Comprehensive with >0% NCB" fuel-banded rate (UP Diesel 17.5 = operator),
+    // not the flat Used-Car 15. Drop *_USED rows when the policy carries NCB.
+    if (matches && rule.insurer === 'icici_lombard' &&
+        /_USED/i.test(rt) && policyHasNCB) {
+      matches = false;
+    }
+
     // Special-body rate_type gate (Go Digit HCV grid). DUMPER_/OIL_TANKER_/
     // GAS_TANKER_ rates apply only to the matching body. A regular goods
     // carrier must price off the plain (non-prefixed) rate, never the
