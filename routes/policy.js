@@ -186,7 +186,10 @@ function aliasHdfcRegion(region) {
  * Maharashtra split (per product owner): Mumbai-metro RTOs → 'MUMBAI', the rest
  * of the state → 'ROM' (Rest of Maharashtra).
  */
-const SHRIRAM_MUMBAI_RTOS = new Set(['MH01', 'MH02', 'MH03', 'MH04', 'MH43', 'MH46', 'MH47', 'MH48']);
+// MH06 (Raigad/Pen) counts as Mumbai for Shriram — USER-confirmed (MH5/2258
+// Maruti Ertiga diesel, NCB 0: operator paid the Mumbai "Without NCB" diesel 11,
+// not ROM's 15 — whose remark excludes Maruti anyway).
+const SHRIRAM_MUMBAI_RTOS = new Set(['MH01', 'MH02', 'MH03', 'MH04', 'MH06', 'MH43', 'MH46', 'MH47', 'MH48']);
 const SHRIRAM_REGION_TOKENS = {
   'GUJARAT': ['GUJARAT'],
   'TAMIL NADU': ['TAMIL'],
