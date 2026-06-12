@@ -47,7 +47,12 @@ function resolveNiaMotorRate(p) {
     // SAOD/SATP and the new-vehicle (age 0) bundled band keep the base legs so
     // the already-matched 20→20 / 40→40 cases don't regress.
     const stPfx = (String(p.rtoCode || '').toUpperCase().match(/^[A-Z]+/) || [''])[0];
-    const odComp = (stPfx === 'MH' || stPfx === 'KA') ? 30 : 20;
+    // BH-series (Bharat) registrations (e.g. "23BH6979D") are NOT state-registered —
+    // their rtoCode is a tracker-prefix fabrication, so the MH/KA uplift must not
+    // apply. USER-checked MH22/5039 (Skoda Kushaq 23BH6979D, age 3): operator legs
+    // = base 20+15=35, not the MH 30+15=45.
+    const isBhSeries = /^\d{2}\s*BH/i.test(String(p.vehicleRegNo || '').replace(/[\s-]/g, ''));
+    const odComp = (!isBhSeries && (stPfx === 'MH' || stPfx === 'KA')) ? 30 : 20;
     if (age === 0)        { od = 25; tp = 15; }   // New vehicle – Bundled (1+3)
     else if (age != null && age <= 10) { od = odComp; tp = 15; } // 1–10 yr Package
     else                  { od = odComp; tp = 12.5; } // Above 10 yr
