@@ -974,6 +974,20 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // Shriram Pvt-Car: CNG/LPG cars belong to the PETROL segment. The grid has only
+  // PRIVATE CAR PETROL / PRIVATE CAR DIESEL; USER-confirmed (DJ1/6578 Ertiga VXI
+  // CNG, Jharkhand, NCB-0: operator paid the PETROL Maruti-family "without NCB"
+  // 30, we matched DIESEL Without-NCB 20). Also covers the blank-fuel case where
+  // only the model name carries "CNG"/"LPG".
+  if (insurerSlug === 'shriram' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR') {
+    const _fu = String(params.fuelType || '').toUpperCase();
+    const _mdl = `${params.model || ''} ${params.vehicleCategory || ''}`.toUpperCase();
+    if (/CNG|LPG/.test(_fu) || (!_fu && /\bCNG\b|\bLPG\b/.test(_mdl))) {
+      params.fuelType = 'Petrol';
+    }
+  }
+
   // Royal Pvt-Car Comp grid bands its payout by OD discount (stored in
   // rate_rules.volume_tier: "Upto 20" / "20-50" / "50-60" / "60-70" / ">70").
   // tmp_PrarambhData.OD_DISCOUNT is blank for these rows, so the discount must
