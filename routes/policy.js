@@ -2012,12 +2012,14 @@ function filterRulesByPolicy(rules, params, _trace) {
       else if (rtIsNcb && !_effHasNCB) matches = false;
     }
 
-    // ICICI Used-Car rows apply only to NO-NCB cases. USER-confirmed (UP4/10403,
-    // MG Hector diesel NCB 45): a used car WITH NCB>0 takes the regular
-    // "Comprehensive with >0% NCB" fuel-banded rate (UP Diesel 17.5 = operator),
-    // not the flat Used-Car 15. Drop *_USED rows when the policy carries NCB.
-    if (matches && rule.insurer === 'icici_lombard' &&
-        /_USED/i.test(rt) && policyHasNCB) {
+    // ICICI Used-Car rows apply only to NO-NCB, non-TP cases. USER-confirmed:
+    // (1) UP4/10403 (MG Hector diesel NCB 45): a used car WITH NCB>0 takes the
+    // regular "Comprehensive with >0% NCB" fuel-banded rate (UP Diesel 17.5 =
+    // operator), not the flat Used-Car 15. (2) MH17/7414 (TP-only used Zen,
+    // Mumbai): a PURE-TP policy takes the Act-only column (Mumbai/Maharashtra =
+    // 0%, all fuels), never the Used-Car rate (TP_USED 25 ≠ operator 0).
+    if (matches && rule.insurer === 'icici_lombard' && /_USED/i.test(rt) &&
+        (policyHasNCB || String(params.insProduct || '').toUpperCase() === 'TP')) {
       matches = false;
     }
 
