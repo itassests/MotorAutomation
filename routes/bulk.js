@@ -955,6 +955,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   const PR_RECONCILE_EXCLUDE = new Set(['royal_sundaram']);
   if (prIndex && !PR_RECONCILE_EXCLUDE.has(insurerSlug) && (params._policy_no || params.vehicleRegNo)) {
     let prMatch = null;
+    let _prViaVehicle = false;
     if (params._policy_no) {
       const pk = String(params._policy_no).trim().toUpperCase();
       prMatch = prIndex.get(pk) || null;
@@ -962,10 +963,10 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
     if (!prMatch && params.vehicleRegNo && prIndex._byVehicle && prIndex._normVeh) {
       const vk = prIndex._normVeh(params.vehicleRegNo);
-      if (vk && vk.length >= 6) prMatch = prIndex._byVehicle.get(vk) || null;
+      if (vk && vk.length >= 6) { prMatch = prIndex._byVehicle.get(vk) || null; _prViaVehicle = !!prMatch; }
     }
     if (prMatch) {
-      const ch = reconcileParamsWithPR(params, prMatch);
+      const ch = reconcileParamsWithPR(params, prMatch, { vehicleMatched: _prViaVehicle });
       if (ch) params._prReconciled = ch;
       // Booking-location city from PR (e.g. THANE) — used for TATA new-vehicle
       // cluster resolution where the RTO is a "NEW" placeholder.
@@ -4981,13 +4982,18 @@ async function runBulkCalculate(body) {
       if (dep != null) r._depreciation = dep;
     }
     // Locate the PR row once (by policy_no, then by existing registration).
-    let pr = null;
+    // A VEHICLE-matched PR row may be a DIFFERENT policy year for the same
+    // vehicle (Sompo: prior-year row with NCB=20 attached to a real-NCB-0
+    // renewal → with-NCB 37 instead of the operator's Non-NCB 32). Such rows
+    // stay usable for VEHICLE attributes but must not supply POLICY-YEAR
+    // attributes (NCB, product) — see prViaVehicle gates below.
+    let pr = null, prViaVehicle = false;
     if (prIndex) {
       const pk = String(r.PolicyNo || r['POLICY NO'] || '').trim().toUpperCase();
       pr = pk ? prIndex.get(pk) : null;
       if (!pr && prIndex._byVehicle && r.VEHICLE_REGISTRATION_NO) {
         const vk = prIndex._normVeh(r.VEHICLE_REGISTRATION_NO);
-        if (vk && vk.length >= 6) pr = prIndex._byVehicle.get(vk) || null;
+        if (vk && vk.length >= 6) { pr = prIndex._byVehicle.get(vk) || null; prViaVehicle = !!pr; }
       }
     }
 
@@ -5094,7 +5100,8 @@ async function runBulkCalculate(body) {
         let psrc = '';
         // (1) PR.product — already a descriptive string ("Comprehensive",
         // "Own Damage", "Liability", "SAOD", "Package", …). Normalise it.
-        if (pr && pr.product) {
+        // (Vehicle-matched PR = possibly another policy year — skip product too.)
+        if (pr && !prViaVehicle && pr.product) {
           const p = String(pr.product).trim().toUpperCase();
           if (/SAOD|STANDALONE|STAND ALONE|OWN\s*DAMAGE|\bOD\b/.test(p)) { resolved = 'SAOD'; psrc = 'PR'; }
           else if (/\b(TP|THIRD\s*PARTY|LIABILITY|SATP|ACT)\b/.test(p)) { resolved = 'Liability'; psrc = 'PR'; }
@@ -5161,7 +5168,7 @@ async function runBulkCalculate(body) {
     const tmpNcb = parseFloat(r.NCB);
     if (!(Number.isFinite(tmpNcb) && tmpNcb > 0)) {
       let resolved = null, source = null;
-      if (pr && pr.ncb != null) {
+      if (pr && !prViaVehicle && pr.ncb != null) {   // vehicle-matched PR = possibly another policy year — no NCB
         const n = parseFloat(pr.ncb);
         if (Number.isFinite(n) && n > 0) { resolved = n; source = 'PR'; }
       }

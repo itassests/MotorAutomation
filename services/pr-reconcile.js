@@ -82,11 +82,18 @@ function normProduct(v) {
  * band by tonnage and PR's value there is a meaningless GVW. Returns a small
  * record of what changed (for diagnostics / logging).
  */
-function reconcileParamsWithPR(params, prRow) {
+function reconcileParamsWithPR(params, prRow, opts) {
   if (!params || !prRow) return null;
   // Diagnostic kill-switch: PR_SKIP=product,fuel,seating,... disables those
   // factors so a single override's effect can be isolated in a recompute.
   const skip = new Set(String(process.env.PR_SKIP || '').toLowerCase().split(/[,\s]+/).filter(Boolean));
+  // A PR row matched by VEHICLE NUMBER (not policy_no) may be a DIFFERENT policy
+  // year for the same vehicle (Sompo JH01EQ6188: PR row 2311/84175076 with NCB=20
+  // attached to policy AVO/2311/20045527 whose real NCB=0 → matched the with-NCB
+  // 37 instead of the operator's Non-NCB 32). Vehicle-matched rows stay
+  // authoritative for VEHICLE attributes (cc/fuel/tonnage/seating) but must not
+  // override POLICY-YEAR attributes (ncb, product).
+  if (opts && opts.vehicleMatched) { skip.add('ncb'); skip.add('product'); }
   const changed = {};
   if (!skip.has('cc')) {
     const cc = normCC(prRow.cc);
