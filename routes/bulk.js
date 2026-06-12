@@ -3129,9 +3129,14 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // never resolved → CAR fell to a wrong region's "PC [SOD]" 0.10. Resolve the CAR
   // region from the RTO state-prefix → cluster, pick PC[PACK]/PACK at the policy's CC
   // band + NCB tier, take max. Chola-CAR-COMP scoped (SAOD keeps its own PC[SOD]).
+  // SAOD extension (USER-confirmed MH23/9440 Brezza petrol SAOD NCB-0, MH40):
+  // region never resolved → matched AP/TS "NCB≥25" 21.5; the correct MH/GA
+  // "PC [SOD]" petrol base is 0.19 = operator. SAOD resolves the same region
+  // cluster but picks sub_type PC[SOD] at the fuel-suffixed segment ([P]/[D]).
+  const _cholaCarProd = String(params.insProduct || '').toUpperCase();
   if (insurerSlug === 'chola_ms' &&
       String(params.vehicleType || '').toUpperCase() === 'CAR' &&
-      String(params.insProduct || '').toUpperCase() === 'COMP' && rules.length) {
+      (_cholaCarProd === 'COMP' || _cholaCarProd === 'SAOD') && rules.length) {
     try {
       // Haryana (HR) has no own Chola Pvt-Car region — it takes the PB (Punjab) grid
       // (USER-confirmed).
@@ -3149,20 +3154,28 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         const ccBand = cc > 0 && cc <= 1000 ? 'UPTO 1000 CC'
                      : cc <= 1500 ? '1000 TO 1500 CC' : 'ABOVE 1500 CC';
         const ncb = Number(params.ncbPct) || 0;
-        const reqC = pool.request().input('reg', sql.NVarChar(60), reg).input('seg', sql.NVarChar(80), ccBand + '%');
+        const isSaod = _cholaCarProd === 'SAOD';
+        // SAOD ("PC [SOD]") segments carry a FUEL suffix: "1000 TO 1500 CC[P]" /
+        // "...CC[D]". '[' is a LIKE wildcard-class char in SQL Server → escape as '[[]'.
+        const fuelSuffix = /DIESEL/i.test(String(params.fuelType || '')) ? '[[]D]' : '[[]P]';
+        const segPat = isSaod ? (ccBand + fuelSuffix + '%') : (ccBand + '%');
+        const subPat = isSaod ? '%SOD%' : '%PACK%';
+        const reqC = pool.request().input('reg', sql.NVarChar(60), reg).input('seg', sql.NVarChar(80), segPat)
+                                   .input('sub', sql.NVarChar(40), subPat);
         // NCB ≥ 25% → the "NCB GT OR Equal to 25%" tier; else the base (no-NCB) band.
         const ncbClause = ncb >= 25 ? "AND segment LIKE '%OR Equal to 25%'" : "AND segment NOT LIKE '%NCB%'";
         // MIN (not MAX): where a region+band carries duplicate card-gen rows (e.g. JH
         // 1000-1500 base = 25 AND 30), the operator pays the lower/current 25;
         // single-valued regions (GJ/MH base 0.30) are unaffected.
         const mr = await reqC.query(`SELECT MIN(rate_value) AS mx FROM rate_rules
-          WHERE insurer LIKE '%chola%' AND region=@reg AND sub_type LIKE '%PACK%'
+          WHERE insurer LIKE '%chola%' AND region=@reg AND sub_type LIKE @sub
             AND rate_type='PACK' AND segment LIKE @seg ${ncbClause} AND rate_value IS NOT NULL`);
         const mx = mr.recordset[0] && mr.recordset[0].mx;
         if (mx != null) {
           const base = rules[0] || { insurer: insurerSlug };
           const clone = { ...base, rate_type: 'PACK', rate_value: mx, region: reg,
-            sub_type: 'PC [PACK]', segment: ccBand + ' (Chola CAR)' };
+            sub_type: isSaod ? 'PC [SOD]' : 'PC [PACK]',
+            segment: ccBand + (isSaod ? ' SAOD' : '') + ' (Chola CAR)' };
           rules = [clone, ...rules.filter(r => r !== base)];
         }
       }
