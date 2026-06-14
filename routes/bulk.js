@@ -4073,8 +4073,15 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     const _zunoTrueSaod = String(params.insProduct || '').toUpperCase() === 'SAOD' ||
       ((Number(params.odPremium) || 0) > 0 &&
        (parseFloat(policy.NET_LIABILITY_PREMIUM) || 0) < 1 && !_zunoHasLiveTp);
+    // TP-only (standalone-TP / Liability, no OD leg) must NOT take the NCB=0
+    // floor — that floor is a COMPREHENSIVE override (applies to OD&TP), whereas
+    // a TP-only policy takes its regional SATP rate. USER-checked BG3/5116
+    // (KA Bolero, Liability, NET_OD=0, NCB=0): operator paid the Karnataka SATP
+    // 18, not the 15 floor. Detect TP-only by no OD premium + TP-product.
+    const _zunoTpOnly = (Number(params.odPremium) || 0) <= 0 &&
+      /^(TP|SATP|ACT|LIABILITY)$/.test(String(params.insProduct || '').toUpperCase());
     const ncb = Number(params.ncbPct) || 0;
-    if (_zunoTrueSaod || (ncb === 0 && !_zunoNorth)) {
+    if (!_zunoTpOnly && (_zunoTrueSaod || (ncb === 0 && !_zunoNorth))) {
       const zKey = 'zuno||carSaodRows';
       let zRows;
       if (caches.lookup.has(zKey)) zRows = caches.lookup.get(zKey);
