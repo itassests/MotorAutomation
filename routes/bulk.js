@@ -4112,6 +4112,50 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // ---- Go Digit CAR: Comprehensive/SAOD must not take the SATP "MAX_CD2" rate ----
+  // "MAX_CD2" is the 4W-SATP commission column (source sheet "4W SATP", header
+  // "Max CD2", region label "Guj_Good") — the Standalone-TP grid, NOT a
+  // comprehensive rate. A Comprehensive car with identifiable fuel/CC resolves to
+  // the SATP region ("Guj_Good") and pickPrimary takes the higher SATP rate (e.g.
+  // Diesel<1500 39) — but the real "Pvt Car Comp+SAOD Grid" rate lives under a
+  // DIFFERENT region label ("GJ_Good"/cluster) that wasn't pooled, so it's
+  // unreachable. USER-confirmed (GJ1/32268 Ford Ecosport, Comprehensive, od 706):
+  // should be COMP_NCB 28, not SATP 39. Blast radius verified: 66 of 67 CAR
+  // MAX_CD2 cars are genuinely TP-only (keep MAX_CD2) — only this 1 Comp car.
+  // For a NON-TP go_digit CAR: drop MAX_CD2 intruders; if that empties the pool
+  // (SATP region was the only one resolved), fetch the Comp+SAOD grid rate for
+  // the RTO's Comp-grid region by NCB.
+  if (insurerSlug === 'go_digit' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR' && rules.length) {
+    const ipU = String(params.insProduct || '').toUpperCase();
+    const isTpOnly = /^(TP|SATP|ACT|LIABILITY)$/.test(ipU) || (Number(params.odPremium) || 0) <= 0;
+    if (!isTpOnly) {
+      const nonCd2 = rules.filter(r => String(r.rate_type || '').toUpperCase() !== 'MAX_CD2');
+      if (nonCd2.length && nonCd2.length !== rules.length) {
+        rules = nonCd2;                               // Comp/SAOD rows already pooled — evict the SATP intruder
+      } else if (!nonCd2.length) {
+        // Pool was ONLY MAX_CD2 (SATP region resolved) — fetch the real Comp/SAOD rate.
+        const isSaod = ipU === 'SAOD';
+        const ncb = Number(params.ncbPct) || 0;
+        const wantType = isSaod ? (ncb > 0 ? 'SAOD_NCB' : 'SAOD_NON_NCB')
+                                : (ncb > 0 ? 'COMP_NCB' : 'COMP_NON_NCB');
+        const rtoN = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        try {
+          const cq = await pool.request()
+            .input('rto', sql.NVarChar(20), rtoN)
+            .input('wt', sql.NVarChar(20), wantType)
+            .query(`SELECT TOP 1 rr.* FROM rate_rules rr
+                    WHERE rr.insurer='go_digit' AND rr.product='CAR' AND rr.rate_type=@wt
+                      AND rr.rate_value IS NOT NULL
+                      AND rr.region IN (SELECT region FROM rto_mappings
+                                        WHERE insurer='go_digit'
+                                          AND REPLACE(REPLACE(rto_code,'-',''),' ','')=@rto)`);
+          if (cq.recordset.length) rules = [cq.recordset[0]];
+        } catch (_) { /* leave rules unchanged on lookup failure */ }
+      }
+    }
+  }
+
   let primary = pickPrimaryRateRule(rules);
   // ---- Enabler / special-payout override ----
   // A criteria-scoped enabler deal (segment + make + transaction + RTO location +
