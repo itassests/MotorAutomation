@@ -1161,6 +1161,16 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // prime the initial lookup with the policy's booking location so we narrow
   // to the right city instead of pulling every region nationwide and picking
   // the first survivor.
+  // HDFC: the Ahmedabad city RTOs (GJ01/GJ27) have NO rto_mapping row and the
+  // Robinhood grid keys them to the AHMEDABAD (Zone-1) region — so the ONLY
+  // resolution path is the booked-location string, which is null for some
+  // policies (GJ1/32428 Land Rover Defender: BooKedLocation null → region null
+  // → arbitrary 'Rest of Assam' 27.5 vs the AHMEDABAD Zone-1 Petrol 30 the
+  // operator paid). Map these RTOs directly so resolution is booked-loc-independent.
+  if (!resolvedRegion && insurerSlug === 'hdfc_ergo') {
+    const _ahmRto = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (_ahmRto === 'GJ01' || _ahmRto === 'GJ1' || _ahmRto === 'GJ27') resolvedRegion = 'Ahmedabad';
+  }
   if (!resolvedRegion && (insurerSlug === 'icici_lombard' || insurerSlug === 'hdfc_ergo')) {
     const bookedLoc = String(
       policy.BusinessBookedLocation || policy['BUSINESS BOOKED LOCATION'] ||
