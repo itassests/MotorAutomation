@@ -2579,79 +2579,34 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         : r);
   }
 
+  // ---- Bajaj Pvt-Car Comprehensive — authoritative ROBINHOOD 1801 state grid ----
+  // Source: "Private Car- Complete Grid- .xlsx" sheet "1801" — a per-RTO-STATE
+  // grid (rate % on OD) by fuel x NCB, NOT zoned. services/bajaj-car.js resolves
+  // rtoCode → grid-state (via the file's RTO Master, with Gurgaon/Faridabad/
+  // Bangalore/Chennai/Hyderabad metros excluded → default) and the rate.
+  // This REPLACES the earlier hand-derived MH&GJ(0.45) / Rajasthan(0.30) /
+  // Delhi-"Zone-1"(0.30) overrides — the last was a FABRICATED borrow of the HDFC
+  // ROBINHOOD zone structure (no Bajaj sheet has zones; user-flagged). Default 40
+  // (operator pays 40, not the grid's printed 45 ceiling). Dry-run vs operator on
+  // the 23 product-1801 CAR cars: +9 net (default 40) — the 4 op-45 GJ/MH cars are
+  // operator inconsistency (same RTO pays both 40 and 45). CD>80% cap / OEM-min /
+  // UP-West-IRDA are NOT modelled (no CD/OEM data); UP-NCB approximated to 35.
   if (insurerSlug === 'bajaj_allianz' &&
       String(params.vehicleType || '').toUpperCase() === 'CAR' &&
-      /-1801-/.test(String(params._policy_no || ''))) {
-    const rtoSt = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2);
-    const reg   = String(resolvedRegion || '').toUpperCase();
-    const inMhGj = ['MH', 'GJ', 'DD', 'DN'].includes(rtoSt) ||
-                   /GUJARAT|MAHARASHTRA|DAMAN|DADRA|NAGAR HAVELI/.test(reg);
-    const compRules = rules.filter(r => /^COMP$/i.test(String(r.rate_type || '')));
-    if (inMhGj && compRules.length > 0) {
-      const ncb = Number(params.ncbPct) || 0;
-      // Per product owner: a NEW vehicle (VEHICLE AGE = 0) is rated as WITH-NCB.
-      const isNew = (Number(params.vehicleAge) || 0) === 0;
-      const fu  = String(params.fuelType || '').toUpperCase();
-      const isPetrol = /PETROL/.test(fu);          // PETROL or PETROL/CNG → petrol family
-      const isHev    = /ELECTRIC|HYBRID|\bHEV\b|BATTERY/.test(fu);
-      let target;
-      if (ncb > 0 || isNew) target = 0.45;         // With NCB (incl. new vehicle) — any fuel
-      else if (isHev)    target = 0.10;            // Without NCB, HEV
-      else if (isPetrol) target = 0.45;            // Without NCB, Petrol
-      else               target = 0.10;            // Without NCB, Diesel / CNG / other
-      const clone = { ...compRules[0], rate_value: target,
-                      region: reg || compRules[0].region,
-                      sheet_name: 'PC',
-                      segment: 'Pvt Car Comprehensive (MH&GJ)' };
-      rules = [clone, ...rules.filter(r => !/^COMP$/i.test(String(r.rate_type || '')))];
-    } else if ((rtoSt === 'RJ' || reg === 'RAJASTHAN') && compRules.length > 0) {
-      // Rajasthan Pvt-Car Comprehensive (Sheet1): the ingested grid carries, per
-      // fuel, TWO identical-looking COMP rows that differ only in rate_value —
-      // 0.30 (With-NCB) and 0.10 (the CD/DTD-banded low row). The NCB-vs-CD
-      // distinction was lost on ingest, and policy.js's byType collapse keeps only
-      // ONE COMP row per fuel (the cheaper 0.10), so by the time bulk.js sees the
-      // pool the 0.30 row is already gone — selecting from the pool can't recover
-      // it. For With-NCB (ncbPct>0) the grid pays 0.30 for ALL fuels; clone the
-      // surviving COMP row and override rate_value=0.30 so it wins pickPrimary.
-      // Scoped to Rajasthan (the only RJ product-1801 car is RJ1/1600) so the
-      // Haryana/HR-51 0.10 match (DL7/13987) is never touched. The 0.30-vs-0.10
-      // split is really an OD-discount band, which isn't wired for Bajaj — hence
-      // the narrow NCB>0 proxy + Rajasthan-only scope.
-      const ncb = Number(params.ncbPct) || 0;
-      // Per product owner: a NEW vehicle (VEHICLE AGE = 0) is rated as WITH-NCB → 0.30 row.
-      const isNew = (Number(params.vehicleAge) || 0) === 0;
-      if (ncb > 0 || isNew) {
-        const clone = { ...compRules[0], rate_value: 0.30,
-                        sheet_name: compRules[0].sheet_name,
-                        segment: 'Pvt Car Comprehensive (Rajasthan With-NCB)' };
-        rules = [clone, ...rules.filter(r => !/^COMP$/i.test(String(r.rate_type || '')))];
+      /-1801-/.test(String(params._policy_no || '')) && rules.length) {
+    try {
+      const { resolveBajajCarRate } = require('../services/bajaj-car');
+      const br = resolveBajajCarRate(params);
+      if (br != null) {
+        const compRules = rules.filter(r => /^COMP$/i.test(String(r.rate_type || '')));
+        const base = compRules[0] || rules[0];
+        if (base) {
+          const clone = { ...base, rate_type: 'COMP', rate_value: br,
+                          sheet_name: '1801', segment: 'Pvt Car Comprehensive (1801 grid)' };
+          rules = [clone, ...rules.filter(r => !/^COMP$/i.test(String(r.rate_type || '')))];
+        }
       }
-    } else if (rtoSt === 'DL' && compRules.length > 0) {
-      // Delhi Pvt-Car Comprehensive — ROBINHOOD Zone-1 grid (product 1801).
-      // The ROBINHOOD zone grid (sheet "PVT Car" in the ROBINHOOD final-rate file:
-      // Zone-1 cols Petrol-NCB / Petrol-NoNCB / NonPetrol-NCB / NonPetrol-NoNCB =
-      // 30 / 30 / 30 / 19.5; New Business is rated in the NCB column; EV/Hybrid
-      // sit in the Petrol grid) was NEVER ingested. Delhi is a Zone-1 geography but
-      // its 1801 cars resolve to "Pan India" and fall to the flat generic rows
-      // (0.40 CD<=80 / 0.15 CD>80 / 0.10 high-end-HEV) — so they mis-rate. Inject
-      // the correct Zone-1 rate. Scoped to genuine DL-prefix RTOs: every DL 1801
-      // car is currently a mismatch, so this can't break an existing match; the
-      // matching HR51 (Haryana / Zone-2, op 10 — a CD>80% band case we can't model
-      // because Bajaj OD-discount isn't wired) is HR-prefix and never touched.
-      const fu  = String(params.fuelType || '').toUpperCase();
-      const isPetrol = /PETROL/.test(fu);
-      const isHev    = /ELECTRIC|HYBRID|\bHEV\b|BATTERY/.test(fu);
-      const ncb  = Number(params.ncbPct) || 0;
-      const isNew = (Number(params.vehicleAge) || 0) === 0;   // new vehicle = age 0
-      let target;
-      if (isPetrol || isHev)   target = 0.30;          // Petrol / EV-Hybrid (NCB or not)
-      else if (ncb > 0 || isNew) target = 0.30;        // Non-petrol, With-NCB / New Business
-      else                     target = 0.195;         // Non-petrol, Renewal without NCB
-      const clone = { ...compRules[0], rate_value: target,
-                      sheet_name: 'PVT Car (ROBINHOOD Zone)',
-                      segment: 'Pvt Car Comprehensive (Zone-1 / Delhi)' };
-      rules = [clone, ...rules.filter(r => !/^COMP$/i.test(String(r.rate_type || '')))];
-    }
+    } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
   // ---- HDFC Pvt-Car Zone × Fuel × NCB override ----

@@ -1,0 +1,32 @@
+{
+  "_source": "Private Car- Complete Grid- .xlsx, sheet '1801' (ROBINHOOD Comprehensive). Rates are % on OD.",
+  "_rules": "Universal: Diesel w/o NCB = 10; HEV w/o NCB = 10. State grid by fuel x NCB below. Unlisted states + excluded metros (Gurgaon/Faridabad/Bangalore/Chennai/Hyderabad/Delhi/Mumbai/etc.) = default 40 (operator pays 40, not the printed 45 ceiling). CD>80% cap (19.5 OEM / 15 non-OEM) and OEM-min 19.5 are NOT modelled (no CD/OEM data).",
+  "default": 40,
+  "dieselNoNcb": 10,
+  "hevNoNcb": 10,
+  "states": {
+    "HARYANA":        { "dieselNoNcb": 10, "petrolNoNcb": 15, "dieselNcb": 25, "petrolNcb": 25 },
+    "PUDUCHERRY":     { "dieselNoNcb": 5,  "petrolNoNcb": 5,  "dieselNcb": 5,  "petrolNcb": 5  },
+    "ODISHA":         { "dieselNoNcb": 10, "petrolNoNcb": 15, "dieselNcb": 25, "petrolNcb": 30 },
+    "JAMMU AND KASHMIR": { "dieselNoNcb": 10, "petrolNoNcb": 15, "dieselNcb": 25, "petrolNcb": 30 },
+    "ASSAM":          { "dieselNoNcb": 10, "petrolNoNcb": 15, "dieselNcb": 30, "petrolNcb": 30 },
+    "CHHATTISGARH":   { "dieselNoNcb": 10, "petrolNoNcb": 15, "dieselNcb": 30, "petrolNcb": 30 },
+    "KARNATAKA":      { "dieselNoNcb": 10, "petrolNoNcb": 30, "dieselNcb": 30, "petrolNcb": 30 },
+    "KERALA":         { "dieselNoNcb": 10, "petrolNoNcb": 30, "dieselNcb": 30, "petrolNcb": 30 },
+    "MADHYA PRADESH": { "dieselNoNcb": 10, "petrolNoNcb": 20, "dieselNcb": 30, "petrolNcb": 30 },
+    "PUNJAB":         { "dieselNoNcb": 10, "petrolNoNcb": 30, "dieselNcb": 30, "petrolNcb": 30 },
+    "RAJASTHAN":      { "dieselNoNcb": 10, "petrolNoNcb": 15, "dieselNcb": 30, "petrolNcb": 30 },
+    "TAMIL NADU":     { "dieselNoNcb": 10, "petrolNoNcb": 15, "dieselNcb": 30, "petrolNcb": 30 },
+    "TELANGANA":      { "dieselNoNcb": 10, "petrolNoNcb": 35, "dieselNcb": 35, "petrolNcb": 35 },
+    "UTTAR PRADESH":  { "_special": "UP", "dieselNoNcb": 10, "petrolNoNcb": 10, "dieselNcb": 35, "petrolNcb": 35 }
+  },
+  "_stateAliases": {
+    "JAMMU & KASHMIR": "JAMMU AND KASHMIR", "J&K": "JAMMU AND KASHMIR",
+    "CHATTISGARH": "CHHATTISGARH", "TAMILNADU": "TAMIL NADU", "PONDICHERRY": "PUDUCHERRY",
+    "ORISSA": "ODISHA",
+    "REST OF KARNATAKA": "KARNATAKA",
+    "REST OF TAMIL NADU": "TAMIL NADU",
+    "REST OF TELANGANA": "TELANGANA"
+  },
+  "_metrosAndUnlistedToDefault": "BANGALORE, CHENNAI, HYDERABAD, MUMBAI, PUNE, KOLKATA, DELHI&NCR, CHANDIGARH, GUJARAT, GOA, BIHAR, HIMACHAL PRADESH, JHARKHAND, UTTARAKHAND, REST OF MAHARASHTRA, REST OF ANDHRA PRADESH, REST OF WEST BENGAL, ANDAMAN & NICOBAR ISLANDS — none are in 'states', so they return the default 40 (Gurgaon/Faridabad/Bangalore/Chennai/Hyderabad metro exclusions handled automatically)."
+}
