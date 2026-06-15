@@ -1179,7 +1179,18 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     // mapped and resolve fine). They're Tamil Nadu = "ROTN" (Rest of Tamil Nadu;
     // same SAOD rate as Chennai = 55). USER-flagged (TN1/791 TN99 TVS Scooter
     // SAOD: op 55, not Mumbai 30; TN1/974 TN45 Yamaha Bike: op 55). TW-scoped.
-    else if (/^TN\d+$/.test(_ahmRto) && String(params.vehicleType || '').toUpperCase() === 'TW') resolvedRegion = 'ROTN';
+    else if (String(params.vehicleType || '').toUpperCase() === 'TW') {
+      // HDFC TW: an RTO with no rto_mapping leaves region null → the generic
+      // lookup grabs an arbitrary "Delhi NCR" row (MH13/2233 MH21 Unicorn Bike
+      // SAOD → Delhi-NCR Bike 35 vs ROM 30; MH11/1188 UP66 TVS Scooter SAOD →
+      // NCR "All" 20 vs Rest-of-UP 10). Resolve the state's rest-of-state TW
+      // region directly (Mumbai/Pune/Chennai/NCR-UP RTOs are mapped, so only the
+      // genuinely-unmapped rest-of-state ones reach here). USER-flagged (TN/MH/UP).
+      const _st2 = _ahmRto.slice(0, 2);
+      if (/^TN\d+$/.test(_ahmRto)) resolvedRegion = 'ROTN';
+      else if (_st2 === 'MH') resolvedRegion = 'ROM';
+      else if (_st2 === 'UP' && !/^UP(14|16)\b/.test(_ahmRto)) resolvedRegion = 'Rest of UP';
+    }
   }
   if (!resolvedRegion && (insurerSlug === 'icici_lombard' || insurerSlug === 'hdfc_ergo')) {
     const bookedLoc = String(
@@ -4177,6 +4188,33 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
              AND rate_value IS NOT NULL`);
         const hit = hq.recordset.find(r => inBand(String(r.volume_tier || '').trim()));
         if (hit) rules = [hit];
+      } catch (_) { /* leave rules unchanged on lookup failure */ }
+    }
+  }
+
+  // ---- HDFC TW ROTN: make-specific row yields to "All" ----
+  // In Rest-of-Tamil-Nadu (ROTN) the operator pays the make-agnostic ("All")
+  // TW rate, NOT the make-specific lower one — e.g. TN1/791 (TN99 TVS Scooter
+  // SAOD): grid ROTN Scooter TVS=45 vs All=55, operator pays 55. USER-confirmed,
+  // ROTN-SCOPED: in Chennai the TVS-specific rate IS honored (TN1/782 op 45), so
+  // this must NOT touch Chennai/other regions. The byType collapse keeps the
+  // make-specific row (higher make-score) and drops "All", so fetch the ROTN
+  // "All" row for the same segment/rate_type and use it.
+  if (insurerSlug === 'hdfc_ergo' &&
+      String(params.vehicleType || '').toUpperCase() === 'TW' &&
+      String(resolvedRegion || '').toUpperCase() === 'ROTN' && rules.length) {
+    const cur = rules[0];
+    const curMake = String(cur && cur.make || '').toUpperCase();
+    if (curMake && curMake !== 'ALL') {
+      try {
+        const aq = await pool.request()
+          .input('seg', sql.NVarChar(40), cur.segment)
+          .input('rt', sql.NVarChar(20), cur.rate_type)
+          .query(`SELECT TOP 1 * FROM rate_rules WHERE insurer='hdfc_ergo' AND product='TW'
+                    AND region='ROTN' AND segment=@seg AND rate_type=@rt
+                    AND (make IS NULL OR UPPER(make)='ALL') AND rate_value IS NOT NULL
+                  ORDER BY rate_value DESC`);
+        if (aq.recordset.length) rules = [aq.recordset[0], ...rules.filter(r => r !== cur)];
       } catch (_) { /* leave rules unchanged on lookup failure */ }
     }
   }
