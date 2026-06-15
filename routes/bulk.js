@@ -4185,6 +4185,41 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // ---- Royal Haryana: non-Gurgaon/Faridabad HR cars use "Rest of State" ----
+  // Royal's Haryana Comp grid rates ONLY the "Rest of State" tier (Key/Other
+  // Cities rows are null). Gurgaon (HR26) & Faridabad (HR51) RTOs correctly use
+  // the Delhi-NCR grid (HR26 op 20 ≈ 19.5); but every OTHER Haryana RTO (HR12,
+  // HR98) wrongly fell to Delhi-NCR Other Cities (19.5) instead of Haryana Rest
+  // of State (12.5). USER-confirmed (DL10/6468 HR98, FINALDISCOUNT 26 → "20-50"):
+  // HR98 is Rest-of-Haryana (op 12.5) despite its PR "Gurgaon" tag. Route
+  // non-Gurgaon/Faridabad HR CAR Comp to Haryana "Rest of State" for the band.
+  if (insurerSlug === 'royal_sundaram' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR' &&
+      String(params.insProduct || '').toUpperCase() === 'COMP' &&
+      params.discountPct != null && rules.length) {
+    const rtoN = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const ROYAL_HR_NCR = new Set(['HR26', 'HR51', 'HR55', 'HR72', 'HR87']); // Gurgaon + Faridabad → Delhi-NCR grid
+    if (/^HR\d+$/.test(rtoN) && !ROYAL_HR_NCR.has(rtoN)) {
+      // Pick the Haryana "Rest of State" band (lower-incl: 50→"50-60", etc.).
+      const d = Number(params.discountPct) || 0;
+      const inBand = (t) => {
+        let mm;
+        if ((mm = /^upto\s*(\d+(?:\.\d+)?)$/i.exec(t)))                  return d >= 0 && d < parseFloat(mm[1]);
+        if ((mm = /^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$/.exec(t)))     return d >= parseFloat(mm[1]) && d < parseFloat(mm[2]);
+        if ((mm = /^>\s*(\d+(?:\.\d+)?)$/.exec(t)))                      return d >= parseFloat(mm[1]);
+        return false;
+      };
+      try {
+        const hq = await pool.request().query(
+          `SELECT * FROM rate_rules WHERE insurer='royal_sundaram' AND product='CAR'
+             AND rate_type='Comp' AND remarks='Haryana' AND segment LIKE '%Rest of State%'
+             AND rate_value IS NOT NULL`);
+        const hit = hq.recordset.find(r => inBand(String(r.volume_tier || '').trim()));
+        if (hit) rules = [hit];
+      } catch (_) { /* leave rules unchanged on lookup failure */ }
+    }
+  }
+
   let primary = pickPrimaryRateRule(rules);
   // ---- Enabler / special-payout override ----
   // A criteria-scoped enabler deal (segment + make + transaction + RTO location +
