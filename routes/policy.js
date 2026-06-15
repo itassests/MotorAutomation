@@ -2353,15 +2353,15 @@ function filterRulesByPolicy(rules, params, _trace) {
       else if ((mm = /^>\s*(\d+(?:\.\d+)?)$/.exec(band)))           { lo = parseFloat(mm[1]); hi = Infinity; }
       if (lo != null) {
         const d = params.discountPct;
-        // Lower bound exclusive for the middle bands ("A-B" = 61-70), but
-        // inclusive at 0 so a 0% discount still lands in the bottom "Upto" band.
-        const lowerOk = lo === 0 ? (d >= lo) : (d > lo);
-        let inBand = (hi === Infinity) ? (d >= lo) : (lowerOk && d <= hi);
-        // At the exact upper boundary, defer to an open ">hi" band if one
-        // exists (70% → ">70", not "60-70"); otherwise the closed band keeps it.
-        if (inBand && hi !== Infinity && d === hi && royalOpenBandThresholds.has(hi)) {
-          inBand = false;
-        }
+        // LOWER-INCLUSIVE / UPPER-EXCLUSIVE: a discount exactly on a boundary
+        // belongs to the HIGHER band. USER-confirmed (VPC1909784000101, MH4/24704
+        // FINALDISCOUNT=50 → "50-60" 19.5, not "20-50" 12.5; MH27/5590 fd=50 →
+        // Key "50-60" 25). So "20-50"=[20,50), "50-60"=[50,60), "60-70"=[60,70),
+        // "Upto 20"=[0,20), ">70"=[70,∞). The exactly-70 case lands in ">70"
+        // naturally (the closed "60-70" excludes 70), so no open-band tweak needed.
+        // Verified: +2 (the two fd=50 cars), 0 regressions across all boundary cars
+        // (the only fd=60 car is an operator anomaly, already mismatched both ways).
+        const inBand = (hi === Infinity) ? (d >= lo) : (d >= lo && d < hi);
         if (!inBand) matches = false;
       }
     }
