@@ -1017,6 +1017,17 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // For these rows, take the region from the operator's own PR classification
   // (State_For_TP_ULR / Key_City_Group / City / State). _bhRegion overrides the
   // resolved region below; _stateName feeds the state/tier fallback.
+  // Reliance NEW two-wheeler: a brand-new TW (vehicle_no='NEW') sometimes carries
+  // AGE_OF_VEHICLE=1 (data quirk) instead of 0, which misses the new-vehicle /
+  // bundle-tenure selection and lands on the annual Comp rate instead of the
+  // COMP_1+5 bundle. USER-confirmed (JK1/833 NTORQ NEW, 1+5 bundle, age 1: op 48 =
+  // J&K Scooter COMP_1+5 47.5, not annual Comp 52.5); its age-0 NEW siblings
+  // (JK1/797 …) all match at 47.5. Force age 0 so the bundle logic fires.
+  if (insurerSlug === 'reliance' && String(params.vehicleType || '').toUpperCase() === 'TW' &&
+      String(params.vehicleRegNo || '').trim().toUpperCase() === 'NEW' && (Number(params.vehicleAge) || 0) > 0) {
+    params.vehicleAge = 0;
+  }
+
   const isBhSeries = /^\s*\d{2}\s*BH/i.test(String(params.vehicleRegNo || '')) ||
                      /^\d{2}BH$/i.test(String(params.rtoCode || ''));
   if (isBhSeries && prIndex && params._policy_no) {
