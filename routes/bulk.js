@@ -1174,6 +1174,12 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   if (!resolvedRegion && insurerSlug === 'hdfc_ergo') {
     const _ahmRto = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (_ahmRto === 'GJ01' || _ahmRto === 'GJ1' || _ahmRto === 'GJ27') resolvedRegion = 'Ahmedabad';
+    // TN RTOs with no rto_mapping (TN45/TN99/… — the higher non-Chennai series)
+    // fall to the booked-location → wrongly 'Mumbai' (Chennai RTOs TN01-14 are
+    // mapped and resolve fine). They're Tamil Nadu = "ROTN" (Rest of Tamil Nadu;
+    // same SAOD rate as Chennai = 55). USER-flagged (TN1/791 TN99 TVS Scooter
+    // SAOD: op 55, not Mumbai 30; TN1/974 TN45 Yamaha Bike: op 55). TW-scoped.
+    else if (/^TN\d+$/.test(_ahmRto) && String(params.vehicleType || '').toUpperCase() === 'TW') resolvedRegion = 'ROTN';
   }
   if (!resolvedRegion && (insurerSlug === 'icici_lombard' || insurerSlug === 'hdfc_ergo')) {
     const bookedLoc = String(
