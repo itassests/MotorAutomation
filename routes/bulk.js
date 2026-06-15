@@ -4153,6 +4153,31 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
           if (cq.recordset.length) rules = [cq.recordset[0]];
         } catch (_) { /* leave rules unchanged on lookup failure */ }
       }
+    } else {
+      // TP-only: the SATP "MAX_CD2" cluster must come from the AUTHORITATIVE
+      // "4W RTO" sheet (4WTP column), not our rto_mappings — which lists some
+      // RTOs under BOTH Good and Bad (e.g. WB20 → WB_Bad AND WB_Good) so the
+      // lookup picked the wrong one. USER-confirmed BH2/6107 (WB20 Petrol>1000):
+      // WB_Good = 40, not WB_Bad 43. Re-resolve to cl.tp and re-fetch the MAX_CD2
+      // rate for the same fuel/CC segment at the policy's age band.
+      let _gdCl = null;
+      try { _gdCl = require('../config/godigit_rto_cluster.json'); } catch (_) { _gdCl = {}; }
+      const rtoN = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const authCl = _gdCl[rtoN] && _gdCl[rtoN].tp;
+      const cur = rules.find(r => String(r.rate_type || '').toUpperCase() === 'MAX_CD2');
+      if (authCl && cur && String(cur.region || '').toUpperCase() !== String(authCl).toUpperCase()) {
+        try {
+          const aq = await pool.request()
+            .input('reg', sql.NVarChar(40), authCl)
+            .input('seg', sql.NVarChar(40), cur.segment)
+            .input('age', sql.Int, Math.round(Number(params.vehicleAge) || 0))
+            .query(`SELECT TOP 1 rr.* FROM rate_rules rr
+                    WHERE rr.insurer='go_digit' AND rr.product='CAR' AND rr.rate_type='MAX_CD2'
+                      AND rr.region=@reg AND rr.segment=@seg AND rr.rate_value IS NOT NULL
+                      AND @age BETWEEN COALESCE(rr.vehicle_age_min,0) AND COALESCE(rr.vehicle_age_max,99)`);
+          if (aq.recordset.length) rules = [aq.recordset[0], ...rules.filter(r => r !== cur)];
+        } catch (_) { /* leave rules unchanged on lookup failure */ }
+      }
     }
   }
 
