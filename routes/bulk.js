@@ -4219,6 +4219,31 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // ---- Shriram NEW two-wheeler: rate by BOOKING LOCATION (Mumbai grid) ----
+  // A NEW TW has a placeholder/null RTO and resolves to ROM (Scooter 35), but the
+  // operator rates it by the booking-location grid. Shriram's Mumbai TW grid
+  // ("MUMBAI (Excl MH-01,48)/GOA", Scooter 40) is otherwise unreachable (compound
+  // region label, no Shriram rto_mapping). USER-confirmed (MH37/3599 NEW Activa
+  // booked Mumbai: op 40 = Mumbai Scooter, not ROM 35). For a Shriram NEW TW
+  // booked in Mumbai (RTO not the excluded MH01/48), fetch the Mumbai grid rate
+  // for the segment and inject it.
+  if (insurerSlug === 'shriram' && String(params.vehicleType || '').toUpperCase() === 'TW' && rules.length) {
+    const isNew = String(params.vehicleRegNo || '').trim().toUpperCase() === 'NEW' || (Number(params.vehicleAge) || 0) === 0;
+    const booked = String(policy.BusinessBookedLocation || policy['BUSINESS BOOKED LOCATION'] || policy.BooKedLocation || '').toUpperCase();
+    const rtoN = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (isNew && /MUMBAI/.test(booked) && rtoN !== 'MH01' && rtoN !== 'MH48') {
+      const curSeg = String((rules[0] && rules[0].segment) || '');
+      const isScoot = /scooter|scooty|moped|activa/i.test(curSeg + ' ' + String(params.model || ''));
+      try {
+        const mq = await pool.request().input('seg', sql.NVarChar(40), isScoot ? '%Scooter%' : '%Bike%')
+          .query(`SELECT TOP 1 * FROM rate_rules WHERE insurer='shriram' AND product='TW'
+                    AND region LIKE 'MUMBAI (Excl%' AND segment LIKE @seg
+                    AND rate_type LIKE 'PACK%' AND rate_value IS NOT NULL ORDER BY rate_value DESC`);
+        if (mq.recordset.length) rules = [mq.recordset[0], ...rules.filter(r => r !== rules[0])];
+      } catch (_) { /* leave rules unchanged on lookup failure */ }
+    }
+  }
+
   let primary = pickPrimaryRateRule(rules);
   // ---- Enabler / special-payout override ----
   // A criteria-scoped enabler deal (segment + make + transaction + RTO location +
