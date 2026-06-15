@@ -565,7 +565,7 @@ async function loadPrIndex(pool) {
   const r = await pool.request().query(
     `SELECT pr.policy_no, pr.vehicle_no, pr.od_premium, pr.addon_premium, pr.tp_premium,
             pr.net_amount, pr.gross_amount, pr.sum_insured, pr.ncb, pr.fuel_type, pr.cc,
-            pr.tonnage, pr.seating, pr.product, pr.region, pr.raw_json,
+            pr.tonnage, pr.seating, pr.product, pr.region, pr.raw_json, pr.final_discount,
             pr.upload_id, u.insurer_label, u.month, u.year
      FROM pr_rows pr
      INNER JOIN pr_uploads u ON u.id = pr.upload_id
@@ -612,7 +612,11 @@ async function loadPrIndex(pool) {
   for (const row of r.recordset) {
     let obj = null;
     if (row.raw_json) { try { obj = JSON.parse(row.raw_json); } catch { obj = null; } }
-    row.final_discount = parseFinalDiscount(row.raw_json);
+    // Prefer the dedicated final_discount column (captured at ingest, bulk-load
+    // safe); fall back to parsing raw_json for older uploads that have it.
+    row.final_discount = (row.final_discount != null)
+      ? +Number(row.final_discount).toFixed(3)
+      : parseFinalDiscount(row.raw_json);
     row.pr_state_tp  = prField(obj, 'State_For_TP_ULR');
     row.pr_key_city  = prField(obj, 'Key_City_Group');
     row.pr_city      = prField(obj, 'City', 'CityName', 'VEHICLE CITY');

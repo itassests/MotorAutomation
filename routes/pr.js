@@ -459,6 +459,23 @@ router.post('/upload', async (req, res, next) => {
       const str = String(s);
       return str.length > len ? str.slice(0, len) : str;
     };
+    // Extract the OD-discount % from the raw row's FINALDISCOUNT column
+    // (Royal stores it as a signed fraction, -0.85 = 85% discount). Normalised
+    // to a positive percent so loadPrIndex/Royal-band logic reads it directly.
+    // Case-insensitive header match; returns null when absent/blank.
+    const parseFinalDiscountCell = (raw) => {
+      if (!raw || typeof raw !== 'object') return null;
+      let val = null;
+      for (const k of Object.keys(raw)) {
+        if (String(k).replace(/[\s_]/g, '').toUpperCase() === 'FINALDISCOUNT') { val = raw[k]; break; }
+      }
+      if (val == null || String(val).trim() === '' || String(val).trim() === '-') return null;
+      let n = parseFloat(String(val).replace(/[%,]/g, ''));
+      if (!Number.isFinite(n)) return null;
+      n = Math.abs(n);
+      if (n <= 1) n = n * 100;          // fraction → percent (0.85 → 85)
+      return +n.toFixed(4);
+    };
     const buildEmptyTable = () => {
       const table = new sql.Table('pr_rows');
       table.columns.add('upload_id',          sql.Int,            { nullable: true });
@@ -496,6 +513,10 @@ router.post('/upload', async (req, res, next) => {
       table.columns.add('tp_end_date',        sql.NVarChar(50),   { nullable: true });
       table.columns.add('state',              sql.NVarChar(200),  { nullable: true });
       table.columns.add('region',             sql.NVarChar(200),  { nullable: true });
+      // final_discount: the OD-discount % (Royal FINALDISCOUNT) — a small DECIMAL,
+      // bulk-load-safe (unlike raw_json). Captured here so loadPrIndex can read the
+      // Royal Comp discount-band WITHOUT raw_json (which the BCP path nulls).
+      table.columns.add('final_discount',     sql.Decimal(8, 4),  { nullable: true });
       // raw_json (NVARCHAR(MAX) in schema) is intentionally NOT included
       // in the bulk-load: tedious BCP rejects all wide string types
       // (NVarChar(>2000), VarChar(>4000), MAX) with "Invalid column type
@@ -571,7 +592,8 @@ router.post('/upload', async (req, res, next) => {
             truncate(toStr(pickCell(raw, columnMap.tp_start_date)), 50),
             truncate(toStr(pickCell(raw, columnMap.tp_end_date)),   50),
             truncate(toStr(pickCell(raw, columnMap.state)),         200),
-            truncate(toStr(pickCell(raw, columnMap.region)),        200)
+            truncate(toStr(pickCell(raw, columnMap.region)),        200),
+            parseFinalDiscountCell(raw)
           );
         }
         await pool.request().bulk(table);
