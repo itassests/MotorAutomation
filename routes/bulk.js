@@ -4372,19 +4372,18 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     return buildOutputRow(policy, params, null, null, null, null, why, stmt, pr);
   }
 
-  // ---- Bajaj split OD/TP COMP grid → premium-weighted blend ----
+  // ---- Bajaj split OD/TP COMP grid → leg-based income (OD-% headline) ----
   // Bajaj's per-district grid files the COMP commission as SEPARATE legs:
-  // COMP_OD_* (OD-premium leg) and COMP_TP (TP-premium leg). pickPrimary
-  // headlines the non-zero OD leg, which OVERSTATES a package's true commission
-  // in No-PO-TP districts: e.g. Aligarh Scooter COMP_OD_OEM=22.5% but the TP leg
-  // is No-PO (0), so on a TP-dominant package the operator pays the ~blended 3%,
-  // not 22.5%. The true commission is OD%×OD + TP%×TP, so set the OD/TP legs and
-  // headline the premium-weighted blend. USER-confirmed (DL2/37319 22.5→~2.4).
-  // TP leg = the same-district COMP_TP rate; absent (segment carries No-PO via a
-  // separate SATP row, or simply none) → 0. Only fires for a genuine package
-  // (both legs present) whose headline is a COMP_OD leg — ~2 policies/cycle.
-  // Note: a few districts where the operator paid the flat OD rate regress and
-  // are handled As-per-Grid (operator's No-PO handling is inconsistent).
+  // COMP_OD_* (OD-premium leg) and COMP_TP (TP-premium leg), e.g. "5% on OD &
+  // 0% on TP". The operator quotes the OD-leg % as the Total Rate (Kanchipuram
+  // TN21: grid 5% on OD / 0% on TP, operator paid 5 = the OD%). pickPrimary
+  // already headlines the OD leg, so the rate_pct is correct — but INCOME must be
+  // leg-based (OD%×OD + TP%×TP), NOT the OD% applied to the whole premium (which
+  // over-counts the No-PO TP). So fetch the same-district COMP_TP rate (absent →
+  // 0 = No-PO) and attach od_rate/tp_rate; the headline stays the OD %.
+  // USER-confirmed (earlier premium-weighted-blend headline understated it —
+  // Kanchipuram blend 1.985 vs op 5 — reverted to the OD-% headline). Only fires
+  // for a genuine package (both legs present) on a COMP_OD headline — ~2/cycle.
   if (insurerSlug === 'bajaj_allianz' && primary &&
       /^COMP_OD(_|$)/i.test(String(primary.rate_type || ''))) {
     const odP = Number(params.odPremium) || 0;
@@ -4405,9 +4404,13 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         if (tpq.recordset.length) tpRate = Number(tpq.recordset[0].rate_value) || 0;
       } catch (_) { /* leave tpRate=0 (No-PO) on lookup failure */ }
       const odRate = Number(primary.rate_value) || 0;
+      // Headline rate_pct STAYS the OD-leg % (= the grid's "X% on OD" — what the
+      // operator quotes as Total Rate, e.g. Kanchipuram TN21 op 5 = OD 5%). Only
+      // attach the OD/TP legs so INCOME is leg-based (OD%×OD + TP%×TP) rather than
+      // OD% applied to the whole premium. (Earlier premium-weighted-blend headline
+      // understated it — Kanchipuram blend 1.985 vs op 5; reverted per USER.)
       primary.od_rate = odRate;
       primary.tp_rate = tpRate;
-      primary.rate_value = (odRate * odP + tpRate * tpP) / (odP + tpP);
     }
   }
 
