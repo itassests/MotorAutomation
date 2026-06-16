@@ -2511,6 +2511,19 @@ function filterRulesByPolicy(rules, params, _trace) {
       }
     }
 
+    // Bajaj make-specific "Renewal/Rollover -5%" rows (make=Bajaj/Vespa/Jawa/Royal
+    // Enfield, remark "<make> Renewal/Rollover -5%") apply ONLY to Renewal/Rollover
+    // business — the -5% is the renewal-retention discount. For New business they
+    // must NOT win over the make=All base; drop them (matches=false) so byType
+    // keeps the make=All base-band rate. USER-confirmed (BG1/1167 New-Business
+    // Bajaj V15, Bangalore: -5% row 15 → make=All base 20 = operator). Gated to
+    // the remark + insurer so renewals/rollovers and other insurers are untouched.
+    if (matches && rule.insurer === 'bajaj_allianz' &&
+        /renewal\s*\/\s*rollover/i.test(String(rule.remarks || ''))) {
+      const _btRR = String(params.businessType || '').toUpperCase();
+      if (_btRR !== 'RENEWAL' && _btRR !== 'ROLLOVER') matches = false;
+    }
+
     // If rate_type carries a make bucket suffix (CD2_Kia, CD2_Others, CD2_HEV),
     // require it to match this policy's bucket.
     if (matches && rtBucket) {
