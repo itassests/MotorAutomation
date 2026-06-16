@@ -4364,6 +4364,45 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     return buildOutputRow(policy, params, null, null, null, null, why, stmt, pr);
   }
 
+  // ---- Bajaj split OD/TP COMP grid → premium-weighted blend ----
+  // Bajaj's per-district grid files the COMP commission as SEPARATE legs:
+  // COMP_OD_* (OD-premium leg) and COMP_TP (TP-premium leg). pickPrimary
+  // headlines the non-zero OD leg, which OVERSTATES a package's true commission
+  // in No-PO-TP districts: e.g. Aligarh Scooter COMP_OD_OEM=22.5% but the TP leg
+  // is No-PO (0), so on a TP-dominant package the operator pays the ~blended 3%,
+  // not 22.5%. The true commission is OD%×OD + TP%×TP, so set the OD/TP legs and
+  // headline the premium-weighted blend. USER-confirmed (DL2/37319 22.5→~2.4).
+  // TP leg = the same-district COMP_TP rate; absent (segment carries No-PO via a
+  // separate SATP row, or simply none) → 0. Only fires for a genuine package
+  // (both legs present) whose headline is a COMP_OD leg — ~2 policies/cycle.
+  // Note: a few districts where the operator paid the flat OD rate regress and
+  // are handled As-per-Grid (operator's No-PO handling is inconsistent).
+  if (insurerSlug === 'bajaj_allianz' && primary &&
+      /^COMP_OD(_|$)/i.test(String(primary.rate_type || ''))) {
+    const odP = Number(params.odPremium) || 0;
+    const tpP = Number(params.tpPremium) || 0;
+    if (odP > 0 && tpP > 0) {
+      let tpRate = 0;
+      try {
+        const tpq = await pool.request()
+          .input('reg', sql.NVarChar, String(primary.region || ''))
+          .input('seg', sql.NVarChar, String(primary.segment || ''))
+          .input('sub', sql.NVarChar, String(primary.sub_type || ''))
+          .input('card', sql.Int, Number(primary.rate_card_id) || 0)
+          .query(`SELECT TOP 1 rate_value FROM rate_rules
+                  WHERE insurer='bajaj_allianz' AND product=@prod AND region=@reg
+                    AND ISNULL(segment,'')=@seg AND ISNULL(sub_type,'')=@sub
+                    AND rate_type='COMP_TP' AND rate_card_id=@card`
+                  .replace('@prod', `'${String(primary.product || '').replace(/'/g, "''")}'`));
+        if (tpq.recordset.length) tpRate = Number(tpq.recordset[0].rate_value) || 0;
+      } catch (_) { /* leave tpRate=0 (No-PO) on lookup failure */ }
+      const odRate = Number(primary.rate_value) || 0;
+      primary.od_rate = odRate;
+      primary.tp_rate = tpRate;
+      primary.rate_value = (odRate * odP + tpRate * tpP) / (odP + tpP);
+    }
+  }
+
   let rateVal = Number(primary.rate_value || 0);
   if (rateVal > 1) rateVal = rateVal / 100;
   // Universal Sompo GCV — operator pays a uniform +1% over the grid (confirmed
