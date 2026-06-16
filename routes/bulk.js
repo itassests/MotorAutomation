@@ -1463,17 +1463,24 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     // card. So unknown-date / historical policies stay on April; only a genuine
     // start date ≥ 1-May routes to May.
     const _en = require('../services/enablers');
-    const sd = policy.POLICY_START_DATE || policy['POLICY_START_DATE'] || null;
-    // Fallback chain: POLICY_ISSUED_DATE → POLICY_START_DATE → PR risk-inception/
-    // OD-start → far-past sentinel (→ earliest/April card). ISSUE date FIRST:
-    // Bajaj pays commission by the BOOKING month's grid, not the risk-start month —
-    // 79 WB SATP bikes issued 30-Apr with risk-start 02-May were paid the April
-    // card's 47.5 (operator 48), not the 1-May card's 50.5 we matched via start
-    // date. (Same -2.5 April-vs-May delta across other regions: 67.5→65, 55.5→53.)
+    // USER-confirmed rule: Bajaj applies the grid GENERATION effective on the
+    // policy's RISK-START date (OD start / policy start / TP start), NOT the
+    // issue/booking date. e.g. UP1/15178 issued 29-Apr but starts 01-May → the
+    // 1-May card (47.5) = operator 48, where issue-date wrongly gave the April
+    // card (44.5). Date priority: OD start → policy start → TP start → PR
+    // risk-inception → (last resort) issue date → far-past sentinel (→ earliest
+    // /April card for unknown-date rows).
+    //
+    // TRADE-OFF (accepted): the ~64 REST-OF-WEST-BENGAL SATP bikes issued 30-Apr
+    // with start 02-May now route to the 1-May card (50.5) per the start-date
+    // rule, whereas the operator paid them the April rate (47.5/48). Those become
+    // grid-correct-on-May with the operator value as noise → marked As-per-Grid.
     const _pr = (prIndex && params._policy_no) ? prIndex.get(String(params._policy_no).trim().toUpperCase()) : null;
-    _bajajEffDate = _en.toIso(policy.POLICY_ISSUED_DATE)
-                 || _en.toIso(sd)
+    _bajajEffDate = _en.toIso(policy.OD_Start_Date)
+                 || _en.toIso(policy.POLICY_START_DATE)
+                 || _en.toIso(policy.TP_POLICY_START_DATE)
                  || _en.toIso(_pr && _pr.pr_start_date)
+                 || _en.toIso(policy.POLICY_ISSUED_DATE)
                  || '2000-01-01';
   }
 
