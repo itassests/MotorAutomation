@@ -4270,6 +4270,16 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // Bajaj COMP OD leg — OEM vs NonOEM. Each district splits the COMP OD leg into
+  // COMP_OD_OEM (OEM/dealer-sourced) and COMP_OD_NonOEM (open-market/broker), both
+  // surviving byType. This is a BROKER book (MT/DIR… trackers), so the NonOEM rate
+  // applies — drop the OEM rows when a NonOEM sibling is present so pickPrimary
+  // takes NonOEM. USER-confirmed (BG3/5065 Honnavar Scooter: OEM 22.5 vs NonOEM
+  // 17.5 = operator 18).
+  if (insurerSlug === 'bajaj_allianz' &&
+      rules.some(r => /^COMP_OD_NonOEM$/i.test(String(r.rate_type || '')))) {
+    rules = rules.filter(r => !/^COMP_OD_OEM$/i.test(String(r.rate_type || '')));
+  }
   let primary = pickPrimaryRateRule(rules);
   // ---- Enabler / special-payout override ----
   // A criteria-scoped enabler deal (segment + make + transaction + RTO location +
