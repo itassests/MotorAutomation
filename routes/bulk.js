@@ -1834,7 +1834,15 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // borrows Comp (that fallback stays on for cars), so this is TW-only. Skip the
   // SAOD→Comp retry for two-wheelers so a SAOD TW resolves to no-rule instead of
   // a spurious Comp rate.
-  const skipSaodAsComp = productIsTw;
+  // EXCEPTION — Royal SCOOTERS: Royal pays a scooter SAOD at its Scooter Comp(1+1)
+  // rate (no dedicated scooter-SAOD rate_type exists), unlike bikes which genuinely
+  // pay 0 for SAOD. USER-confirmed (BG3/5115 Honda Activa SAOD, KA25 → ROKA Scooter
+  // Comp 22, op 20; bike SAOD e.g. Enfield Classic 350 stays no-rule/0). So allow
+  // the SAOD→Comp borrow for Royal scooters only; all other TW SAOD stays skipped.
+  const _saodMdl = String(params.model || '').toUpperCase();
+  const _saodCat = String(params.vehicleCategory || params.vehicleClass || '').toUpperCase();
+  const _saodIsScooter = /ACTIVA|JUPITER|FASCINO|ACCESS|DIO|BURGMAN|NTORQ|MAESTRO|AVIATOR|PLEASURE|VESPA|SCOOTY|DESTINI|XOOM|\bRAY\b|ALPHA|CHETAK|IQUBE|OLA\s+S\d|ELECTRIC\s*SCOOTER/.test(_saodMdl) || /SCOOT/.test(_saodCat);
+  const skipSaodAsComp = productIsTw && !(insurerSlug === 'royal_sundaram' && _saodIsScooter);
   if (rules.length === 0 && baseLookup.ins_product === 'SAOD' && !skipSaodAsComp) {
     const compArgs = { ...baseLookup, ins_product: 'Comp' };
     const compKey = lookupKey + '||saodAsComp';
