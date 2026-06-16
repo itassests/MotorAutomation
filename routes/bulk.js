@@ -4280,6 +4280,28 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       rules.some(r => /^COMP_OD_NonOEM$/i.test(String(r.rate_type || '')))) {
     rules = rules.filter(r => !/^COMP_OD_OEM$/i.test(String(r.rate_type || '')));
   }
+  // TATA NEW two-wheeler scooter in Delhi → Brand-New rate. A new vehicle
+  // (reg 'NEW'/age 0) must take the "Brand New" sub_type, but TATA files the
+  // Scooter Brand-New rate under rate_type DM|All while Renewal/Rollover sit in
+  // DM|Package — so pickPrimary defaults to the Renewal Package rate (0.53) and
+  // misses Brand New. For a Delhi scooter, Brand-New = DM|All 0.45. USER-confirmed
+  // (DL1/2070 TVS Jupiter NEW, Delhi: grid Brand New 0.45; operator 30 is a
+  // separate anomaly → As-per-Grid). Scoped to TATA+TW+NEW+Delhi+scooter so the
+  // Maharashtra/other new-TW (operator pays Renewal HOM|Package 52) are untouched.
+  if (insurerSlug === 'tata_aig' && productIsTw &&
+      (String(params.vehicleRegNo || '').trim().toUpperCase() === 'NEW' || params.vehicleAge === 0) &&
+      String(resolvedRegion || '').toUpperCase() === 'DELHI') {
+    const _mdlScoot = `${params.model || ''} ${params.vehicleCategory || ''}`.toUpperCase();
+    if (/ACTIVA|JUPITER|FASCINO|ACCESS|DIO|NTORQ|MAESTRO|AVIATOR|VESPA|SCOOTY|SCOOTER|CHETAK|IQUBE/.test(_mdlScoot)) {
+      try {
+        const bnq = await pool.request().query(
+          `SELECT TOP 1 * FROM rate_rules WHERE insurer='tata_aig' AND product='TW'
+             AND region='Delhi' AND segment='Scooter' AND sub_type='Brand New'
+             AND rate_value IS NOT NULL ORDER BY rate_value DESC`);
+        if (bnq.recordset.length) rules = [bnq.recordset[0]];
+      } catch (_) { /* leave rules unchanged on lookup failure */ }
+    }
+  }
   let primary = pickPrimaryRateRule(rules);
   // ---- Enabler / special-payout override ----
   // A criteria-scoped enabler deal (segment + make + transaction + RTO location +
