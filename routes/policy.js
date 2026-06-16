@@ -1827,6 +1827,15 @@ function filterRulesByPolicy(rules, params, _trace) {
   // only cross-family rules available would be stranded at no-rule.
   const hasTaxiSeg = rules.some(r => /TAXI\b|\bMAXI\s*CAB\b|\bBIG\s*TAXI/i.test(String(r.segment || '')));
   const hasBusSeg  = rules.some(r => /\bBUS\b|\bSTAGE\s*CARR?IAGE\b|\bCONTRACT\s*CARR?IAGE\b/i.test(String(r.segment || '')));
+  // Pre-scan: does the candidate set carry a DEDICATED EV-scooter segment
+  // (e.g. "SC_EV" / "Scooter EV")?  The petrol-vs-EV scooter demotion below
+  // (-6 on a plain "Scooter" row for an electric scooter) only makes sense when
+  // such an EV variant actually exists to win instead. When the grid has only a
+  // plain "Scooter" row (TATA's TW grid), that row IS the electric scooter's
+  // rate — demoting it strands the policy on a wrong segment (Moped/MC outscores
+  // it). USER case GJ10/1651: electric Chetak, Surat — op 27 = Surat "Scooter"
+  // SAOD; the -6 demotion dropped it below "Moped" 24.
+  const hasEvScooterVariant = rules.some(r => /\bSC[_\s]+EV\b|SCOOTER[_\s]+EV/i.test(String(r.segment || '')));
 
   // Royal Comp discount-band: collect the thresholds of any ">N" open band
   // among the candidate rules. A discount sitting exactly on a closed band's
@@ -2884,7 +2893,10 @@ function filterRulesByPolicy(rules, params, _trace) {
       const segIsEvScooterVariant = /\bSC[_\s]+EV\b|SCOOTER[_\s]+EV/i.test(seg);
       if (policyIsScooter) {
         if (segIsEvScooterVariant && !policyIsEv) score -= 6;        // EV-only rate, petrol scooter
-        else if (segHasSc && !segHasEv && policyIsEv) score -= 6;    // petrol rate, EV scooter
+        // Demote a plain "Scooter" row for an electric scooter ONLY when a
+        // dedicated EV-scooter variant exists to take its place; otherwise the
+        // plain row IS the EV scooter's rate (see hasEvScooterVariant pre-scan).
+        else if (segHasSc && !segHasEv && policyIsEv && hasEvScooterVariant) score -= 6;
       }
       // Disambiguation fallback: when the policy's sub-type couldn't be
       // determined (model not in our SCOOTER_MODELS / BIKE_MODELS lists,
