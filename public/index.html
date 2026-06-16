@@ -12990,18 +12990,21 @@
       try { localStorage.setItem(rcGridKey(), JSON.stringify([..._rcGrid])); } catch (_) {}
       try { localStorage.setItem(rcVerifiedKey(), JSON.stringify([..._rcVerified])); } catch (_) {}
     }
-    // One-time seed of the reviewed-as-matched trackers (public/rc_verified_seed.json)
-    // into the current cycle's Verified set. Runs once per cycle (guarded by a flag),
-    // so the user can still toggle individual rows afterward without them re-appearing.
+    // Seed the reviewed-as-matched trackers (public/rc_verified_seed.json) into the
+    // current cycle's Verified set. VERSION-AWARE (entry-count in the guard key):
+    // re-seeds once per (cycle, seed-version) so a grown seed file merges in
+    // automatically on next load. Additive + idempotent within a version, so
+    // manual toggles survive until the seed file next changes.
     async function rcSeedVerified() {
       try {
         const cid = document.getElementById('rcCycle').value || '0';
-        const seededKey = 'rx.reconcile.verified.seeded.' + cid;
-        if (localStorage.getItem(seededKey)) return;        // already seeded this cycle
         if (_rcVerifiedSeed == null) {
           const resp = await fetch('rc_verified_seed.json', { cache: 'no-store' });
           _rcVerifiedSeed = resp.ok ? await resp.json() : [];
         }
+        const ver = Array.isArray(_rcVerifiedSeed) ? _rcVerifiedSeed.length : 0;
+        const seededKey = 'rx.reconcile.verified.seeded.' + cid + '.v' + ver;
+        if (localStorage.getItem(seededKey)) return;        // already seeded this cycle+version
         if (Array.isArray(_rcVerifiedSeed) && _rcVerifiedSeed.length) {
           for (const t of _rcVerifiedSeed) _rcVerified.add(t);
           localStorage.setItem(rcVerifiedKey(), JSON.stringify([..._rcVerified]));
@@ -13009,18 +13012,24 @@
         localStorage.setItem(seededKey, '1');
       } catch (_) { /* seed is best-effort */ }
     }
-    // One-time seed of the reviewed "As per Grid" trackers (public/rc_grid_seed.json)
-    // into the current cycle's Grid set. Same one-time-per-cycle semantics as the
-    // Verified seed above.
+    // Seed the reviewed "As per Grid" trackers (public/rc_grid_seed.json) into the
+    // current cycle's Grid set. VERSION-AWARE: the guard key includes the seed's
+    // entry count, so when the seed file GROWS (new As-per-Grid trackers added
+    // server-side) the key changes and the new entries merge in automatically on
+    // the next load — no manual localStorage clear needed. Re-seeding is additive
+    // (Set.add), and idempotent within a version, so manual toggles are preserved
+    // until the seed file next changes.
     async function rcSeedGrid() {
       try {
         const cid = document.getElementById('rcCycle').value || '0';
-        const seededKey = 'rx.reconcile.aspergrid.seeded.' + cid;
-        if (localStorage.getItem(seededKey)) return;       // already seeded this cycle
+        // Fetch FIRST so we know the seed version (entry count) before the guard.
         if (_rcGridSeed == null) {
           const resp = await fetch('rc_grid_seed.json', { cache: 'no-store' });
           _rcGridSeed = resp.ok ? await resp.json() : [];
         }
+        const ver = Array.isArray(_rcGridSeed) ? _rcGridSeed.length : 0;
+        const seededKey = 'rx.reconcile.aspergrid.seeded.' + cid + '.v' + ver;
+        if (localStorage.getItem(seededKey)) return;       // already seeded this cycle+version
         if (Array.isArray(_rcGridSeed) && _rcGridSeed.length) {
           for (const t of _rcGridSeed) _rcGrid.add(t);
           localStorage.setItem(rcGridKey(), JSON.stringify([..._rcGrid]));
