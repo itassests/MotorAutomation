@@ -2579,6 +2579,21 @@ function filterRulesByPolicy(rules, params, _trace) {
       const rem = String(rule.remarks).toUpperCase();
       const looksLikeStateRemark = /\b(MAHARASHTRA|GUJARAT|KARNATAKA|TAMIL\s*NADU|KERALA|ANDHRA|TELANGANA|PUNJAB|HARYANA|DELHI|RAJASTHAN|UTTAR\s*PRADESH|BIHAR|JHARKHAND|ODISHA|ORISSA|WEST\s*BENGAL|MADHYA\s*PRADESH|CHHATTISGARH|UTTARAKHAND|HIMACHAL|JAMMU|KASHMIR|GOA|ASSAM|MEGHALAYA|MIZORAM|MANIPUR|NAGALAND|TRIPURA|SIKKIM|ARUNACHAL|DELHI\s*-\s*NCR|NCR)\b/.test(rem);
       if (looksLikeStateRemark) {
+        // AMBIGUOUS multi-word states that share a token with another state must
+        // match on their DISTINCTIVE full name, not a loose token — otherwise
+        // "Uttar Pradesh" matches "Uttarakhand" (shared "UTTAR") and any
+        // "* Pradesh" matches another (shared "PRADESH"). USER case UP1/14971:
+        // a UP "Rest of State" policy wrongly took the Uttarakhand row (0.195)
+        // over UP's (0.125). Require the full name for these.
+        const _AMBIG = /UTTAR\s*PRADESH|MADHYA\s*PRADESH|ANDHRA\s*PRADESH|UTTARAKHAND|UTTARANCHAL/;
+        if (_AMBIG.test(policyStateFull)) {
+          const pol = policyStateFull, m =
+            (/UTTAR\s*PRADESH/.test(pol)            && /UTTAR\s*PRADESH/.test(rem)) ||
+            (/(UTTARAKHAND|UTTARANCHAL)/.test(pol)  && /(UTTARAKHAND|UTTARANCHAL)/.test(rem)) ||
+            (/MADHYA\s*PRADESH/.test(pol)           && /MADHYA\s*PRADESH/.test(rem)) ||
+            (/ANDHRA\s*PRADESH/.test(pol)           && /ANDHRA\s*PRADESH|TELANGANA/.test(rem));
+          if (m) score += 4; else matches = false;
+        } else {
         // Bidirectional token match — try policy-state tokens against remarks
         // AND remarks tokens against policy state. Handles compound remarks
         // ("Delhi-NCR", "Maharashtra, Gujarat") as well as compound state
@@ -2604,6 +2619,7 @@ function filterRulesByPolicy(rules, params, _trace) {
           remTokens.some(t => policyStateFull.includes(t));
         if (!remarkContainsState) matches = false;
         else score += 4; // state-specific match
+        }
       }
     }
 

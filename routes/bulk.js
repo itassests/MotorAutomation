@@ -1985,9 +1985,33 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     const STATE_PREFIX_FULL = require('./policy').STATE_PREFIX_FULL || {};
     const rtoStateName = STATE_PREFIX_FULL[rtoStatePrefix(params.rtoCode)] || '';
     const stateForTiers = params._stateName || rtoStateName;
-    const tierCandidates = inferLocationTiers
+    let tierCandidates = inferLocationTiers
       ? inferLocationTiers((rtoInfo && rtoInfo.cluster) || resolvedRegion, stateForTiers, insurerSlug)
       : [];
+    // Royal Pvt-Car AUTHORITATIVE city tier from the RTO Master's "City
+    // Configuration for Private Car" column (Key Cities / Other Cities / Rest of
+    // State). The inferLocationTiers heuristic always tries "Other Cities" before
+    // "Rest of State", so a true Rest-of-State RTO (e.g. UP70 Allahabad) wrongly
+    // headlines the Other Cities rate (19.5) instead of Rest of State (12.5 = op).
+    // Prepend the RTO's authoritative tier so the ordered fallback loop hits it
+    // first. USER-confirmed (UP1/14971 UP70 → Rest of State 12.5 = op 13).
+    // EXCEPTION: Nashik/Nagpur clusters keep the heuristic order (Royal prices
+    // them under a dedicated "Nasik & Nagpur" tier, which inferLocationTiers
+    // already leads with — the RTO Master labels them "Other Cities").
+    if (insurerSlug === 'royal_sundaram' &&
+        /^(CAR|4W|PVT)/i.test(String(params.vehicleType || ''))) {
+      const _clusterUp = String((rtoInfo && rtoInfo.cluster) || resolvedRegion || '').toUpperCase();
+      if (!/^(NASHIK|NASIK|NAGPUR)$/.test(_clusterUp)) {
+        const ROYAL_CITY_TIER = require('../config/royal_pvtcar_city_tier.json');
+        const _rc = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const _m = _rc.match(/^([A-Z]+)(\d+)$/);
+        const _variants = [_rc];
+        if (_m) { _variants.push(_m[1] + parseInt(_m[2], 10), _m[1] + String(parseInt(_m[2], 10)).padStart(2, '0')); }
+        let _tier = null;
+        for (const v of _variants) { if (ROYAL_CITY_TIER[v]) { _tier = ROYAL_CITY_TIER[v]; break; } }
+        if (_tier) tierCandidates = [_tier, ...tierCandidates];
+      }
+    }
     const seen = new Set();
     // Zuno: catch-all regions + Pan India NCB=0/discount-override bucket.
     const zunoCandidates = (insurerSlug === 'zuno')
