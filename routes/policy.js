@@ -2610,6 +2610,11 @@ function filterRulesByPolicy(rules, params, _trace) {
           'WEST BENGAL': ['WEST', 'BENGAL', 'WB'],
           'JAMMU & KASHMIR': ['JAMMU', 'KASHMIR', 'J&K', 'JK'],
           'JAMMU AND KASHMIR': ['JAMMU', 'KASHMIR', 'J&K', 'JK'],
+          // Odisha was renamed from "Orissa" (2011). Royal's PC-STP sheet still
+          // carries the legacy "Orissa" in remarks while the Comp rows (and the
+          // policy state) say "Odisha", so the two spellings must match.
+          'ODISHA': ['ODISHA', 'ORISSA'],
+          'ORISSA': ['ODISHA', 'ORISSA'],
         };
         const policyStateTokens = (STATE_ALIASES[policyStateFull] ||
                                    policyStateFull.split(/[\s,/&-]+/).filter(t => t.length >= 2));
