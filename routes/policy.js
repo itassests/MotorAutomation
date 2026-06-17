@@ -3473,6 +3473,35 @@ function filterRulesByPolicy(rules, params, _trace) {
         else score += 8;
       }
     }
+    // MISC body in the SEGMENT column (United India and similar): the MISC grid
+    // names the body — "Ambulance", "Agricultural Tractor", "All other
+    // Miscellaneous Vehicles" (the catch-all). A policy whose category names a
+    // specific body must take that body's segment, not the generic catch-all
+    // (both are rate_type=COMP, so byType collapses to one and the lower-id
+    // catch-all otherwise wins). Boost the specific-body match and demote the
+    // "All other Miscellaneous Vehicles" catch-all when a specific body applies.
+    // USER UP1/15204 (Maruti Omni "MISC - D - Ambulance", United SATP): the
+    // Ambulance row (0.20 = operator) beat the catch-all (0.10).
+    if (matches && String(params.vehicleType || '').toUpperCase() === 'MISC' && rule.segment) {
+      const segU = String(rule.segment).toUpperCase();
+      const catProbe = (vehicleCategory + ' ' + model + ' ' + (params.vehicleSubModel || '')).toUpperCase();
+      const isGenericMisc = /ALL\s+OTHER\s+MISC/.test(segU);
+      const MISC_BODY = [
+        { cat: /\bAMBULANCE\b/,            seg: /\bAMBULANCE\b/ },
+        { cat: /\bHEARSE\b/,               seg: /\bHEARSE\b/ },
+        { cat: /\bTRACTOR\b/,              seg: /\bTRACTOR\b/ },
+        { cat: /\bMOBILE\s*CLINIC\b/,      seg: /\bMOBILE\s*CLINIC\b/ },
+      ];
+      const polBody = MISC_BODY.find(b => b.cat.test(catProbe));
+      if (polBody) {
+        // Swing must beat the catch-all's large generic base score (~17 for
+        // United's "All other Miscellaneous Vehicles"), so the specific body
+        // wins byType — while the catch-all still survives if it's the only row
+        // present (e.g. an insurer with no Ambulance segment) rather than no-rule.
+        if (polBody.seg.test(segU)) score += 15;          // policy body matches this segment
+        else if (isGenericMisc) score -= 15;              // demote catch-all when a specific body applies
+      }
+    }
     // Make matching from rule.make field — "All" / "Any" / "*" / blank = wildcard,
     // "Others" = catch-all fallback (kept with low priority).
     //
