@@ -1027,6 +1027,17 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       String(params.vehicleRegNo || '').trim().toUpperCase() === 'NEW' && (Number(params.vehicleAge) || 0) > 0) {
     params.vehicleAge = 0;
   }
+  // TATA: same data quirk on cars — a brand-new vehicle (vehicle_no='NEW',
+  // BUSINESS/SUB_BUSINESS = New Business / New Vehicle) sometimes reports
+  // AGE_OF_VEHICLE=1 because it was manufactured in the prior calendar year but
+  // first-insured now. TATA's Pvt-Car grid prices a NEW car off the "Brand New"
+  // sub_type (age 0-0); age 1 misses it and lands on the Renewal age-1-99 band
+  // (e.g. PAN INDIA COMP: Brand New 0.30 vs Renewal Other-Than-Diesel 0.25).
+  // USER-confirmed (GJ1/32328 Innova Hycross NEW: op 30 = Brand New 0.30).
+  if (insurerSlug === 'tata_aig' &&
+      String(params.vehicleRegNo || '').trim().toUpperCase() === 'NEW' && (Number(params.vehicleAge) || 0) > 0) {
+    params.vehicleAge = 0;
+  }
 
   const isBhSeries = /^\s*\d{2}\s*BH/i.test(String(params.vehicleRegNo || '')) ||
                      /^\d{2}BH$/i.test(String(params.rtoCode || ''));
