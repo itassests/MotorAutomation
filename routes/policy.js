@@ -2092,10 +2092,19 @@ function filterRulesByPolicy(rules, params, _trace) {
       // (a new car is NCB=0 by definition but isn't a no-NCB renewal). Drop the override.
       const _zunoNewVehicle = rule.insurer === 'zuno' && !policyIsPureTp &&
         (Number(params.vehicleAge) || 0) === 0;
+      // Universal Sompo SAOD: the standalone-OD commission is a SINGLE rate that
+      // does NOT vary by NCB — the SAOD rate_type row is labelled "SAOD-Non-NCB |
+      // NCB = 0 (applies to SAOD & Comp)" but, per the operator (USER, RJ1/1724),
+      // it applies to SAOD policies regardless of NCB. So the "NCB = 0" token is a
+      // label, not a gate, for the SAOD rate_type. (The COMP sibling that shares
+      // this remark — the no-NCB Comp 0.24 vs Package NCB-1-99 0.29 — KEEPS its
+      // NCB gating; Comp does split by NCB. Scoped to rate_type='SAOD' only.)
+      const _usSaodFlatNcb = rule.insurer === 'universal_sompo' &&
+        String(rule.rate_type || '').toUpperCase() === 'SAOD';
       if (policyIsPureTp) {
         if (ruleIsNcbZeroOverride) matches = false;   // OD-only override — not a TP rate
         // else: leave TP rules untouched (no NCB filtering for TP)
-      } else if (ruleIsNcbZero && policyHasNCB) {
+      } else if (ruleIsNcbZero && policyHasNCB && !_usSaodFlatNcb) {
         matches = false;                 // NCB=0 rule, but policy has NCB → drop
       } else if (ruleIsNcbPositive && !policyHasNCB) {
         if (!_zunoNorthFlat && !_zunoNewVehicle) matches = false;   // keep regional/new-vehicle rate
