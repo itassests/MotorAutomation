@@ -4376,6 +4376,35 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       if (kept.length) rules = kept;
     }
   }
+  // ---- Bajaj PCV School Bus (segment absent from the ingested grid) ----
+  // The Bajaj grid only files "PCV 4W Staff Bus" and "PCV 4W other than school
+  // bus" — there is NO School Bus segment, so school buses hit no-rule. The
+  // operator pays a per-region high-payout COMP commission (USER-confirmed,
+  // missing-grid fill): UP 70 / MH 69 / KA 72 / Punjab-Haryana-J&K 75, default
+  // 70. Inject it as a flat COMP rate (income = rate x net). All observed
+  // policies are April-start.
+  if (insurerSlug === 'bajaj_allianz' &&
+      String(params.vehicleType || '').toUpperCase() === 'PCV' &&
+      /SCHOOL\s*BUS/i.test(String(params.vehicleCategory || ''))) {
+    try {
+      const SB = require('../config/bajaj_school_bus.json');
+      const STATE_PREFIX_FULL = require('./policy').STATE_PREFIX_FULL || {};
+      let st = String(params._stateName || '').toUpperCase().trim();
+      let rate = SB[st];
+      if (rate == null) {
+        const pre = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2);
+        const full = STATE_PREFIX_FULL[pre];
+        if (full) rate = SB[String(full).toUpperCase().trim()];
+      }
+      if (rate == null) rate = SB._default;
+      if (rate != null) {
+        const base = rules[0] || { insurer: insurerSlug, region: resolvedRegion || null, product: 'PCV' };
+        rules = [{ ...base, product: 'PCV', segment: 'PCV School Bus (Bajaj per-region)',
+          sub_type: null, rate_type: 'COMP', rate_value: +(Number(rate) / 100).toFixed(4),
+          is_declined: 0, od_rate: null, tp_rate: null }];
+      }
+    } catch (_) { /* leave rules unchanged on any failure */ }
+  }
   let primary = pickPrimaryRateRule(rules);
   // ---- Enabler / special-payout override ----
   // A criteria-scoped enabler deal (segment + make + transaction + RTO location +

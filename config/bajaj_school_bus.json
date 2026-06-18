@@ -1,0 +1,11 @@
+{
+  "_comment": "Bajaj Allianz PCV School Bus commission (COMP %) by state, FY26-27 April. The 'School Bus' segment is ABSENT from the ingested Bajaj grid (only 'PCV 4W Staff Bus' and 'PCV 4W other than school bus' exist), so school buses hit no-rule. Operator pays a per-region high-payout commission; these are the operator-confirmed per-region April rates (USER-delegated, missing-grid fill). _default applies to unlisted states. All observed policies are April-start; May-start would shift per the Bajaj April/May dual-card if a sheet surfaces.",
+  "_default": 70,
+  "UTTAR PRADESH": 70,
+  "MAHARASHTRA": 69,
+  "KARNATAKA": 72,
+  "PUNJAB": 75,
+  "HARYANA": 75,
+  "JAMMU AND KASHMIR": 75,
+  "JAMMU & KASHMIR": 75
+}
