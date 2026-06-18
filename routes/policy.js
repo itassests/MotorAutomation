@@ -3512,6 +3512,13 @@ function filterRulesByPolicy(rules, params, _trace) {
         if (polBody.seg.test(segU)) score += 15;          // policy body matches this segment
         else if (isGenericMisc) score -= 15;              // demote catch-all when a specific body applies
       }
+      // Universal Sompo MISC volume_tier is a discount band; the only EXACT-value
+      // tier "80" is the BASE band (the others are 5-wide ranges 65-69/70-74/
+      // 75-79/81-85 = extra-discount slabs). USER (BG3/5041): with no discount a
+      // policy takes the base, so prefer vol 80 within whichever segment wins —
+      // KA Crane vol 80 = 0.29 = operator. Small boost (below the +15 segment
+      // swing) so it only selects the band, never overrides the body.
+      if (rule.insurer === 'universal_sompo' && String(rule.volume_tier || '').trim() === '80') score += 4;
     }
     // Make matching from rule.make field — "All" / "Any" / "*" / blank = wildcard,
     // "Others" = catch-all fallback (kept with low priority).
