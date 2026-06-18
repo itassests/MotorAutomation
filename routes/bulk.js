@@ -4337,6 +4337,25 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       } catch (_) { /* leave rules unchanged on lookup failure */ }
     }
   }
+  // ---- ICICI MISC construction equipment: prefer the MISC "CE" segment ----
+  // ICICI's MISC lookup product set is broad (["MISC","MIS","CV","GCV"]), so a
+  // JCB / excavator / loader (filed under the MISC "Misc D CE (Excluding CRANES)"
+  // segment) can ALSO match a GCV "SCV >= 2450 GVW" goods-band row. pickPrimary
+  // then takes the higher GCV rate (e.g. Odisha ALL_Net 0.2209) over the MISC CE
+  // leg. Construction equipment is NOT a goods carrier — when the MISC CE rule is
+  // present, drop the GCV/CV product rows so the CE rule wins (COMP 50 / AOTP 5).
+  // USER DJ1/6549 (JCB 3DX Excavator Loader, Odisha, TP-only): 0.2209 → MISC CE
+  // TP 0.05 = operator. MH/GJ JCBs already match (MISC CE wins there).
+  if (insurerSlug === 'icici_lombard' && String(params.vehicleType || '').toUpperCase() === 'MISC') {
+    const _ceCat = `${params.vehicleCategory || ''} ${params.model || ''}`.toUpperCase();
+    const _isCE = /\bJCB\b|EXCAVAT|LOADER|BACKHOE|\bDOZER\b|GRADER|\bCRANE\b|CONSTRUCTION/.test(_ceCat);
+    const _hasMiscCE = rules.some(r => /^(MISC|MIS)$/i.test(String(r.product || '')) &&
+                                       /\bCE\b/.test(String(r.segment || '').toUpperCase()));
+    if (_isCE && _hasMiscCE) {
+      const kept = rules.filter(r => /^(MISC|MIS)$/i.test(String(r.product || '')));
+      if (kept.length) rules = kept;
+    }
+  }
   let primary = pickPrimaryRateRule(rules);
   // ---- Enabler / special-payout override ----
   // A criteria-scoped enabler deal (segment + make + transaction + RTO location +
