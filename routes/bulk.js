@@ -566,7 +566,7 @@ async function loadPrIndex(pool) {
     `SELECT pr.policy_no, pr.vehicle_no, pr.od_premium, pr.addon_premium, pr.tp_premium,
             pr.net_amount, pr.gross_amount, pr.sum_insured, pr.ncb, pr.fuel_type, pr.cc,
             pr.tonnage, pr.seating, pr.product, pr.region, pr.raw_json, pr.final_discount,
-            pr.upload_id, u.insurer_label, u.month, u.year
+            pr.zero_dep, pr.upload_id, u.insurer_label, u.month, u.year
      FROM pr_rows pr
      INNER JOIN pr_uploads u ON u.id = pr.upload_id
      WHERE u.status = 'active'`
@@ -975,6 +975,11 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       // Booking-location city from PR (e.g. THANE) — used for TATA new-vehicle
       // cluster resolution where the RTO is a "NEW" placeholder.
       params._prRegion = prMatch.region || null;
+      // PR zero-dep flag (authoritative for the Shriram WB nil-dep rate split,
+      // where the operator honours nil-dep — unlike MH). YES/Y/1/TRUE → nil-dep.
+      if (prMatch.zero_dep != null && String(prMatch.zero_dep).trim() !== '') {
+        params._prZeroDep = /^(YES|Y|1|TRUE)$/i.test(String(prMatch.zero_dep).trim());
+      }
     }
   }
 

@@ -1969,6 +1969,12 @@ function filterRulesByPolicy(rules, params, _trace) {
     const rt = (rule.rate_type || '').toUpperCase();
     let score = 0;
     let matches = true;
+    // Shriram WB "Upto 6+1" 55% row carries make='AMBASSADOR' (from the remark
+    // "incl Kaali peeli taxi ambassador model only"). Per USER it applies to ALL
+    // makes UNLESS the vehicle is a kaali-peeli taxi (then it must be Ambassador).
+    // Set when that Ambassador make should NOT gate (non-kaali policy) so the
+    // make-matching block below is skipped for it.
+    let _shriramAmbMakeOk = false;
 
     // Extended-Warranty sheet exclusion: TATA ships a separate
     // "Pvtcar_Extended Warranty" catalogue (lower rate, e.g. 22%) that only
@@ -2230,14 +2236,68 @@ function filterRulesByPolicy(rules, params, _trace) {
           .test(`${vehicleCategory} ${model}`);
         if (remOnlyKaali && !polIsKaaliPeeli) matches = false;     // kaali-peeli-only row, regular taxi → drop
         else if (remOtherThanKaali && polIsKaaliPeeli) matches = false;
-        // NIL DEP (zero-dep) variant applies only to nil-dep policies.
+        // The row's make='AMBASSADOR' (from "…kaali peeli taxi ambassador model
+        // only") only restricts make for KAALI-PEELI vehicles; a regular (non-
+        // kaali) taxi of any make qualifies. For a non-kaali policy, mark the
+        // Ambassador make non-gating so the make block below is skipped for it.
+        // WB-scoped — this kaali-peeli/ambassador "only" phrasing is the WB grid's.
+        if (/AMBASSADOR/.test(String(rule.make || '').toUpperCase()) && !polIsKaaliPeeli
+            && (/WEST\s*BENGAL/i.test(String(rule.region || ''))
+                || /WEST\s*BENGAL/i.test(String(params._stateName || '')))) {
+          _shriramAmbMakeOk = true;
+        }
+        // NIL DEP (zero-dep) variant applies only to nil-dep policies. The "with
+        // NIL dep" side is filed as "WITH NIL DEP", "for NIL dep cases", "NIL dep
+        // cases"; the "without" side as "WITHOUT NIL DEP" / "Except NIL dep cases".
+        // Nil-dep SIGNAL is operator-inconsistent by region: West Bengal honours it
+        // (PR zero_dep authoritative — DW1/5287 NO→55, DW1/5289 YES→42.5), but
+        // Maharashtra IGNORES it (MH14/6849 zero_dep=YES yet op pays the without-
+        // nil-dep 52). So for WB use PR zero_dep + recognise "for NIL dep"; for
+        // other states keep the old addon/category signal (which reads false here,
+        // matching MH's behaviour). USER DW1/5287.
         if (matches) {
-          const remWithNilDep    = /WITH\s+NIL\s*DEP/.test(rem) && !/WITHOUT\s+NIL\s*DEP/.test(rem);
-          const remWithoutNilDep = /WITHOUT\s+NIL\s*DEP/.test(rem);
-          const polHasNilDep     = params.hasNilDep === true ||
-            /NIL\s*DEP|ZERO\s*DEP/i.test(`${params.addonText || ''} ${vehicleCategory}`);
+          const _isWB = /WEST\s*BENGAL/i.test(String(rule.region || ''))
+            || /WEST\s*BENGAL/i.test(String(params._stateName || ''));
+          let remWithNilDep, remWithoutNilDep, polHasNilDep;
+          if (_isWB) {
+            remWithNilDep = (/WITH\s+NIL\s*DEP|FOR\s+NIL\s*DEP|NIL\s*DEP\s+CASES?/.test(rem))
+              && !/WITHOUT\s+NIL\s*DEP|EXCEPT\s+NIL\s*DEP/.test(rem);
+            remWithoutNilDep = /WITHOUT\s+NIL\s*DEP|EXCEPT\s+NIL\s*DEP/.test(rem);
+            polHasNilDep = (params._prZeroDep != null)
+              ? params._prZeroDep === true
+              : (params.hasNilDep === true ||
+                 /NIL\s*DEP|ZERO\s*DEP/i.test(`${params.addonText || ''} ${vehicleCategory}`));
+          } else {
+            remWithNilDep = /WITH\s+NIL\s*DEP/.test(rem) && !/WITHOUT\s+NIL\s*DEP/.test(rem);
+            remWithoutNilDep = /WITHOUT\s+NIL\s*DEP/.test(rem);
+            polHasNilDep = params.hasNilDep === true ||
+              /NIL\s*DEP|ZERO\s*DEP/i.test(`${params.addonText || ''} ${vehicleCategory}`);
+          }
           if (remWithNilDep && !polHasNilDep) matches = false;
           else if (remWithoutNilDep && polHasNilDep) matches = false;
+        }
+        // RTO-list gate: WB "Upto 6+1" variants apply to a NAMED RTO list ("…for
+        // RTOs WB-04, … WB-23, …") or its complement ("…excluding RTO (WB-04, …)").
+        // Parse the RTO codes and gate by whether the policy RTO is in the list.
+        // USER DW1/5287 (WB-23, in the 55% list) → drop the 50% "excluding" row.
+        // SCOPED to West Bengal — other states' Shriram remarks list RTO codes for
+        // unrelated reasons (e.g. "UP 70,75,79 IS DECLINED"), which this gate must
+        // not treat as an applicability list.
+        if (matches && (/WEST\s*BENGAL/i.test(String(rule.region || ''))
+            || /WEST\s*BENGAL/i.test(String(params._stateName || '')))) {
+          const rtoCodes = rem.match(/\b[A-Z]{2}[\s-]?\d{1,3}\b/g);
+          if (rtoCodes && rtoCodes.length >= 3) {
+            const nrm = (s) => String(s).toUpperCase().replace(/[^A-Z0-9]/g, '')
+              .replace(/^([A-Z]+)0*(\d+)$/, '$1$2');
+            const list = new Set(rtoCodes.map(nrm));
+            const polRto = nrm(params.rtoCode || '');
+            if (polRto) {
+              const isExcluding = /EXCLUD|EXCEPT[^A-Z]*RTO/.test(rem);
+              const inList = list.has(polRto);
+              if (isExcluding) { if (inList) matches = false; }
+              else { if (!inList) matches = false; }
+            }
+          }
         }
         // Short-term (min 90-day) pro-rata rows apply only to short-term
         // policies; default annual policies drop them.
@@ -3536,7 +3596,7 @@ function filterRulesByPolicy(rules, params, _trace) {
     // that category in vehicleCategory (e.g. "MISC - D - Loader"). So for MISC
     // policies we match rule.make tokens against the category keyword, not the
     // manufacturer name.
-    if (matches && rule.make && !_iciciSubRow) {
+    if (matches && rule.make && !_iciciSubRow && !_shriramAmbMakeOk) {
       const ruleMake = (rule.make || '').toUpperCase();
       const primaryMake = (make || '').split(/\s+/)[0];
       const isWildcard = ruleMake === 'ALL' || ruleMake === 'ANY' || ruleMake === '*' || ruleMake === '';
