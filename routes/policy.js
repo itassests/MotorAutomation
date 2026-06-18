@@ -189,7 +189,10 @@ function aliasHdfcRegion(region) {
 // MH06 (Raigad/Pen) counts as Mumbai for Shriram — USER-confirmed (MH5/2258
 // Maruti Ertiga diesel, NCB 0: operator paid the Mumbai "Without NCB" diesel 11,
 // not ROM's 15 — whose remark excludes Maruti anyway).
-const SHRIRAM_MUMBAI_RTOS = new Set(['MH01', 'MH02', 'MH03', 'MH04', 'MH06', 'MH43', 'MH46', 'MH47', 'MH48']);
+// MH05 (Kalyan) and MH58 (Mira-Bhayandar) are also Mumbai-metro — USER-confirmed
+// (MH20/6745 Ertiga taxi, RTO MH-05: operator paid the Mumbai "Upto 6+1" rate,
+// not ROM's 35). USER Mumbai RTO list: MH-01..06, 43, 46, 47, 48, 58.
+const SHRIRAM_MUMBAI_RTOS = new Set(['MH01', 'MH02', 'MH03', 'MH04', 'MH05', 'MH06', 'MH43', 'MH46', 'MH47', 'MH48', 'MH58']);
 const SHRIRAM_REGION_TOKENS = {
   'GUJARAT': ['GUJARAT'],
   'TAMIL NADU': ['TAMIL'],
@@ -2258,6 +2261,7 @@ function filterRulesByPolicy(rules, params, _trace) {
         if (matches) {
           const _isWB = /WEST\s*BENGAL/i.test(String(rule.region || ''))
             || /WEST\s*BENGAL/i.test(String(params._stateName || ''));
+          const _isMumbai = /^MUMBAI/i.test(String(rule.region || ''));
           let remWithNilDep, remWithoutNilDep, polHasNilDep;
           if (_isWB) {
             remWithNilDep = (/WITH\s+NIL\s*DEP|FOR\s+NIL\s*DEP|NIL\s*DEP\s+CASES?/.test(rem))
@@ -2267,6 +2271,15 @@ function filterRulesByPolicy(rules, params, _trace) {
               ? params._prZeroDep === true
               : (params.hasNilDep === true ||
                  /NIL\s*DEP|ZERO\s*DEP/i.test(`${params.addonText || ''} ${vehicleCategory}`));
+          } else if (_isMumbai) {
+            // Shriram MUMBAI taxi 45 (With NIL DEP) / 52 (Without): the operator's
+            // nil-dep split tracks the ACTUAL zero-dep ADD-ON premium, not PR
+            // zero_dep (which is YES for both here). Addon_Premium>0 → nil-dep →
+            // 45; =0 → 52. USER MH20/6745 (MH-05, addon 9525→45) vs MH14/6849
+            // (MH-02, addon 0→52, both zero_dep=YES).
+            remWithNilDep = /WITH\s+NIL\s*DEP/.test(rem) && !/WITHOUT\s+NIL\s*DEP/.test(rem);
+            remWithoutNilDep = /WITHOUT\s+NIL\s*DEP/.test(rem);
+            polHasNilDep = (Number(params.addonPremium) || 0) > 0;
           } else {
             remWithNilDep = /WITH\s+NIL\s*DEP/.test(rem) && !/WITHOUT\s+NIL\s*DEP/.test(rem);
             remWithoutNilDep = /WITHOUT\s+NIL\s*DEP/.test(rem);
