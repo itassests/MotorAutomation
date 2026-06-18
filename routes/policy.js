@@ -3295,25 +3295,22 @@ function filterRulesByPolicy(rules, params, _trace) {
             matches = false;
           }
           // United PCV-TAXI cars ("PCV-TAXI (4-6)STR" / "(7-10)STR") are 4-wheeler
-          // passenger cabs (<=10 seats). United prices them under the seat-banded
-          // "4W PCV > 6" PCC<=10 band (=20% in most states), NOT the "Taxi" segment
-          // (15%/25%) and NOT "2W PCV" (10%). The engine was landing on 2W PCV /
-          // Taxi and under-rating (our 10/15/25 vs operator 20). In the whole
-          // United PCV set the operator NEVER pays the Taxi-segment rate — taxi
-          // cabs always take the 4W-PCV band — so drop 2W/3W PCV and Taxi rows for
-          // a taxi-cab and boost the 4W PCV seat-banded segment so it wins. Scoped
-          // to United (magma/iffco/national/oriental/zuno reuse the same 2W/3W/4W
-          // PCV labels with their own grids — a global drop would regress them).
+          // passenger cabs (<=10 seats). USER ruling (DL7/14228): a TAXI takes the
+          // dedicated "Taxi" segment (15% low-rate states / 25% others), which is
+          // GRID-CORRECT — NOT the seat-banded "4W PCV > 6" band. (An earlier read
+          // routed cabs to 4W-PCV>6 because the operator pays a flat ~20 that
+          // coincides with the 4W-PCV "most states" 20; per the user that op-20 is
+          // an over-payment and 15/25 is the real Taxi grid → As-per-Grid divergence.)
+          // 2W/3W PCV are never correct for a 4-wheeler cab → hard-drop; demote the
+          // 4W-PCV>6 band so the Taxi segment (+6, below) wins, but keep it as a
+          // fallback so a region/seat with no Taxi row doesn't strand to no-rule.
+          // Scoped to United (magma/iffco/national/oriental/zuno reuse the 2W/3W/4W
+          // PCV labels with their own grids — a global change would regress them).
           if (rule.insurer === 'united_india_insurance' && policyIsTaxi && !policyIsRickshaw) {
             const segIs2wOr3wPcv = /\b[23]\s*W\s*PCV\b/i.test(seg);
             const segIsFourWPcv  = /\b4\s*W\s*PCV\b/i.test(seg);
-            // 2W/3W PCV are never correct for a 4-wheeler cab → hard-drop.
-            // Boost 4W PCV ABOVE the Taxi segment (+12 vs Taxi's +8) rather than
-            // dropping Taxi — so the seat-banded 4W-PCV band wins whenever it
-            // matches, but Taxi survives as a fallback if (for some region/seat)
-            // no 4W-PCV row resolves, avoiding a no-rule strand (e.g. BG1/1268).
             if (segIs2wOr3wPcv) matches = false;
-            else if (segIsFourWPcv) score += 12;
+            else if (segIsFourWPcv) score -= 6;
           }
         }
         // PCV catch-all: source category not reliable — let scoring pick
