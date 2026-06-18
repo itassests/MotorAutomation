@@ -3519,6 +3519,16 @@ function filterRulesByPolicy(rules, params, _trace) {
       // KA Crane vol 80 = 0.29 = operator. Small boost (below the +15 segment
       // swing) so it only selects the band, never overrides the body.
       if (rule.insurer === 'universal_sompo' && String(rule.volume_tier || '').trim() === '80') score += 4;
+      // go_digit: the multi-body CE segment ("Backhoe loader, Forklift,
+      // Excavator, and loader" / "E-Loaders") must NOT match a non-CE body — a
+      // harvester (or any body go_digit doesn't name) is MISC-others and takes
+      // the "MiscD" segment. USER MH39/3155 (Shaktiman harvester, MH13/ROM2):
+      // demote the CE segment for a non-CE policy so MiscD wins.
+      if (rule.insurer === 'go_digit') {
+        const _segCE = /BACKHOE|FORK\s*LIFT|FORKLIFT|EXCAVAT|\bLOADER\b/.test(segU);
+        const _polCE = /\bJCB\b|BACKHOE|FORK\s*LIFT|FORKLIFT|EXCAVAT|\bLOADER\b/.test(catProbe);
+        if (_segCE && !_polCE) score -= 15;
+      }
     }
     // Make matching from rule.make field — "All" / "Any" / "*" / blank = wildcard,
     // "Others" = catch-all fallback (kept with low priority).
