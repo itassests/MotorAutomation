@@ -193,6 +193,13 @@ function aliasHdfcRegion(region) {
 // (MH20/6745 Ertiga taxi, RTO MH-05: operator paid the Mumbai "Upto 6+1" rate,
 // not ROM's 35). USER Mumbai RTO list: MH-01..06, 43, 46, 47, 48, 58.
 const SHRIRAM_MUMBAI_RTOS = new Set(['MH01', 'MH02', 'MH03', 'MH04', 'MH05', 'MH06', 'MH43', 'MH46', 'MH47', 'MH48', 'MH58']);
+// Shriram's KARNATAKA grid splits "Bangalore RTO Codes" vs "Other Than Bangalore
+// RTO Codes" in the rule REMARK (region stays "KARNATAKA") — Bangalore taxis pay
+// more (Upto 6+1 22.5 vs 15; 3W 62.5 vs 51; HCV bands differ). Bangalore-metro
+// RTO list is USER-confirmed: KA-01..05, 41, 42, 43, 50, 51, 52, 53, 57, 59, 60.
+// Stored zero-stripped (KA1, KA50, ...) to match the gate's nrm() normalisation.
+const SHRIRAM_BANGALORE_RTOS = new Set(['KA1', 'KA2', 'KA3', 'KA4', 'KA5', 'KA41',
+  'KA42', 'KA43', 'KA50', 'KA51', 'KA52', 'KA53', 'KA57', 'KA59', 'KA60']);
 const SHRIRAM_REGION_TOKENS = {
   'GUJARAT': ['GUJARAT'],
   'TAMIL NADU': ['TAMIL'],
@@ -2312,9 +2319,53 @@ function filterRulesByPolicy(rules, params, _trace) {
             }
           }
         }
+        // Karnataka "Bangalore RTO Codes" vs "Other Than Bangalore RTO Codes"
+        // split (encoded in the remark, region stays "KARNATAKA"). Gate by the
+        // USER-confirmed Bangalore-metro RTO set so a non-Bangalore KA taxi takes
+        // the "Other Than Bangalore" rate (Upto 6+1 = 15) instead of defaulting
+        // to the Bangalore rate (22.5). Karnataka-scoped — keeps clear of other
+        // states' RTO-decline remarks (handled by the WB-scoped gate above).
+        if (matches && (/KARNATAKA/i.test(String(rule.region || ''))
+            || /KARNATAKA/i.test(String(params._stateName || '')))) {
+          const remOtherBlr = /OTHER\s+THAN\s+BANGALORE/.test(rem);
+          const remBlr = /BANGALORE\s+RTO\s*CODE/.test(rem) && !remOtherBlr;
+          if (remOtherBlr || remBlr) {
+            const nrm = (s) => String(s).toUpperCase().replace(/[^A-Z0-9]/g, '')
+              .replace(/^([A-Z]+)0*(\d+)$/, '$1$2');
+            const polRto = nrm(params.rtoCode || '');
+            if (polRto) {
+              const inBlr = SHRIRAM_BANGALORE_RTOS.has(polRto);
+              if (remBlr && !inBlr) matches = false;
+              else if (remOtherBlr && inBlr) matches = false;
+            }
+          }
+        }
         // Short-term (min 90-day) pro-rata rows apply only to short-term
         // policies; default annual policies drop them.
         if (matches && /SHORT\s*TERM\s*POLICY/.test(rem)) matches = false;
+      }
+    }
+
+    // Shriram KARNATAKA "Bangalore RTO Codes" vs "Other Than Bangalore" split for
+    // GCV (HCV bands) — the PCV remark gate above is scoped to vehicleType=PCV, so
+    // a Karnataka truck (e.g. KA07 HCV 12001-20000) didn't get gated and defaulted
+    // to the Bangalore rate (22.5) instead of "Other Than Bangalore" (20). Same
+    // phrase logic, GCV-scoped; rem computed locally (outside the PCV block).
+    if (matches && rule.insurer === 'shriram'
+        && String(params.vehicleType || '').toUpperCase() === 'GCV'
+        && (/KARNATAKA/i.test(String(rule.region || '')) || /KARNATAKA/i.test(String(params._stateName || '')))) {
+      const remG = String(rule.remarks || '').toUpperCase();
+      const remOtherBlr = /OTHER\s+THAN\s+BANGALORE/.test(remG);
+      const remBlr = /BANGALORE\s+RTO\s*CODE/.test(remG) && !remOtherBlr;
+      if (remOtherBlr || remBlr) {
+        const nrm = (s) => String(s).toUpperCase().replace(/[^A-Z0-9]/g, '')
+          .replace(/^([A-Z]+)0*(\d+)$/, '$1$2');
+        const polRto = nrm(params.rtoCode || '');
+        if (polRto) {
+          const inBlr = SHRIRAM_BANGALORE_RTOS.has(polRto);
+          if (remBlr && !inBlr) matches = false;
+          else if (remOtherBlr && inBlr) matches = false;
+        }
       }
     }
 
