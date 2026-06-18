@@ -2522,9 +2522,17 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     const isStandaloneTp = ip === 'TP' || (Number(params.odPremium) || 0) === 0;
     const cur = pickPrimaryRateRule(rules);
     const curRate = cur ? Number(cur.rate_value) : 0;
-    if (isElectric && isStandaloneTp && !(curRate > 0)) {
-      const vt = String(params.vehicleType || '').toUpperCase();
-      const isRick = /RIKSHAW|RICKSHAW|E-?RICK|E-?RIK|\b3W\b|3\s*WHEEL|TREO|PCV3W?/.test(cat + ' ' + mdl);
+    const curIsEvStp = cur && String(cur.sheet_name || '') === 'EV STP';
+    const vt = String(params.vehicleType || '').toUpperCase();
+    const isRick = /RIKSHAW|RICKSHAW|E-?RICK|E-?RIK|\b3W\b|3\s*WHEEL|TREO|PCV3W?/.test(cat + ' ' + mdl);
+    // Fire when no real STP rate matched (0/null) — OR for an electric 3W
+    // E-Rickshaw PCV that matched a generic, fuel-agnostic regional 3W/auto SATP:
+    // the electric EV-STP rate (PCV-3W 0.54) must override the generic (USER
+    // UP1/15110, UP "3 Wheeler >3 Seating Capacity" SATP 0.11 vs EV-STP 0.54).
+    // Never overrides a row that is already an EV-STP rate.
+    const evStpFire = isElectric && isStandaloneTp &&
+      (!(curRate > 0) || (vt === 'PCV' && isRick && !curIsEvStp));
+    if (evStpFire) {
       let wantSeg = null;
       if (vt === 'PCV')      wantSeg = isRick ? 'PCV - 3 wheeler' : 'PCV - 4 wheeler';
       else if (vt === 'TW')  wantSeg = 'Two Wheeler';
@@ -2546,7 +2554,12 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
             evRows = er.recordset;
             caches.lookup.set(evKey, evRows);
           }
-          if (evRows && evRows.length > 0) rules = [...rules, evRows[0]];
+          // PREPEND so the EV-STP row is pickPrimaryRateRule's finalPool[0] — it
+          // selects the FIRST non-zero/non-ACT rule by array order, not the max.
+          // Appending left a non-zero generic (e.g. UP 3W SATP 0.11) ahead of the
+          // EV-STP 0.54; prepending makes the electric rate win. (The old 0/null
+          // case still works — the zero generic is filtered out regardless.)
+          if (evRows && evRows.length > 0) rules = [evRows[0], ...rules];
         } catch (_) { /* leave rules unchanged on lookup failure */ }
       }
     }
@@ -4356,7 +4369,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       if (kept.length) rules = kept;
     }
   }
-  let primary = pickPrimaryRateRule(rules);
+  let primary = pickPrimaryRateRule(rules);
   // ---- Enabler / special-payout override ----
   // A criteria-scoped enabler deal (segment + make + transaction + RTO location +
   // date window) overrides the policy's income rate to the deal's COA% — REGARDLESS
