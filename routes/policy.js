@@ -3485,12 +3485,23 @@ function filterRulesByPolicy(rules, params, _trace) {
     if (matches && String(params.vehicleType || '').toUpperCase() === 'MISC' && rule.segment) {
       const segU = String(rule.segment).toUpperCase();
       const catProbe = (vehicleCategory + ' ' + model + ' ' + (params.vehicleSubModel || '')).toUpperCase();
-      const isGenericMisc = /ALL\s+OTHER\s+MISC/.test(segU);
+      // Catch-all segment names: United "All other Miscellaneous Vehicles",
+      // Universal "Misc-D | Other Misc-D".
+      const isGenericMisc = /\bOTHER\s+MISC/.test(segU);
       const MISC_BODY = [
         { cat: /\bAMBULANCE\b/,            seg: /\bAMBULANCE\b/ },
         { cat: /\bHEARSE\b/,               seg: /\bHEARSE\b/ },
         { cat: /\bTRACTOR\b/,              seg: /\bTRACTOR\b/ },
         { cat: /\bMOBILE\s*CLINIC\b/,      seg: /\bMOBILE\s*CLINIC\b/ },
+        // Universal Sompo construction-equipment MISC bodies (body is in the
+        // segment "Misc-D | Crane/ Excavator" etc., not rule.make). USER BG3/5041
+        // (Escorts Hydraulic Mobile Crane, "MISC - D - Crane", Universal KA): the
+        // Crane/Excavator segment must beat the "Other Misc-D" catch-all. (The
+        // intra-segment volume_tier band is a separate, unresolved selector.)
+        { cat: /\bCRANE\b|\bEXCAVATOR\b/,                  seg: /CRANE|EXCAVAT/ },
+        { cat: /\bLOADER\b|\bBACKHOE\b|\bBACHO\b/,         seg: /BACHO|BACKHOE|LOADER/ },
+        { cat: /\bDIGGER\b|\bBORING\b|\bBORE\s*WELL\b/,    seg: /DIGGER|BORING/ },
+        { cat: /\bGARBAGE\b/,                              seg: /GARBAGE/ },
       ];
       const polBody = MISC_BODY.find(b => b.cat.test(catProbe));
       if (polBody) {
