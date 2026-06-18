@@ -2531,7 +2531,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     // UP1/15110, UP "3 Wheeler >3 Seating Capacity" SATP 0.11 vs EV-STP 0.54).
     // Never overrides a row that is already an EV-STP rate.
     const evStpFire = isElectric && isStandaloneTp &&
-      (!(curRate > 0) || (vt === 'PCV' && isRick && !curIsEvStp));
+      (!(curRate > 0) || (vt === 'PCV' && isRick && !curIsEvStp));
     if (evStpFire) {
       let wantSeg = null;
       if (vt === 'PCV')      wantSeg = isRick ? 'PCV - 3 wheeler' : 'PCV - 4 wheeler';
@@ -2559,7 +2559,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
           // Appending left a non-zero generic (e.g. UP 3W SATP 0.11) ahead of the
           // EV-STP 0.54; prepending makes the electric rate win. (The old 0/null
           // case still works — the zero generic is filtered out regardless.)
-          if (evRows && evRows.length > 0) rules = [evRows[0], ...rules];
+          if (evRows && evRows.length > 0) rules = [evRows[0], ...rules];
         } catch (_) { /* leave rules unchanged on lookup failure */ }
       }
     }
@@ -2585,12 +2585,19 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     const hay = cat + ' ' + mdl;
     const isElectric = /ELECTRIC|BATTERY|\bEV\b/.test(fu) ||
                        /E-?RIKSHAW|E-?RICKSHAW|E-?CART/.test(hay);
-    const isERick = /E-?RIKSHAW|E-?RICKSHAW|E-?RICK|E-?RIK/.test(hay);
+    // An electric 3W PCV passenger auto = E-Rickshaw for commission, even when
+    // the source labels it "Auto Rikshaw" / "PCV-3 WH" / a model like Treo
+    // rather than literally "E-Rickshaw" (USER MH23/9287, Mahindra Treo Plus,
+    // electric, package: op 40 = E-Rickshaw Comp_PACKAGE Pan India, not the
+    // generic "3W PCV Auto 0-3 Seater" 0.20). Gated to PCV below so electric
+    // GOODS e-carts (handled by the GCV e-cart override) aren't swept in.
+    const pkgVt = String(params.vehicleType || '').toUpperCase();
+    const isERick = /E-?RIKSHAW|E-?RICKSHAW|E-?RICK|E-?RIK|\bRIKSHAW\b|\bRICKSHAW\b|AUTO\s*RIK|TREO|3\s*WH|3\s*WHEEL|PCV[\s-]*3/.test(hay);
     const isPackage = (Number(params.odPremium) || 0) > 0;
     const hasERickRow = rules.some(r =>
       /E-?RICKSHAW/i.test(String(r.segment || '')) &&
       /PACKAGE/i.test(String(r.rate_type || '')));
-    if (isElectric && isERick && isPackage && !hasERickRow) {
+    if (isElectric && isERick && isPackage && pkgVt === 'PCV' && !hasERickRow) {
       const st    = String(resolvedRegion || '').toUpperCase();
       const rtoSt = String(params.rtoCode || '').toUpperCase().slice(0, 2);
       let evSeg, evReg;
@@ -4369,7 +4376,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       if (kept.length) rules = kept;
     }
   }
-  let primary = pickPrimaryRateRule(rules);
+  let primary = pickPrimaryRateRule(rules);
   // ---- Enabler / special-payout override ----
   // A criteria-scoped enabler deal (segment + make + transaction + RTO location +
   // date window) overrides the policy's income rate to the deal's COA% — REGARDLESS
