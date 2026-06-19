@@ -1951,6 +1951,16 @@ function filterRulesByPolicy(rules, params, _trace) {
     if (/^GAS[_\s]*TANKER[_\s]/.test(rt)) return policyIsGasTanker;
     return true;
   };
+  // Segment-text age band (Go Digit encodes age in the segment string, not the
+  // vehicle_age columns). A COMP row from a DIFFERENT age band must not count as
+  // "Comp available" for this policy — otherwise a null-COMP Age-0-1 policy sees
+  // the Age-2/3-5/6+ COMP rows (age columns null → _ageWithinRule passes) and
+  // wrongly reports a usable Comp rate, blocking the SATP fallback.
+  const _segAgeOk = (r) => {
+    const sar = extractSegmentAgeRange(r.segment);
+    if (!sar || params.vehicleAge == null) return true;
+    return params.vehicleAge >= sar.min && params.vehicleAge <= sar.max;
+  };
   const _hasUsableComp = rules.some(r => {
     const rt = (r.rate_type || '').toUpperCase();
     // A Comprehensive *commission* rate (CD2 column), body-appropriate, with a
@@ -1958,7 +1968,7 @@ function filterRulesByPolicy(rules, params, _trace) {
     // commission), so it doesn't count toward "Comp rate available".
     const isCompCommission = /(^|_)COMP(_|$)/.test(rt) && /CD2/.test(rt);
     return isCompCommission && r.rate_value != null && _bodyAllowsRt(rt)
-        && _ageWithinRule(r) && _weightWithinRule(r);
+        && _ageWithinRule(r) && _weightWithinRule(r) && _segAgeOk(r);
   });
   // Go Digit prices Comprehensive (COMP_*_CD2) and TP (SATP_*) as SEPARATE
   // commission columns; a Comprehensive policy must take the COMP rate ONLY and
@@ -1968,10 +1978,21 @@ function filterRulesByPolicy(rules, params, _trace) {
   // no-COMP — a large over-rate. Disable the fallback for go_digit (user rule:
   // COMP product → COMP rate, SATP → TP only). Other insurers keep the fallback.
   const _poolInsurer = rules.length ? rules[0].insurer : null;
+  // EXCEPTION to the go_digit disable: go_digit's 3W PCV grid prices COMP = SATP
+  // (the two columns carry the SAME value in every region/age where both exist —
+  // 72 of 72 populated cells, incl. ROM2's own Age-2/3-5/6+). So where the COMP
+  // cell is an ingest gap (null) but SATP has a value, the SATP rate IS the
+  // intended Comprehensive commission — unlike go_digit GCV/4W (the case the
+  // disable was written for), where COMP and SATP genuinely differ and borrowing
+  // SATP over-rates. USER MH22/4981 (Bajaj Maxima 3W, ROM2, non-diesel age 1):
+  // ROM2 "PCV3W non-diesel Age 0-1" COMP=null / SATP=0.345 → operator paid 0.345.
+  const _isGoDigit3wPcv = _poolInsurer === 'go_digit'
+    && String(params.vehicleType || '').toUpperCase() === 'PCV'
+    && /3\s*-?\s*W|3\s*WH|RICK|RIKSHAW|\bAUTO\b/i.test(`${params.vehicleCategory || ''} ${params.model || ''}`);
   const allowAgedSatpFallback = _isCommercialVeh
     && String(params.insProduct || '').toUpperCase() === 'COMP'
     && !_hasUsableComp
-    && _poolInsurer !== 'go_digit';
+    && (_poolInsurer !== 'go_digit' || _isGoDigit3wPcv);
 
   // Score each rule by how well its segment matches the policy
   const scored = rules.map(rule => {
