@@ -1335,6 +1335,12 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       const pfx = BRANCH_STATE_PREFIX[bm[1].trim()];
       if (pfx && SPF[pfx]) bookedState = SPF[pfx];
     }
+    // J&K exception: Shriram rates a Jammu & Kashmir-registered vehicle by its
+    // RTO state, NOT the booking location (USER-confirmed PJ2/4835: a JK21 truck
+    // booked at the Punjab branch takes the J&K rate 14, not Punjab's 19, even
+    // though Punjab carries the band). Ignore the booking state for JK RTOs so
+    // the RTO-state path below resolves region to "J & K".
+    if (rtoStatePrefix(params.rtoCode) === 'JK') bookedState = null;
     // Booking state wins; fall back to the resolved region / RTO-state.
     const rtoState = SPF[rtoStatePrefix(params.rtoCode)];
     const fullState = bookedState || resolvedRegion || rtoState;
