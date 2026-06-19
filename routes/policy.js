@@ -2224,10 +2224,23 @@ function filterRulesByPolicy(rules, params, _trace) {
       // Tanker applicability
       if (remTankerOnly && !policyIsTankerBody) matches = false;
       else if (remExclTankers && policyIsTankerBody) matches = false;
-      // NCB / claim-status twin (claim-free renewal ↔ positive NCB)
+      // New/Rollover vs "Our Claim-Free renewal" twin. The PRIMARY discriminator
+      // is BUSINESS TYPE, not NCB: a New or Rollover policy takes the
+      // "New/Rollover" rate even when it carries NCB forwarded from the prior
+      // insurer (a rollover keeps its NCB). Only a genuine RENEWAL of a Shriram
+      // ("Our") claim-free policy takes the "Claim-Free renewal" rate. The old
+      // NCB-only proxy mis-rated a rollover-with-NCB (Tata Signa 4623, GJ05,
+      // New/Rollover, NCB 35 → wrongly took claim-free 20 vs operator 17.5).
       if (matches) {
-        if (remClaimFree && !policyHasNCB) matches = false;       // claim-free rate, but zero NCB
-        else if (remNewRollover && policyHasNCB) matches = false; // new/rollover rate, but has NCB
+        const _bt = String(params.businessType || '').toUpperCase();
+        const _btNewRollover = _bt === 'NEW' || _bt === 'ROLLOVER';
+        if (_btNewRollover) {
+          if (remClaimFree) matches = false;        // new/rollover business → not the renewal rate
+        } else {
+          // Renewal / unknown business — fall back to the NCB (claim-status) proxy.
+          if (remClaimFree && !policyHasNCB) matches = false;       // claim-free rate, but zero NCB
+          else if (remNewRollover && policyHasNCB) matches = false; // new/rollover rate, but has NCB
+        }
       }
     }
 
