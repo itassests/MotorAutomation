@@ -110,10 +110,12 @@ function bandFromCat(cat, makeModel) {
   const mm = String(makeModel || '').toLowerCase();
   if (/3w|3 w|e-?rik|e-?rick/.test(c) || /\bape\b|maxima|atul|piaggio|shakti|gem\b/.test(mm)) return '3W';
   if (/upto 2\.5|0-2\.5|<2\.5|upto 2500|<\s*2500/.test(c)) {
-    // Ashok Leyland DOST is a ~2.8T-GVW LCV that sometimes gets mis-filed as
-    // "Upto 2.5Tn" — every OTHER Dost in the data is "2.5-3.5Tn" (30 of 31). Bump
-    // it to the 2.5-3.5T band so it takes the correct grid cell. USER MH27/5577.
-    if (/\bdost\b/.test(mm)) return '2.5-3.5T';
+    // Ashok Leyland Dost STRONG is the heavier (~2.8T-GVW) variant — when filed
+    // "Upto 2.5Tn" it belongs in 2.5-3.5T (USER MH27/5577, sub-model "Strong LX":
+    // 2.5-3.5T others 52.5 +7.5 = 60 = op). The BASE Dost (e.g. sub-model "LS")
+    // is a genuine ≤2.5T and stays 0-2.5T (USER MH4/24452 "LS": 0-2.5T others 55
+    // +7.5 = 62.5 = op 63). `mm` includes the sub-model (passed by resolveGcvRate).
+    if (/\bdost\b/.test(mm) && /\bstrong\b/.test(mm)) return '2.5-3.5T';
     return '0-2.5T';
   }
   if (/2\.5-3\.5|2\.5 ?- ?3\.5|2500-3500/.test(c)) return '2.5-3.5T';
@@ -196,7 +198,7 @@ function resolveGcvRate(params, resolvedRegion, rtoState, isSatp) {
   // Distinct from the rated "GCV - 3W" autos (which match at 0.65), so this is a
   // targeted category decline — returns null (zero commission).
   if (/E-?RIK|E-?RICK/.test(cat)) return null;
-  const band = bandFromCat(params.vehicleCategory, make + ' ' + model);
+  const band = bandFromCat(params.vehicleCategory, make + ' ' + model + ' ' + (params.vehicleSubModel || ''));
   if (!band) return undefined;
   const { state, loc } = gridLoc(resolvedRegion, rtoState, params.rtoCode);
   if (!state) return undefined;
