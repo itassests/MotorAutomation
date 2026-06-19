@@ -4419,6 +4419,23 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       }
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
+  // ---- go_digit GCV 20-40T "Good GJ" non-TATA → no-rule (grid has only a TATA rate) ----
+  // The make='All' rows for this exact cell are ingest garbage (MULTIPLE conflicting
+  // values per rate_type: COMP_MAX_CD2 = 0.025/0.215/0.28, SATP_MAX = 0.125/0.385/0.45)
+  // while make='TATA' has clean single values (COMP 0.30). USER manual-check: the grid
+  // specifies ONLY a TATA rate for Good GJ 20-40T, so a non-TATA truck has no rate
+  // (operator 0). Clear the whole pool (not just the 20-40T rows) — dropping only those
+  // exposes a stray "Backhoe loader/Forklift/Excavator" MISC segment (0.425, make='All',
+  // same GOOD GJ region) that wrongly matches a truck. USER GJ10/1554 (Bharat Benz 2523 C,
+  // GJ-15): 28 → no-rule = operator 0. (The op-28 Bharat Benz in GJ-26/GJ-01 and op-26
+  // Mahindra Navistar are operator OVER-payments vs the grid → As-per-Grid divergences.)
+  if (insurerSlug === 'go_digit'
+      && String(params.vehicleType || '').toUpperCase() === 'GCV'
+      && /GOOD\s*GJ/i.test(String((rtoInfo && rtoInfo.region) || resolvedRegion || ''))
+      && !/TATA/i.test(String(params.make || '').toUpperCase())
+      && /20\s*(?:-|–|to)\s*40/i.test(String(params.vehicleCategory || ''))) {
+    rules = [];
+  }
   let primary = pickPrimaryRateRule(rules);
   // ---- Enabler / special-payout override ----
   // A criteria-scoped enabler deal (segment + make + transaction + RTO location +
