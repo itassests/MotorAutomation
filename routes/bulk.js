@@ -2120,15 +2120,30 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     // cluster to the correct "_OTHERS" grid region and try it FIRST. TW-scoped
     // so the CAR tier path (Key Cities / Other Cities / Rest of State) is
     // untouched.
-    const royalRestCandidates = (insurerSlug === 'royal_sundaram' && productIsTw)
+    const royalRestCandidates = (insurerSlug === 'royal_sundaram')
       ? (() => {
           const clu = String((rtoInfo && rtoInfo.cluster) || '').toUpperCase().trim();
           const m = clu.match(/^REST\s+OF\s+(.+)$/);
-          if (m) {
-            const st = m[1].trim();
-            return [st.replace(/\s+/g, '') + '_OTHERS', st + '_OTHERS'];
+          if (!m) return [];
+          const st = m[1].trim();
+          const out = [];
+          if (productIsTw) {
+            // TW Comp grid labels rest-of-state "<STATE>_OTHERS".
+            out.push(st.replace(/\s+/g, '') + '_OTHERS', st + '_OTHERS');
           }
-          return [];
+          if (String(resolvedProduct).toUpperCase().includes('GCV')) {
+            // GCV grid labels rest-of-state "REST OF <STATECODE>" (e.g.
+            // "REST OF MH"/"REST OF JH"), but rto_mappings clusters the RTO as
+            // "REST OF <FULLSTATE>" ("REST OF MAHARASHTRA"). The generic MH
+            // state fallback tries 'Pune' first and Royal's grid HAS a literal
+            // PUNE region, so a genuine rest-of-Maharashtra GCV truck (MH17)
+            // wrongly took PUNE (0.40) instead of REST OF MH (0.35). Map the
+            // cluster to the state-code form and try it FIRST. (Some states use
+            // the full name in the grid too — push both.)
+            if (stateKey) out.push('REST OF ' + stateKey);
+            out.push('REST OF ' + st);
+          }
+          return out;
         })()
       : [];
     const candidates = [
