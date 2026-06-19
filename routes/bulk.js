@@ -1315,12 +1315,33 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   if (insurerSlug === 'shriram') {
     const P = require('./policy');
     const SPF = P.STATE_PREFIX_FULL || {};
-    const fullState = resolvedRegion || SPF[rtoStatePrefix(params.rtoCode)];
+    // Shriram rates by the policy's BOOKING LOCATION, not the vehicle RTO state.
+    // The booking branch is filed as "DIR <State>" (e.g. "DIR Gujarat"). A
+    // truck registered in Rajasthan (RJ12) but booked at the Surat branch takes
+    // the GUJARAT grid, not Rajasthan. Map the branch state → RTO prefix → the
+    // same canonical full-state string SPF produces, so same-state policies are
+    // unchanged (booking state == RTO state) and only cross-state bookings move.
+    const BRANCH_STATE_PREFIX = {
+      'GUJARAT': 'GJ', 'MAHARASHTRA': 'MH', 'UTTAR PRADESH': 'UP', 'DELHI': 'DL',
+      'WEST BENGAL': 'WB', 'KARNATAKA': 'KA', 'TAMIL NADU': 'TN', 'TAMILNADU': 'TN',
+      'JHARKHAND': 'JH', 'PUNJAB': 'PB', 'RAJASTHAN': 'RJ', 'BIHAR': 'BR',
+      'UTTARAKHAND': 'UK', 'UTTRAKHAND': 'UK',
+    };
+    let bookedState = null;
+    const branch = String(policy.Branch || policy['BOOKING BRANCH'] || '').toUpperCase().trim();
+    const bm = branch.match(/^DIR\s+(.+)$/);
+    if (bm) {
+      const pfx = BRANCH_STATE_PREFIX[bm[1].trim()];
+      if (pfx && SPF[pfx]) bookedState = SPF[pfx];
+    }
+    // Booking state wins; fall back to the resolved region / RTO-state.
+    const fullState = bookedState || resolvedRegion || SPF[rtoStatePrefix(params.rtoCode)];
     if (P.aliasShriramRegion) {
       const toks = P.aliasShriramRegion(fullState, params.rtoCode);
       if (toks && toks.length) shriramRegionTokens = toks;
     }
-    if (!resolvedRegion && fullState) resolvedRegion = fullState;
+    if (bookedState) resolvedRegion = bookedState;
+    else if (!resolvedRegion && fullState) resolvedRegion = fullState;
   }
   // United India GCV funnel: 0 rto_mappings → region never resolves, and a 3W/light
   // goods category often has a null Tonnes field. Two funnel steps so the existing
@@ -5079,7 +5100,7 @@ async function runBulkCalculate(body) {
     'BASE_OD_PREMIUM','NET_OD_PREMIUM','NET_LIABILITY_PREMIUM',
     'PREMIUM_WITHOUT_GST','ADD_ON_PREMIUM','Addon_Premium',
     'ANNUAL_PREMIUM','NCB','OD_DISCOUNT',
-    'BUSINESS_TYPE_ID','SubmissionDate','POLICY_ISSUED_DATE','POLICY_START_DATE','City','BooKedLocation',
+    'BUSINESS_TYPE_ID','SubmissionDate','POLICY_ISSUED_DATE','POLICY_START_DATE','City','BooKedLocation','Branch',
     // OD/TP period dates → odTenure/tpTenure → bundledTag ("1+1"/"1+3"/"3+3"); used by the
     // go_digit CAR bundled-vs-annual tenure routing (3+3 new car → 3+3_CD2, not annual).
     'OD_Start_Date','OD_End_Date','TP_POLICY_START_DATE','TP_POLICY_END_DATE',
@@ -5149,6 +5170,10 @@ async function runBulkCalculate(body) {
     // by booking-branch city like "JANAK PURI", "MUMBAI ANDHERI", etc.).
     'BusinessBookedLocation':   r.BooKedLocation,
     'BUSINESS BOOKED LOCATION': r.BooKedLocation,
+    // Booking branch — Shriram's "DIR <State>" booking-state signal (Shriram
+    // rates by booking location, not the vehicle RTO state).
+    'Branch':                   r.Branch,
+    'BOOKING BRANCH':           r.Branch,
     'FULL NAME':                r.FULLNAME_PROPOSER,
     'PROPOSER NAME':            r.FULLNAME_PROPOSER,
     'CC':                       r.CC,
