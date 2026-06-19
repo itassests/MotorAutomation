@@ -4569,6 +4569,19 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       && /20\s*(?:-|–|to)\s*40/i.test(String(params.vehicleCategory || ''))) {
     rules = [];
   }
+  // ---- Universal Sompo UP-2: heavy GCV (> 7.5T) is DECLINED ----
+  // The UP-2 cluster grid carries ONLY light GCV bands (0-3.5T, 3.5-7.5T); the
+  // insurer does not write heavier goods vehicles there. With no UP-2 heavy band,
+  // the cross-cluster US fallback wrongly borrowed UP-1's [20-45] rate. USER
+  // (DL7/14165, BharatBenz 20-40T, RTO UP17/UP-2): operator declines (0). Force
+  // no-rule when a US GCV in UP-2 exceeds UP-2's 7.5T coverage.
+  if (insurerSlug === 'universal_sompo'
+      && String(params.vehicleType || '').toUpperCase() === 'GCV'
+      && /^UP[\s-]*2$/i.test(String((rtoInfo && rtoInfo.cluster) || resolvedRegion || '').trim())) {
+    const _lo = params.tonnageMin != null ? params.tonnageMin
+              : (params.tonnage != null ? params.tonnage : null);
+    if (_lo != null && _lo > 7.5) rules = [];
+  }
   let primary = pickPrimaryRateRule(rules);
   // ---- Enabler / special-payout override ----
   // A criteria-scoped enabler deal (segment + make + transaction + RTO location +
