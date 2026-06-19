@@ -1100,12 +1100,19 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   if ((params.tonnage == null || params.tonnageCoarse) && params.mainId && caches && caches.tonnageById) {
     const t = caches.tonnageById.get(String(params.mainId));
     if (t != null) {
-      params.tonnage = t;
-      params.tonnageCoarse = false;   // now a precise value
-      // Collapse the coarse min/max to the precise value so band-overlap
-      // checks key off the real GVW.
-      params.tonnageMin = t;
-      params.tonnageMax = t;
+      // Refine to the precise GVW only when it falls STRICTLY INSIDE the coarse
+      // category band. At/over the band's upper edge (e.g. a nominal-40T Tata
+      // Signa 4025 whose GVW reads exactly 40 while the category says "20-40Tn")
+      // a 40.0 point matches BOTH "20 to 40" and "40 to 45" and the wrong band
+      // can win — keep the band so the operator's classification governs (→ ≤40).
+      // USER MH14/7034. (1.6T-in-"Upto 2.5Tn"→"<=2" still works: 1.6 is inside.)
+      const _cLo = params.tonnageMin, _cHi = params.tonnageMax;
+      if (_cHi == null || (t > _cLo && t < _cHi)) {
+        params.tonnage = t;
+        params.tonnageCoarse = false;   // now a precise value
+        params.tonnageMin = t;
+        params.tonnageMax = t;
+      }
     }
   }
 
@@ -1127,10 +1134,15 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
     const ton = prT && prT.tonnage != null ? Number(prT.tonnage) : null;
     if (ton != null && Number.isFinite(ton) && ton > 0) {
-      params.tonnage = ton;
-      params.tonnageCoarse = false;
-      params.tonnageMin = ton;
-      params.tonnageMax = ton;
+      // Same edge guard as the Prarambh-GVW block above: keep the coarse category
+      // band when the PR GVW sits at/over its upper edge (nominal-class vehicles).
+      const _cLo = params.tonnageMin, _cHi = params.tonnageMax;
+      if (_cHi == null || (ton > _cLo && ton < _cHi)) {
+        params.tonnage = ton;
+        params.tonnageCoarse = false;
+        params.tonnageMin = ton;
+        params.tonnageMax = ton;
+      }
     }
   }
 

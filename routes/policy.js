@@ -534,11 +534,24 @@ router.post('/lookup', async (req, res, next) => {
         const { fetchTonnage } = require('../services/prarambh-tonnage');
         const t = await fetchTonnage(prarambhPool, params.mainId);
         if (t != null) {
-          params.tonnage = t;
-          params.tonnageCoarse = false;
-          // Precise GVW — collapse min/max so band matching keys off it.
-          params.tonnageMin = t;
-          params.tonnageMax = t;
+          // The precise GVW REFINES the coarse category band only when it falls
+          // STRICTLY INSIDE it. When it sits AT/OVER the band's upper edge — e.g.
+          // a nominal-40T Tata Signa 4025 whose GVW reads exactly 40.0 while the
+          // category says "20-40Tn" — collapsing to a 40.0 point makes it match
+          // BOTH "20 to 40" and "40 to 45" (boundary), and the wrong band can win.
+          // Keep the category band so the operator's classification governs (→ the
+          // ≤40 band). USER MH14/7034. (The 1.6T-in-"Upto 2.5Tn"→"<=2" refinement
+          // still works: 1.6 is strictly inside [0,2.5].)
+          const _catLo = params.tonnageMin, _catHi = params.tonnageMax;
+          const _withinBand = _catHi != null && _catLo != null && t > _catLo && t < _catHi;
+          if (_catHi == null || _withinBand) {
+            params.tonnage = t;
+            params.tonnageCoarse = false;
+            // Precise GVW — collapse min/max so band matching keys off it.
+            params.tonnageMin = t;
+            params.tonnageMax = t;
+          }
+          // else: GVW at/outside the band edge → keep the coarse category band.
         }
       } catch (e) {
         console.warn('[policy] tonnage fallback skipped:', e.message);
@@ -1717,6 +1730,13 @@ function extractSegmentTonnageRange(seg) {
   if ((m = s.match(/(\d+(?:\.\d+)?)\s*(?:to|-)\s*(\d+(?:\.\d+)?)\s*Tn?\b/i))) {
     return { min: parseFloat(m[1]), max: parseFloat(m[2]) };
   }
+  // Royal GCV disc-band segments lead with the tonnage band but carry NO "Tn"
+  // suffix — "20 to 40 upto 85% disc...", "40 to 45 Dis Upto 90%...". Match the
+  // leading "X to Y" before a disc/upto token so the band is gated (else both
+  // "20 to 40" and "40 to 45" pass for a 20-40T truck). USER MH14/7034.
+  if ((m = s.match(/^\s*(\d+(?:\.\d+)?)\s*to\s*(\d+(?:\.\d+)?)\s+(?:upto|dis|disc)\b/i))) {
+    return { min: parseFloat(m[1]), max: parseFloat(m[2]) };
+  }
   if ((m = s.match(/upto\s*(\d+(?:\.\d+)?)\s*Tn?\b/i))) {
     return { min: 0, max: parseFloat(m[1]) };
   }
@@ -2875,7 +2895,19 @@ function filterRulesByPolicy(rules, params, _trace) {
       if (segTonRange) {
         const policyLo = params.tonnageMin != null ? params.tonnageMin : tonnage;
         const policyHi = params.tonnageMax != null ? params.tonnageMax : tonnage;
-        const overlaps = !(policyHi < segTonRange.min || policyLo > segTonRange.max);
+        // When the policy tonnage is a coarse CATEGORY BAND (a range, min≠max,
+        // e.g. "20-40Tn" → [20,40]) rather than a precise point GVW, its edge
+        // belongs to ONE band: consecutive grid bands ("20 to 40" / "40 to 45")
+        // share the 40 boundary, which the LOWER band owns. Use EXCLUSIVE edges
+        // for a range so a "20-40Tn" truck takes "20 to 40", not "40 to 45".
+        // A precise point tonnage keeps inclusive edges (a 40.0T GVW may legitimately
+        // sit on either boundary). USER MH14/7034 (Tata Signa 4025, "20-40Tn",
+        // no GVW → band [20,40] → "20 to 40" 0.39, not "40 to 45" 0.30).
+        const _isBand = params.tonnageMin != null && params.tonnageMax != null
+          && params.tonnageMin !== params.tonnageMax;
+        const overlaps = _isBand
+          ? !(policyHi <= segTonRange.min || policyLo >= segTonRange.max)
+          : !(policyHi < segTonRange.min || policyLo > segTonRange.max);
         if (!overlaps) matches = false;
         else score += 5;
       }
