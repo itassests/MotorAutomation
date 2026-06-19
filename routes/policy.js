@@ -4057,6 +4057,39 @@ function filterRulesByPolicy(rules, params, _trace) {
       } else {
         if (kept.some(s => !segTataAl(s))) kept = kept.filter(s => !segTataAl(s)); // non-T/AL → drop "(TATA&AL)" rows
       }
+
+      // rule.make-based make-family preference. Some Royal GCV regions (e.g.
+      // WEST_UP "20 to 40") encode the TATA&AL split in the rule.make COLUMN
+      // ("TATA, Ashok Leyland") with a plain "20 to 40" segment, while the
+      // "Other than Tata & AL" catch-all is make-BLANK (and split into IRDA
+      // OD/TP × Nil/NoNil rate_types). The rule.make CV-family gate scores the
+      // make-specific row +10, but pickPrimaryRateRule is score-blind ACROSS
+      // rate_types, so a lower-id make-blank "Other than" row wins by SQL order
+      // (Tata LPT3118 took the make-blank IRDA_OD_NilDep 0.195 vs the
+      // make-specific TATA&AL Comp_NoNilDep 0.18). When a row whose rule.make
+      // names the policy's OWN CV family survives, drop the make-blank rows (the
+      // catch-all). Only fires when such a specific row exists, so Eicher in a
+      // band that has no Eicher-specific make row (its "TATA, Ashok Leyland" row
+      // is already dropped by the per-rule CV-family gate) keeps the make-blank
+      // "Other than" rate, and non-T/AL/E makes are untouched.
+      const polFams = [];
+      { const pn = make.replace(/[^A-Z]/g, '');
+        if (/ASHOKLEYLAND/.test(pn)) polFams.push('AL');
+        if (/^TATA|TATAMOTORS/.test(pn)) polFams.push('TATA');
+        if (/EICHER/.test(pn)) polFams.push('EICHER'); }
+      if (polFams.length) {
+        const ruleFamMatch = (s) => {
+          const rn = String(s.rule.make || '').toUpperCase().replace(/[^A-Z]/g, '');
+          if (!rn) return false;                       // blank = wildcard, not specific
+          return (/ASHOKLEYLAND/.test(rn) && polFams.includes('AL'))
+              || (/TATA/.test(rn) && polFams.includes('TATA'))
+              || (/EICHER/.test(rn) && polFams.includes('EICHER'));
+        };
+        const makeBlank = (s) => !String(s.rule.make || '').trim();
+        if (kept.some(ruleFamMatch) && kept.some(makeBlank)) {
+          kept = kept.filter(s => !makeBlank(s));
+        }
+      }
     }
 
     // If any kept rule uses a specific make bucket (anything that isn't _Others),
