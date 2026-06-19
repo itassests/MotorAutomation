@@ -3162,6 +3162,18 @@ function filterRulesByPolicy(rules, params, _trace) {
       }
     }
 
+    // Liberty GCV vs PCV 3W segment family. Liberty pools both "GCV 3W" (goods)
+    // and "PCV 3W" (passenger) under one light-CV geo-cluster, so a goods 3W
+    // (vehicleType GCV) wrongly took the cheaper "PCV 3W" rate. Gate the GCV/PCV
+    // segment family by the policy's vehicle type. USER MH20/6669 (Mahindra Alfa
+    // GCV-3W, age 8, MAHARASHTRA-1M: PCV 3W 0.57 → GCV 3W age 5-10 = 0.65 = op).
+    if (matches && rule.insurer === 'liberty_videocon') {
+      const _segU = String(rule.segment || '').toUpperCase();
+      const _vtU = String(params.vehicleType || '').toUpperCase();
+      if (_vtU === 'GCV' && /^PCV\b/.test(_segU)) matches = false;
+      else if (_vtU === 'PCV' && /^GCV\b/.test(_segU)) matches = false;
+    }
+
     // Segment-based make matching — hard drop when the segment explicitly lists
     // makes and the policy's make isn't one of them (and isn't "Others").
     if (make && matches) {
