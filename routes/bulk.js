@@ -1312,6 +1312,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // 'contains' (substring) mode. Maharashtra splits Mumbai-metro RTOs → MUMBAI,
   // rest → ROM. include_null_region (below) keeps national PAN-INDIA rows.
   let shriramRegionTokens = null;
+  let shriramRtoFallbackTokens = null;
   if (insurerSlug === 'shriram') {
     const P = require('./policy');
     const SPF = P.STATE_PREFIX_FULL || {};
@@ -1335,13 +1336,24 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       if (pfx && SPF[pfx]) bookedState = SPF[pfx];
     }
     // Booking state wins; fall back to the resolved region / RTO-state.
-    const fullState = bookedState || resolvedRegion || SPF[rtoStatePrefix(params.rtoCode)];
+    const rtoState = SPF[rtoStatePrefix(params.rtoCode)];
+    const fullState = bookedState || resolvedRegion || rtoState;
     if (P.aliasShriramRegion) {
       const toks = P.aliasShriramRegion(fullState, params.rtoCode);
       if (toks && toks.length) shriramRegionTokens = toks;
     }
     if (bookedState) resolvedRegion = bookedState;
     else if (!resolvedRegion && fullState) resolvedRegion = fullState;
+    // When the booking state differs from the vehicle's RTO state, remember the
+    // RTO-state tokens as a FALLBACK: Shriram rates by booking location, but if
+    // the booking-state grid has no band covering the vehicle (e.g. a 48T truck
+    // booked in UP, whose HCV bands cap at 42.5T), the operator rates it by the
+    // RTO state instead (USER-confirmed). Applied below only when the booking
+    // lookup yields no usable rule.
+    if (bookedState && rtoState && bookedState !== rtoState && P.aliasShriramRegion) {
+      const rtoToks = P.aliasShriramRegion(rtoState, params.rtoCode);
+      if (rtoToks && rtoToks.length) shriramRtoFallbackTokens = rtoToks;
+    }
   }
   // United India GCV funnel: 0 rto_mappings → region never resolves, and a 3W/light
   // goods category often has a null Tonnes field. Two funnel steps so the existing
@@ -1920,6 +1932,57 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
     const compFiltered = compRules.length > 0 ? filterRulesByPolicy(compRules, params) : [];
     if (compFiltered.length > 0) rules = compFiltered;
+  }
+
+  // Shriram booking-location → RTO-state fallback. Shriram rates by the policy's
+  // booking state, but when that state's grid has NO band covering the vehicle
+  // (e.g. a 48T truck booked in UP, whose HCV grid caps at 42.5T → no goods band
+  // → the harvester catch-all is gated out → nothing usable), the operator rates
+  // it by the vehicle's RTO state. Re-lookup with the RTO-state tokens only when
+  // the booking-state lookup yields no usable (non-CD1, rated) rule. USER-confirmed.
+  if (insurerSlug === 'shriram' && shriramRtoFallbackTokens) {
+    const bookedFiltered = rules.length > 0 ? filterRulesByPolicy(rules, params) : [];
+    const _tn = Number(params.tonnage);
+    // For a GCV with a known tonnage, a "usable" booking-state rule must actually
+    // cover that tonnage in its weight band — a weight-band-less catch-all (the
+    // harvester / 3W junk rows a heavy truck wrongly falls onto) does NOT count,
+    // so a 48T truck whose booking state caps at 42.5T correctly falls back to RTO.
+    const _gcvTon = String(params.vehicleType || '').toUpperCase() === 'GCV'
+      && Number.isFinite(_tn) && _tn > 0;
+    const covers = (r) => {
+      const lo = r.weight_band_min, hi = r.weight_band_max;
+      if (lo == null && hi == null) return false;
+      return (lo == null || _tn >= lo) && (hi == null || _tn <= hi);
+    };
+    const usable = bookedFiltered.some(r => {
+      const rt = String(r.rate_type || '').toUpperCase();
+      if (rt.includes('CD1') || rt.startsWith('FLEXI') || r.rate_value == null) return false;
+      return _gcvTon ? covers(r) : true;
+    });
+    if (!usable) {
+      const fbKey = lookupKey + '||shriramRtoFb:' + shriramRtoFallbackTokens.join('|');
+      let fbRules;
+      if (caches.lookup.has(fbKey)) {
+        fbRules = caches.lookup.get(fbKey);
+      } else {
+        fbRules = await lookupRates(pool, {
+          ...baseLookup, region: '', cluster: '',
+          region_list: shriramRtoFallbackTokens, region_match_mode: 'contains',
+        });
+        caches.lookup.set(fbKey, fbRules);
+      }
+      let fbFiltered = fbRules.length > 0 ? filterRulesByPolicy(fbRules, params) : [];
+      // For a GCV with a known tonnage, keep only rules whose weight band covers
+      // it — otherwise the RTO state's own weight-band-less catch-alls (3W /
+      // harvester rows) would survive and win over the correct heavy-truck band.
+      if (_gcvTon && fbFiltered.some(covers)) fbFiltered = fbFiltered.filter(covers);
+      if (fbFiltered.some(r => r.rate_value != null && !String(r.rate_type || '').toUpperCase().includes('CD1'))) {
+        // Store the FILTERED set (as the other fallbacks do) — not the raw
+        // lookup, or weight-band-less junk rows (3W catch-all) survive and win.
+        rules = fbFiltered;
+        resolvedRegion = (fbFiltered[0] && fbFiltered[0].region) || resolvedRegion;
+      }
+    }
   }
 
   // Multi-RTO-mapping fallback — a single RTO often has SEVERAL mappings
