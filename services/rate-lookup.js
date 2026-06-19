@@ -193,7 +193,11 @@ async function lookupRates(pool, params) {
     // "Petrol / CNG / EV". We match if ANY equivalent token applies.
     const upper = String(fuel_type).toUpperCase();
     const equivalents = new Set([fuel_type]);
-    const isCng = /CNG|LPG|BIFUEL/i.test(upper);
+    // "INBUILT" (and "COMPANY FITTED") = a factory-fitted gas kit — the PR file
+    // labels CNG/LPG vehicles this way (113 rows: Maruti/Tata/Hyundai). Treat as
+    // CNG-family so it matches "Petrol / Diesel / CNG"-style rule fuel columns
+    // instead of only blank-fuel rows.
+    const isCng = /CNG|LPG|BIFUEL|INBUILT|COMPANY\s*FITTED/i.test(upper);
     const isPetrol = /PETROL|HYBRID/i.test(upper);
     const isDiesel = /DIESEL/i.test(upper);
     const isElectric = /ELECTRIC|BATTERY|\bEV\b/i.test(upper);
