@@ -107,8 +107,15 @@ function interpret(text, base, ctx) {
 
 function bandFromCat(cat, makeModel) {
   const c = String(cat || '').toLowerCase();
-  if (/3w|3 w|e-?rik|e-?rick/.test(c) || /\bape\b|maxima|atul|piaggio|shakti|gem\b/.test(String(makeModel || '').toLowerCase())) return '3W';
-  if (/upto 2\.5|0-2\.5|<2\.5|upto 2500|<\s*2500/.test(c)) return '0-2.5T';
+  const mm = String(makeModel || '').toLowerCase();
+  if (/3w|3 w|e-?rik|e-?rick/.test(c) || /\bape\b|maxima|atul|piaggio|shakti|gem\b/.test(mm)) return '3W';
+  if (/upto 2\.5|0-2\.5|<2\.5|upto 2500|<\s*2500/.test(c)) {
+    // Ashok Leyland DOST is a ~2.8T-GVW LCV that sometimes gets mis-filed as
+    // "Upto 2.5Tn" — every OTHER Dost in the data is "2.5-3.5Tn" (30 of 31). Bump
+    // it to the 2.5-3.5T band so it takes the correct grid cell. USER MH27/5577.
+    if (/\bdost\b/.test(mm)) return '2.5-3.5T';
+    return '0-2.5T';
+  }
   if (/2\.5-3\.5|2\.5 ?- ?3\.5|2500-3500/.test(c)) return '2.5-3.5T';
   if (/3\.5-7\.5|3\.5 ?- ?7|3500-7500/.test(c)) return '3.5-7.5T';
   if (/7\.5-12|7500-12000/.test(c)) return '7.5-12T';
