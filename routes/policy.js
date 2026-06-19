@@ -3031,6 +3031,16 @@ function filterRulesByPolicy(rules, params, _trace) {
     if (matches && !_bundledSkipAge && params.vehicleAge != null && (rule.vehicle_age_min != null || rule.vehicle_age_max != null)) {
       if (rule.vehicle_age_min != null && params.vehicleAge < rule.vehicle_age_min) matches = false;
       if (matches && rule.vehicle_age_max != null && params.vehicleAge > rule.vehicle_age_max) matches = false;
+      // Shared-boundary tie-break: consecutive age bands like [0,5]/[5,99] both
+      // include an age-exactly-5 vehicle (inclusive on both edges). The LOWER
+      // band owns the shared boundary, so a row whose upper edge == the policy
+      // age (a real band, min<max) gets a small boost to win the same-rate_type
+      // byType collapse over the touching upper band (whose min == the age).
+      if (matches && rule.vehicle_age_max != null && rule.vehicle_age_min != null
+          && rule.vehicle_age_min < rule.vehicle_age_max
+          && params.vehicleAge === rule.vehicle_age_max) {
+        score += 2;
+      }
     }
 
     // Addon flag — when a rule is explicitly conditioned on add-on status
