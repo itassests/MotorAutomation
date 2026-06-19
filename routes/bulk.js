@@ -1431,6 +1431,22 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       params._tataBookingRegion = mapped;
     }
   }
+  // ---- RELIANCE GCV: resolve the MH sub-region from the Reliance RTO master ----
+  // Reliance's GCV grid prices MH by sub-region (Mumbai/Pune 0.675, generic
+  // "MAHARASHTRA"/Rom + Ahmednagar/Kolhapur/Nashik/Solapur 0.65, Aurangabad/
+  // Nagpur 0.225), but rest-of-MH RTOs (e.g. MH30 Osmanabad) fell back to a
+  // wrong city (PUNE 0.675). config/reliance_mh_gcv_region.json (from "Reliance
+  // RTO Master.xlsx" Region_City) gives the authoritative RTO→region. USER
+  // MH5/2272 (MH30 = "Rom" → MAHARASHTRA 0.65). GCV-scoped.
+  if (insurerSlug === 'reliance' && String(params.vehicleType || '').toUpperCase() === 'GCV') {
+    const _rlCode = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^([A-Z]+)0*(\d+)$/, '$1$2');
+    if (/^MH\d/.test(_rlCode)) {
+      let _rlMap; try { _rlMap = require('../config/reliance_mh_gcv_region.json'); } catch (_) { _rlMap = {}; }
+      // config keys are zero-padded (MH01); normalise both ways
+      const _rlReg = _rlMap[_rlCode] || _rlMap[_rlCode.replace(/^MH(\d)$/, 'MH0$1')];
+      if (_rlReg) resolvedRegion = _rlReg;
+    }
+  }
   params.resolvedRegion = resolvedRegion;
 
   // Product alias set
