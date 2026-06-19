@@ -4021,6 +4021,23 @@ function filterRulesByPolicy(rules, params, _trace) {
         kept = kept.filter(s => rtOf(s) !== dropRt);
       }
 
+      // Segment-text nil-dep gate. The "Other than TATA & AL" catch-all bands
+      // file the no-nil-dep variant as a PLAIN `Comp` rate_type (not
+      // Comp_NoNilDep), so the rate_type gate above can't separate it from the
+      // "With nil dep" Comp_NilDep sibling — both survive byType and the cheaper
+      // with-nil row wins by SQL order. The nil-dep distinction is carried in
+      // the SEGMENT text ("With nil dep" vs "WO/without nil dep"). When both a
+      // with- and a without-nil-dep segment survive, keep only the side matching
+      // the policy's depreciation cover (dep===1 → with, else 2/missing → without).
+      const segOf = (s) => String(s.rule.segment || '');
+      const segWithNil = (s) => /\bWITH\s+NIL\s*DEP/i.test(segOf(s));
+      const segWoNil   = (s) => /\bW\/?O\s+NIL\s*DEP|\bWITHOUT\s+NIL\s*DEP/i.test(segOf(s));
+      if (kept.some(segWithNil) && kept.some(segWoNil)) {
+        const polHasNilDep = Number(params._depreciation) === 1;
+        kept = polHasNilDep ? kept.filter(s => !segWoNil(s))
+                            : kept.filter(s => !segWithNil(s));
+      }
+
       // Royal GCV "(TATA & AL)" make-specific vs "Other than TATA & AL"
       // catch-all. Each tonnage/disc band is filed as a make-specific row
       // (rule.make = "Tata, Ashok Leyland[, Only]") AND a make-BLANK catch-all
