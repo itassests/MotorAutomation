@@ -155,6 +155,11 @@ function gridLoc(region, rtoState, rtoCode) {
   // TW-derived rto_mapping wrongly tags some unlisted GJ RTOs like GJ14 as "ROG
   // Bad locations"). Default unlisted GJ codes to Others, overriding region-name.
   if (code.startsWith('GJ')) return { state: 'Gujarat', loc: 'Others, DD, DN' };
+  // Daman (DD*) & Dadra-Nagar-Haveli (DN*) are explicitly the Gujarat "Others,
+  // DD, DN" location group — they have no GCV-RTO-map entry and their resolved
+  // region (booked "Vapi Valsad" etc.) doesn't hit the loc heuristics, so map
+  // them directly. USER GJ10/1637 (DN09 Bolero 2.5-3.5T SATP → base 0.55 +7.5% = 0.625).
+  if (code.startsWith('DD') || code.startsWith('DN')) return { state: 'Gujarat', loc: 'Others, DD, DN' };
   let loc = null;
   // Specific city groups FIRST — note "BAD" must use a word boundary, else it
   // false-matches "ahmedaBAD"/"ahemedaBAD".
