@@ -1814,7 +1814,15 @@ function filterRulesByPolicy(rules, params, _trace) {
   // even when the vehicle is registered elsewhere (HR20). The vehicle's
   // RTO is the true state for rate matching.
   const policyStateRaw = String(params._stateName || '').trim();
-  const policyStateFromRto = STATE_PREFIX_FULL[rtoStatePrefix(params.rtoCode)] || '';
+  const _rtoStatePfx = rtoStatePrefix(params.rtoCode);
+  let policyStateFromRto = STATE_PREFIX_FULL[_rtoStatePfx] || '';
+  // Daman & Diu (DD) and Dadra & Nagar Haveli (DN) are administered WITH GUJARAT
+  // in insurer grids (HDFC GCV files them under "Gujarat / Others, DD, DN").
+  // Their full names ("Dadra and Nagar Haveli" / "Daman and Diu") also carry the
+  // generic "AND" token, which false-matches a remarks like "Uttar-AKH-AND" /
+  // "Nag-A-L-AND" in the token-overlap test below — so a DN truck wrongly took an
+  // "Uttarakhand" GCV row. Treat DD/DN as GUJARAT for remarks-state matching.
+  if (_rtoStatePfx === 'DD' || _rtoStatePfx === 'DN') policyStateFromRto = 'Gujarat';
   const policyStateFull = (policyStateFromRto || policyStateRaw || '').toUpperCase();
 
   // Pre-scan: does the candidate set contain a DEDICATED rickshaw / 3W
@@ -2770,9 +2778,14 @@ function filterRulesByPolicy(rules, params, _trace) {
           'ODISHA': ['ODISHA', 'ORISSA'],
           'ORISSA': ['ODISHA', 'ORISSA'],
         };
+        // Drop the generic connector token "AND" — "Dadra AND Nagar Haveli" /
+        // "Jammu AND Kashmir" would otherwise match any remarks containing the
+        // substring "AND" (e.g. "Uttar-akh-AND", "Nag-a-l-and") via the overlap
+        // test below.
+        const _dropConnector = (t) => t.length >= 2 && t !== 'AND';
         const policyStateTokens = (STATE_ALIASES[policyStateFull] ||
-                                   policyStateFull.split(/[\s,/&-]+/).filter(t => t.length >= 2));
-        const remTokens = rem.split(/[\s,/&-]+/).filter(t => t.length >= 2);
+                                   policyStateFull.split(/[\s,/&-]+/).filter(_dropConnector));
+        const remTokens = rem.split(/[\s,/&-]+/).filter(_dropConnector);
         const remarkContainsState =
           policyStateTokens.some(t => rem.includes(t)) ||
           remTokens.some(t => policyStateFull.includes(t));
