@@ -3281,7 +3281,15 @@ function filterRulesByPolicy(rules, params, _trace) {
       // declared above). Keep ONLY the School Bus segment so it can't borrow the generic
       // >36-pax (5%) / 17-36-pax (7.5%) bands or Staff Bus via the +6 bus boost / max-rate
       // pick. (≤17 seat still → 6-17 pax 15% via _orientalMiniRouteBus.)
-      if (policyIsRouteBus && rule.insurer !== 'iffco_tokio' && !_orientalMiniRouteBus && !_orientalSchoolRouteBus) { matches = false; }
+      // Shriram pays SMALL route buses as ordinary PCV passenger vehicles, NOT
+      // declined: the operator rated 7-8 seat route buses at the "7 to 10" band
+      // (GJ11/497 seat 8, Gujarat = 15; DL10/6454 seat 7, Delhi = 20). Exempt
+      // ≤10-seat Shriram route buses so the normal seating-band gate applies
+      // (want=SEVEN10 → "7 to 10"); larger ones stay declined (no operator
+      // evidence for Shriram >10-seat route buses → keep the safe default).
+      const _shriramSmallRouteBus = rule.insurer === 'shriram' && policyIsRouteBus &&
+        Number(params.seatingCapacity) >= 1 && Number(params.seatingCapacity) <= 10;
+      if (policyIsRouteBus && rule.insurer !== 'iffco_tokio' && !_orientalMiniRouteBus && !_orientalSchoolRouteBus && !_shriramSmallRouteBus) { matches = false; }
       if (_orientalMiniRouteBus && !/6-17/i.test(seg)) { matches = false; }
       if (_orientalSchoolRouteBus && !/School\s*Bus/i.test(seg)) { matches = false; }
       if (matches && CAT_KEYWORDS.TAXI.test(seg) && !policyIsTaxi) {
