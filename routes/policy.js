@@ -200,6 +200,12 @@ const SHRIRAM_MUMBAI_RTOS = new Set(['MH01', 'MH02', 'MH03', 'MH04', 'MH05', 'MH
 // Stored zero-stripped (KA1, KA50, ...) to match the gate's nrm() normalisation.
 const SHRIRAM_BANGALORE_RTOS = new Set(['KA1', 'KA2', 'KA3', 'KA4', 'KA5', 'KA41',
   'KA42', 'KA43', 'KA50', 'KA51', 'KA52', 'KA53', 'KA57', 'KA59', 'KA60']);
+// Shriram Chennai-metro RTO codes (from the grid remark "[RTO: TN01..TN87] |
+// Chennai (METRO)" + USER confirmation TN19 is metro). Normalised (leading zeros
+// stripped, TN01→TN1) to match the rtoCode normalisation in the metro gate. The
+// TAMILNADU GCV/PCV bands split "Metro RTO codes" vs "Non-Metro RTO Codes".
+const SHRIRAM_CHENNAI_METRO_RTOS = new Set(['TN1', 'TN2', 'TN3', 'TN4', 'TN5', 'TN6',
+  'TN7', 'TN9', 'TN10', 'TN11', 'TN12', 'TN13', 'TN14', 'TN18', 'TN19', 'TN20', 'TN22', 'TN87']);
 const SHRIRAM_REGION_TOKENS = {
   'GUJARAT': ['GUJARAT'],
   'TAMIL NADU': ['TAMIL'],
@@ -2414,6 +2420,30 @@ function filterRulesByPolicy(rules, params, _trace) {
           const inBlr = SHRIRAM_BANGALORE_RTOS.has(polRto);
           if (remBlr && !inBlr) matches = false;
           else if (remOtherBlr && inBlr) matches = false;
+        }
+      }
+    }
+
+    // Shriram TAMILNADU "Metro RTO codes" vs "Non-Metro RTO Codes" split — the
+    // LCV / HCV age bands carry parallel Metro/Non-Metro rows (region stays
+    // "TAMILNADU & PONDICHERRY", the split lives in the remark). Pick by the
+    // grid-listed / USER-confirmed Chennai-metro RTO set (TN01-07,09-14,18,19,
+    // 20,22,87) so a Chennai-metro truck (TN19) takes the Metro rate (52) and a
+    // rest-of-TN truck the Non-Metro rate (47). Tamil-Nadu-scoped.
+    if (matches && rule.insurer === 'shriram'
+        && (/TAMIL\s*NADU|TAMILNADU/i.test(String(rule.region || ''))
+            || /TAMIL\s*NADU|TAMILNADU/i.test(String(params._stateName || '')))) {
+      const remT = String(rule.remarks || '').toUpperCase();
+      const remNonMetro = /NON[\s-]*METRO\s+RTO/.test(remT);
+      const remMetro = /\bMETRO\s+RTO/.test(remT) && !remNonMetro;
+      if (remMetro || remNonMetro) {
+        const nrm = (s) => String(s).toUpperCase().replace(/[^A-Z0-9]/g, '')
+          .replace(/^([A-Z]+)0*(\d+)$/, '$1$2');
+        const polRto = nrm(params.rtoCode || '');
+        if (polRto) {
+          const inMetro = SHRIRAM_CHENNAI_METRO_RTOS.has(polRto);
+          if (remMetro && !inMetro) matches = false;
+          else if (remNonMetro && inMetro) matches = false;
         }
       }
     }
