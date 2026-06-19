@@ -3898,6 +3898,27 @@ function filterRulesByPolicy(rules, params, _trace) {
     }
   }
 
+  // Royal GCV "(TATA & AL)" vs "Other than TATA&AL" make-family preference — MUST
+  // run BEFORE the byType collapse below. The make-blank "Other than" row and the
+  // make-specific "(TATA & AL Only)" row tie on score (both ~25: the +10 CV-family
+  // bonus on the named row is cancelled by the blank row's own segment-match
+  // points), so byType's first-wins tie-break keeps the blank "Other than" row and
+  // the make-specific one is gone before the post-byType gate can prefer it. Drop
+  // the wrong side here, on the full scored list. USER DW1/5858 (Ashok Leyland 35T
+  // WB: "Other than" 0.13 → "(TATA & AL)" 0.40). Royal-GCV-scoped.
+  if (filtered.length > 1 && filtered.some(s => s.rule.insurer === 'royal_sundaram')
+      && String(params.vehicleType || '').toUpperCase() === 'GCV') {
+    const _segOther  = (s) => /OTHER\s*THAN\s*TATA/i.test(String(s.rule.segment || ''));
+    const _segTataAl = (s) => !_segOther(s) &&
+      /TATA\s*&\s*AL|TATA&AL|TATA,\s*ASHOK\s*LEYLAND/i.test(String(s.rule.segment || ''));
+    const _polTataAl = /ASHOKLEYLAND|^TATA|TATAMOTORS|EICHER/.test(make.replace(/[^A-Z]/g, ''));
+    if (_polTataAl) {
+      if (filtered.some(_segTataAl)) filtered = filtered.filter(s => !_segOther(s));
+    } else {
+      if (filtered.some(s => !_segTataAl(s))) filtered = filtered.filter(s => !_segTataAl(s));
+    }
+  }
+
   if (filtered.length > 0) {
     const isLiveRate = (r) => r && r.rate_value != null && r.rate_value > 0 && !r.is_declined;
     const byType = {};
