@@ -294,7 +294,7 @@ function shriramRtoDeclined(remark, rtoCode) {
  * (state-level umbrella before country-level catch-all).
  */
 const HDFC_STATE_FALLBACKS = {
-  'GJ': ['Rest of Gujarat', 'AHMEDABAD', 'Ahemedabad', 'Ahemedabad, Surat', 'Gujarat'],
+  'GJ': ['Rest of Gujarat', 'AHMEDABAD', 'Ahemedabad', 'Ahemedabad, Surat', 'Ahm, Vad, Surat', 'Ahm', 'Gujarat'],
   'DL': ['Delhi NCR', 'NCR', 'Delhi'],
   'HR': ['Haryana', 'Delhi NCR', 'NCR'],
   'UP': ['Delhi NCR', 'NCR', 'Uttar Pradesh'],
