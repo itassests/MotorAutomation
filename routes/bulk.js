@@ -3145,8 +3145,14 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   }
 
   // ---- Reliance PCV (School Bus tier + Taxi segment) ----
-  // School Bus grid = age(>10/<10) × owner(Individual/School). Operator uses the
-  // "Owned by Individual" tier (we wrongly took the School max), tier by age. Taxi:
+  // School Bus grid = age(>10/<10) × owner(Individual/School). The operator pays
+  // the ~67.5% tier for school buses regardless of band, which maps to DIFFERENT
+  // owner sub_types by age: <10 Year → "Owned by Individual" (0.675; the School
+  // <10 row is 0.70 and over-rates), >10 Year → "Owned by School" (0.675; the
+  // Individual >10 row is 0.65 and under-rates). USER MH22/4946/4948 & MH13/2184
+  // (>10-yr school buses, operator 68 = School 67.5; we wrongly took Individual
+  // 65). MH5/2203 (>10, operator 65) is the lone outlier (same Nagpur region/age
+  // as MH13/2184 which pays 68) → operator noise, As-per-Grid. Taxi:
   // route to "PCV Taxi <6 St" (the standard taxi, for 4-6 & 7-10 seaters) at
   // COMP_NoNilDep (operator's higher dep variant), not the "Short Term" rule the
   // generic matcher picked. Region = resolved city (rtoInfo.region). Reliance-PCV.
@@ -3169,7 +3175,10 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       let seg = null, extra = '', rtClause = null;
       if (/SCHOOL\s*BUS/.test(cat)) {
         seg = 'School Bus';
-        extra = "AND sub_type LIKE '%Individual%' AND sub_type LIKE '" + (age > 10 ? '>10%' : '<10%') + "'";
+        // >10 Year → "Owned by School" (0.675); <10 Year → "Owned by Individual"
+        // (0.675). Both land on the operator's ~67.5% school-bus tier.
+        const _owner = age > 10 ? '%School%' : '%Individual%';
+        extra = "AND sub_type LIKE '" + _owner + "' AND sub_type LIKE '" + (age > 10 ? '>10%' : '<10%') + "'";
         rtClause = (ip === 'TP' || ip === 'SATP') ? "rate_type='SATP'" : "rate_type='COMP'";
       } else if (/TAXI/.test(cat)) {
         seg = 'PCV Taxi <6 St';
