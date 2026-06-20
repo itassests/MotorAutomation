@@ -219,8 +219,12 @@ async function processPdfs(app, live) {
         await app.request().input('id', sql.Int, row.id).input('t', sql.NVarChar(200), trackerNo)
           .query('UPDATE dbo.ocr_bulk_pdf SET tracker_no = @t WHERE id = @id');
       }
-      const { policyNo, ocrText } = await runOcr(row.pdf_path);
-      if (!policyNo) throw new Error('OCR returned no policy number. Raw response: ' + String(ocrText || '').slice(0, 2500));
+      const ocr = await runOcr(row.pdf_path);
+      if (!ocr.policyNo) throw new Error('OCR no policy. '
+        + `step1 GetFileInJson(${ocr.fileStatus}): ` + String(ocr.fileText || '').slice(0, 1200)
+        + ` || sentToStep2: ` + String(ocr.sentToStep2 || '').slice(0, 600)
+        + ` || step2 GetOCRdata(${ocr.ocrStatus}): ` + String(ocr.ocrText || '').slice(0, 800));
+      const policyNo = ocr.policyNo;
       // Final result → shared trn_OCRBulkEntry (Trackerno + PolicyNo + FolderPath + TransactionID).
       await live.request()
         .input('t', sql.VarChar(500), trackerNo)

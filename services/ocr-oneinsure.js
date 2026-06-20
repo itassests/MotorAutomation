@@ -93,7 +93,13 @@ async function runOcr(pdfPath) {
 
   const ocrJson = body2.json;
   const policyNo = ocrJson != null ? findPolicyNo(ocrJson) : null;
-  return { policyNo, ocrJson, ocrText: body2.text };
+  return {
+    policyNo, ocrJson, ocrText: body2.text,
+    // Diagnostics so a "no policy" failure shows the whole 2-step flow in the DB.
+    fileStatus: res1.status, fileText: body1.text,
+    sentToStep2: JSON.stringify(step1Payload),
+    ocrStatus: res2.status,
+  };
 }
 
 module.exports = { runOcr, findPolicyNo, GETFILE_URL, GETOCR_URL };
