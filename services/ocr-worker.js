@@ -47,6 +47,23 @@ let _operator = TRACKER_EMPCODE;
 const folderKey = (name) =>
   String(name || '').replace(/^\d{1,2}-\d{1,2}-\d{2,4}_/, '').replace(/\.zip$/i, '').trim();
 
+// Flatten an error to a useful string. mssql wraps SP failures in a RequestError
+// whose .message is empty and whose .originalError is an AggregateError bundling
+// the real SQL errors — so a naive String(err.message) yields "".
+function errMsg(err) {
+  if (!err) return 'unknown error';
+  const parts = [];
+  if (err.message) parts.push(err.message);
+  const oe = err.originalError;
+  if (oe) {
+    if (Array.isArray(oe.errors)) parts.push(...oe.errors.map(e => (e && e.message) || String(e)));
+    else if (oe.message) parts.push(oe.message);
+  }
+  if (Array.isArray(err.precedingErrors)) parts.push(...err.precedingErrors.map(e => (e && e.message) || String(e)));
+  const out = parts.filter(Boolean).join(' | ');
+  return out || (err.name ? `${err.name} (no message)` : String(err));
+}
+
 let _running = false;
 let _started = false;
 
@@ -219,9 +236,9 @@ async function processPdfs(app, live) {
       const status = next < MAX_RETRY ? 1 : 3;
       await app.request().input('id', sql.Int, row.id).input('t', sql.NVarChar(200), trackerNo)
         .input('s', sql.Int, status).input('r', sql.Int, next)
-        .input('e', sql.NVarChar(sql.MAX), String(err.message || '').slice(0, 3900))
+        .input('e', sql.NVarChar(sql.MAX), errMsg(err).slice(0, 3900))
         .query('UPDATE dbo.ocr_bulk_pdf SET status = @s, tracker_no = @t, retry = @r, error = @e, processed_at = GETDATE() WHERE id = @id');
-      console.warn(`[ocr-worker] pdf ${row.id} failed: ${err.message}`);
+      console.warn(`[ocr-worker] pdf ${row.id} failed: ${errMsg(err)}`);
     }
   }
 }

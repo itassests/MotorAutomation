@@ -1,5 +1,11 @@
 /**
- * services/tracker-gen.js — mint a Tracker No via Prarambh_UAT.App_GenerateTrackerNo.
+ * services/tracker-gen.js — mint a Tracker No via Prarambh_Live.App_GenerateTrackerNo.
+ *
+ * The whole OCR module runs against Prarambh_Live. The SP also lives (and works)
+ * in Prarambh_UAT, but the UAT copies of the seed tables it inserts into
+ * (TRN_PrarambhReportedFields / MotorDetails / MotorMISUpdation) have a non-
+ * IDENTITY `Id` column, so every mint there fails with error 515 (NULL Id).
+ * Live has proper IDENTITY columns, so we execute the SP on the Live pool.
  *
  * SP inputs (per spec): InsurerTypeId=16, BUSS_TYPE=1, CoverType_ID=9380,
  * CoverType_MasterId=9030, CustomerMobile='', InseptionYear=current year, and
@@ -10,7 +16,6 @@
  */
 const sql = require('mssql');
 const { getPrarambhPool } = require('../db/prarambh-connection');
-const { getPrarambhUatPool } = require('../db/prarambh-uat-connection');
 
 const INSURER_TYPE_ID = 16;
 const BUSS_TYPE = 1;
@@ -50,8 +55,8 @@ async function resolveProfile(uploaderKey) {
 /** Generate a fresh Tracker No for the given uploader key. */
 async function generateTracker(uploaderKey) {
   const p = await resolveProfile(uploaderKey);
-  const uat = await getPrarambhUatPool();
-  const result = await uat.request()
+  const live = await getPrarambhPool();
+  const result = await live.request()
     .input('InsurerTypeId',      sql.Int, INSURER_TYPE_ID)
     .input('VerticalID',         sql.Int, p.verticalId)
     .input('SalesBranchId',      sql.Int, p.branchId)
