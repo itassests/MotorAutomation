@@ -46,11 +46,20 @@ let _started = false;
 /** Locate a folder's PDFs on disk. Returns { dir, pdfs: [fullPath...] } or null. */
 function locateFolderPdfs(uploadId, folderName) {
   const key = folderKey(folderName);
-  const listPdfs = (dir) => {
-    try { return fs.readdirSync(dir).filter(f => /\.pdf$/i.test(f)).map(f => path.join(dir, f)); }
-    catch (_) { return []; }
+  // Recursively collect every PDF under a directory (handles zip→folder→pdfs
+  // and folder→subfolder→pdfs); bounded depth so a stray deep tree can't hang.
+  const listPdfs = (dir, depth = 0, out = []) => {
+    if (depth > 6) return out;
+    let ents = [];
+    try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return out; }
+    for (const e of ents) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) listPdfs(full, depth + 1, out);
+      else if (/\.pdf$/i.test(e.name)) out.push(full);
+    }
+    return out;
   };
-  // 1) A zip dropped by the new tab → extract under the drop dir.
+  // 1) A zip dropped by the new tab → extract (preserving inner folders) and walk.
   for (const base of [DROP_DIR, ...SOURCE_DIRS]) {
     const zipPath = path.join(base, folderName);
     if (fs.existsSync(zipPath) && /\.zip$/i.test(zipPath)) {
@@ -59,7 +68,7 @@ function locateFolderPdfs(uploadId, folderName) {
         fs.mkdirSync(dir, { recursive: true });
         const zip = new AdmZip(zipPath);
         zip.getEntries().filter(e => !e.isDirectory && /\.pdf$/i.test(e.entryName))
-          .forEach(e => zip.extractEntryTo(e, dir, false, true));
+          .forEach(e => zip.extractEntryTo(e, dir, true, true));   // keep inner folder structure
         const pdfs = listPdfs(dir);
         if (pdfs.length) return { dir, pdfs };
       } catch (_) { /* try next */ }
