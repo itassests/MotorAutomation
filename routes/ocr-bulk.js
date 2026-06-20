@@ -244,7 +244,9 @@ router.get('/uploads/:id/failures', async (req, res, next) => {
 router.post('/process', async (req, res, next) => {
   try {
     if (!req.user || !req.user.empcode) return res.status(401).json({ success: false, error: 'Login required' });
-    await require('../services/ocr-worker').tick();
+    // The clicking operator's empcode is the identity that mints trackers for
+    // legacy portal folders (their PortalUserId isn't a Bugnet_userprofiles user).
+    await require('../services/ocr-worker').tick(req.user.empcode);
     res.json({ success: true, message: 'Processing tick run' });
   } catch (err) { next(err); }
 });

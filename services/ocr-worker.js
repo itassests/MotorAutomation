@@ -37,6 +37,13 @@ const DROP_DIR = process.env.OCR_ZIP_DROP_DIR
 const SOURCE_DIRS = String(process.env.OCR_SOURCE_DIRS || DROP_DIR)
   .split(/[;]/).map(s => s.trim()).filter(Boolean);
 
+// Operator empcode that mints trackers. Legacy portal folders carry a
+// PortalUserId (e.g. "ROBLTD005") that is NOT a Bugnet_userprofiles user, so
+// the tracker is minted under the logged-in operator instead. Seeded from
+// OCR_TRACKER_EMPCODE; the /process route overrides it with the clicker's empcode.
+const TRACKER_EMPCODE = String(process.env.OCR_TRACKER_EMPCODE || '').trim();
+let _operator = TRACKER_EMPCODE;
+
 const folderKey = (name) =>
   String(name || '').replace(/^\d{1,2}-\d{1,2}-\d{2,4}_/, '').replace(/\.zip$/i, '').trim();
 
@@ -155,6 +162,27 @@ async function upsertMeta(app, id, folderName, total, uploader, state, txnId, di
             VALUES (@uid, @fn, @fk, @n, @emp, @st, @tx);`);
 }
 
+/** Mint a tracker under the folder's emp_code, falling back to the operator
+ *  empcode when that identity isn't a Bugnet_userprofiles user (legacy portal
+ *  folders whose PortalUserId is an agent code, not an employee). */
+async function mintTracker(folderEmp) {
+  const tried = [];
+  const candidates = [];
+  if (folderEmp) candidates.push(folderEmp);
+  if (_operator && _operator !== folderEmp) candidates.push(_operator);
+  if (!candidates.length) throw new Error('no tracker identity (set OCR_TRACKER_EMPCODE or run via Process now)');
+  let lastErr;
+  for (const c of candidates) {
+    try { return await generateTracker(c); }
+    catch (e) {
+      lastErr = e; tried.push(c);
+      // Only fall through on an identity miss; surface real SP/DB errors.
+      if (!/No Bugnet_userprofiles match|No Users\.UserId/i.test(e.message)) throw e;
+    }
+  }
+  throw new Error(`${lastErr ? lastErr.message : 'tracker failed'} (tried: ${tried.join(', ')})`);
+}
+
 /** Phase 2 — process up to N queued PDFs. */
 async function processPdfs(app, live) {
   for (let i = 0; i < PDFS_PER_TICK; i++) {
@@ -170,7 +198,7 @@ async function processPdfs(app, live) {
     let trackerNo = row.tracker_no || null;
     try {
       if (!trackerNo) {
-        trackerNo = (await generateTracker(md.emp_code)).trackerNo;
+        trackerNo = (await mintTracker(md.emp_code)).trackerNo;
         await app.request().input('id', sql.Int, row.id).input('t', sql.NVarChar(200), trackerNo)
           .query('UPDATE dbo.ocr_bulk_pdf SET tracker_no = @t WHERE id = @id');
       }
@@ -214,7 +242,8 @@ async function settleFolders(app, live) {
   }
 }
 
-async function tick() {
+async function tick(operatorEmpcode) {
+  if (operatorEmpcode) _operator = String(operatorEmpcode).trim();
   if (_running) return;
   _running = true;
   try {
