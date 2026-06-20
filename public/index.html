@@ -396,6 +396,7 @@
     <div class="tab"        data-tab="special-rates"     title="Special Rates"      ><span class="tab-icon">&#11088;</span><span class="tab-label">Special Rates</span></div>
     <div class="tab"        data-tab="statements"        title="Statements"         ><span class="tab-icon">&#128196;</span><span class="tab-label">Statements</span></div>
     <div class="tab"        data-tab="pr"                title="Premium Register"   ><span class="tab-icon">&#128203;</span><span class="tab-label">Premium Register</span></div>
+    <div class="tab"        data-tab="ocr-bulk"          title="OCR Bulk Upload"    ><span class="tab-icon">&#128230;</span><span class="tab-label">OCR Bulk Upload</span></div>
     <div class="tab"        data-tab="bulk"              title="Bulk Calculation"   ><span class="tab-icon">&#129518;</span><span class="tab-label">Bulk Calculation</span></div>
     <div class="tab"        data-tab="payout"            title="Payout Summary"     ><span class="tab-icon">&#128181;</span><span class="tab-label">Payout Summary</span></div>
     <div class="tab"        data-tab="recon"             title="Recon Summary"      ><span class="tab-icon">&#128200;</span><span class="tab-label">Recon Summary</span></div>
@@ -1818,6 +1819,111 @@
     </div>
 
     <!-- ============ PREMIUM REGISTER PANEL ============ -->
+    <!-- ============ OCR BULK UPLOAD ============ -->
+    <div class="panel" id="panel-ocr-bulk">
+      <div class="card">
+        <h2><span class="icon">&#128230;</span> OCR Bulk Upload</h2>
+        <p style="color:#666; font-size:13px; margin-top:-8px; margin-bottom:14px;">
+          Upload one or more ZIP folders of policy PDFs. The server generates a Tracker No
+          for each policy, OCRs the PDF to read the policy number, and records both.
+          Processing runs in the background &mdash; you can leave this screen.
+        </p>
+
+        <div class="form-row" style="display:flex; gap:14px; align-items:end; flex-wrap:wrap; margin-bottom:14px;">
+          <div class="form-group" style="min-width:220px;">
+            <label>Insurer</label>
+            <select id="ocrInsurer"><option value="">-- Select Insurer --</option></select>
+          </div>
+          <div class="form-group" style="min-width:160px;">
+            <label>PosCode</label>
+            <input type="text" id="ocrPosCode" placeholder="e.g. POSLG01234">
+          </div>
+          <div class="form-group" style="min-width:160px;">
+            <label>Booking Location</label>
+            <input type="text" id="ocrBookingLocation" placeholder="e.g. Surat">
+          </div>
+          <div class="form-group" style="min-width:160px;">
+            <label>Portal UserId</label>
+            <input type="text" id="ocrPortalUserId" placeholder="OneInsure portal user id">
+          </div>
+          <div class="form-group" style="min-width:140px;">
+            <label>Product Type</label>
+            <select id="ocrProductType">
+              <option value="Comp">Comp</option>
+              <option value="SAOD">SAOD</option>
+              <option value="TP">TP</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row" style="display:flex; gap:14px; align-items:end; flex-wrap:wrap;">
+          <div class="form-group" style="min-width:320px;">
+            <label>ZIP folders (you can pick several)</label>
+            <input type="file" id="ocrZipFiles" accept=".zip" multiple>
+          </div>
+          <div class="form-group">
+            <button class="btn btn-primary" style="padding:9px 22px; font-weight:500;" id="ocrUploadBtn" onclick="ocrUpload()">
+              <span style="margin-right:6px;">&#128228;</span>Upload
+            </button>
+          </div>
+          <div class="form-group" style="font-size:12px; color:#888; align-self:center;">
+            <span id="ocrUploadMsg"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+          <h2 style="margin:0;"><span class="icon">&#128193;</span> Uploaded Folders</h2>
+          <select id="ocrStatusFilter" style="padding:6px 10px;" onchange="ocrLoadList()">
+            <option value="1">Pending only</option>
+            <option value="2">Done only</option>
+            <option value="all">All</option>
+          </select>
+          <button class="btn" style="padding:6px 14px;" onclick="ocrLoadList()">
+            <span style="margin-right:6px;">&#128260;</span>Refresh
+          </button>
+          <button class="btn btn-primary" id="ocrProcessBtn" style="padding:6px 14px;" onclick="ocrProcessNow()" title="Run a processing pass now">
+            <span style="margin-right:6px;">&#9889;</span>Process now
+          </button>
+          <span id="ocrShowing" style="margin-left:auto; font-size:12px; color:#888;"></span>
+        </div>
+
+        <!-- Summary KPIs — so the user sees the counts at a glance. -->
+        <div style="display:grid; grid-template-columns:repeat(3, minmax(140px,1fr)); gap:10px; margin-bottom:14px;">
+          <div class="kpi-card" style="background:#fff7f0; border:1px solid #f5dcc4; border-radius:8px; padding:12px;">
+            <div style="font-size:11px; color:#5a6a7a; text-transform:uppercase; letter-spacing:0.4px;">Pending Folders</div>
+            <div id="ocrKpiPending" style="font-size:24px; font-weight:600; color:#a04a00; margin-top:4px;">—</div>
+            <div style="font-size:10px; color:#999; margin-top:2px;">Uploaded, not yet OCR'd</div>
+          </div>
+          <div class="kpi-card" style="background:#f5fff7; border:1px solid #cfe9d4; border-radius:8px; padding:12px;">
+            <div style="font-size:11px; color:#5a6a7a; text-transform:uppercase; letter-spacing:0.4px;">Done Folders</div>
+            <div id="ocrKpiDone" style="font-size:24px; font-weight:600; color:#1b5e20; margin-top:4px;">—</div>
+            <div style="font-size:10px; color:#999; margin-top:2px;">Trackers generated</div>
+          </div>
+          <div class="kpi-card" style="background:#f5f9ff; border:1px solid #d6e6fa; border-radius:8px; padding:12px;">
+            <div style="font-size:11px; color:#5a6a7a; text-transform:uppercase; letter-spacing:0.4px;">Total Folders</div>
+            <div id="ocrKpiTotal" style="font-size:24px; font-weight:600; color:#0a3d62; margin-top:4px;">—</div>
+            <div style="font-size:10px; color:#999; margin-top:2px;">Pending + Done</div>
+          </div>
+        </div>
+
+        <div style="overflow:auto;">
+          <table class="data-table" id="ocrFoldersTable" style="width:100%; border-collapse:collapse;">
+            <thead>
+              <tr>
+                <th>Folder</th><th>PosCode</th><th>Product</th><th>Date</th>
+                <th>Progress</th><th>Status</th><th>Excel</th>
+              </tr>
+            </thead>
+            <tbody id="ocrFoldersBody">
+              <tr><td colspan="7" style="text-align:center; color:#999; padding:18px;">No uploads yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <div class="panel" id="panel-pr">
       <!-- Dashboard card — quick health view of PR vs Prarambh coverage for
            the active cycle / insurer. Sits above the upload card so users
@@ -3863,6 +3969,7 @@
         if (tab.dataset.tab === 'recon' && !window._reconInited) reconInit();
         if (tab.dataset.tab === 'reconcile') rcInit();
         if (tab.dataset.tab === 'pr' && !window._prDashInited) prDashInit();
+        if (tab.dataset.tab === 'ocr-bulk') ocrBulkInit();
         // Margin coverage scan is expensive — defer until tab first opened.
         if (tab.dataset.tab === 'margins' && !window._marginCoverageInited) {
           window._marginCoverageInited = true;
@@ -6228,6 +6335,193 @@
         console.error('Failed to load all insurers:', e);
         showToast('Failed to load insurer list', 'error');
       }
+    }
+
+    // ============ OCR BULK UPLOAD ============
+    let _ocrPollTimer = null;
+
+    function ocrBulkInit() {
+      // Populate the insurer dropdown from the master list (once), then refresh.
+      if (!window._ocrInsurersLoaded) {
+        window._ocrInsurersLoaded = true;
+        fetch(API + '/meta/all-insurers').then(r => r.json()).then(d => {
+          const sel = document.getElementById('ocrInsurer');
+          (d.insurers || []).forEach(ins => {
+            sel.innerHTML += `<option value="${ins.slug}" data-id="${ins.id}">${ins.name}</option>`;
+          });
+        }).catch(() => {});
+      }
+      ocrLoadSummary();
+      ocrLoadList();
+    }
+
+    async function ocrLoadSummary() {
+      try {
+        const r = await fetch(API + '/ocr-bulk/summary').then(x => x.json());
+        if (!r.success) return;
+        document.getElementById('ocrKpiPending').textContent = (r.pending || 0).toLocaleString('en-IN');
+        document.getElementById('ocrKpiDone').textContent = (r.done || 0).toLocaleString('en-IN');
+        document.getElementById('ocrKpiTotal').textContent = (r.total || 0).toLocaleString('en-IN');
+      } catch (_) { /* keep last values */ }
+    }
+
+    async function ocrProcessNow() {
+      const btn = document.getElementById('ocrProcessBtn');
+      btn.disabled = true; const old = btn.innerHTML; btn.innerHTML = 'Processing…';
+      try {
+        const r = await fetch(API + '/ocr-bulk/process', { method: 'POST' }).then(x => x.json());
+        if (!r.success) throw new Error(r.error || 'Process failed');
+        showToast('Processing pass triggered', 'success');
+        ocrLoadSummary();
+        ocrLoadList();
+      } catch (e) { showToast(e.message, 'error'); }
+      finally { btn.disabled = false; btn.innerHTML = old; }
+    }
+
+    async function ocrShowFailures(uploadId) {
+      try {
+        const r = await fetch(API + `/ocr-bulk/uploads/${uploadId}/failures`).then(x => x.json());
+        const list = (r.failures || []);
+        const rowsHtml = list.length
+          ? list.map(f => `<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;">${f.pdf}</td>`
+              + `<td style="padding:4px 8px; border-bottom:1px solid #eee; color:#c62828;">${(f.error || '').replace(/</g, '&lt;')}</td></tr>`).join('')
+          : '<tr><td colspan="2" style="padding:10px; color:#999;">No failures.</td></tr>';
+        const ov = document.createElement('div');
+        ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:9999; display:flex; align-items:center; justify-content:center;';
+        ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+        ov.innerHTML = `<div style="background:#fff; border-radius:10px; max-width:760px; width:92%; max-height:80vh; overflow:auto; padding:18px;">
+          <div style="display:flex; align-items:center; margin-bottom:10px;">
+            <h3 style="margin:0;">Failed PDFs (${list.length})</h3>
+            <button class="btn" style="margin-left:auto; padding:4px 12px;" onclick="this.closest('div[style*=fixed]').remove()">Close</button>
+          </div>
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead><tr><th style="text-align:left; padding:4px 8px; border-bottom:2px solid #ddd;">PDF</th><th style="text-align:left; padding:4px 8px; border-bottom:2px solid #ddd;">Error</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table></div>`;
+        document.body.appendChild(ov);
+      } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function ocrUpload() {
+      const files = document.getElementById('ocrZipFiles').files;
+      const msg = document.getElementById('ocrUploadMsg');
+      if (!files || files.length === 0) { showToast('Pick at least one .zip', 'error'); return; }
+      const insSel = document.getElementById('ocrInsurer');
+      const insOpt = insSel.options[insSel.selectedIndex];
+      const fd = new FormData();
+      for (const f of files) fd.append('files', f);
+      fd.append('insurer', insSel.value);
+      fd.append('insurerId', (insOpt && insOpt.getAttribute('data-id')) || '');
+      fd.append('posCode', document.getElementById('ocrPosCode').value.trim());
+      fd.append('bookingLocation', document.getElementById('ocrBookingLocation').value.trim());
+      fd.append('portalUserId', document.getElementById('ocrPortalUserId').value.trim());
+      fd.append('productType', document.getElementById('ocrProductType').value);
+      const btn = document.getElementById('ocrUploadBtn');
+      btn.disabled = true; msg.textContent = 'Uploading…';
+      try {
+        const res = await fetch(API + '/ocr-bulk/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Upload failed');
+        const n = (data.uploads || []).reduce((s, u) => s + (u.totalPdfs || 0), 0);
+        msg.textContent = `Uploaded ${data.uploads.length} folder(s), ${n} PDF(s) queued.`;
+        showToast('Upload queued for OCR', 'success');
+        document.getElementById('ocrZipFiles').value = '';
+        ocrLoadSummary();
+        ocrLoadList();
+      } catch (e) {
+        msg.textContent = ''; showToast(e.message, 'error');
+      } finally { btn.disabled = false; }
+    }
+
+    async function ocrLoadList() {
+      const body = document.getElementById('ocrFoldersBody');
+      try {
+        const filterEl = document.getElementById('ocrStatusFilter');
+        const status = filterEl ? filterEl.value : 'all';
+        ocrLoadSummary();
+        const res = await fetch(API + '/ocr-bulk/uploads?status=' + encodeURIComponent(status));
+        const data = await res.json();
+        const rows = data.uploads || [];
+        const label = status === '1' ? 'pending' : status === '2' ? 'done' : '';
+        const showing = document.getElementById('ocrShowing');
+        if (showing) showing.textContent = `Showing ${rows.length}${rows.length === 300 ? '+ (latest)' : ''} ${label} folder${rows.length === 1 ? '' : 's'}`;
+        if (rows.length === 0) {
+          body.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#999; padding:18px;">No folders for this filter.</td></tr>';
+          return;
+        }
+        body.innerHTML = rows.map(u => {
+          const dt = u.CreatedDate ? new Date(u.CreatedDate).toLocaleString() : '';
+          const excel = `<button class="btn" style="padding:4px 12px;" onclick="window.location.href='${API}/ocr-bulk/uploads/${u.Id}/export?token='+encodeURIComponent(_authToken||'')">Excel</button>`;
+          const notDone = u.Status !== 2;
+          const totAttr = (u.TotalPdfs != null) ? u.TotalPdfs : '';
+          const totLabel = (u.TotalPdfs != null) ? (u.TotalPdfs + ' PDFs') : '';
+          const statusTxt = notDone
+            ? '<span style="color:#a04a00; font-weight:600;">Not done</span>'
+            : '<span style="color:#1b5e20; font-weight:600;">Done</span>';
+          // Done folders are already complete (skip progress fetch + polling).
+          const progCell = notDone ? `${totLabel} <span style="color:#888;">loading…</span>` : '—';
+          return `<tr data-uid="${u.Id}" data-status="${u.Status}" data-total="${totAttr}" data-complete="${notDone ? 0 : 1}">
+            <td>${u.FolderName || ''}</td>
+            <td>${u.PosCode || ''}</td>
+            <td>${u.ProductType || ''}</td>
+            <td>${dt}</td>
+            <td class="ocr-progress" id="ocrProg-${u.Id}">${progCell}</td>
+            <td>${statusTxt}</td>
+            <td>${excel}</td>
+          </tr>`;
+        }).join('');
+        await ocrRefreshAllProgress();   // one pass over not-done rows (throttled)
+        ocrStartPolling();               // then poll only the in-progress ones
+      } catch (e) {
+        body.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#c62828; padding:18px;">${e.message}</td></tr>`;
+      }
+    }
+
+    // Render one folder's progress cell + decide whether it still needs polling.
+    function ocrRenderProgress(tr, r) {
+      const uid = tr.getAttribute('data-uid');
+      const cell = document.getElementById('ocrProg-' + uid);
+      if (cell) {
+        const totTxt = (r.total != null) ? `${r.total} PDFs` : `${r.generated} found`;
+        const pendTxt = (r.pending != null && r.pending > 0) ? ` &middot; <span style="color:#a04a00;">${r.pending} pending</span>` : '';
+        const failTxt = (r.failed) ? ` &middot; <a href="#" onclick="ocrShowFailures(${uid});return false;" style="color:#c62828; text-decoration:underline;">${r.failed} failed</a>` : '';
+        cell.innerHTML = `${totTxt} &middot; <b style="color:#1b5e20;">${r.done} done</b>${pendTxt}${failTxt}`;
+      }
+      // Keep polling only while something is still pending.
+      const complete = (r.pending != null) ? (r.pending <= 0) : !(r.total != null && r.generated < r.total);
+      tr.setAttribute('data-complete', complete ? '1' : '0');
+    }
+
+    // Fetch progress once for the not-done rows, with limited concurrency.
+    async function ocrRefreshAllProgress() {
+      const rows = [...document.querySelectorAll('#ocrFoldersBody tr[data-complete="0"]')];
+      let i = 0;
+      const worker = async () => {
+        while (i < rows.length) {
+          const tr = rows[i++];
+          try {
+            const r = await fetch(API + `/ocr-bulk/uploads/${tr.getAttribute('data-uid')}/progress`).then(x => x.json());
+            if (r.success) ocrRenderProgress(tr, r);
+          } catch (_) { /* skip */ }
+        }
+      };
+      await Promise.all([worker(), worker(), worker(), worker()]);   // 4 at a time
+    }
+
+    function ocrStartPolling() {
+      if (_ocrPollTimer) clearInterval(_ocrPollTimer);
+      const poll = async () => {
+        // Poll only folders still in-progress (known total not yet fully tracked).
+        const rows = [...document.querySelectorAll('#ocrFoldersBody tr[data-complete="0"]')];
+        if (rows.length === 0) { clearInterval(_ocrPollTimer); _ocrPollTimer = null; return; }
+        for (const tr of rows) {
+          try {
+            const r = await fetch(API + `/ocr-bulk/uploads/${tr.getAttribute('data-uid')}/progress`).then(x => x.json());
+            if (r.success) ocrRenderProgress(tr, r);
+          } catch (_) { /* keep polling */ }
+        }
+      };
+      _ocrPollTimer = setInterval(poll, 3000);
     }
 
     // ============ UPLOAD ============

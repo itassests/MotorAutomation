@@ -26,6 +26,7 @@ const mastersRoutes = require('./routes/masters');
 const authRoutes = require('./routes/auth');
 const companyMarginRoutes = require('./routes/company-margin');
 const reconRoutes = require('./routes/recon');
+const ocrBulkRoutes = require('./routes/ocr-bulk');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -77,6 +78,7 @@ app.use('/api/masters', mastersRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/company-margins', companyMarginRoutes);
 app.use('/api/recon', reconRoutes);
+app.use('/api/ocr-bulk', ocrBulkRoutes);
 app.use('/api/agent', require('./routes/agent'));
 app.use('/api/employee', require('./routes/employee'));
 app.use('/api/enablers', require('./routes/enablers'));
@@ -101,6 +103,12 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`[RateExtract] Server running on port ${PORT}`);
   console.log(`[RateExtract] Upload directory: ${UPLOAD_DIR}`);
+  // OCR bulk processor — only runs when OCR_WORKER_ENABLED=1 (OCR file machine).
+  try {
+    require('./services/ocr-worker').startWorker();
+  } catch (e) {
+    console.warn('[RateExtract] OCR worker failed to start:', e.message);
+  }
 });
 
 module.exports = app;
