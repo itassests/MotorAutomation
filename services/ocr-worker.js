@@ -205,7 +205,7 @@ async function processPdfs(app, live) {
   for (let i = 0; i < PDFS_PER_TICK; i++) {
     const claim = await app.request().query(`
       UPDATE TOP (1) p SET p.status = 4
-      OUTPUT INSERTED.id, INSERTED.upload_id, INSERTED.pdf_path, INSERTED.tracker_no, INSERTED.retry
+      OUTPUT INSERTED.id, INSERTED.upload_id, INSERTED.pdf_path, INSERTED.tracker_no, INSERTED.prarambh_main_id, INSERTED.retry
       FROM dbo.ocr_bulk_pdf p WITH (READPAST, ROWLOCK, UPDLOCK) WHERE p.status = 1`);
     if (claim.recordset.length === 0) break;
     const row = claim.recordset[0];
@@ -213,13 +213,21 @@ async function processPdfs(app, live) {
       .query('SELECT emp_code, transaction_id, folder_key FROM dbo.ocr_bulk_meta WHERE upload_id = @id');
     const md = meta.recordset[0] || {};
     let trackerNo = row.tracker_no || null;
+    let mainId = row.prarambh_main_id != null ? row.prarambh_main_id : null;
     try {
       if (!trackerNo) {
-        trackerNo = (await mintTracker(md.emp_code)).trackerNo;
-        await app.request().input('id', sql.Int, row.id).input('t', sql.NVarChar(200), trackerNo)
-          .query('UPDATE dbo.ocr_bulk_pdf SET tracker_no = @t WHERE id = @id');
+        const minted = await mintTracker(md.emp_code);
+        trackerNo = minted.trackerNo;
+        if (minted.id != null) mainId = minted.id;
+        await app.request().input('id', sql.Int, row.id)
+          .input('t', sql.NVarChar(200), trackerNo)
+          .input('pm', sql.Int, mainId != null ? mainId : null)
+          .query('UPDATE dbo.ocr_bulk_pdf SET tracker_no = @t, prarambh_main_id = @pm WHERE id = @id');
       }
-      const ocr = await runOcr(row.pdf_path);
+      const ocr = await runOcr(row.pdf_path, {
+        tracker: trackerNo, prarambhMainId: mainId,
+        uploadName: path.basename(row.pdf_path), docPassword: '',
+      });
       if (!ocr.policyNo) throw new Error('OCR no policy. '
         + `step1 GetFileInJson(${ocr.fileStatus}): ` + String(ocr.fileText || '').slice(0, 1200)
         + ` || sentToStep2: ` + String(ocr.sentToStep2 || '').slice(0, 600)

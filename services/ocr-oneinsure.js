@@ -68,13 +68,20 @@ function findPolicyNo(obj, depth = 0) {
   return null;
 }
 
-/** Run the 2-step OCR on a PDF. */
-async function runOcr(pdfPath) {
+/** Run the 2-step OCR on a PDF.
+ *  opts: { tracker, prarambhMainId, uploadName, docPassword } — GetFileInJson
+ *  (a .NET endpoint) requires all of these alongside the file; omitting them
+ *  triggers a server-side NullReferenceException. */
+async function runOcr(pdfPath, opts = {}) {
   const buf = fs.readFileSync(pdfPath);
 
-  // Step 1 — GetFileInJson: multipart field "file", octet-stream.
+  // Step 1 — GetFileInJson: multipart "file" (octet-stream) + required fields.
   const form = new FormData();
   form.append(FILE_FIELD, new Blob([buf], { type: 'application/octet-stream' }), path.basename(pdfPath));
+  form.append('Tracker', String(opts.tracker || ''));
+  form.append('UploadName', String(opts.uploadName || path.basename(pdfPath)));
+  form.append('PrarambhMainId', String(opts.prarambhMainId == null ? '' : opts.prarambhMainId));
+  form.append('DocPassword', String(opts.docPassword || ''));
   const res1 = await fetch(GETFILE_URL, { method: 'POST', body: form });
   const body1 = await readBody(res1);
   logRaw('GetFileInJson(' + res1.status + ')', body1.text);
