@@ -3811,6 +3811,12 @@
         _authToken = r.token;
         _currentUser = r.user;
         localStorage.setItem('rx_token', _authToken);
+        // Fresh login → drop the previous user's cached dashboard filter options
+        // and KPI drill-downs so the Business Dashboard fully re-scopes to them.
+        if (typeof _empState === 'object' && _empState) {
+          _empState.optsLoaded = false;
+          _empState.logStatus = null; _empState.policyStatus = null; _empState.onlineTxn = null;
+        }
         renderUserChrome();
         applyPermissions();
         hideLoginOverlay();
@@ -3921,11 +3927,17 @@
           first.classList.add('active');
           const p = document.getElementById('panel-' + first.dataset.tab);
           if (p) p.classList.add('active');
-          // Auto-load data for the landed tab (e.g. a pure employee whose only
-          // visible tab is the Business Dashboard).
-          if (first.dataset.tab === 'employee-view') loadEmployeeDashboard();
-          if (first.dataset.tab === 'agent-view' && typeof loadAgentView === 'function') loadAgentView();
         }
+      }
+      // Re-scope the active per-user dashboard to the (possibly newly logged-in)
+      // user. applyPermissions runs on every login/bootstrap; without this, a
+      // re-login that keeps the same tab visible+active never re-fetches, so the
+      // dashboard stays on the previous user's numbers (it's server-scoped to the
+      // token's empcode — e.g. stuck on 107077 after switching users).
+      const act = document.querySelector('.tabs .tab.active');
+      if (act && act.style.display !== 'none') {
+        if (act.dataset.tab === 'employee-view') loadEmployeeDashboard();
+        else if (act.dataset.tab === 'agent-view' && typeof loadAgentView === 'function') loadAgentView();
       }
     }
 
