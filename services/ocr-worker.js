@@ -59,31 +59,41 @@ function locateFolderPdfs(uploadId, folderName) {
     }
     return out;
   };
-  // 1) A zip dropped by the new tab → extract (preserving inner folders) and walk.
+  const extractZip = (zipPath) => {
+    const dir = path.join(DROP_DIR, 'extract', String(uploadId));
+    fs.mkdirSync(dir, { recursive: true });
+    const zip = new AdmZip(zipPath);
+    zip.getEntries().filter(e => !e.isDirectory && /\.pdf$/i.test(e.entryName))
+      .forEach(e => zip.extractEntryTo(e, dir, true, true));   // keep inner folder structure
+    return { dir, pdfs: listPdfs(dir) };
+  };
+  // 1) Exact zip name in the dropzone / source dirs (new-tab uploads).
   for (const base of [DROP_DIR, ...SOURCE_DIRS]) {
     const zipPath = path.join(base, folderName);
     if (fs.existsSync(zipPath) && /\.zip$/i.test(zipPath)) {
-      const dir = path.join(DROP_DIR, 'extract', String(uploadId));
-      try {
-        fs.mkdirSync(dir, { recursive: true });
-        const zip = new AdmZip(zipPath);
-        zip.getEntries().filter(e => !e.isDirectory && /\.pdf$/i.test(e.entryName))
-          .forEach(e => zip.extractEntryTo(e, dir, true, true));   // keep inner folder structure
-        const pdfs = listPdfs(dir);
-        if (pdfs.length) return { dir, pdfs };
-      } catch (_) { /* try next */ }
+      try { const r = extractZip(zipPath); if (r.pdfs.length) return r; } catch (_) { /* next */ }
     }
   }
-  // 2) An already-extracted folder whose name contains the descriptor.
+  // 2) Fuzzy scan: a zip FILE or an already-extracted FOLDER whose
+  //    date-prefix-stripped name matches the descriptor (on-disk names often
+  //    carry a "DD-MM-YYYY_" prefix the DB FolderPath lacks, or vice versa).
   for (const base of SOURCE_DIRS) {
     let entries = [];
     try { entries = fs.readdirSync(base, { withFileTypes: true }); } catch (_) { continue; }
     for (const ent of entries) {
-      if (ent.isDirectory() && ent.name.indexOf(key) !== -1) {
-        const dir = path.join(base, ent.name);
-        const pdfs = listPdfs(dir);
-        if (pdfs.length) return { dir, pdfs };
-      }
+      const entKey = folderKey(ent.name);
+      const matches = entKey === key || entKey.indexOf(key) !== -1 || key.indexOf(entKey) !== -1;
+      if (!matches) continue;
+      try {
+        if (ent.isDirectory()) {
+          const dir = path.join(base, ent.name);
+          const pdfs = listPdfs(dir);
+          if (pdfs.length) return { dir, pdfs };
+        } else if (/\.zip$/i.test(ent.name)) {
+          const r = extractZip(path.join(base, ent.name));
+          if (r.pdfs.length) return r;
+        }
+      } catch (_) { /* next entry */ }
     }
   }
   return null;
