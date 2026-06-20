@@ -219,8 +219,8 @@ async function processPdfs(app, live) {
         await app.request().input('id', sql.Int, row.id).input('t', sql.NVarChar(200), trackerNo)
           .query('UPDATE dbo.ocr_bulk_pdf SET tracker_no = @t WHERE id = @id');
       }
-      const { policyNo } = await runOcr(row.pdf_path);
-      if (!policyNo) throw new Error('OCR returned no policy number');
+      const { policyNo, ocrText } = await runOcr(row.pdf_path);
+      if (!policyNo) throw new Error('OCR returned no policy number. Raw response: ' + String(ocrText || '').slice(0, 2500));
       // Final result → shared trn_OCRBulkEntry (Trackerno + PolicyNo + FolderPath + TransactionID).
       await live.request()
         .input('t', sql.VarChar(500), trackerNo)
