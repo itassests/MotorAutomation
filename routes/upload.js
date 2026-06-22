@@ -284,6 +284,15 @@ router.post('/upload', async (req, res, next) => {
         const s = String(v);
         return s.length > n ? s.slice(0, n) : s;
       };
+      // Numeric coercion for bulk-load columns. `?? null` does NOT catch NaN, so
+      // a parser yielding NaN (e.g. Number('') or a bad band) reached the bulk
+      // load and crashed it with "Invalid number". Coerce non-finite → null.
+      const num = (v) => {
+        if (v === null || v === undefined || v === '') return null;
+        const n = typeof v === 'number' ? v : Number(v);
+        return Number.isFinite(n) ? n : null;
+      };
+      const intOrNull = (v) => { const n = num(v); return n === null ? null : Math.round(n); };
 
       for (let i = 0; i < bulkRules.length; i += 5000) {
         const slice = bulkRules.slice(i, i + 5000);
@@ -336,26 +345,26 @@ router.post('/upload', async (req, res, next) => {
             truncate(rule.state, 200),
             truncate(rule.applied_on, 10),
             truncate(rule.fuel_type, 50),
-            rule.cc_band_min ?? null,
-            rule.cc_band_max ?? null,
-            rule.weight_band_min ?? null,
-            rule.weight_band_max ?? null,
-            rule.age_band_min ?? null,
-            rule.age_band_max ?? null,
-            rule.vehicle_age_min ?? null,
-            rule.vehicle_age_max ?? null,
+            intOrNull(rule.cc_band_min),
+            intOrNull(rule.cc_band_max),
+            num(rule.weight_band_min),
+            num(rule.weight_band_max),
+            intOrNull(rule.age_band_min),
+            intOrNull(rule.age_band_max),
+            intOrNull(rule.vehicle_age_min),
+            intOrNull(rule.vehicle_age_max),
             truncate(rule.volume_tier, 100),
             truncate(rule.addon, 50),
             truncate(rule.carrier_type, 100),
             truncate(rule.rate_type, 50),
-            rule.rate_value ?? null,
+            num(rule.rate_value),
             rule.is_declined ? 1 : 0,
             truncate(rule.rate_text, 500),
             rule.is_conditional ? 1 : 0,
-            rule.seating_capacity_min ?? null,
-            rule.seating_capacity_max ?? null,
+            intOrNull(rule.seating_capacity_min),
+            intOrNull(rule.seating_capacity_max),
             truncate(rule.remarks, 500),
-            rule.discount_pct ?? null
+            num(rule.discount_pct)
           );
         }
 
