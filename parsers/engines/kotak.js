@@ -16,6 +16,7 @@
  */
 
 const fs = require('fs');
+const XLSX = require('xlsx');
 const MsgReader = require('@kenjiuno/msgreader').default || require('@kenjiuno/msgreader');
 
 // ----------------------------------------------------------------------------
@@ -678,6 +679,74 @@ function parseTwMsgBody(body, meta) {
   return rules;
 }
 
+// ----------------------------------------------------------------------------
+// Pvt Car SATP — "SATP COA working revised.xlsx" (May'26). Two sheets:
+//   "Proposed COA SATP"          — District × CC-band(≤1000/>1000) × Fuel
+//                                  (Petrol/CNG/Diesel) → SATP rate or "Decline"
+//   "RTO list for each district" — District → RTO_Code (many rows per RTO)
+// preprocessWorkbook reads the COA sheet into meta; parseSatpRto emits one rule
+// per (RTO × cc-band × fuel) with the district's COA rate inlined.
+// ----------------------------------------------------------------------------
+function preprocessWorkbook(workbook, insurerConfig, meta) {
+  const sn = workbook.SheetNames.find(s => /Proposed\s*COA\s*SATP/i.test(s));
+  if (!sn) return;
+  const aoa = XLSX.utils.sheet_to_json(workbook.Sheets[sn], { header: 1, defval: '' });
+  const parseCellRate = (v) => {
+    const s = cell(v);
+    if (!s) return null;
+    if (/decline/i.test(s)) return { decline: true };
+    const n = asRate(s);
+    return n == null ? null : { rate: n };
+  };
+  const coa = new Map();   // DISTRICT(upper) → { le1000:{Petrol,CNG,Diesel}, gt1000:{...} }
+  for (let r = 3; r < aoa.length; r++) {
+    const row = aoa[r] || [];
+    const dist = cell(row[0]);
+    if (!dist) continue;
+    coa.set(dist.toUpperCase(), {
+      le1000: { Petrol: parseCellRate(row[1]), CNG: parseCellRate(row[2]), Diesel: parseCellRate(row[3]) },
+      gt1000: { Petrol: parseCellRate(row[4]), CNG: parseCellRate(row[5]), Diesel: parseCellRate(row[6]) },
+    });
+  }
+  meta._kotak_satp_coa = coa;
+}
+
+function parseSatpRto(aoa, meta) {
+  const coa = meta._kotak_satp_coa;
+  if (!coa) return [];
+  const rules = [];
+  const seen = new Set();
+  const BANDS = [
+    { key: 'le1000', cc_min: 0, cc_max: 1000, label: '≤1000cc' },
+    { key: 'gt1000', cc_min: 1001, cc_max: 99999, label: '>1000cc' },
+  ];
+  for (let r = 1; r < aoa.length; r++) {
+    const row = aoa[r] || [];
+    const dist = cell(row[0]);
+    const rto = cell(row[1]);
+    if (!rto || seen.has(rto)) continue;
+    seen.add(rto);
+    const c = coa.get(dist.toUpperCase());
+    if (!c) continue;
+    for (const b of BANDS) {
+      for (const fuel of ['Petrol', 'CNG', 'Diesel']) {
+        const cv = c[b.key][fuel];
+        if (!cv) continue;
+        rules.push({
+          product: 'CAR', sheet_name: meta.sheetName, segment: 'Pvt Car', make: 'All',
+          region: normState(dist), state: normState(dist), sub_type: rto,
+          fuel_type: fuel, cc_band_min: b.cc_min, cc_band_max: b.cc_max,
+          rate_type: 'SATP', applied_on: 'TP',
+          rate_value: cv.decline ? 0 : cv.rate, is_declined: !!cv.decline,
+          remarks: `Kotak Pvt Car SATP | ${dist} ${rto} | ${fuel} ${b.label} | ${cv.decline ? 'Decline' : (cv.rate * 100).toFixed(2) + '%'}`,
+          rate_text: `Kotak SATP | ${normState(dist)}/${rto} | ${fuel} ${b.label} | ${cv.decline ? 'Decline' : (cv.rate * 100).toFixed(2) + '%'}`,
+        });
+      }
+    }
+  }
+  return rules;
+}
+
 /** Entry point for .msg uploads — routes by subject/body content. */
 function parseMsgFile(filePath) {
   const data = new MsgReader(fs.readFileSync(filePath)).getFileData();
@@ -701,10 +770,11 @@ function parse(sheetData, sheetConfig, meta) {
     case 'kotak_rto_gcv_2_5_3_5':
     case 'kotak_rto_gcv_3_5_7_5':
       return parseGcvRto(sheetData, meta, kind);
+    case 'kotak_satp_rto':          return parseSatpRto(sheetData, meta);
     default:
       console.warn(`[kotak] unknown sheet_kind: ${kind}`);
       return [];
   }
 }
 
-module.exports = { parse, parseMsgFile };
+module.exports = { parse, parseMsgFile, preprocessWorkbook };

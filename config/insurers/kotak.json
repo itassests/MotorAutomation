@@ -63,6 +63,21 @@
       "file_pattern": "Tractor[ _]RTO|tractor[ _]rto",
       "layout": "kotak",
       "config": { "sheet_kind": "kotak_rto_tractor" }
+    },
+    {
+      "_comment": "May'26 Pvt Car SATP — 'SATP COA working revised.xlsx'. Per-RTO SATP (cc-band × fuel) from the district COA grid; preprocessWorkbook joins the 'Proposed COA SATP' sheet.",
+      "name": "RTO list for each district",
+      "file_pattern": "SATP[ _]COA",
+      "layout": "kotak",
+      "config": { "sheet_kind": "kotak_satp_rto" }
+    },
+    {
+      "_comment": "May'26 TW Deal Calculation — RTO Code → District/State → TP-ULR Category (0A/0B). Feeds rto_mappings so TW .msg Cat rates can resolve per RTO.",
+      "name": "RTO list with TPULR",
+      "file_pattern": "Deal[ _]Calculation|TW[ _]Deal",
+      "layout": "rto_mapping",
+      "product": "TW",
+      "config": { "data_start_row": 2, "column_map": { "rto_code": 0, "region": 1, "cluster": 3 } }
     }
   ]
 }
