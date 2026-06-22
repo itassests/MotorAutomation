@@ -399,6 +399,21 @@
       "config": { "sheet_kind": "pvt_car_new" }
     },
     {
+      "_comment": "May Private_Car file — Pvt Car Standalone OD (1870) free-text PO conditions.",
+      "name": "1870",
+      "name_pattern": "^1870$|Standalone",
+      "file_pattern": "Private.*Car|Robinhood",
+      "layout": "bajaj_robinhood",
+      "config": { "sheet_kind": "pc_saod_1870" }
+    },
+    {
+      "_comment": "May Private_Car file — HEV Treaty luxury makes × lowest payout.",
+      "name": "HEV Make Consider",
+      "file_pattern": "Private.*Car|Robinhood",
+      "layout": "bajaj_robinhood",
+      "config": { "sheet_kind": "hev_makes" }
+    },
+    {
       "_comment": "File 3 — Sheet5: Hero/TVS state × CD-band grid (mirror of File 1 HMC&TVS).",
       "name": "Sheet5",
       "file_pattern": "Robinhood",

@@ -2196,6 +2196,71 @@ function parseSheet5(sheetData, sheetConfig, meta) {
 // ============================================================================
 //  Top-level dispatch
 // ============================================================================
+// ============================================================================
+//  PC Standalone-OD 1870 — a few free-text PO conditions (col A only).
+//    "Haryana and Bihar - All Channels PO@10%"
+//    "Rest of Diesel w/o NCB at 10% on OD"
+//    "Rest of the business at MISP i.e 15%"
+// ============================================================================
+function parsePc1870Saod(sheetData, sheetConfig, meta) {
+  const rules = [];
+  const mk = (region, fuel, nonNcb, rate, rem) => ({
+    product: 'CAR', sheet_name: meta.sheetName, region, segment: 'Pvt Car', make: 'All',
+    fuel_type: fuel || null,
+    age_band_min: nonNcb ? 0 : null, age_band_max: nonNcb ? 0 : null,
+    rate_type: 'SAOD', rate_value: rate, applied_on: 'OD', is_declined: false,
+    remarks: rem, rate_text: `Bajaj 1870 SAOD | ${region} | ${fuel || 'All'} | ${(rate * 100).toFixed(0)}% OD`,
+  });
+  for (const row of sheetData) {
+    const t = String((row && row[0]) || '').trim();
+    if (!t) continue;
+    let m = t.match(/Haryana\s+and\s+Bihar.*?@?\s*(\d+(?:\.\d+)?)\s*%/i);
+    if (m) { const r = parseFloat(m[1]) / 100; rules.push(mk('Haryana', null, false, r, t)); rules.push(mk('Bihar', null, false, r, t)); continue; }
+    m = t.match(/Diesel\s+w\/o\s+NCB\s+(?:at\s+)+(\d+(?:\.\d+)?)\s*%/i);
+    if (m) { rules.push(mk('Pan India', 'Diesel', true, parseFloat(m[1]) / 100, t)); continue; }
+    m = t.match(/Rest.*?(?:MISP\D*?|at\s+)(\d+(?:\.\d+)?)\s*%/i);
+    if (m) { rules.push(mk('Pan India', null, false, parseFloat(m[1]) / 100, t)); continue; }
+  }
+  return rules;
+}
+
+// ============================================================================
+//  HEV Treaty Makes — luxury make × model × lowest-payout list.
+//  Cols: A=Make, B=Model, F=Condition, G=Payout (numeric % or "Local grid").
+//  Approximation: flat make/model rule at the listed (lowest) payout; the
+//  condition text is carried in remarks. Rows with no numeric payout are
+//  skipped (no rate to encode).
+// ============================================================================
+function parseHevMakes(sheetData, sheetConfig, meta) {
+  const rules = [];
+  let hdr = sheetData.findIndex(r => r && /vehicle\s*make/i.test(String(r[0] || '')));
+  if (hdr < 0) hdr = 1;
+  for (let i = hdr + 1; i < sheetData.length; i++) {
+    const row = sheetData[i] || [];
+    const make = String(row[0] || '').trim();
+    if (!make || /^list of/i.test(make)) continue;
+    const model = String(row[1] || '').trim();
+    const cond = String(row[5] || '').trim();
+    const payRaw = String(row[6] || '').trim();
+    const pv = payRaw.match(/(\d+(?:\.\d+)?)/);
+    if (!pv) continue;   // "Local grid" / blank — nothing numeric to encode
+    const rate = parseFloat(pv[1]) / 100;
+    const models = model && !/^all$/i.test(model) ? model.split(/[,/]/).map(s => s.trim()).filter(Boolean) : [null];
+    for (const mdl of models) {
+      for (const rt of ['COMP', 'SAOD']) {
+        rules.push({
+          product: 'CAR', sheet_name: meta.sheetName, region: 'Pan India',
+          segment: 'Pvt Car High End', make, model: mdl,
+          rate_type: rt, rate_value: rate, applied_on: 'OD', is_declined: false,
+          remarks: `HEV Treaty${cond ? ' — ' + cond : ''} (payout ${payRaw})`,
+          rate_text: `Bajaj HEV | ${make}${mdl ? ' ' + mdl : ''} | ${(rate * 100).toFixed(1)}% | ${rt}`,
+        });
+      }
+    }
+  }
+  return rules;
+}
+
 function parse(sheetData, sheetConfig, meta) {
   const kind = sheetConfig.sheet_kind;
   switch (kind) {
@@ -2204,6 +2269,8 @@ function parse(sheetData, sheetConfig, meta) {
     case 'tw_new':          return parseTwNew(sheetData, sheetConfig, meta);
     case 'pvt_car_new':     return parsePvtCarNew(sheetData, sheetConfig, meta);
     case 'sheet5_cd_grid':  return parseSheet5(sheetData, sheetConfig, meta);
+    case 'pc_saod_1870':    return parsePc1870Saod(sheetData, sheetConfig, meta);
+    case 'hev_makes':       return parseHevMakes(sheetData, sheetConfig, meta);
     default:
       console.warn(`[bajaj-robinhood] unknown sheet_kind "${kind}" for "${meta.sheetName}"`);
       return [];
