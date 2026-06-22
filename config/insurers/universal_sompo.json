@@ -16,6 +16,7 @@
     { "name": "Tractor",         "name_pattern": "^\\s*tractor\\s*$",                           "layout": "universal_sompo", "config": { "sheet_kind": "tractor",       "header_row": 2, "data_start_row": 3 } },
     { "name": "PCV",             "name_pattern": "^\\s*pcv\\s*$",                               "layout": "universal_sompo", "config": { "sheet_kind": "pcv",           "header_row": 2, "data_start_row": 3 } },
     { "name": "Non Tractor",     "name_pattern": "^\\s*non[\\s_]*tractor\\s*$",                 "layout": "universal_sompo", "config": { "sheet_kind": "non_tractor",   "header_row": 2, "data_start_row": 3 } },
-    { "name": "PCV Short Term",  "name_pattern": "pcv[\\s_]*short[\\s_]*term",                  "layout": "universal_sompo", "config": { "sheet_kind": "pcv_short",     "header_row": 2, "data_start_row": 3 } }
+    { "name": "PCV Short Term",  "name_pattern": "pcv[\\s_]*short[\\s_]*term",                  "layout": "universal_sompo", "config": { "sheet_kind": "pcv_short",     "header_row": 2, "data_start_row": 3 } },
+    { "name": "Sheet1",          "name_pattern": "^\\s*sheet\\s*1?\\s*$",                       "layout": "universal_sompo_stacked", "config": {} }
   ]
 }
