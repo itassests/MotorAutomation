@@ -393,7 +393,8 @@
     {
       "_comment": "File 3 — Pvt Car New (1825) district × Doable/Declined matrix.",
       "name": "PVT car New (1825)",
-      "file_pattern": "Robinhood",
+      "name_pattern": "1825.*District|PVT car New",
+      "file_pattern": "Robinhood|Private.*Car",
       "layout": "bajaj_robinhood",
       "config": { "sheet_kind": "pvt_car_new" }
     },

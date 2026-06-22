@@ -1852,6 +1852,19 @@ function parsePvtCarBlock(text) {
     }
   }
 
+  // CNG (and other non-diesel fuels) follow the Petrol rate when the grid lists
+  // only Diesel & Petrol for a state and has no "Rest business" catch-all
+  // (user-confirmed: diesel vs non-diesel). Only fills CNG combos still
+  // uncovered, so explicit bullets / Rest-business rates always win.
+  for (const ncbVal of [...new Set(out.map(f => f.ncb))]) {
+    const subRegions = [...new Set(out.filter(f => f.ncb === ncbVal).map(f => f.sub_region || null))];
+    for (const sr of subRegions) {
+      const petrol = out.find(f => f.ncb === ncbVal && (f.sub_region || null) === sr && /^petrol$/i.test(f.fuel));
+      const hasCng = out.some(f => f.ncb === ncbVal && (f.sub_region || null) === sr && /^cng$/i.test(f.fuel));
+      if (petrol && !hasCng) out.push({ ...petrol, fuel: 'CNG' });
+    }
+  }
+
   return out;
 }
 
