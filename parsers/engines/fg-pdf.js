@@ -36,6 +36,26 @@ const COMP_SLABS = [
  */
 function parsePvtCarComp(lines, meta) {
   const rules = [];
+
+  // Flat format (May'26+): the slab grid was replaced by a single line
+  //   "Pvt Car - Comprehensive Policy Flat 30% on OD"
+  // Emit one Pan-India flat COMP rule and return (no slab rows in this layout).
+  const joined = lines.join(' ').replace(/\s+/g, ' ');
+  const flat = joined.match(/Pvt\s*Car[^%\n]*Comprehensive[^%\n]*Flat\s+(\d+(?:\.\d+)?)\s*%\s*on\s*OD/i);
+  if (flat) {
+    const pct = parseFloat(flat[1]);
+    rules.push({
+      product: 'CAR', sheet_name: meta.sheetName || 'PDF Grid',
+      region: 'Pan India', segment: 'Pvt Car', make: 'All',
+      rate_type: 'COMP', applied_on: 'OD',
+      rate_value: Number((pct / 100).toFixed(4)), is_declined: false,
+      volume_tier: 'Flat',
+      remarks: `Pvt Car Comprehensive — Flat ${pct}% on OD`,
+      rate_text: `Pvt Car Comp | Flat ${pct}% OD`,
+    });
+    return rules;
+  }
+
   for (const raw of lines) {
     const line = raw.replace(/\s+/g, ' ').trim();
     // Detect "<slab-text> <irda>% <rate>%" — IRDA is typically 15% but we don't gate on it
@@ -86,10 +106,27 @@ const TP_FUELS = ['Petrol', 'Diesel'];
 
 function parsePvtCarTp(text, meta) {
   const rules = [];
-  // Locate the section between "Private Car TP only policy" and "PVTP doable states".
-  const sec = text.match(/(?:Private\s+Car|Pvt\s+Car)\s+TP\s+only\s+policy([\s\S]*?)PVTP\s+doable\s+states/i);
-  if (!sec) return rules;
-  const blob = sec[1];
+  // The doable-state list sits next to the "PVTP doable states" marker. The old
+  // layout had it AFTER "Pvt Car TP only policy"; the May'26 layout extracts the
+  // comma-separated state list on the line(s) immediately BEFORE the marker.
+  // Try the old section regex first, then fall back to grabbing the comma-list
+  // lines adjacent to "PVTP doable states".
+  let blob = '';
+  const sec = text.match(/(?:Private\s+Car|Pvt\s+Car)\s*-?\s*TP\s+only\s+policy([\s\S]*?)PVTP\s+doable\s+states/i);
+  if (sec) {
+    blob = sec[1];
+  } else {
+    const lines = text.split(/\r?\n/).map(l => l.trim());
+    const idx = lines.findIndex(l => /PVTP\s+doable\s+states/i.test(l));
+    if (idx >= 0) {
+      // Collect comma-bearing list lines just before (and the marker line's tail).
+      for (let k = Math.max(0, idx - 4); k <= idx; k++) {
+        const l = (lines[k] || '').replace(/PVTP\s+doable\s+states/i, '').trim();
+        if (/,/.test(l) && /[A-Za-z]{2,}/.test(l)) blob += ' ' + l;
+      }
+    }
+  }
+  if (!blob.trim()) return rules;
 
   // Strip "Petrol" / "Diesel" labels then collect comma/and-separated state names.
   const stateBlob = blob
