@@ -4,23 +4,27 @@
  *   1) GetFileInJson : POST the PDF as multipart form-data, field "file",
  *      content-type application/octet-stream (per the existing .NET client) →
  *      returns a response body.
- *   2) GetOCRdata    : POST that response → returns JSON with the policy data.
+ *   2) GetOCRdata    : POST that response → triggers the OCR.
  *
- * The GetFileInJson response shape and the exact policy-number field in the
- * GetOCRdata JSON weren't specified, so the first few calls log their raw
- * payloads (OCR_LOG_BUDGET) and the policy number is found by a tolerant deep
- * search. Lock the field/auth from those logs before enabling for real.
+ * NOTE: GetOCRdata's HTTP body is only a status flag (typically
+ * [{"Prarambhmainid":0,"Result":"False"}]) — it does NOT carry the policy
+ * number. The engine writes the extracted number synchronously into
+ * Prarambh_Live.TRN_PrarambhMotorMISUpdation.POLICY_NO (keyed by
+ * PrarambhMainId); the worker reads it back from there (ocr-worker.lookupPolicyNo).
+ * The tolerant findPolicyNo() below is kept only as a best-effort fast path in
+ * case a future response ever includes the number.
  *
+ * Defaults point at PRODUCTION (no auth); override per-env if needed.
  * Config (env): OCR_GETFILE_URL, OCR_GETOCR_URL, OCR_FILE_FIELD (default "file"),
- *               OCR_POLICY_FIELD (optional exact JSON key once known).
+ *               OCR_POLICY_FIELD (optional exact JSON key).
  */
 const fs = require('fs');
 const path = require('path');
 
 const GETFILE_URL = process.env.OCR_GETFILE_URL
-  || 'https://oneerpuat.oneinsure.com/oneerpapiuat.oneinsure.com/api/master/GetFileInJson';
+  || 'https://oneerpapi.oneinsure.com/api/master/GetFileInJson';
 const GETOCR_URL = process.env.OCR_GETOCR_URL
-  || 'https://oneerpuat.oneinsure.com/oneerpapiuat.oneinsure.com//api/master/GetOCRdata';
+  || 'https://oneerpapi.oneinsure.com/api/master/GetOCRdata';
 const FILE_FIELD = process.env.OCR_FILE_FIELD || 'file';
 const POLICY_FIELD = (process.env.OCR_POLICY_FIELD || '').trim();   // optional exact key
 
