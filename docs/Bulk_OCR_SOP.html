@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bulk OCR Upload — Standard Operating Procedure</title>
+<style>
+  :root{ --blue:#0a3d62; --ink:#243746; --muted:#6b7a89; --line:#dfe6ee; --orange:#a04a00; --green:#1b5e20; }
+  *{ box-sizing:border-box; }
+  body{ font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif; color:var(--ink); margin:0; background:#eef1f5; line-height:1.5; }
+  .page{ max-width:860px; margin:24px auto; background:#fff; padding:48px 56px; box-shadow:0 1px 6px rgba(0,0,0,.08); }
+  h1{ color:var(--blue); font-size:30px; margin:0 0 2px; }
+  .sub{ color:var(--muted); font-size:14px; margin:0 0 4px; }
+  .tagline{ color:var(--muted); font-size:13px; border-bottom:3px solid var(--blue); padding-bottom:14px; margin-bottom:26px; }
+  h2{ color:var(--blue); font-size:19px; margin:30px 0 8px; border-bottom:1px solid var(--line); padding-bottom:5px; }
+  h3{ color:#34495e; font-size:15px; margin:18px 0 6px; }
+  p{ margin:8px 0; }
+  ul,ol{ margin:8px 0 8px 4px; padding-left:22px; }
+  li{ margin:4px 0; }
+  code{ background:#f1f4f8; padding:1px 6px; border-radius:4px; font-size:13px; }
+  table.ref{ border-collapse:collapse; width:100%; margin:10px 0 4px; font-size:14px; }
+  table.ref th{ background:#e8f0f7; color:var(--blue); text-align:left; padding:7px 10px; border:1px solid var(--line); }
+  table.ref td{ padding:7px 10px; border:1px solid var(--line); vertical-align:top; }
+  .note{ background:#f5f9ff; border:1px solid #d6e6fa; border-radius:8px; padding:10px 14px; margin:12px 0; font-size:14px; }
+  .figcap{ font-size:12px; color:var(--muted); margin:6px 0 22px; text-align:center; }
+  .callout{ background:#fff7f0; border-left:4px solid #e67e22; padding:8px 14px; margin:12px 0; font-size:14px; }
+
+  /* ---- UI mockup (matches the real screen) ---- */
+  .shot{ border:1px solid #cfd8e2; border-radius:10px; overflow:hidden; margin:14px 0 4px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .ui{ background:#f3f5f8; padding:16px; font-size:12.5px; }
+  .ui .card{ background:#fff; border:1px solid #e6ebf1; border-radius:10px; padding:16px; margin-bottom:14px; }
+  .ui .card:last-child{ margin-bottom:0; }
+  .ui h4{ margin:0 0 4px; font-size:15px; color:#243746; }
+  .ui .desc{ color:var(--muted); font-size:11.5px; margin:0 0 12px; }
+  .ui .row{ display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+  .ui .fg{ display:flex; flex-direction:column; gap:3px; }
+  .ui label{ font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:#5a6a7a; }
+  .ui .inp{ border:1px solid #cdd6e0; border-radius:6px; padding:6px 9px; background:#fff; min-width:130px; font-size:12px; color:#243746; }
+  .ui .btn{ border:1px solid #cdd6e0; background:#fff; border-radius:6px; padding:6px 12px; font-size:12px; cursor:default; }
+  .ui .btn.primary{ background:#0b3d91; color:#fff; border-color:#0b3d91; }
+  .ui .muted{ color:var(--muted); font-size:11px; }
+  .ui .toolbar{ display:flex; align-items:center; gap:9px; margin-bottom:10px; }
+  .ui .pill{ display:inline-flex; align-items:center; gap:7px; border-radius:14px; padding:4px 12px; font-size:11.5px; font-weight:600; background:#fff3e0; color:var(--orange); border:1px solid #f5dcc4; }
+  .ui .dot{ width:8px;height:8px;border-radius:50%;background:#e67e22; }
+  .ui .kpis{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:12px 0; }
+  .ui .kpi{ border-radius:8px; padding:10px 12px; }
+  .ui .kpi .k{ font-size:9.5px; text-transform:uppercase; letter-spacing:.4px; color:#5a6a7a; }
+  .ui .kpi .v{ font-size:21px; font-weight:600; margin-top:2px; }
+  .ui .kpi.p{ background:#fff7f0; border:1px solid #f5dcc4; } .ui .kpi.p .v{ color:var(--orange); }
+  .ui .kpi.d{ background:#f5fff7; border:1px solid #cfe9d4; } .ui .kpi.d .v{ color:var(--green); }
+  .ui .kpi.t{ background:#f5f9ff; border:1px solid #d6e6fa; } .ui .kpi.t .v{ color:var(--blue); }
+  .ui table.fld{ width:100%; border-collapse:collapse; font-size:11.5px; }
+  .ui table.fld th{ text-align:left; color:#5a6a7a; font-weight:600; border-bottom:2px solid #e6ebf1; padding:6px 8px; }
+  .ui table.fld td{ border-bottom:1px solid #eef2f6; padding:6px 8px; }
+  .ui .done{ color:var(--green); font-weight:700; } .ui .pend{ color:var(--orange); } .ui .fail{ color:#c62828; text-decoration:underline; }
+  .ui .st-done{ color:var(--green); font-weight:600; } .ui .st-no{ color:var(--orange); font-weight:600; }
+  .ui .xls{ border:1px solid #cdd6e0; background:#fff; border-radius:5px; padding:3px 10px; font-size:11px; }
+
+  footer{ margin-top:34px; border-top:1px solid var(--line); padding-top:10px; color:var(--muted); font-size:12px; font-style:italic; }
+  @media print{ body{ background:#fff; } .page{ box-shadow:none; margin:0; max-width:none; padding:0; } .shot{ break-inside:avoid; } h2{ break-after:avoid; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Standard Operating Procedure</h1>
+  <p class="sub" style="font-size:20px;color:#34495e;font-weight:600;margin:0;">Bulk OCR Upload</p>
+  <p class="tagline">RateExtract Portal &nbsp;·&nbsp; OneInsure Motor Automation</p>
+
+  <h2>1. What this screen does</h2>
+  <p>The <b>Bulk OCR Upload</b> screen lets you upload ZIP folders of policy PDF copies in bulk. For every PDF, the system automatically:</p>
+  <ul>
+    <li>Generates a <b>Tracker Number</b> for the policy,</li>
+    <li>Runs <b>OCR</b> on the PDF to read the <b>Policy Number</b>, and</li>
+    <li>Records the Tracker Number against the Policy Number so it can be exported.</li>
+  </ul>
+  <p>Processing runs in the background on the server &mdash; you can start an upload and leave the screen, and your work is not lost.</p>
+
+  <h2>2. Who can use it</h2>
+  <p>This screen is restricted to a single authorised operator (employee code <b>107110</b>). It is <b>not visible to other users, including administrators</b>. If you cannot see the OCR Bulk Upload tab, you are not logged in with the authorised employee code.</p>
+
+  <h2>3. Before you start — prepare your files</h2>
+  <ul>
+    <li>Put the policy PDF copies into a <code>.zip</code> file. One ZIP can hold many PDFs, and they may be inside sub-folders — the system finds all PDFs automatically.</li>
+    <li>Each <b>PDF should be a single policy document</b> (the policy copy that shows the policy number).</li>
+    <li>Only <code>.pdf</code> files are processed. Other file types in the ZIP are ignored.</li>
+    <li>You can select and upload <b>several ZIP files at once</b>.</li>
+    <li>Give the ZIP a meaningful name (for example, <i>location-poscode-insurer-period</i>) so it is easy to find later in the folder list.</li>
+  </ul>
+
+  <h2>4. Logging in</h2>
+  <ol>
+    <li>Open the RateExtract portal in your browser.</li>
+    <li>Enter your <b>employee code (107110)</b> and continue.</li>
+    <li>Enter the <b>OTP</b> provided to you and sign in.</li>
+    <li>Click the <b>OCR Bulk Upload</b> tab (box icon) in the left menu.</li>
+  </ol>
+
+  <h2>5. Uploading policy folders</h2>
+  <p>In the top card, fill in the details, then choose your files and click <b>Upload</b>:</p>
+  <table class="ref">
+    <tr><th style="width:170px;">Field</th><th>What to enter</th></tr>
+    <tr><td>Insurer</td><td>Select the insurer for the policies in this batch.</td></tr>
+    <tr><td>PosCode</td><td>The POS / agent code (for example, POSLG01234).</td></tr>
+    <tr><td>Booking Location</td><td>Where the policy was booked (for example, Mumbai).</td></tr>
+    <tr><td>Portal UserId</td><td>The OneInsure portal user id for the batch.</td></tr>
+    <tr><td>Product Type</td><td>Choose <b>Comp</b>, <b>SAOD</b>, or <b>TP</b> for the policies in the ZIP.</td></tr>
+    <tr><td>ZIP folders</td><td>Click to pick one or more <code>.zip</code> files of policy PDFs.</td></tr>
+  </table>
+
+  <!-- Figure 1: Upload form -->
+  <div class="shot"><div class="ui">
+    <div class="card">
+      <h4>📦&nbsp; OCR Bulk Upload</h4>
+      <p class="desc">Upload one or more ZIP folders of policy PDFs. The server generates a Tracker No for each policy, OCRs the PDF to read the policy number, and records both. Processing runs in the background — you can leave this screen.</p>
+      <div class="row" style="margin-bottom:12px;">
+        <div class="fg"><label>Insurer</label><div class="inp">ICICI Lombard ▾</div></div>
+        <div class="fg"><label>PosCode</label><div class="inp">POSLG04926</div></div>
+        <div class="fg"><label>Booking Location</label><div class="inp">Mumbai</div></div>
+        <div class="fg"><label>Portal UserId</label><div class="inp">oneinsure_mum01</div></div>
+        <div class="fg"><label>Product Type</label><div class="inp">Comp ▾</div></div>
+      </div>
+      <div class="row">
+        <div class="fg"><label>ZIP folders (you can pick several)</label><div class="inp" style="min-width:230px;">Choose Files&nbsp;&nbsp;<span class="muted">2 files selected</span></div></div>
+        <div class="btn primary">📤&nbsp; Upload</div>
+        <span class="muted">Uploaded 2 folder(s), 19 PDF(s) queued.</span>
+      </div>
+    </div>
+  </div></div>
+  <p class="figcap">Figure 1 — The upload form. Fill the fields, choose your ZIP file(s), then click Upload.</p>
+
+  <p>After you click Upload, a confirmation shows how many folders and PDFs were queued, and the new folder(s) appear in the <b>Uploaded Folders</b> list below and begin processing.</p>
+
+  <h2>6. Reading the Uploaded Folders screen</h2>
+  <h3>Status pill (top of the list)</h3>
+  <ul>
+    <li><b>Processing · N folders pending</b> (orange, with a blinking dot) — there is still work to be done.</li>
+    <li><b>✓ All folders processed</b> (green) — nothing is pending.</li>
+    <li>The note on the right shows the last-updated time and confirms the screen auto-refreshes.</li>
+  </ul>
+  <h3>Summary cards &amp; folder table</h3>
+  <table class="ref">
+    <tr><th style="width:190px;">Column / Card</th><th>Meaning</th></tr>
+    <tr><td>Pending / Done / Total</td><td>Folder counts: not-yet-OCR'd, fully processed, and the total.</td></tr>
+    <tr><td>Folder</td><td>The ZIP / folder name you uploaded.</td></tr>
+    <tr><td>PosCode / Product / Date</td><td>The details captured at upload time.</td></tr>
+    <tr><td>Progress</td><td>Live count: total PDFs, how many are done, pending, and any failures.</td></tr>
+    <tr><td>Status</td><td><b>Not done</b> (still processing) or <b>Done</b> (complete).</td></tr>
+    <tr><td>Excel</td><td>Download the results for that folder (see section 8).</td></tr>
+  </table>
+
+  <!-- Figure 2: Uploaded folders -->
+  <div class="shot"><div class="ui">
+    <div class="card">
+      <div class="toolbar">
+        <h4 style="margin:0;">📁&nbsp; Uploaded Folders</h4>
+        <span class="inp" style="padding:4px 8px;">Pending only ▾</span>
+        <span class="btn">🔄 Refresh</span>
+        <span class="btn primary">⚡ Process now</span>
+        <span class="muted" style="margin-left:auto;">Showing 4 folders</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <span class="pill"><span class="dot"></span> Processing · 12 folders pending</span>
+        <span class="muted" style="margin-left:auto;">Auto-refreshes every 3 min · updated 12:07:41</span>
+      </div>
+      <div class="kpis">
+        <div class="kpi p"><div class="k">Pending Folders</div><div class="v">12</div></div>
+        <div class="kpi d"><div class="k">Done Folders</div><div class="v">1,607</div></div>
+        <div class="kpi t"><div class="k">Total Folders</div><div class="v">1,619</div></div>
+      </div>
+      <table class="fld">
+        <tr><th>Folder</th><th>PosCode</th><th>Product</th><th>Date</th><th>Progress</th><th>Status</th><th>Excel</th></tr>
+        <tr><td>Mumbai-ICICI-Swati Kamboj-7</td><td>POSLG04926</td><td>Comp</td><td>22 Jun, 11:54</td><td>7 PDFs · <span class="done">5 done</span> · <span class="pend">2 pending</span></td><td><span class="st-no">Not done</span></td><td><span class="xls">Excel</span></td></tr>
+        <tr><td>Surat-HDFC-Mala-2</td><td>POSLG07355</td><td>Comp</td><td>22 Jun, 11:40</td><td>12 PDFs · <span class="done">4 done</span> · <span class="pend">8 pending</span> · <span class="fail">1 failed</span></td><td><span class="st-no">Not done</span></td><td><span class="xls">Excel</span></td></tr>
+        <tr><td>Delhi-KOTAK-Anuj Arora-3</td><td>POSLG01850</td><td>SAOD</td><td>22 Jun, 11:48</td><td>3 PDFs · <span class="done">3 done</span></td><td><span class="st-done">Done</span></td><td><span class="xls">Excel</span></td></tr>
+        <tr><td>Delhi-UNITED-Neerendra-10</td><td>POSLG04509</td><td>TP</td><td>22 Jun, 11:44</td><td>10 PDFs · <span class="done">10 done</span></td><td><span class="st-done">Done</span></td><td><span class="xls">Excel</span></td></tr>
+      </table>
+    </div>
+  </div></div>
+  <p class="figcap">Figure 2 — The Uploaded Folders list: processing pill, summary cards, and per-folder progress. It auto-refreshes every 3 minutes.</p>
+
+  <h2>7. Monitoring progress</h2>
+  <ul>
+    <li>The folder list <b>auto-refreshes every 3 minutes</b> while the tab is open, so finished folders update on their own.</li>
+    <li>Each in-progress folder's <b>Progress</b> cell updates every few seconds.</li>
+    <li>Use the <b>Refresh</b> button or the <b>Pending / Done / All</b> filter to look at a specific set of folders.</li>
+    <li>You may safely leave the screen and return later — processing continues on the server.</li>
+  </ul>
+  <div class="callout"><b>About “Process now”:</b> processing normally runs automatically in the background. The <b>Process now</b> button triggers one extra processing pass and is only needed if support asks. Pressing it does not harm anything.</div>
+
+  <h2>8. Downloading the results</h2>
+  <ol>
+    <li>Find the folder in the list (use the <b>Done only</b> filter to see completed ones).</li>
+    <li>Click the <b>Excel</b> button on that row.</li>
+    <li>An Excel file downloads with two columns: <b>Policy No</b> and <b>Tracker No</b>.</li>
+  </ol>
+
+  <h2>9. Handling failed PDFs</h2>
+  <p>If a folder's Progress shows a red <span class="fail">N failed</span> link, click it to see which PDFs could not be read and why. Common reasons:</p>
+  <ul>
+    <li>The PDF is a scanned image of poor quality, or is not actually a policy copy.</li>
+    <li>The PDF is password-protected or corrupted.</li>
+  </ul>
+  <p>Re-check those documents and, if needed, re-upload corrected copies in a new ZIP. Share the failure details with support if the cause is unclear.</p>
+
+  <h2>10. Quick answers</h2>
+  <table class="ref">
+    <tr><th style="width:300px;">Question</th><th>Answer</th></tr>
+    <tr><td>Can I close the screen during processing?</td><td>Yes. Processing runs on the server and continues.</td></tr>
+    <tr><td>How long does it take?</td><td>It depends on the number of PDFs. Large batches finish over time; the pill turns green when done.</td></tr>
+    <tr><td>Nothing seems to be moving.</td><td>Wait for the 3-minute auto-refresh, or click Refresh. If still stuck, contact support.</td></tr>
+    <tr><td>The Excel is empty / missing policies.</td><td>Some PDFs may still be processing or have failed — check the Progress and the failed link first.</td></tr>
+    <tr><td>I can't see the OCR Bulk tab.</td><td>You are not logged in as the authorised employee code (107110).</td></tr>
+  </table>
+
+  <footer>For access issues or processing errors that persist, contact the RateExtract support team.</footer>
+</div>
+</body>
+</html>
