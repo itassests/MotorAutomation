@@ -3,6 +3,12 @@
   "label": "Kotak General Insurance",
   "sheets": [
     {
+      "_comment": "May'26+ — Pvt Car Comp/SAOD and TW grids arrive as Outlook .msg email bodies (parsed by kotak.parseMsgFile, routed by subject/body).",
+      "name": "MSG grid",
+      "file_pattern": "\\.msg$",
+      "layout": "kotak_msg"
+    },
+    {
       "_comment": "Grid.xlsx — TW sheet (Bike/Scooter × Comp/SAOD/Liability rates with code labels)",
       "name": "TW",
       "file_pattern": "^Grid\\.|kotak[ _]grid",

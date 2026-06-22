@@ -15,6 +15,9 @@
  * Entry: parse(sheetData, sheetConfig, meta) → rule[]
  */
 
+const fs = require('fs');
+const MsgReader = require('@kenjiuno/msgreader').default || require('@kenjiuno/msgreader');
+
 // ----------------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------------
@@ -599,6 +602,93 @@ function parseTractorRto(aoa, meta) {
 // ----------------------------------------------------------------------------
 // Engine entry — dispatch by sheet_kind
 // ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// .msg (Outlook email) grids — May'26 onwards Kotak ships some grids as the
+// body of an email rather than an xlsx attachment.
+// ----------------------------------------------------------------------------
+const FUEL_ALIAS = { cng: 'CNG', lpg: 'LPG', ev: 'EV', petrol: 'Petrol', diesel: 'Diesel' };
+const ncbSuffix = (s) => /with\s*out\s*ncb|without\s*ncb|w\/o\s*ncb/i.test(s) ? '|NCB:None'
+                       : /with\s*ncb/i.test(s) ? '|NCB:GT0' : '';
+
+/** Pvt Car Comp/SAOD — tab-separated table in the email body:
+ *  Insurer | RTO | Coverage Type | Fuel Type | With/Without NCB | Condition | Income */
+function parsePvtCarMsgBody(body, meta) {
+  const rules = [];
+  const lines = body.split(/\r?\n/);
+  for (const raw of lines) {
+    const cols = raw.split('\t').map(c => c.trim());
+    if (cols.length < 7) continue;
+    if (!/^kotak$/i.test(cols[0])) continue;               // data rows start with "KOTAK"
+    const coverage = cols[2], fuelRaw = cols[3], ncb = cols[4], cond = cols[5];
+    const rate = asRate(cols[6]);
+    if (rate == null) continue;
+    const base = /saod/i.test(coverage) ? 'SAOD' : 'COMP';
+    const rate_type = base + ncbSuffix(ncb);
+    const isBundled = /bundled/i.test(coverage);
+    const fuels = /all\s*fuel/i.test(fuelRaw) ? [null]
+      : fuelRaw.split(/[,/]/).map(f => FUEL_ALIAS[f.trim().toLowerCase()] || f.trim()).filter(Boolean);
+    for (const fuel of fuels) {
+      rules.push({
+        product: 'CAR', sheet_name: meta.sheetName, region: 'Pan India',
+        segment: 'Pvt Car', make: 'All', fuel_type: fuel,
+        sub_type: isBundled ? coverage : null,
+        rate_type, applied_on: 'OD', rate_value: rate, is_declined: false,
+        remarks: `Kotak Pvt Car | ${coverage} | ${ncb || '-'} | ${cond}`,
+        rate_text: `Kotak Pvt Car | ${coverage} | ${fuel || 'All Fuel'} | ${ncb || '-'} | ${(rate * 100).toFixed(2)}%`,
+      });
+    }
+  }
+  return rules;
+}
+
+/** TW — vertical email body: Product → Segment (Scooter/Bike) → RTO Category
+ *  (Cat 0A/0B) → PO%. Rate keyed by category (RTO→category map comes from the
+ *  TW Deal Calculation xlsx). */
+function parseTwMsgBody(body, meta) {
+  const rules = [];
+  const lines = body.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  let products = null, segment = null, pendingCat = null;
+  for (const line of lines) {
+    const prod = line.match(/Two-?Wheeler\s+Secure\s*-\s*(.+)/i);
+    if (prod) {
+      // "SAOD" → SAOD; "Standalone Third Party and 1+1 Package" → TP + PACKAGE.
+      products = /saod/i.test(prod[1]) ? ['SAOD'] : ['TP', 'PACKAGE'];
+      segment = null; pendingCat = null; continue;
+    }
+    if (/^Scooter$/i.test(line)) { segment = 'Scooter'; pendingCat = null; continue; }
+    if (/^Bike$/i.test(line))    { segment = 'Bike';    pendingCat = null; continue; }
+    const cat = line.match(/Cat\s*0\s*([AB])/i);
+    if (cat) { pendingCat = 'Cat 0' + cat[1].toUpperCase(); continue; }
+    const rm = line.match(/^(\d+(?:\.\d+)?)\s*%$/);
+    if (rm && products && segment && pendingCat) {
+      const rate = parseFloat(rm[1]) / 100;
+      for (const rt of products) {
+        rules.push({
+          product: 'TW', sheet_name: meta.sheetName, region: 'Pan India',
+          segment, make: 'All', sub_type: pendingCat,
+          rate_type: rt, applied_on: rt === 'SAOD' ? 'OD' : 'TP',
+          rate_value: rate, is_declined: false,
+          remarks: `Kotak TW | ${segment} | ${pendingCat} | ${rt} | ${(rate * 100).toFixed(0)}%`,
+          rate_text: `Kotak TW | ${segment} | ${pendingCat} | ${rt} | ${(rate * 100).toFixed(0)}%`,
+        });
+      }
+      pendingCat = null;
+    }
+  }
+  return rules;
+}
+
+/** Entry point for .msg uploads — routes by subject/body content. */
+function parseMsgFile(filePath) {
+  const data = new MsgReader(fs.readFileSync(filePath)).getFileData();
+  const subject = String(data.subject || '');
+  const body = String(data.body || '').replace(/\r/g, '');
+  const meta = { sheetName: (subject || 'Kotak MSG').slice(0, 80) };
+  if (/two-?wheeler\s+secure/i.test(body) || /\bTW\b/i.test(subject)) return parseTwMsgBody(body, meta);
+  if (/coverage\s*type/i.test(body) || /pvt\s*car|private\s*car/i.test(subject)) return parsePvtCarMsgBody(body, meta);
+  return [];
+}
+
 function parse(sheetData, sheetConfig, meta) {
   const kind = sheetConfig?.config?.sheet_kind || sheetConfig?.kind;
   switch (kind) {
@@ -617,4 +707,4 @@ function parse(sheetData, sheetConfig, meta) {
   }
 }
 
-module.exports = { parse };
+module.exports = { parse, parseMsgFile };
