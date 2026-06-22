@@ -1889,6 +1889,19 @@
           <span id="ocrShowing" style="margin-left:auto; font-size:12px; color:#888;"></span>
         </div>
 
+        <!-- Processing status + auto-refresh indicator. -->
+        <style>
+          @keyframes ocrPulse { 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+          .ocr-pill{display:inline-flex;align-items:center;gap:7px;border-radius:14px;padding:4px 12px;font-size:12px;font-weight:600;}
+          .ocr-pill-proc{background:#fff3e0;color:#a04a00;border:1px solid #f5dcc4;}
+          .ocr-pill-done{background:#eaf7ec;color:#1b5e20;border:1px solid #cfe9d4;}
+          .ocr-dot{width:9px;height:9px;border-radius:50%;background:#e67e22;animation:ocrPulse 1s infinite;}
+        </style>
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+          <span id="ocrStatusPill" class="ocr-pill ocr-pill-done">&#10003; All folders processed</span>
+          <span id="ocrAutoNote" style="margin-left:auto; font-size:12px; color:#999;">Auto-refreshes every 3 min</span>
+        </div>
+
         <!-- Summary KPIs — so the user sees the counts at a glance. -->
         <div style="display:grid; grid-template-columns:repeat(3, minmax(140px,1fr)); gap:10px; margin-bottom:14px;">
           <div class="kpi-card" style="background:#fff7f0; border:1px solid #f5dcc4; border-radius:8px; padding:12px;">
@@ -3972,6 +3985,8 @@
     // ============ TABS ============
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
+        // Stop OCR Bulk timers when navigating away (ocrBulkInit re-starts them on entry).
+        if (tab.dataset.tab !== 'ocr-bulk' && typeof ocrStopAuto === 'function') ocrStopAuto();
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
@@ -6360,6 +6375,40 @@
 
     // ============ OCR BULK UPLOAD ============
     let _ocrPollTimer = null;
+    let _ocrAutoTimer = null;   // full-list auto-refresh (every 3 min)
+
+    // Re-fetch the whole folder list every 3 minutes while the tab is open, so
+    // newly-finished/added folders show up without a manual Refresh.
+    function ocrStartAutoRefresh() {
+      if (_ocrAutoTimer) clearInterval(_ocrAutoTimer);
+      _ocrAutoTimer = setInterval(() => {
+        const panel = document.getElementById('panel-ocr-bulk');
+        if (panel && panel.classList.contains('active')) ocrLoadList();
+      }, 180000);
+    }
+
+    // Stop both timers when leaving the tab (called from the tab switcher).
+    function ocrStopAuto() {
+      if (_ocrAutoTimer) { clearInterval(_ocrAutoTimer); _ocrAutoTimer = null; }
+      if (_ocrPollTimer) { clearInterval(_ocrPollTimer); _ocrPollTimer = null; }
+    }
+
+    // Top-of-screen "Processing / All done" pill + last-updated time.
+    function ocrUpdateProcessingStatus(s) {
+      const pill = document.getElementById('ocrStatusPill');
+      const note = document.getElementById('ocrAutoNote');
+      if (pill) {
+        const pending = s ? (s.pending || 0) : 0;
+        if (pending > 0) {
+          pill.className = 'ocr-pill ocr-pill-proc';
+          pill.innerHTML = `<span class="ocr-dot"></span> Processing &middot; ${pending.toLocaleString('en-IN')} folder${pending === 1 ? '' : 's'} pending`;
+        } else {
+          pill.className = 'ocr-pill ocr-pill-done';
+          pill.innerHTML = '&#10003; All folders processed';
+        }
+      }
+      if (note) note.textContent = 'Auto-refreshes every 3 min · updated ' + new Date().toLocaleTimeString();
+    }
 
     function ocrBulkInit() {
       // Populate the insurer dropdown from the master list (once), then refresh.
@@ -6374,6 +6423,7 @@
       }
       ocrLoadSummary();
       ocrLoadList();
+      ocrStartAutoRefresh();
     }
 
     async function ocrLoadSummary() {
@@ -6383,6 +6433,7 @@
         document.getElementById('ocrKpiPending').textContent = (r.pending || 0).toLocaleString('en-IN');
         document.getElementById('ocrKpiDone').textContent = (r.done || 0).toLocaleString('en-IN');
         document.getElementById('ocrKpiTotal').textContent = (r.total || 0).toLocaleString('en-IN');
+        ocrUpdateProcessingStatus(r);
       } catch (_) { /* keep last values */ }
     }
 
@@ -6534,7 +6585,7 @@
       const poll = async () => {
         // Poll only folders still in-progress (known total not yet fully tracked).
         const rows = [...document.querySelectorAll('#ocrFoldersBody tr[data-complete="0"]')];
-        if (rows.length === 0) { clearInterval(_ocrPollTimer); _ocrPollTimer = null; return; }
+        if (rows.length === 0) { clearInterval(_ocrPollTimer); _ocrPollTimer = null; ocrLoadSummary(); return; }
         for (const tr of rows) {
           try {
             const r = await fetch(API + `/ocr-bulk/uploads/${tr.getAttribute('data-uid')}/progress`).then(x => x.json());
