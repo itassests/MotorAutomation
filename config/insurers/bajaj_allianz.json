@@ -30,7 +30,8 @@
     {
       "_comment": "Bajaj TW Comp & SAOD.xlsx — Agency 2W Comprehensive grid (1802). State × monthly GWP volume bands (0-50K / 50K-1L / 1-2L / 2-3L / 3L+) + Max Scooter band. Note 2: Bajaj/Vespa/Jawa/RE rollover -5%. Note 9: IRDA = OEM 22.5% / non-OEM 17.5% on OD. Cells like '5% on OD & 0% on TP' split into two rules.",
       "name": "Agency 2W Grid - 1802",
-      "file_pattern": "Bajaj.*TW.*Comp",
+      "name_pattern": "^Agency 2W Grid",
+      "file_pattern": "TW.*Comp",
       "layout": "bajaj_pvt_car",
       "config": {
         "sheet_kind": "tw_comp_1802",
@@ -41,7 +42,7 @@
     {
       "_comment": "Bajaj TW Comp & SAOD.xlsx — RTO-code-level overrides for the 1802 grid. Same 5 volume bands + Max Scooter, but keyed by RTO code (sub_type) instead of state. Region = Commission Grid State (col 2). Comp + SAOD emitted per cell, plus Bajaj/Vespa/Jawa/RE rollover -5%.",
       "name": "RTO Based Payouts File",
-      "file_pattern": "Bajaj.*TW.*Comp",
+      "file_pattern": "TW.*Comp",
       "layout": "bajaj_pvt_car",
       "config": {
         "sheet_kind": "tw_comp_1802_rto",
@@ -51,7 +52,7 @@
     {
       "_comment": "Bajaj TW Comp & SAOD.xlsx — RTO code → state-name mapping.",
       "name": "RTO State Mapping",
-      "file_pattern": "^Bajaj TW Comp",
+      "file_pattern": "TW.*Comp",
       "layout": "rto_mapping",
       "product": "ALL",
       "config": {
