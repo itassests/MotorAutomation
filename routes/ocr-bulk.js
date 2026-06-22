@@ -41,6 +41,18 @@ const upload = multer({ storage });
 
 router.use(attachUser());
 
+// OCR Bulk Upload is restricted to a SINGLE operator (empcode 170110) — not even
+// admins. Gate every endpoint here, not just the UI tab, since the tab being
+// hidden is cosmetic. Override the allowed empcode via OCR_BULK_EMPCODE if needed.
+const OCR_BULK_EMPCODE = String(process.env.OCR_BULK_EMPCODE || '170110').trim().toUpperCase();
+router.use((req, res, next) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'Login required' });
+  if (String(req.user.empcode || '').trim().toUpperCase() !== OCR_BULK_EMPCODE) {
+    return res.status(403).json({ success: false, error: 'Not authorized for OCR Bulk Upload' });
+  }
+  next();
+});
+
 // Product Type select (Comp/SAOD/TP) → the wording the existing table uses.
 const PRODUCT_MAP = { Comp: 'Comprehensive', Comprehensive: 'Comprehensive', SAOD: 'SAOD', TP: 'TP' };
 // Folder key = the bare descriptor the processor stores in entry.FolderPath:

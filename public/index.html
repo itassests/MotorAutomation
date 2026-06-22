@@ -3903,6 +3903,12 @@
           tab.style.display = (_currentUser && _currentUser.role === 'admin') ? '' : 'none';
           return;
         }
+        // OCR Bulk Upload is locked to a single operator (empcode 170110) — not
+        // even admins. The /api/ocr-bulk routes enforce the same on the server.
+        if (k === 'ocr-bulk') {
+          tab.style.display = (_currentUser && String(_currentUser.empcode).trim().toUpperCase() === '170110') ? '' : 'none';
+          return;
+        }
         const p = permFor(k);
         tab.style.display = p.read ? '' : 'none';
       });
@@ -5262,7 +5268,6 @@
       'special-rates': 'Special Rates',
       statements:      'Statements',
       pr:              'Premium Register',
-      'ocr-bulk':      'OCR Bulk Upload',
       bulk:            'Bulk Calculation',
       payout:          'Payout Summary',
       recon:           'Recon Summary',
