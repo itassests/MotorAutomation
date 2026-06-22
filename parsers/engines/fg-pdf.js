@@ -100,10 +100,8 @@ function parsePvtCarComp(lines, meta) {
  *   and WB
  *   PVTP doable states
  *
- * Emits one TP rule per (state × fuel) at IRDA SATP rate (firm-wide).
+ * Emits one TP rule per (state × monthly-GWP volume band).
  */
-const TP_FUELS = ['Petrol', 'Diesel'];
-
 function parsePvtCarTp(text, meta) {
   const rules = [];
   // The doable-state list sits next to the "PVTP doable states" marker. The old
@@ -166,11 +164,19 @@ function parsePvtCarTp(text, meta) {
     .filter(s => s.length > 0 && !/^(and|Pvt|Private|Car|TP|only|policy)$/i.test(s));
   if (cleaned.length === 0) return rules;
 
-  // Per user spec: doable states get Petrol 30% / Diesel 20% (NOT IRDA).
-  // Headers on the PDF page show "30%" for Petrol and "20%" for Diesel.
-  const TP_FUEL_RATES = { Petrol: 0.30, Diesel: 0.20 };
+  // May'26+: doable states are rated by MONTHLY-GWP VOLUME band (user-confirmed),
+  // not per fuel — the PDF carries "< 2 Lacs <N>%" and "> 2 Lacs <N>%". Parse
+  // those two rates (fallback 25% / 30%) and emit one TP rule per (state × band).
+  // Volume = the operator's monthly premium with FG (partner-level, NOT derivable
+  // per-policy) — both bands are stored via volume_tier; matching defaults a band.
+  const below = text.match(/<\s*2\s*Lacs?\s*(\d+(?:\.\d+)?)\s*%/i);
+  const above = text.match(/>\s*2\s*Lacs?\s*(\d+(?:\.\d+)?)\s*%/i);
+  const VOL_BANDS = [
+    { tier: 'Upto 2L', rate: below ? parseFloat(below[1]) / 100 : 0.25 },
+    { tier: '>2L',     rate: above ? parseFloat(above[1]) / 100 : 0.30 },
+  ];
   for (const state of cleaned) {
-    for (const fuel of TP_FUELS) {
+    for (const band of VOL_BANDS) {
       rules.push({
         product: 'CAR',
         sheet_name: meta.sheetName || 'PDF Grid',
@@ -178,13 +184,14 @@ function parsePvtCarTp(text, meta) {
         state: state,
         segment: 'Pvt Car',
         make: 'All',
-        fuel_type: fuel,
+        fuel_type: null,
         rate_type: 'TP',
         applied_on: 'TP',
-        rate_value: TP_FUEL_RATES[fuel],
+        volume_tier: band.tier,
+        rate_value: band.rate,
         is_declined: false,
-        remarks: `Pvt Car TP-only doable state — ${fuel} @ ${(TP_FUEL_RATES[fuel] * 100).toFixed(0)}%`,
-        rate_text: `Pvt Car TP | ${state} | ${fuel} @ ${(TP_FUEL_RATES[fuel] * 100).toFixed(0)}%`,
+        remarks: `Pvt Car TP-only doable state — monthly GWP ${band.tier} @ ${(band.rate * 100).toFixed(0)}%`,
+        rate_text: `Pvt Car TP | ${state} | vol ${band.tier} @ ${(band.rate * 100).toFixed(0)}%`,
       });
     }
   }
