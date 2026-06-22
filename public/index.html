@@ -3903,10 +3903,10 @@
           tab.style.display = (_currentUser && _currentUser.role === 'admin') ? '' : 'none';
           return;
         }
-        // OCR Bulk Upload is locked to a single operator (empcode 170110) — not
+        // OCR Bulk Upload is locked to a single operator (empcode 107110) — not
         // even admins. The /api/ocr-bulk routes enforce the same on the server.
         if (k === 'ocr-bulk') {
-          tab.style.display = (_currentUser && String(_currentUser.empcode).trim().toUpperCase() === '170110') ? '' : 'none';
+          tab.style.display = (_currentUser && String(_currentUser.empcode).trim().toUpperCase() === '107110') ? '' : 'none';
           return;
         }
         const p = permFor(k);
