@@ -203,10 +203,26 @@ router.get('/uploads/:id/progress', async (req, res, next) => {
     const meta = await getMeta(app, id);
     if (!meta) return res.status(404).json({ success: false, error: 'Not found' });
     const live = await getPrarambhPool();
+    // "done" = an entry whose tracker has an OCR'd policy number. The number
+    // lives in TRN_PrarambhMotorMISUpdation.POLICY_NO (the worker also copies it
+    // into trn_OCRBulkEntry.PolicyNo for new folders); legacy folders only have
+    // it in MISUpdation. EXISTS avoids row fan-out so "generated" stays exact.
     const c = await live.request().input('k', sql.NVarChar(500), meta.folder_key).query(`
       SELECT COUNT(*) AS generated,
-             SUM(CASE WHEN PolicyNo IS NOT NULL AND LTRIM(RTRIM(PolicyNo)) <> '' THEN 1 ELSE 0 END) AS done
-      FROM dbo.trn_OCRBulkEntry WHERE CHARINDEX(@k, FolderPath) > 0`);
+             SUM(CASE WHEN x.PolicyNo IS NOT NULL AND LTRIM(RTRIM(x.PolicyNo)) <> '' THEN 1 ELSE 0 END) AS done
+      FROM (
+        SELECT COALESCE(NULLIF(LTRIM(RTRIM(e.PolicyNo)), ''), mis.POLICY_NO) AS PolicyNo
+        FROM dbo.trn_OCRBulkEntry e
+        OUTER APPLY (
+          SELECT TOP 1 mis.POLICY_NO
+          FROM dbo.TRN_PrarambhMain m
+          JOIN dbo.TRN_PrarambhMotorMISUpdation mis ON mis.PrarambhMainId = m.Id
+          WHERE m.TrackerNo = e.Trackerno
+            AND mis.POLICY_NO IS NOT NULL AND LTRIM(RTRIM(mis.POLICY_NO)) <> ''
+          ORDER BY mis.Id DESC
+        ) mis
+        WHERE CHARINDEX(@k, e.FolderPath) > 0
+      ) x`);
     const generated = c.recordset[0].generated || 0;
     const done = c.recordset[0].done || 0;
     const total = (meta.total_pdfs != null) ? meta.total_pdfs : null;   // null = unknown (non-Node folder)
@@ -261,8 +277,22 @@ router.get('/uploads/:id/export', async (req, res, next) => {
     if (!meta) return res.status(404).json({ success: false, error: 'Not found' });
 
     const live = await getPrarambhPool();
+    // Prefer the entry's own PolicyNo (new folders); fall back to the OCR result
+    // in TRN_PrarambhMotorMISUpdation via the tracker (legacy folders). OUTER
+    // APPLY TOP 1 keeps it one row per entry.
     const r = await live.request().input('k', sql.NVarChar(500), meta.folder_key).query(
-      `SELECT Trackerno, PolicyNo FROM dbo.trn_OCRBulkEntry WHERE CHARINDEX(@k, FolderPath) > 0 ORDER BY Id`);
+      `SELECT e.Trackerno,
+              COALESCE(NULLIF(LTRIM(RTRIM(e.PolicyNo)), ''), mis.POLICY_NO) AS PolicyNo
+       FROM dbo.trn_OCRBulkEntry e
+       OUTER APPLY (
+         SELECT TOP 1 mis.POLICY_NO
+         FROM dbo.TRN_PrarambhMain m
+         JOIN dbo.TRN_PrarambhMotorMISUpdation mis ON mis.PrarambhMainId = m.Id
+         WHERE m.TrackerNo = e.Trackerno
+           AND mis.POLICY_NO IS NOT NULL AND LTRIM(RTRIM(mis.POLICY_NO)) <> ''
+         ORDER BY mis.Id DESC
+       ) mis
+       WHERE CHARINDEX(@k, e.FolderPath) > 0 ORDER BY e.Id`);
     const aoa = [['Policy No', 'Tracker No']];
     for (const e of r.recordset) aoa.push([e.PolicyNo || '', e.Trackerno || '']);
 
