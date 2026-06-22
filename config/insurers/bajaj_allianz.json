@@ -378,7 +378,8 @@
     {
       "_comment": "File 3 — Pvt Car Comp & STOD with multi-line NCB / fuel rules per state.",
       "name": "PVT car Comprehensive & STOD",
-      "file_pattern": "Robinhood",
+      "name_pattern": "^1801$|PVT car Comprehensive",
+      "file_pattern": "Robinhood|Private.*Car",
       "layout": "bajaj_robinhood",
       "config": { "sheet_kind": "pvt_car_comp" }
     },

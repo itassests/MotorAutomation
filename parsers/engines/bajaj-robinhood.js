@@ -1798,9 +1798,14 @@ function parsePvtCarBlock(text) {
 
     // "<state-region> entire state at N% on OD" — applies to ALL fuels under currentNcb.
     // Example: "UP entire state at 10% on OD".
+    // Guard: a per-fuel bullet like "Diesel at 10% on OD" must NOT be treated
+    // as a region (it would apply one fuel's rate to ALL fuels and block the
+    // later per-fuel bullets via isCovered). Let those fall to the bullet
+    // handler below.
+    const startsWithFuel = /^(Diesel|Petrol|CNG|EV|Electric|Bifuel|LPG|Hybrid|All\s+Fuels?)\b/i.test(line);
     const regionAt = line.match(/(?:entire\s+state|all\s+state|state)\s+at\s+(\d+(?:\.\d+)?)\s*%\s*on\s*OD/i)
                   || line.match(/^[\w\s&]+\s+at\s+(\d+(?:\.\d+)?)\s*%\s*on\s*OD/i);
-    if (regionAt && currentNcb !== null) {
+    if (regionAt && currentNcb !== null && !startsWithFuel) {
       const rate = parseFloat(regionAt[1]) / 100;
       const excl = [...parseExclusions(line), ...currentExcluded];
       for (const f of ['Petrol', 'Diesel', 'CNG']) {
