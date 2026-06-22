@@ -51,11 +51,34 @@ try {
 } catch { /* file missing — populate on first request */ }
 const ALL_INSURERS_TTL_MS = 12 * 60 * 60 * 1000;
 
+// Merge locally-configured insurers (config/insurers/*.json) into the master
+// list. Lets a brand-new insurer that isn't in the Prarambh master view yet
+// (e.g. Kshema) still be selectable in the upload dropdown — keyed by its
+// config-file slug. Done on every response (outside the cache) so adding a new
+// config file shows up immediately without waiting for the 12h TTL.
+function mergeConfigInsurers(viewInsurers) {
+  const out = Array.isArray(viewInsurers) ? viewInsurers.slice() : [];
+  const haveSlug = new Set(out.map((i) => i.slug));
+  try {
+    const files = fs.readdirSync(INSURERS_DIR).filter((f) => f.endsWith('.json'));
+    for (const f of files) {
+      const slug = path.basename(f, '.json');
+      if (haveSlug.has(slug)) continue;
+      let cfg = {};
+      try { cfg = JSON.parse(fs.readFileSync(path.join(INSURERS_DIR, f), 'utf8')); } catch { continue; }
+      out.push({ id: slug, name: cfg.display_name || cfg.insurer || slug, slug, config_only: true });
+      haveSlug.add(slug);
+    }
+  } catch { /* config dir unreadable — return view list as-is */ }
+  out.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  return out;
+}
+
 router.get('/all-insurers', async (req, res, next) => {
   try {
     const now = Date.now();
     if (_allInsurersCache.payload && (now - _allInsurersCache.at) < ALL_INSURERS_TTL_MS) {
-      return res.json(_allInsurersCache.payload);
+      return res.json({ success: true, insurers: mergeConfigInsurers(_allInsurersCache.payload.insurers) });
     }
     const pool = await getPool();
     const rq = pool.request();
@@ -99,10 +122,10 @@ router.get('/all-insurers', async (req, res, next) => {
       slug: deriveSlug(r.InsurerName),
     }));
 
-    const payload = { success: true, insurers };
+    const payload = { success: true, insurers };   // view-only; cached
     _allInsurersCache = { at: now, payload };
     try { _fs.writeFileSync(_CACHE_FILE, JSON.stringify(payload), 'utf8'); } catch { /* ignore */ }
-    res.json(payload);
+    res.json({ success: true, insurers: mergeConfigInsurers(insurers) });
   } catch (err) {
     next(err);
   }
