@@ -200,6 +200,26 @@ async function mintTracker(folderEmp) {
   throw new Error(`${lastErr ? lastErr.message : 'tracker failed'} (tried: ${tried.join(', ')})`);
 }
 
+/** Read the OCR'd policy number back from Prarambh_Live. GetOCRdata's HTTP
+ *  response is only a status flag; the engine writes the extracted number into
+ *  TRN_PrarambhMotorMISUpdation.POLICY_NO (keyed by PrarambhMainId), so that —
+ *  not the response body — is the source of truth. Resolves the main id from
+ *  the tracker when it wasn't passed through. */
+async function lookupPolicyNo(live, mainId, trackerNo) {
+  let id = mainId;
+  if (id == null && trackerNo) {
+    const m = await live.request().input('tk', sql.VarChar(500), trackerNo)
+      .query('SELECT TOP 1 Id FROM dbo.TRN_PrarambhMain WHERE TrackerNo = @tk ORDER BY Id DESC');
+    if (m.recordset[0]) id = m.recordset[0].Id;
+  }
+  if (id == null) return null;
+  const r = await live.request().input('id', sql.BigInt, id).query(
+    `SELECT TOP 1 POLICY_NO FROM dbo.TRN_PrarambhMotorMISUpdation
+     WHERE PrarambhMainId = @id AND POLICY_NO IS NOT NULL AND LTRIM(RTRIM(POLICY_NO)) <> ''
+     ORDER BY Id DESC`);
+  return r.recordset[0] ? String(r.recordset[0].POLICY_NO).trim() : null;
+}
+
 /** Phase 2 — process up to N queued PDFs. */
 async function processPdfs(app, live) {
   for (let i = 0; i < PDFS_PER_TICK; i++) {
@@ -228,11 +248,13 @@ async function processPdfs(app, live) {
         tracker: trackerNo, prarambhMainId: mainId,
         uploadName: path.basename(row.pdf_path), docPassword: '',
       });
-      if (!ocr.policyNo) throw new Error('OCR no policy. '
+      // The policy number lands in TRN_PrarambhMotorMISUpdation (written
+      // synchronously by GetOCRdata), not in the HTTP response — read it back.
+      const policyNo = ocr.policyNo || await lookupPolicyNo(live, mainId, trackerNo);
+      if (!policyNo) throw new Error('OCR no policy. '
         + `step1 GetFileInJson(${ocr.fileStatus}): ` + String(ocr.fileText || '').slice(0, 1200)
         + ` || sentToStep2: ` + String(ocr.sentToStep2 || '').slice(0, 600)
         + ` || step2 GetOCRdata(${ocr.ocrStatus}): ` + String(ocr.ocrText || '').slice(0, 800));
-      const policyNo = ocr.policyNo;
       // Final result → shared trn_OCRBulkEntry (Trackerno + PolicyNo + FolderPath + TransactionID).
       await live.request()
         .input('t', sql.VarChar(500), trackerNo)
