@@ -13,11 +13,23 @@
   "sheets": [
     {
       "name": "A&B Cat Broker_Apr26",
-      "name_pattern": "a\\s*&?\\s*b[\\s_]*cat[\\s_]*broker|broker[\\s_]*grid",
+      "name_pattern": "a\\s*&?\\s*b[\\s_]*cat[\\s_]*broker|^\\s*broker[\\s_]*grid\\s*$",
       "layout": "sbi_grouped",
       "config": {
         "data_start_row": 4
       }
+    },
+    {
+      "name": "GCV & Pvt Car Payout Condition",
+      "name_pattern": "gcv\\s*&?\\s*pvt[\\s_]*car|pvt[\\s_]*car[\\s_]*payout",
+      "layout": "sbi_grouped_jun",
+      "config": { "sheet_kind": "gcv_pvtcar", "data_start_row": 5 }
+    },
+    {
+      "name": "PCV, MISD & TW",
+      "name_pattern": "pcv\\s*,?\\s*mis[d]?\\s*&?\\s*tw|pcv.*misd.*tw",
+      "layout": "sbi_grouped_jun",
+      "config": { "sheet_kind": "pcv_misd_tw", "data_start_row": 4 }
     },
     {
       "name": "PVT car SATP-Apr26",

@@ -608,4 +608,9 @@ function parse(sheetData, sheetConfig, meta) {
   return rules;
 }
 
-module.exports = { parse };
+module.exports = {
+  parse,
+  // Shared with the June split-sheet engine (sbi-grouped-jun.js).
+  parseStateField, parseRate, cellOrNull, findClustersForRow,
+  PREMIUM_SLABS, rateForSlab, ZONES,
+};

@@ -19,6 +19,7 @@ const engines = {
   pivot_by_city: require('./engines/pivot-by-city'),
   multi_region_blocks: require('./engines/multi-region-blocks'),
   sbi_grouped:         require('./engines/sbi-grouped'),
+  sbi_grouped_jun:     require('./engines/sbi-grouped-jun'),
   sbi_pvt_satp:        require('./engines/sbi-pvt-satp'),
   universal_sompo:     require('./engines/universal-sompo'),
   universal_sompo_stacked: require('./engines/universal-sompo-stacked'),
