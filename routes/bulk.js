@@ -5789,6 +5789,30 @@ async function runBulkCalculate(body) {
       }
     }
 
+    // (B4b) Seating capacity — when tmp lacks a usable seating, fill from PR,
+    // then from TRN_PrarambhMotorDetails (same tmp → PR → MotorDetails chain as
+    // fuel/CC). Drives PCV seating bands (6+1 taxi, 7-10, School Bus 18+) — many
+    // portal exports (e.g. HDFC "New Portal") carry no seating, leaving PCV
+    // policies unmatched until this fallback supplies it.
+    {
+      const curSeat = parseInt(r.SEATING_CAPACITY, 10);
+      if (!(Number.isFinite(curSeat) && curSeat > 0)) {
+        let seat = null;
+        const prSeat = pr ? parseInt(pr.seating, 10) : NaN;
+        if (Number.isFinite(prSeat) && prSeat > 0) seat = prSeat;
+        if (seat == null) {
+          const mainId = r.ID || r.PrarambhMainId;
+          const trn = mainId ? trnRtoById.get(String(mainId)) : null;
+          if (trn && trn.seating) seat = trn.seating;
+        }
+        if (seat != null) {
+          r.SEATING_CAPACITY = seat;
+          r['SEATING CAPACITY'] = seat;
+          r['SEATING'] = seat;
+        }
+      }
+    }
+
     // (B5) Tenure bucket — derived from OD/TP policy-term dates
     // (TRN_PrarambhMotorMISUpdation). Routes multi-year Comp policies to the
     // correct grid (1+1 vs 1+5 vs 5+5). Stashed as a private column the

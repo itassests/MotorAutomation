@@ -87,6 +87,7 @@ async function fetchRtoMap(pool, ids) {
       const r = await pool.request().query(
         `SELECT d.PrarambhMainId, d.RTO_Code, d.VEHICLE_REGISTRATION_NO,
                 d.FUELTYPE, d.VEHICAL_FUELTYPE, d.CC, d.PRODUCT_TYPE_Id,
+                d.SEATING_CAPACITY,
                 d.NCB AS NCB_Code, f.Name AS NCB_Pct
          FROM TRN_PrarambhMotorDetails d
          LEFT JOIN MST_FieldMasters f ON f.MasterId = 9310 AND f.Value = d.NCB
@@ -97,11 +98,13 @@ async function fetchRtoMap(pool, ids) {
         // or null when the code didn't resolve (unknown — caller falls back).
         const p = parseFloat(row.NCB_Pct);
         const ncb = Number.isFinite(p) ? p : null;
+        const seat = parseInt(row.SEATING_CAPACITY, 10);
         out.set(String(row.PrarambhMainId), {
           rto: row.RTO_Code,
           reg: row.VEHICLE_REGISTRATION_NO,
           fuel: row.FUELTYPE || row.VEHICAL_FUELTYPE || null,
           cc: row.CC,
+          seating: Number.isFinite(seat) && seat > 0 ? seat : null,
           productTypeId: row.PRODUCT_TYPE_Id,
           ncb,
         });
