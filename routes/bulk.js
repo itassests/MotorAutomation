@@ -1579,11 +1579,21 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     // rule, whereas the operator paid them the April rate (47.5/48). Those become
     // grid-correct-on-May with the operator value as noise → marked As-per-Grid.
     const _pr = (prIndex && params._policy_no) ? prIndex.get(String(params._policy_no).trim().toUpperCase()) : null;
-    _bajajEffDate = _en.toIso(policy.OD_Start_Date)
-                 || _en.toIso(policy.POLICY_START_DATE)
-                 || _en.toIso(policy.TP_POLICY_START_DATE)
-                 || _en.toIso(_pr && _pr.pr_start_date)
-                 || _en.toIso(policy.POLICY_ISSUED_DATE)
+    // Reject placeholder dates: TP-only policies carry a sentinel OD_Start_Date /
+    // POLICY_START_DATE of 1999-12-31 (no OD leg), which is a *truthy* date and
+    // would otherwise win the `||` chain and route the policy to the EARLIEST
+    // (April) card. A FY26-27 policy can never start before 2020, so treat any
+    // pre-2020 date as missing and fall through to the real risk-start (TP start /
+    // issued date). Without this, June TP-only kotak policies (TP start 06-Jun,
+    // OD start 1999-12-31) took the April make-category grid instead of the June
+    // cc×fuel grid (MT/DIRNE/UP1/16410 Lucknow Petrol 796cc: April 50% vs June
+    // ≤1000cc 32.15%).
+    const _vd = (d) => { const s = _en.toIso(d); return (s && s >= '2020-01-01') ? s : null; };
+    _bajajEffDate = _vd(policy.OD_Start_Date)
+                 || _vd(policy.POLICY_START_DATE)
+                 || _vd(policy.TP_POLICY_START_DATE)
+                 || _vd(_pr && _pr.pr_start_date)
+                 || _vd(policy.POLICY_ISSUED_DATE)
                  || '2000-01-01';
   }
 
