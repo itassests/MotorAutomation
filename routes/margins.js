@@ -655,15 +655,15 @@ router.get('/coverage', async (req, res, next) => {
 
     // Synthetic-margin default: the bulk policy engine applies a flat default
     // margin when no explicit margin_rule matches (see bulk.js processOnePolicy):
-    //   Commercial (GCV / PCV / MISC / MIS / CV — incl. TAXI / GCCV) → 6%
-    //   Pvt Car    (CAR / 4W / PC / PVT.CAR)                         → 5%
+    //   Pvt Car    (CAR / 4W / PC / PVT.CAR)                         → 6%
+    //   Commercial (GCV / PCV / MISC / MIS / CV — incl. TAXI / GCCV) → 5%
     //   Two-wheeler (TW / 2W / TW_EV)                                → 3%
     // Mirror that here so the coverage card doesn't flag those rules as "pending"
     // — they ARE margined (by the synthetic default) at compute time. TESTING
     // default; remove this block to revert the card to explicit-rule coverage only.
     const SYNTH_MARGIN_PRODUCTS = new Set([
-      'GCV', 'PCV', 'MISC', 'MIS', 'CV', 'TAXI', 'GCCV', 'PCCV',  // CV → 6%
-      'CAR', '4W', 'PC', 'PVT.CAR',                                // Pvt Car → 5%
+      'GCV', 'PCV', 'MISC', 'MIS', 'CV', 'TAXI', 'GCCV', 'PCCV',  // CV → 5%
+      'CAR', '4W', 'PC', 'PVT.CAR',                                // Pvt Car → 6%
       'TW', '2W', 'TW_EV',                                         // Two-wheeler → 3%
     ]);
     const isCvProduct = (p) => SYNTH_MARGIN_PRODUCTS.has(String(p == null ? '' : p).toUpperCase().trim());

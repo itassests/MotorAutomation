@@ -4767,8 +4767,8 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     const isPvtCar = vt === 'CAR' || vt === '4W' || vt === 'PC' || vt === 'PVT.CAR';
     const isCv     = vt === 'GCV' || vt === 'PCV' || vt === 'MISC' || vt === 'MIS' || vt === 'CV';
     const isTw     = vt === 'TW' || vt === '2W' || vt === 'TW_EV';
-    if (isPvtCar)    _syntheticMargin = { id: null, margin_pct: 5, _synthetic: true, _basis: 'default Pvt Car 5%' };
-    else if (isCv)   _syntheticMargin = { id: null, margin_pct: 6, _synthetic: true, _basis: 'default CV 6%' };
+    if (isPvtCar)    _syntheticMargin = { id: null, margin_pct: 6, _synthetic: true, _basis: 'default Pvt Car 6%' };
+    else if (isCv)   _syntheticMargin = { id: null, margin_pct: 5, _synthetic: true, _basis: 'default CV 5%' };
     else if (isTw)   _syntheticMargin = { id: null, margin_pct: 3, _synthetic: true, _basis: 'default TW 3%' };
   }
   // Prefer a real (>0) matched margin; else the synthetic default; else the
