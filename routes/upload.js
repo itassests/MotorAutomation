@@ -469,6 +469,58 @@ router.get('/rate-cards', async (req, res, next) => {
 });
 
 /**
+ * GET /coverage-matrix
+ * Insurer × effective-month coverage so the user can spot gaps. Each cell
+ * carries the number of rate cards uploaded for that insurer/month and the
+ * total rate rules across them (a card with rules=0 = uploaded but parsed
+ * nothing). Months derived from rate_cards.effective_from.
+ */
+router.get('/coverage-matrix', async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    // Cards per insurer per effective-month.
+    const cards = await pool.request().query(`
+      SELECT insurer,
+             CONVERT(char(7), effective_from, 126) AS ym,
+             COUNT(*) AS cards
+      FROM rate_cards
+      WHERE effective_from IS NOT NULL
+      GROUP BY insurer, CONVERT(char(7), effective_from, 126)`);
+    // Rule totals per insurer per effective-month (join kept light via group).
+    const rules = await pool.request().query(`
+      SELECT c.insurer,
+             CONVERT(char(7), c.effective_from, 126) AS ym,
+             COUNT(r.id) AS rules
+      FROM rate_cards c
+      INNER JOIN rate_rules r ON r.rate_card_id = c.id
+      WHERE c.effective_from IS NOT NULL
+      GROUP BY c.insurer, CONVERT(char(7), c.effective_from, 126)`);
+
+    const ruleMap = new Map();
+    for (const r of rules.recordset) ruleMap.set(r.insurer + '|' + r.ym, r.rules);
+
+    const months = new Set();
+    const byInsurer = new Map();
+    for (const c of cards.recordset) {
+      months.add(c.ym);
+      if (!byInsurer.has(c.insurer)) byInsurer.set(c.insurer, {});
+      byInsurer.get(c.insurer)[c.ym] = {
+        cards: c.cards,
+        rules: ruleMap.get(c.insurer + '|' + c.ym) || 0,
+      };
+    }
+    const monthList = [...months].sort();
+    const rows = [...byInsurer.entries()]
+      .map(([insurer, cells]) => ({ insurer, cells }))
+      .sort((a, b) => a.insurer.localeCompare(b.insurer));
+
+    res.json({ success: true, months: monthList, rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * DELETE /rate-cards/:id
  * Delete a rate card and all associated data.
  */

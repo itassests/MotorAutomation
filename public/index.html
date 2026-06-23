@@ -1014,6 +1014,21 @@
     <!-- ============ MANAGE RATE CARDS PANEL ============ -->
     <div class="panel" id="panel-cards">
       <div class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+          <h2 style="margin:0;"><span class="icon">&#128202;</span> Coverage — Insurer &times; Month</h2>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:12px; color:#888;">
+              <span style="display:inline-block; width:11px; height:11px; background:#c8e6c9; border:1px solid #81c784; border-radius:2px; vertical-align:middle;"></span> rules
+              &nbsp;<span style="display:inline-block; width:11px; height:11px; background:#ffe0b2; border:1px solid #ffb74d; border-radius:2px; vertical-align:middle;"></span> 0 rules
+              &nbsp;<span style="display:inline-block; width:11px; height:11px; background:#f5f5f5; border:1px solid #e0e0e0; border-radius:2px; vertical-align:middle;"></span> missing
+            </span>
+            <button class="btn btn-outline btn-sm" onclick="loadCoverageMatrix()">Refresh</button>
+          </div>
+        </div>
+        <p style="color:#666; font-size:12px; margin:6px 0 14px;">Rate cards uploaded per insurer per effective month. Cell shows cards / rules — amber = uploaded but parsed 0 rules, blank = no upload for that month.</p>
+        <div id="coverageMatrix" style="overflow-x:auto;"><div class="no-data">Loading…</div></div>
+      </div>
+      <div class="card">
         <h2><span class="icon">&#128451;</span> Uploaded Rate Cards</h2>
         <div class="actions" style="margin-top:0; margin-bottom: 16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
           <button class="btn btn-outline btn-sm" onclick="loadRateCards()">Refresh</button>
@@ -8656,6 +8671,53 @@
         _allRateCards = data.rate_cards || [];
         renderRateCardsList();
       } catch (e) { showToast('Failed to load rate cards', 'error'); }
+      loadCoverageMatrix();
+    }
+
+    // Pretty insurer label from a slug (sbi_general → "Sbi General").
+    function _insurerLabel(slug) {
+      return String(slug || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    // Coverage matrix: insurer rows × effective-month columns. Each cell is
+    // colour-coded so gaps (no upload) and failed uploads (0 rules) stand out.
+    async function loadCoverageMatrix() {
+      const el = document.getElementById('coverageMatrix');
+      if (!el) return;
+      try {
+        const data = await fetch(API + '/upload/coverage-matrix').then(r => r.json());
+        if (!data.success) throw new Error(data.error || 'failed');
+        const months = data.months || [];
+        const rows = data.rows || [];
+        if (!months.length || !rows.length) {
+          el.innerHTML = '<div class="no-data">No rate cards with an effective month yet.</div>';
+          return;
+        }
+        const fmtMonth = (ym) => {
+          const [y, m] = ym.split('-');
+          return new Date(Number(y), Number(m) - 1, 1).toLocaleString('en-US', { month: 'short' }) + " '" + y.slice(2);
+        };
+        const fmtRules = (n) => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : String(n);
+        const head = '<th style="position:sticky; left:0; background:#fff; text-align:left; padding:8px 10px; border-bottom:2px solid #eee;">Insurer</th>'
+          + months.map(ym => `<th style="padding:8px 10px; border-bottom:2px solid #eee; font-size:12px; white-space:nowrap;">${fmtMonth(ym)}</th>`).join('');
+        const body = rows.map(row => {
+          const cells = months.map(ym => {
+            const c = row.cells[ym];
+            if (!c) return '<td style="text-align:center; padding:7px 10px; background:#fafafa; color:#ccc; border:1px solid #f0f0f0;">—</td>';
+            const ok = c.rules > 0;
+            const bg = ok ? '#e8f5e9' : '#fff3e0';
+            const bd = ok ? '#a5d6a7' : '#ffcc80';
+            const title = `${c.cards} card${c.cards !== 1 ? 's' : ''}, ${c.rules.toLocaleString('en-IN')} rules`;
+            return `<td title="${title}" style="text-align:center; padding:7px 10px; background:${bg}; border:1px solid ${bd}; font-size:12px;">`
+              + `<div style="font-weight:600; color:#333;">${c.cards}</div>`
+              + `<div style="font-size:11px; color:${ok ? '#558b2f' : '#e65100'};">${ok ? fmtRules(c.rules) : '0'}</div></td>`;
+          }).join('');
+          return `<tr><td style="position:sticky; left:0; background:#fff; padding:7px 10px; font-weight:600; white-space:nowrap; border:1px solid #f0f0f0;">${escapeHtml(_insurerLabel(row.insurer))}</td>${cells}</tr>`;
+        }).join('');
+        el.innerHTML = `<table style="border-collapse:collapse; min-width:100%; font-size:13px;"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+      } catch (e) {
+        el.innerHTML = `<div class="no-data" style="color:#c62828;">Failed to load coverage: ${escapeHtml(e.message)}</div>`;
+      }
     }
 
     function renderRateCardsList() {
