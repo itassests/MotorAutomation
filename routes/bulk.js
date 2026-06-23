@@ -3677,8 +3677,10 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
                   || rules.find(r => /GCV/i.test(String(r.segment || ''))) || rules[0]
                   // No base rule to clone: the initial lookup pool was empty (no
                   // region/band match) — synthesize a minimal rule so the
-                  // interpreter's rate still applies (else these fall to no-rule).
-                  || { insurer: insurerSlug, region: resolvedRegion || null };
+                  // interpreter's rate still applies. Sentinel id = -1 so the
+                  // policy counts as MATCHED (rated by the HDFC approved-grid
+                  // handler) rather than falling into the "no-rule" bucket.
+                  || { id: -1, insurer: insurerSlug, region: resolvedRegion || null };
         const clone = { ...base, rate_type: base.rate_type || want,
           rate_value: g === null ? 0 : g, is_declined: g === null ? 1 : base.is_declined,
           segment: 'GCV (HDFC approved grid)' };
