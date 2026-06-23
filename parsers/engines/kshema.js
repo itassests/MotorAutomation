@@ -166,4 +166,4 @@ function parse(sheetData, sheetConfig, meta) {
   return rules;
 }
 
-module.exports = { parse, preprocessWorkbook };
+module.exports = { parse, preprocessWorkbook, STATE_CANON };

@@ -1169,6 +1169,17 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
     if (rtoInfo) resolvedRegion = rtoInfo.region;
   }
+  // Kshema is rated purely by state (its grid keys on full state names and it
+  // has no RTO-cluster mappings). When the RTO didn't resolve to a region,
+  // derive the canonical state name from the RTO prefix (UP15 → UTTAR PRADESH)
+  // so the state-keyed Kshema rules match.
+  if (insurerSlug === 'kshema' && !resolvedRegion && params.rtoCode) {
+    try {
+      const { STATE_CANON } = require('../parsers/engines/kshema');
+      const pref = String(rtoStatePrefix(params.rtoCode) || '').toUpperCase();
+      if (pref && STATE_CANON[pref]) resolvedRegion = STATE_CANON[pref];
+    } catch (_) { /* leave null */ }
+  }
   // BH-series: the operator's PR classification is authoritative. Override the
   // (tracker-fabricated) RTO region with the PR-derived region and drop the
   // bogus cluster so the state/tier fallback keys off the real location.
