@@ -39,6 +39,7 @@ const engines = {
   iffco:               require('./engines/iffco'),
   raheja:              require('./engines/raheja'),
   kotak:               require('./engines/kotak'),
+  kshema:              require('./engines/kshema'),
   tata_pci:            require('./engines/tata-pci'),
 };
 

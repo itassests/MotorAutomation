@@ -4,9 +4,11 @@
   "file_patterns": ["*Kshema*", "Kshema*"],
 
   "_layout_notes": [
-    "STUB — Kshema added to the insurer list on request; grid files pending.",
-    "Sheet layouts will be defined once the actual Kshema rate-card files are provided. Until then an upload under this insurer will parse 0 rules (no sheets configured)."
+    "Two sheets: 'Pvt car mapping' (State Code | State Name | Status: preferred/Non Preferred/declined — Pvt Car only) and 'Grid' (State | Segment | COA%).",
+    "The kshema engine's preprocessWorkbook reads the mapping sheet; the Grid parse emits GCV/PCV rows per explicit state and fans the two Pvt Car rows (Preferred 0.43 / Non-Preferred 0.38) across states by status, with declined states as no-payout."
   ],
 
-  "sheets": []
+  "sheets": [
+    { "name": "Grid", "name_pattern": "^\\s*grid\\s*$", "layout": "kshema", "config": { "data_start_row": 1 } }
+  ]
 }
