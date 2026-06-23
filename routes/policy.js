@@ -1562,7 +1562,10 @@ function resolveInsurerSlug(insurerName) {
     { patterns: ['UNITED INDIA'], slug: 'united_india_insurance' },
     { patterns: ['ICICI LOMBARD'], slug: 'icici_lombard' },
     { patterns: ['HDFC ERGO'], slug: 'hdfc_ergo' },
-    { patterns: ['TATA AIG'], slug: 'tata_aig' },
+    // "TATA AIA"/"Tata AIA Life" on a motor policy is TATA AIG mis-named in the
+    // source (AIG general-insurance booked under the AIA life entity) — map to
+    // the motor slug so these resolve to the TATA AIG rate card.
+    { patterns: ['TATA AIG', 'TATA AIA'], slug: 'tata_aig' },
     { patterns: ['NATIONAL'], slug: 'national_insurance' },
     { patterns: ['NEW INDIA'], slug: 'new_india_assurance' },
     { patterns: ['ORIENTAL'], slug: 'oriental_insurance' },
