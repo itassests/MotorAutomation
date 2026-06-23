@@ -1549,7 +1549,16 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // generations that must keep coexisting). All-April currently → no-op until a
   // May Bajaj card is uploaded.
   let _bajajEffDate;
-  if (insurerSlug === 'bajaj_allianz') {
+  // Kotak joins the date-filter (same risk-start-date derivation as Bajaj): its
+  // grid CHANGED FORMAT between generations — the April card files Pvt-Car SATP as
+  // make-category rows (make=Mahindra/Tata "Category 0" at rate 0, cc-NULL) while
+  // the May/June cards file the real district cc×fuel grid (make=All, Diesel
+  // >1000cc 17.74% etc.). Without a generation filter all 3 cards pool, and the
+  // April exact-make rate-0 row out-scores the June make=All cc-banded row in
+  // filterRulesByPolicy → a Diesel >1000cc Mahindra in Lucknow collapsed to 0 and
+  // ended up no-rule (MT/DIRNE/UP1/16386). These generations must NOT coexist, so
+  // select the card effective on the policy's risk-start date.
+  if (insurerSlug === 'bajaj_allianz' || insurerSlug === 'kotak') {
     // Always pass an effective_date so the generation filter ALWAYS runs (else a
     // null/garbage start date leaves April+May rules mixed → pickPrimary grabs the
     // wrong generation). Prefer POLICY_START_DATE, fall back to issue date, then to
