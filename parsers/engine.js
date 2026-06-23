@@ -30,6 +30,7 @@ const engines = {
   bajaj_robinhood:     require('./engines/bajaj-robinhood'),
   shriram_grid:        require('./engines/shriram-grid'),
   liberty_grid:        require('./engines/liberty-grid'),
+  liberty_geo_band:    require('./engines/liberty-geo-band'),
   future_generali:     require('./engines/future-generali'),
   united_india:        require('./engines/united-india'),
   zuno_robinhood:      require('./engines/zuno-robinhood'),
