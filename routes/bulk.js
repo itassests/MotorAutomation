@@ -3269,7 +3269,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
                   AND segment=@seg AND region=@reg AND ${rtClause} AND rate_value IS NOT NULL`);
         const mx = mr.recordset[0] && mr.recordset[0].mx;
         if (mx != null) {
-          const base = rules[0] || { insurer: insurerSlug };
+          const base = rules[0] || { id: -1, insurer: insurerSlug };
           const clone = { ...base, rate_type: 'COMP', rate_value: mx, region: twReg, segment: seg + ' (Reliance)' };
           rules = [clone, ...rules.filter(r => r !== base)];
         }
@@ -3324,7 +3324,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
                     AND segment=@seg AND region=@reg AND ${rtClause} ${extra} AND rate_value IS NOT NULL`);
           const mx = mr.recordset[0] && mr.recordset[0].mx;
           if (mx != null) {
-            const base = rules[0] || { insurer: insurerSlug };
+            const base = rules[0] || { id: -1, insurer: insurerSlug };
             const clone = { ...base, rate_type: 'COMP', rate_value: mx, region: reg, segment: seg + ' (Reliance)' };
             rules = [clone, ...rules.filter(r => r !== base)];
             break;
@@ -3386,7 +3386,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
             AND rate_type='PACK' AND segment LIKE @seg ${ncbClause} AND rate_value IS NOT NULL`);
         const mx = mr.recordset[0] && mr.recordset[0].mx;
         if (mx != null) {
-          const base = rules[0] || { insurer: insurerSlug };
+          const base = rules[0] || { id: -1, insurer: insurerSlug };
           const clone = { ...base, rate_type: 'PACK', rate_value: mx, region: reg,
             sub_type: isSaod ? 'PC [SOD]' : 'PC [PACK]',
             segment: ccBand + (isSaod ? ' SAOD' : '') + ' (Chola CAR)' };
@@ -3440,7 +3440,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
           caches.lookup.set(trKey, trRows);
         }
         if (trRows[0]) {
-          const base = rules[0] || { insurer: insurerSlug };
+          const base = rules[0] || { id: -1, insurer: insurerSlug };
           const clone = { ...base, rate_type: 'PACK', rate_value: Number(trRows[0].rate_value),
             is_declined: 0, region: reg, sub_type: 'MSV', segment: '1_TRAC[' + band + '] (Chola ' + reg + ')' };
           rules = [clone];
@@ -3481,7 +3481,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
                       AND rr.rate_type=@rt ORDER BY rc.effective_from DESC, rr.rate_value DESC`)).recordset;
           caches.lookup.set(ceKey, ceRows);
         }
-        const base = rules[0] || { insurer: insurerSlug };
+        const base = rules[0] || { id: -1, insurer: insurerSlug };
         const rv = ceRows[0] ? Number(ceRows[0].rate_value) : null;
         if (rv == null || rv === 0) {
           // no current-card excavator rate for this region+cover (or explicit 0) → decline
@@ -3561,7 +3561,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
                     AND ${segClause}`);
         const mx = mr.recordset[0] && mr.recordset[0].mx;
         if (mx != null) {
-          const base = rules[0] || { insurer: insurerSlug };
+          const base = rules[0] || { id: -1, insurer: insurerSlug };
           const clone = { ...base, rate_type: 'PACK', rate_value: mx, region: reg,
             sub_type: 'GCCV', segment: 'GCCV (Chola ' + reg + ')' };
           rules = [clone, ...rules.filter(r => r !== base)];
@@ -3703,7 +3703,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       const ur = resolveUnitedCarRate(params);
       if (ur != null) {
         const base = rules.find(r => /CAR|PVT/i.test(String(r.segment || ''))) || rules[0]
-          || { insurer: insurerSlug, region: resolvedRegion || null, segment: 'Pvt Car' };
+          || { id: -1, insurer: insurerSlug, region: resolvedRegion || null, segment: 'Pvt Car' };
         const clone = { ...base, rate_type: base.rate_type || 'COMP', rate_value: ur,
           is_declined: 0, segment: 'Pvt Car (United grid)' };
         rules = [clone, ...rules.filter(r => r !== base)];
@@ -3722,7 +3722,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       const ug = resolveUnitedGcvRate(params);
       if (ug != null) {
         const base = rules.find(r => /GCV/i.test(String(r.segment || ''))) || rules[0]
-          || { insurer: insurerSlug, region: resolvedRegion || null, segment: 'GCV' };
+          || { id: -1, insurer: insurerSlug, region: resolvedRegion || null, segment: 'GCV' };
         const clone = { ...base, rate_type: base.rate_type || 'COMP', rate_value: ug,
           is_declined: 0, segment: 'GCV (United Sub-Annexure-2)' };
         rules = [clone, ...rules.filter(r => r !== base)];
@@ -3783,7 +3783,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       const st = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 2);
       const ecRate = st === 'MP' ? 0.25 : 0.40;
       const base = rules.find(r => /GCV|E-?CART|RICK/i.test(String(r.segment || ''))) || rules[0]
-        || { insurer: insurerSlug, region: resolvedRegion || null, segment: 'GCV' };
+        || { id: -1, insurer: insurerSlug, region: resolvedRegion || null, segment: 'GCV' };
       const clone = { ...base, rate_type: base.rate_type || 'COMP', rate_value: ecRate,
         is_declined: 0, segment: 'GCV E-Cart (United 3W rate)' };
       rules = [clone, ...rules.filter(r => r !== base)];
@@ -3798,7 +3798,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       const up = resolveUnitedPcvRate(params);
       if (up != null) {
         const base = rules.find(r => /PCV|3\s*W|RICK/i.test(String(r.segment || ''))) || rules[0]
-          || { insurer: insurerSlug, region: resolvedRegion || null, segment: 'PCV 3W' };
+          || { id: -1, insurer: insurerSlug, region: resolvedRegion || null, segment: 'PCV 3W' };
         const clone = { ...base, rate_type: base.rate_type || 'COMP', rate_value: up,
           is_declined: 0, segment: 'PCV 3W (United grid)' };
         rules = [clone, ...rules.filter(r => r !== base)];
@@ -3824,7 +3824,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       if (g !== undefined) {
         const base = rules.find(r => String(r.rate_type || '').toUpperCase().includes(want))
                   || rules.find(r => /SCOOTER|BIKE/i.test(String(r.segment || ''))) || rules[0]
-                  || { insurer: insurerSlug, region: resolvedRegion || null };
+                  || { id: -1, insurer: insurerSlug, region: resolvedRegion || null };
         const clone = { ...base, rate_type: base.rate_type || want, rate_value: g,
           segment: 'TW (HDFC grid)' };
         rules = [clone, ...rules.filter(r => r !== base)];
@@ -3852,7 +3852,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
                    : (ip === 'SAOD' || ip === 'OD') ? 'SAOD' : 'COMP';
         const base = rules.find(r => String(r.rate_type || '').toUpperCase().includes(want))
                   || rules[0]
-                  || { insurer: insurerSlug, region: resolvedRegion || null };
+                  || { id: -1, insurer: insurerSlug, region: resolvedRegion || null };
         // rate_value = summed headline (operator match); od_rate/tp_rate = legs
         // so income = OD%×OD-prem + TP%×TP-prem.
         const clone = { ...base, rate_type: base.rate_type || want,
@@ -3881,7 +3881,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
                    : (ip === 'SAOD' || ip === 'OD') ? 'SAOD' : 'COMP';
         const base = rules.find(r => String(r.rate_type || '').toUpperCase().includes(want))
                   || rules[0]
-                  || { insurer: insurerSlug, region: resolvedRegion || null };
+                  || { id: -1, insurer: insurerSlug, region: resolvedRegion || null };
         // rate_value = headline (for operator rate-match); od_rate/tp_rate = the
         // per-leg commission so income = OD%×OD-prem + TP%×TP-prem.
         const clone = { ...base, rate_type: base.rate_type || want,
@@ -4023,7 +4023,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // 5/5 paid 65). Inject a 0.65 rule for any Kotak PCV so every PCV prices at
   // 65; the school-bus rows already at 0.65 are unchanged (zero-regression).
   if (insurerSlug === 'kotak' && String(params.vehicleType || '').toUpperCase() === 'PCV') {
-    const base = rules[0] || { insurer: insurerSlug, region: resolvedRegion || 'Pan India' };
+    const base = rules[0] || { id: -1, insurer: insurerSlug, region: resolvedRegion || 'Pan India' };
     const clone = { ...base, rate_type: base.rate_type || 'COMP', rate_value: 0.65,
       is_declined: 0, segment: 'PCV (Kotak flat 65)' };
     rules = [clone];
@@ -4547,7 +4547,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       }
       if (rate == null) rate = SB._default;
       if (rate != null) {
-        const base = rules[0] || { insurer: insurerSlug, region: resolvedRegion || null, product: 'PCV' };
+        const base = rules[0] || { id: -1, insurer: insurerSlug, region: resolvedRegion || null, product: 'PCV' };
         rules = [{ ...base, product: 'PCV', segment: 'PCV School Bus (Bajaj per-region)',
           sub_type: null, rate_type: 'COMP', rate_value: +(Number(rate) / 100).toFixed(4),
           is_declined: 0, od_rate: null, tp_rate: null }];
