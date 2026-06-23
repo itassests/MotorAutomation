@@ -377,7 +377,21 @@ async function lookupRates(pool, params) {
         target = iso(dated[0]._eff_from);
         for (const r of dated) { const v = iso(r._eff_from); if (v < target) target = v; }    // earliest (fallback)
       }
-      rules = rules.filter((r) => !r._eff_from || iso(r._eff_from) === target);
+      // Fallback: if the selected (latest ≤ date) generation carries NO weight-
+      // banded rule for this lookup but an earlier generation does, keep those
+      // earlier weight-banded rules too. Handles a current card that lost a
+      // sub-grid (e.g. HDFC's June GCV card is 3-wheeler-only, superseding the
+      // April card that carried the 4W weight bands) — without this, 4W GCV
+      // policies on the June date would match nothing. Inert for any insurer
+      // whose current card still has weight-banded rules (the common case).
+      const targetHasWeightBand = rules.some((r) =>
+        (!r._eff_from || iso(r._eff_from) === target) &&
+        (r.weight_band_min != null || r.weight_band_max != null));
+      rules = rules.filter((r) => {
+        if (!r._eff_from || iso(r._eff_from) === target) return true;
+        if (!targetHasWeightBand && (r.weight_band_min != null || r.weight_band_max != null)) return true;
+        return false;
+      });
     }
   }
 
