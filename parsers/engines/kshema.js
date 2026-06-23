@@ -129,22 +129,27 @@ function parse(sheetData, sheetConfig, meta) {
         : /prefer/i.test(stateRaw) ? 'preferred' : null;
       if (rate == null || !wantStatus) continue;
       for (const st of status.filter(s => s.status === wantStatus)) {
-        rules.push({
-          product: 'CAR', sheet_name: meta.sheetName, region: st.state,
-          segment: 'Pvt Car', make: 'All', rate_type: 'COMP', rate_value: rate,
-          is_declined: false,
-          rate_text: `Pvt Car | ${st.state} | ${wantStatus.replace('_', '-')}`,
-        });
+        // COA% applies to TP-only policies too (user-confirmed) → emit COMP + SATP.
+        for (const rtype of ['COMP', 'SATP']) {
+          rules.push({
+            product: 'CAR', sheet_name: meta.sheetName, region: st.state,
+            segment: 'Pvt Car', make: 'All', rate_type: rtype, rate_value: rate,
+            is_declined: false,
+            rate_text: `Pvt Car | ${st.state} | ${wantStatus.replace('_', '-')}`,
+          });
+        }
       }
       // Emit declined Pvt Car rows once (no payout in declined states).
       if (!pvtCarDeclinedEmitted) {
         pvtCarDeclinedEmitted = true;
         for (const st of status.filter(s => s.status === 'declined')) {
-          rules.push({
-            product: 'CAR', sheet_name: meta.sheetName, region: st.state,
-            segment: 'Pvt Car', make: 'All', rate_type: 'COMP', rate_value: null,
-            is_declined: true, rate_text: `Pvt Car | ${st.state} | declined`,
-          });
+          for (const rtype of ['COMP', 'SATP']) {
+            rules.push({
+              product: 'CAR', sheet_name: meta.sheetName, region: st.state,
+              segment: 'Pvt Car', make: 'All', rate_type: rtype, rate_value: null,
+              is_declined: true, rate_text: `Pvt Car | ${st.state} | declined`,
+            });
+          }
         }
       }
       continue;
@@ -153,14 +158,17 @@ function parse(sheetData, sheetConfig, meta) {
     // GCV / PCV — one rule per resolved state.
     if (rate == null) continue;
     for (const stName of resolveGridStates(stateRaw)) {
-      rules.push({
-        product: spec.product, sheet_name: meta.sheetName, region: stName,
-        segment: spec.segment, make: 'All', rate_type: 'COMP', rate_value: rate,
-        weight_band_min: spec.weight_band_min ?? null,
-        weight_band_max: spec.weight_band_max ?? null,
-        is_declined: false,
-        rate_text: `${spec.segment} | ${stName} | ${segRaw}`,
-      });
+      // COA% applies to TP-only policies too (user-confirmed) → emit COMP + SATP.
+      for (const rtype of ['COMP', 'SATP']) {
+        rules.push({
+          product: spec.product, sheet_name: meta.sheetName, region: stName,
+          segment: spec.segment, make: 'All', rate_type: rtype, rate_value: rate,
+          weight_band_min: spec.weight_band_min ?? null,
+          weight_band_max: spec.weight_band_max ?? null,
+          is_declined: false,
+          rate_text: `${spec.segment} | ${stName} | ${segRaw}`,
+        });
+      }
     }
   }
   return rules;
