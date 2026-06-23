@@ -1584,6 +1584,7 @@ function resolveInsurerSlug(insurerName) {
     { patterns: ['UNIVERSAL SOMPO', 'SOMPO'], slug: 'universal_sompo' },
     { patterns: ['STAR HEALTH'], slug: 'star_health' },
     { patterns: ['RAHEJA QBE'], slug: 'raheja_qbe' },
+    { patterns: ['KSHEMA'], slug: 'kshema' },
   ];
 
   for (const m of mappings) {
