@@ -159,12 +159,15 @@ function applyOverrides(storedRow) {
     } else {
       row.income = +(base * Number(row.rate_pct || 0) / 100).toFixed(2);
     }
-    // Outgoing = income − our margin cut (margin% × base). Works for both the
-    // single-rate and OD+TP income; explicit outgoing override still wins.
+    // Outgoing = income − our margin cut (margin% × base), floored at 0; the
+    // margin cut (savings) is capped at income so it can't exceed what was
+    // earned (mirrors buildOutputRow — matters for OD+TP split-rate income whose
+    // effective rate can be below the flat margin%). Explicit outgoing override
+    // still wins.
     row.outgoing = outPctExplicit != null
-      ? +(base * outPctExplicit / 100).toFixed(2)
-      : +(row.income - base * marginForOutgoing / 100).toFixed(2);
-    row.savings  = +(row.income - row.outgoing).toFixed(2);
+      ? +Math.max(0, base * outPctExplicit / 100).toFixed(2)
+      : +Math.max(0, row.income - base * marginForOutgoing / 100).toFixed(2);
+    row.savings  = +Math.max(0, row.income - row.outgoing).toFixed(2);
     row.outgoing_pct_override = outPctExplicit;   // surface the explicit edit
   }
   // Always expose the effective Outgoing % so the UI and CSV download

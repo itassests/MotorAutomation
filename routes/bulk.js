@@ -4894,7 +4894,14 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
   const marginPct = effectiveMarginPctRaw / 100;
-  const savings = marginPct * premiumBase;
+  // Cap savings (our margin cut) at the income (commission earned) — you can't
+  // save more than you earn. For OD+TP split-rate insurers (New India / Oriental
+  // / National) income is the per-leg sum (od_rate×OD + tp_rate×TP), whose
+  // EFFECTIVE rate on the full premium can be below the flat margin% — e.g.
+  // New India PJ3/5612: income 1345 (~3.3% of 40218) but margin 5% = 2011, so
+  // an uncapped savings exceeds income and income−savings goes negative. Capping
+  // keeps savings ≤ income and outgoing ≥ 0, consistently.
+  const savings = Math.min(marginPct * premiumBase, income);
   const outgoing = Math.max(0, income - savings);
 
   // Tag for the output row so the UI can flag policies whose calc was
