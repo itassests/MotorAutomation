@@ -4614,6 +4614,32 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
               : (params.tonnage != null ? params.tonnage : null);
     if (_lo != null && _lo > 7.5) rules = [];
   }
+  // iffco PCV decline last-resort (INTERIM — full May-2026 grid rebuild deferred).
+  // iffco's CV grid has 0 rto_mappings, so the per-state PCV grid is never reached
+  // and a Red/declined segment falls through to no-rule. When nothing else produced
+  // a usable rate, seed the region from the RTO state; if the iffco PCV grid
+  // DECLINES this segment for that state (every matching row is_declined, rate 0),
+  // surface it as a sentinel-id 0% match = a recognised decline (operator pays 0 →
+  // recompare agrees) rather than an unmatched no-rule. Runs LAST + gated on
+  // no-primary so it never preempts a real rate an earlier fallback found (e.g.
+  // 19-36 buses already matched 17.5%). e.g. 45-seat UP buses (Bus 37-60 = Red) →
+  // 0%. NOTE: the real grid pays PREFERRED segments 17.5%/20% by GWP slab (not
+  // per-seating) — that broader rebuild from "Motor Scheme May 2026" is separate.
+  if (insurerSlug === 'iffco_tokio' &&
+      /^(PCV|PC)$/.test(String(params.vehicleType || '').toUpperCase()) &&
+      params.rtoCode && !pickPrimaryRateRule(rules)) {
+    const stName = (require('./policy').STATE_PREFIX_FULL || {})[rtoStatePrefix(params.rtoCode)];
+    if (stName) {
+      const pRules = await lookupRates(pool, { insurer: 'iffco_tokio', product: 'PCV', region: stName });
+      const filtered = pRules.length > 0 ? filterRulesByPolicy(pRules, params) : [];
+      if (filtered.length > 0 && filtered.every(r => r.is_declined)) {
+        const isComp = (Number(params.odPremium != null ? params.odPremium : params.od_premium) || 0) > 0;
+        const pref = filtered.find(r => isComp ? /COMP/i.test(r.rate_type) : /SATP|TP/i.test(r.rate_type)) || filtered[0];
+        rules = [{ ...pref, id: -1, rate_value: 0, is_declined: 0 }];
+        resolvedRegion = stName; params.resolvedRegion = stName;
+      }
+    }
+  }
   let primary = pickPrimaryRateRule(rules);
   // ---- Enabler / special-payout override ----
   // A criteria-scoped enabler deal (segment + make + transaction + RTO location +
