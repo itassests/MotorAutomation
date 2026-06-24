@@ -268,7 +268,7 @@
       "config": {
         "header_row": 1,
         "data_start_row": 2,
-        "rate_divisor": 100,
+        "rate_divisor": 1,
         "column_map": {
           "region": 0
         },
