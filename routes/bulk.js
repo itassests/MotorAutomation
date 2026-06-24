@@ -5083,10 +5083,14 @@ function buildOutputRow(policy, params, rule, rateVal, marginRule, nums, note, s
     global_uplift_pct:    nums && nums.special ? nums.special.global_uplift_pct   : null,
     effective_margin_pct: nums && nums.special ? nums.special.effective_margin_pct
                                               : (marginRule ? Number(marginRule.margin_pct) : 0),
-    // Outgoing % — Rate − effective Margin. Surfaced as a top-level field
-    // so the UI and CSV download can read it directly without
+    // Outgoing % — Rate − effective Margin, floored at 0. Surfaced as a
+    // top-level field so the UI and CSV download can read it directly without
     // recomputing. applyOverrides() recomputes when the user edits any axis.
-    outgoing_pct: +(
+    // Clamp to 0 (matches the outgoing AMOUNT's Math.max(0, income−savings) at
+    // ~L4877): when the rate is 0 / below the margin (e.g. a declined 0% row or
+    // income=0), outgoing can't be negative — you don't pay the agent a negative
+    // %, so it floors at 0 instead of showing e.g. −5%.
+    outgoing_pct: +Math.max(0,
       Number(rateVal != null ? rateVal * 100 : 0)
       - (nums && nums.special ? Number(nums.special.effective_margin_pct || 0)
                               : (marginRule ? Number(marginRule.margin_pct || 0) : 0))
