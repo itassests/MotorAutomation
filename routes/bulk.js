@@ -4812,12 +4812,17 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   const matchedMargin = matchMarginForPolicy(params, rtoInfo, marginRules);
   // Default-margin fallback: apply a flat per-product-class default so the row
   // doesn't end up at 0% margin.
-  //   Pvt Car (CAR / 4W / PC)         → 5%
-  //   Commercial (GCV / PCV / MISC)   → 6%
+  //   Pvt Car (CAR / 4W / PC)         → 6%
+  //   Commercial (GCV / PCV / MISC)   → 5%
   //   Two-wheeler (TW / 2W / TW_EV)   → 3%
   // Fires when no margin_rule matched OR the matched rule is 0% (a 0%-margin
   // rule otherwise blocks the default and the row shows 0). A matched rule with
   // a real (>0) margin always wins.
+  // The synthetic default carries a SENTINEL id (-1) so it counts as a matched
+  // margin (margin_id truthy) — the per-product default IS the specified margin
+  // policy, so "Margin Rules Matched" should include these rows (mirrors the
+  // rate-rule sentinel-id convention). Without it the UI under-counts: only the
+  // ~1798 rows that hit an explicit margin_rule showed as matched.
   const matchedMarginPct = matchedMargin ? Number(matchedMargin.margin_pct) : null;
   let _syntheticMargin = null;
   if (!matchedMargin || !(matchedMarginPct > 0)) {
@@ -4825,9 +4830,9 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     const isPvtCar = vt === 'CAR' || vt === '4W' || vt === 'PC' || vt === 'PVT.CAR';
     const isCv     = vt === 'GCV' || vt === 'PCV' || vt === 'MISC' || vt === 'MIS' || vt === 'CV';
     const isTw     = vt === 'TW' || vt === '2W' || vt === 'TW_EV';
-    if (isPvtCar)    _syntheticMargin = { id: null, margin_pct: 6, _synthetic: true, _basis: 'default Pvt Car 6%' };
-    else if (isCv)   _syntheticMargin = { id: null, margin_pct: 5, _synthetic: true, _basis: 'default CV 5%' };
-    else if (isTw)   _syntheticMargin = { id: null, margin_pct: 3, _synthetic: true, _basis: 'default TW 3%' };
+    if (isPvtCar)    _syntheticMargin = { id: -1, margin_pct: 6, _synthetic: true, _basis: 'default Pvt Car 6%' };
+    else if (isCv)   _syntheticMargin = { id: -1, margin_pct: 5, _synthetic: true, _basis: 'default CV 5%' };
+    else if (isTw)   _syntheticMargin = { id: -1, margin_pct: 3, _synthetic: true, _basis: 'default TW 3%' };
   }
   // Prefer a real (>0) matched margin; else the synthetic default; else the
   // matched (possibly 0) rule / null.
@@ -5000,6 +5005,22 @@ function buildOutputRow(policy, params, rule, rateVal, marginRule, nums, note, s
     _submissionDate = _submissionDate.toISOString().slice(0, 10);
   }
 
+  // Product-default margin for the margin_id / margin_pct DISPLAY + COUNT so that
+  // EVERY row carries a matched margin — margin is product-based and independent
+  // of whether a rate rule matched, so no-rule / declined / early-return rows
+  // (which reach here with marginRule = null) still show the specified default
+  // (Pvt Car 6% / CV 5% / TW 3%) with a sentinel id (-1). "Margin Rules Matched"
+  // then reads ~100%. NOTE: only margin_id/margin_pct use this; effective_margin
+  // _pct and outgoing_pct keep using the real `marginRule`, so a no-rule row
+  // (no rate) stays at 0 outgoing rather than going negative.
+  let _effMarginRule = marginRule;
+  if (!_effMarginRule) {
+    const _vt = String(params.vehicleType || '').toUpperCase();
+    if (_vt === 'CAR' || _vt === '4W' || _vt === 'PC' || _vt === 'PVT.CAR') _effMarginRule = { id: -1, margin_pct: 6 };
+    else if (_vt === 'GCV' || _vt === 'PCV' || _vt === 'MISC' || _vt === 'MIS' || _vt === 'CV') _effMarginRule = { id: -1, margin_pct: 5 };
+    else if (_vt === 'TW' || _vt === '2W' || _vt === 'TW_EV') _effMarginRule = { id: -1, margin_pct: 3 };
+  }
+
   return {
     policy_no: policy['POLICY NO'] || null,
     tracker_no: policy['TRACKER NO'] || null,
@@ -5048,11 +5069,11 @@ function buildOutputRow(policy, params, rule, rateVal, marginRule, nums, note, s
     // in the bulk screen alongside OD Rate / TP Rate / Total for OD+TP rules.
     od_comm: rule && rule.od_rate != null ? +(Number(rule.od_rate) * (params.odPremium || 0)).toFixed(2) : null,
     tp_comm: rule && rule.tp_rate != null ? +(Number(rule.tp_rate) * (params.tpPremium || 0)).toFixed(2) : null,
-    margin_id:  marginRule ? marginRule.id : null,
+    margin_id:  _effMarginRule ? _effMarginRule.id : null,
     // margin_pct stays as the original DEFAULT margin so the UI's Margin
     // column displays unchanged (the agent's special rate is signalled by a
     // chip + the Outgoing %, which reads from effective_margin_pct).
-    margin_pct: marginRule ? Number(marginRule.margin_pct) : 0,
+    margin_pct: _effMarginRule ? Number(_effMarginRule.margin_pct) : 0,
     // Special-rate trace — null when the agent has no override / uplift
     // in effect for this scope. effective_margin_pct is the % actually
     // subtracted from rate inside savings/outgoing — the UI uses it to
