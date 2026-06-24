@@ -5081,6 +5081,13 @@ function buildOutputRow(policy, params, rule, rateVal, marginRule, nums, note, s
     matched_segment:  rule ? rule.segment : null,
     matched_rate_type: rule ? rule.rate_type : null,
     rate_pct:   rateVal != null ? +(rateVal * 100).toFixed(3) : null,
+    // Declined flag — a policy that MATCHED a rule (not no-rule) but whose rate
+    // is 0/null is a genuine grid decline (the insurer pays 0% for that
+    // region/segment, e.g. icici old-bike SAOD, iffco large buses), NOT a rated
+    // 0%. The UI + Excel render "Declined" instead of "0%" so it reads as a
+    // recognised no-payout, not a suspicious zero rate. no-rule rows (rule=null)
+    // are NOT declined — they stay no-rule.
+    declined:   !!rule && !(Number(rateVal) > 0),
     // OD+TP per-leg commission (fractions) — present only for rules that split
     // the rate into OD% (on OD premium) + TP% (on TP premium). Lets the income
     // re-derivation (applyOverrides) reproduce the per-leg calc, not rate×base.

@@ -11690,7 +11690,7 @@
           <td>${escapeHtml(r.matched_rate_type) || '-'}<div style="font-size:11px; color:#888;">${escapeHtml(r.matched_segment) || ''}</div></td>
           <td style="text-align:right; color:#0066cc;">${r.od_rate != null ? (r.od_rate*100).toFixed(2) + '%' : '<span style="color:#ccc;">—</span>'}</td>
           <td style="text-align:right; color:#0066cc;">${r.tp_rate != null ? (r.tp_rate*100).toFixed(2) + '%' : '<span style="color:#ccc;">—</span>'}</td>
-          <td style="text-align:right;">${r.rate_pct != null ? r.rate_pct.toFixed(2) + '%' : '-'}</td>
+          <td style="text-align:right;">${r.declined ? '<span class="badge badge-red">Declined</span>' : (r.rate_pct != null ? r.rate_pct.toFixed(2) + '%' : '-')}</td>
           <td style="text-align:right;">
             <span class="badge badge-orange">${(r.margin_pct || 0).toFixed(2)}%</span>
             ${r.special_rate_source ? (() => {

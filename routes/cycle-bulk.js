@@ -171,7 +171,11 @@ function applyOverrides(storedRow) {
   // can read a single field. Rate − Margin (effective) by default; the
   // explicit override wins when present. Rounded to 3 decimals to match
   // rate_pct precision.
-  row.outgoing_pct = +Number(outPct).toFixed(3);
+  row.outgoing_pct = +Math.max(0, Number(outPct)).toFixed(3);
+  // Recompute the Declined flag against the EFFECTIVE (post-override) rate: a
+  // matched policy with rate not > 0 is a decline; a user override to a real
+  // rate clears it. (Mirrors buildOutputRow; kept in sync after overrides.)
+  row.declined = !!row.matched_rule_id && !(Number(row.rate_pct) > 0);
   row._edited = !!(storedRow.rate_pct_override != null || storedRow.margin_pct_override != null ||
                    storedRow.outgoing_pct_override != null || storedRow.excluded || storedRow.note);
   row.stored_row_id = storedRow.id;
@@ -1830,6 +1834,7 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
           insurer_slug: merged.insurer_slug || null,
           vehicle_type: merged.vehicle_type || null,
           our_rate: merged.rate_pct != null ? Number(merged.rate_pct) : null,
+          declined: !!merged.declined,
           // OD/TP per-leg rates (as %), present only when the rule splits the
           // commission into separate OD + TP legs (e.g. Oriental bundled,
           // New India / National). null → single (non-split) rate.
@@ -1995,7 +2000,7 @@ async function compareTrackersCore(cycleId, filePath, fmt, res, extraCycleIds = 
             'Insurer':            us ? us.insurer : '',
             'OD Rate %':          us && us.od_rate != null ? us.od_rate : '',
             'TP Rate %':          us && us.tp_rate != null ? us.tp_rate : '',
-            'Rate %':             us && us.our_rate != null ? us.our_rate : '',
+            'Rate %':             us && us.declined ? 'Declined' : (us && us.our_rate != null ? us.our_rate : ''),
             'Operator Rate %':    theirRate != null ? theirRate : '',
             'Margin %':           us && us.margin_pct   != null ? us.margin_pct   : '',
             'Outgoing Rate %':    us && us.outgoing_pct != null ? us.outgoing_pct : '',
