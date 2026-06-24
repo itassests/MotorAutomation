@@ -4814,7 +4814,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // doesn't end up at 0% margin.
   //   Pvt Car (CAR / 4W / PC)         → 6%
   //   Commercial (GCV / PCV / MISC)   → 5%
-  //   Two-wheeler (TW / 2W / TW_EV)   → 3%
+  //   Two-wheeler (TW / 2W / TW_EV)   → 5%
   // Fires when no margin_rule matched OR the matched rule is 0% (a 0%-margin
   // rule otherwise blocks the default and the row shows 0). A matched rule with
   // a real (>0) margin always wins.
@@ -4832,7 +4832,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     const isTw     = vt === 'TW' || vt === '2W' || vt === 'TW_EV';
     if (isPvtCar)    _syntheticMargin = { id: -1, margin_pct: 6, _synthetic: true, _basis: 'default Pvt Car 6%' };
     else if (isCv)   _syntheticMargin = { id: -1, margin_pct: 5, _synthetic: true, _basis: 'default CV 5%' };
-    else if (isTw)   _syntheticMargin = { id: -1, margin_pct: 3, _synthetic: true, _basis: 'default TW 3%' };
+    else if (isTw)   _syntheticMargin = { id: -1, margin_pct: 5, _synthetic: true, _basis: 'default TW 5%' };
   }
   // Prefer a real (>0) matched margin; else the synthetic default; else the
   // matched (possibly 0) rule / null.
@@ -5018,7 +5018,7 @@ function buildOutputRow(policy, params, rule, rateVal, marginRule, nums, note, s
     const _vt = String(params.vehicleType || '').toUpperCase();
     if (_vt === 'CAR' || _vt === '4W' || _vt === 'PC' || _vt === 'PVT.CAR') _effMarginRule = { id: -1, margin_pct: 6 };
     else if (_vt === 'GCV' || _vt === 'PCV' || _vt === 'MISC' || _vt === 'MIS' || _vt === 'CV') _effMarginRule = { id: -1, margin_pct: 5 };
-    else if (_vt === 'TW' || _vt === '2W' || _vt === 'TW_EV') _effMarginRule = { id: -1, margin_pct: 3 };
+    else if (_vt === 'TW' || _vt === '2W' || _vt === 'TW_EV') _effMarginRule = { id: -1, margin_pct: 5 };
   }
 
   return {
