@@ -1263,6 +1263,27 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   if (insurerSlug === 'hdfc_ergo' && resolvedRegion && aliasHdfcRegion) {
     resolvedRegion = aliasHdfcRegion(resolvedRegion);
   }
+  // TATA: its CAR / TW / CV grids are keyed by CITY CLUSTER (Ahmedabad, Nagpur,
+  // ROM1-4, ROGJ, UP1, Mumbai…), NOT by state. tata has no rto_mappings, so the
+  // region resolved to the STATE name ("Gujrat"/"Maharashtra") which matches no
+  // grid region — the policy then fell through to a 0-rate fallback (GJ01 in
+  // Ahmedabad: DM|SATP should be 0.225/0.31, but came out 0). Resolve the
+  // per-product cluster from the TATA RTO Master (config/tata_rto_cluster.json:
+  // RTO → {car, tw, cv}) and override the state region. New vehicles carry a
+  // placeholder RTO not in the master, so they fall through to the existing
+  // booking-location resolution; only real RTOs are remapped here.
+  if (insurerSlug === 'tata_aig' && params.rtoCode) {
+    const _tataMap = require('../config/tata_rto_cluster.json');
+    const _tk = String(params.rtoCode).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const _ent = _tataMap[_tk];
+    if (_ent) {
+      const _vt = String(params.vehicleType || '').toUpperCase();
+      const _pk = (_vt === 'TW' || _vt === '2W' || _vt === 'TW_EV') ? 'tw'
+                : (_vt === 'GCV' || _vt === 'PCV' || _vt === 'MISC' || _vt === 'MIS' || _vt === 'CV') ? 'cv'
+                : 'car';
+      if (_ent[_pk]) resolvedRegion = _ent[_pk];
+    }
+  }
   // Universal Sompo: files rates under the full UPPERCASE state name +
   // cluster regions. Scope the initial lookup to the primary state region
   // (else an empty region returns all-state rules and the dedup can pick a
