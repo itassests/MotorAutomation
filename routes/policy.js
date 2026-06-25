@@ -1560,8 +1560,13 @@ function resolveInsurerSlug(insurerName) {
     { patterns: ['CHOLAMANDALAM', 'CHOLA MS', 'CHOLA'], slug: 'chola_ms' },
     { patterns: ['BAJAJ', 'BAJAJ ALLIANZ'], slug: 'bajaj_allianz' },
     { patterns: ['UNITED INDIA'], slug: 'united_india_insurance' },
-    { patterns: ['ICICI LOMBARD'], slug: 'icici_lombard' },
-    { patterns: ['HDFC ERGO'], slug: 'hdfc_ergo' },
+    // ICICIBANK / HDFC ASSET MANAGEMENT / SBI (bare) are data-entry variants the
+    // portal re-sync keeps writing into INSURERNAME (the bank / AMC name instead
+    // of the motor insurer). A data-level fix doesn't hold (re-sync reverts it),
+    // so map the variants to the real motor insurer here. Broad 'ICICI'/'HDFC'
+    // catch any spelling; 'SBI' is only ever SBI General in motor context.
+    { patterns: ['ICICI LOMBARD', 'ICICIBANK', 'ICICI'], slug: 'icici_lombard' },
+    { patterns: ['HDFC ERGO', 'HDFC ASSET MANAGEMENT', 'HDFC'], slug: 'hdfc_ergo' },
     // "TATA AIA"/"Tata AIA Life" on a motor policy is TATA AIG mis-named in the
     // source (AIG general-insurance booked under the AIA life entity) — map to
     // the motor slug so these resolve to the TATA AIG rate card.
@@ -1569,7 +1574,7 @@ function resolveInsurerSlug(insurerName) {
     { patterns: ['NATIONAL'], slug: 'national_insurance' },
     { patterns: ['NEW INDIA'], slug: 'new_india_assurance' },
     { patterns: ['ORIENTAL'], slug: 'oriental_insurance' },
-    { patterns: ['SBI GENERAL'], slug: 'sbi_general' },
+    { patterns: ['SBI GENERAL', 'SBI'], slug: 'sbi_general' },
     { patterns: ['RELIANCE'], slug: 'reliance' },
     { patterns: ['IFFCO TOKIO', 'IFFCO'], slug: 'iffco_tokio' },
     { patterns: ['KOTAK'], slug: 'kotak' },
