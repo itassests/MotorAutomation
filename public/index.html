@@ -12336,6 +12336,8 @@
         // trailing spaces) per user request.
         ['Tracker No',       r => String(r.tracker_no == null ? '' : r.tracker_no).trim()],
         ['Insurer',          r => r.insurer || r.insurer_slug],
+        ['Agent Code',       r => String(r.agent_code == null ? '' : r.agent_code).trim()],
+        ['Agent Name',       r => r.agent_name],
         ['Product',          r => r.product],
         ['Vehicle Type',     r => r.vehicle_type],
         ['Make',             r => r.make],
