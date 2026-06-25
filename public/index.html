@@ -1861,10 +1861,9 @@
           <div id="rnProgressBar" style="height:100%; width:0%; background:#42a5f5; transition:width .3s;"></div>
         </div>
         <div id="rnCounts" style="display:flex; gap:18px; flex-wrap:wrap; font-size:13px; margin-bottom:12px;"></div>
-        <div id="rnFolders" style="margin-bottom:12px;"></div>
         <div id="rnSamples" style="font-size:12px; color:#555;"></div>
-        <details style="margin-top:10px;"><summary style="cursor:pointer; font-size:12px; color:#777;">Log</summary>
-          <pre id="rnLog" style="font-size:11px; background:#fafafa; border:1px solid #eee; border-radius:6px; padding:8px; max-height:200px; overflow:auto;"></pre>
+        <details open style="margin-top:10px;"><summary style="cursor:pointer; font-size:12px; color:#777;">Log</summary>
+          <pre id="rnLog" style="font-size:11px; background:#fafafa; border:1px solid #eee; border-radius:6px; padding:8px; max-height:260px; overflow:auto;"></pre>
         </details>
       </div>
     </div>
@@ -6525,13 +6524,6 @@
       document.getElementById('rnCounts').innerHTML =
         chip('Matched', job.matched, '#e3f2fd') + chip('Copied', job.copied, '#e8f5e9') +
         chip('Unmatched', job.unmatched, '#fff3e0') + chip('Errors', job.errors, job.errors ? '#ffebee' : '#f5f5f5');
-      const folders = job.folders || [];
-      document.getElementById('rnFolders').innerHTML = folders.length
-        ? `<details open><summary style="cursor:pointer; font-size:12px; color:#555; font-weight:600;">Folders identified (${folders.length})</summary>`
-          + '<div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">'
-          + folders.map(f => `<span style="background:#eef3f8; border:1px solid #d6e2ee; border-radius:12px; padding:3px 9px; font-size:12px;">${escapeHtml(f.name)} <strong>${f.files}</strong></span>`).join('')
-          + '</div></details>'
-        : '';
       const s = job.samples || {};
       const block = (title, arr, col) => (arr && arr.length)
         ? `<div style="margin-top:8px;"><strong style="color:${col};">${title} (showing ${arr.length}):</strong><ul style="margin:4px 0 0 18px;">${arr.map(x => '<li>' + escapeHtml(x) + '</li>').join('')}</ul></div>` : '';
