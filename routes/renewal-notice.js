@@ -60,22 +60,21 @@ async function scanPdfs(dir, out) {
   }
 }
 
-/** Batch-resolve stripped file names → { Id, TrackerNo } via one scan per chunk. */
+/**
+ * Resolve stripped file names → { Id, TrackerNo }. TRN_PrarambhMain (~765K rows)
+ * has no index on the *stripped* tracker, so matching with a per-row SQL REPLACE
+ * scans for minutes — the IN(1500-param) form timed out at 180s. Instead we load
+ * (Id, TrackerNo) ONCE (~9s for 765K rows) and strip+match in JS (sub-second).
+ */
 async function resolveTrackers(live, strippedNames) {
+  const needed = new Set(strippedNames);
   const map = new Map();
-  const list = [...new Set(strippedNames)];
-  const CHUNK = 1500;
-  for (let i = 0; i < list.length; i += CHUNK) {
-    const chunk = list.slice(i, i + CHUNK);
-    const req = live.request();
-    const params = chunk.map((s, j) => { req.input('n' + j, sql.VarChar(120), s); return '@n' + j; });
-    const r = await req.query(
-      `SELECT Id, TrackerNo,
-              REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TrackerNo),'/',''),'-',''),' ',''),'.','') AS stripped
-       FROM TRN_PrarambhMain
-       WHERE REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TrackerNo),'/',''),'-',''),' ',''),'.','') IN (${params.join(',')})`
-    );
-    for (const row of r.recordset) map.set(row.stripped, { Id: row.Id, TrackerNo: row.TrackerNo });
+  const req = live.request();
+  req.timeout = 600000;   // one big scan — give it room (well over the ~9s seen)
+  const r = await req.query('SELECT Id, TrackerNo FROM TRN_PrarambhMain WHERE TrackerNo IS NOT NULL');
+  for (const row of r.recordset) {
+    const s = strip(row.TrackerNo);
+    if (needed.has(s) && !map.has(s)) map.set(s, { Id: row.Id, TrackerNo: row.TrackerNo });
   }
   return map;
 }
