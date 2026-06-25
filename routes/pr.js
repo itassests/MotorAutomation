@@ -689,6 +689,23 @@ router.get('/coverage-matrix', async (req, res, next) => {
     for (const c of cardIns.recordset) {
       if (c.insurer && !byInsurer.has(c.insurer)) byInsurer.set(c.insurer, {});
     }
+    // Calendar-dynamic months: fill every month from the earliest upload through
+    // the CURRENT month, so the ongoing month always shows (all-pending until its
+    // PRs arrive) — e.g. July appears the moment July begins, before any July
+    // upload, instead of only after the first July PR.
+    const now = new Date();
+    const curYm = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    const uploaded = [...months].sort();
+    let sy, sm;
+    if (uploaded.length) { [sy, sm] = uploaded[0].split('-').map(Number); }
+    else { sy = now.getFullYear(); sm = now.getMonth() + 1; }
+    // End at the later of (current month, latest uploaded month).
+    const endYm = (uploaded.length && uploaded[uploaded.length - 1] > curYm) ? uploaded[uploaded.length - 1] : curYm;
+    const [ey, em] = endYm.split('-').map(Number);
+    while (sy < ey || (sy === ey && sm <= em)) {
+      months.add(sy + '-' + String(sm).padStart(2, '0'));
+      sm++; if (sm > 12) { sm = 1; sy++; }
+    }
     const monthList = [...months].sort();
     const rows = [...byInsurer.entries()]
       .map(([slug, cells]) => ({ insurer_slug: slug, insurer_label: labelOf.get(slug) || slug, cells }))
