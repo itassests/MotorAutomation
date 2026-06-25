@@ -20,6 +20,9 @@ const express = require('express');
 const fsp = require('fs/promises');
 const path = require('path');
 const sql = require('mssql');
+const { exec } = require('child_process');
+const util = require('util');
+const execp = util.promisify(exec);
 const { getPrarambhPool } = require('../db/prarambh-connection');
 const { attachUser } = require('./auth');
 
@@ -77,8 +80,36 @@ async function resolveTrackers(live, strippedNames) {
   return map;
 }
 
+/** Extract the \\server\share root from a deeper UNC path. */
+function shareRootOf(p) {
+  const m = String(p).match(/^(\\\\[^\\]+\\[^\\]+)/);
+  return m ? m[1] : null;
+}
+
+/**
+ * Authenticate the node process to the source share if RENEWAL_SHARE_USER /
+ * RENEWAL_SHARE_PASS are set. Node's fs can't pass SMB credentials directly, so
+ * we establish a session via `net use` (under the node account) first — then the
+ * UNC path becomes readable. No-op when no credentials are configured (relies on
+ * the node account's own share access). Errors are logged, not fatal.
+ */
+async function ensureShareAuth(job) {
+  const user = process.env.RENEWAL_SHARE_USER;
+  const pass = process.env.RENEWAL_SHARE_PASS;
+  const root = shareRootOf(SOURCE_BASE);
+  if (!user || !pass || !root) return;
+  try {
+    await execp(`net use "${root}" /delete /y`).catch(() => {});   // drop any stale session
+    await execp(`net use "${root}" /user:"${user}" "${pass}"`);
+    job.log.push(`Authenticated to ${root} as ${user}.`);
+  } catch (e) {
+    job.log.push(`Share auth (net use) failed for ${root}: ${(e.stderr || e.message || '').toString().trim()}`);
+  }
+}
+
 async function processJob(job, empcode) {
   try {
+    await ensureShareAuth(job);
     const srcDir = path.join(SOURCE_BASE, job.monthFolder);
     job.log.push(`Scanning ${srcDir} …`);
     const files = [];
