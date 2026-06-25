@@ -122,6 +122,11 @@ async function processJob(job, empcode) {
     job.log.push(`Matched ${trackerMap.size} distinct tracker(s) in Prarambh.`);
 
     for (const f of files) {
+      if (job.cancelRequested) {
+        job.status = 'cancelled';
+        job.log.push(`Stopped by user after ${job.scanned} of ${job.total} file(s).`);
+        break;
+      }
       job.scanned++;
       try {
         const key = strip(path.basename(f.name, path.extname(f.name)));
@@ -164,9 +169,9 @@ async function processJob(job, empcode) {
         job.samples.errors.length < 25 && job.samples.errors.push(`${f.name}: ${e.message}`);
       }
     }
-    job.status = 'done';
+    if (job.status !== 'cancelled') job.status = 'done';
     job.finishedAt = new Date().toISOString();
-    job.log.push(`Done — matched ${job.matched}, copied ${job.copied}, unmatched ${job.unmatched}, errors ${job.errors}.`);
+    job.log.push(`${job.status === 'cancelled' ? 'Stopped' : 'Done'} — matched ${job.matched}, copied ${job.copied}, unmatched ${job.unmatched}, errors ${job.errors}.`);
   } catch (e) {
     job.status = 'error';
     job.error = e.message;
@@ -187,6 +192,7 @@ router.post('/process', async (req, res, next) => {
     const job = {
       id, monthFolder, status: 'running', error: null,
       total: 0, scanned: 0, matched: 0, copied: 0, unmatched: 0, errors: 0,
+      cancelRequested: false,
       samples: { copied: [], unmatched: [], errors: [] },
       log: [], startedAt: new Date().toISOString(), finishedAt: null,
       by: req.user.empcode,
@@ -204,6 +210,14 @@ router.get('/progress/:jobId', (req, res) => {
   const job = jobs.get(req.params.jobId);
   if (!job) return res.status(404).json({ success: false, error: 'Unknown job (it may have expired on a server restart)' });
   res.json({ success: true, job });
+});
+
+/** POST /cancel/:jobId — request the job stop after the current file. */
+router.post('/cancel/:jobId', (req, res) => {
+  const job = jobs.get(req.params.jobId);
+  if (!job) return res.status(404).json({ success: false, error: 'Unknown job' });
+  if (job.status === 'running') { job.cancelRequested = true; job.log.push('Stop requested…'); }
+  res.json({ success: true, status: job.status });
 });
 
 /** GET /jobs — recent jobs (newest first). */

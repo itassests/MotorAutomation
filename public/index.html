@@ -1855,7 +1855,10 @@
       </div>
 
       <div class="card" id="rnProgressCard" style="display:none;">
-        <h2 style="margin-bottom:6px;"><span class="icon">&#9203;</span> Progress</h2>
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <h2 style="margin-bottom:6px;"><span class="icon">&#9203;</span> Progress</h2>
+          <button class="btn btn-outline btn-sm" id="rnStopBtn" onclick="rnStop()" style="display:none; color:#c62828; border-color:#ef9a9a;">&#9209; Stop</button>
+        </div>
         <div id="rnStatusLine" style="font-size:13px; color:#444; margin-bottom:10px;"></div>
         <div style="background:#eee; border-radius:6px; height:14px; overflow:hidden; margin-bottom:12px;">
           <div id="rnProgressBar" style="height:100%; width:0%; background:#42a5f5; transition:width .3s;"></div>
@@ -6500,7 +6503,16 @@
         btn.disabled = false; btn.textContent = 'Process';
       }
     }
+    async function rnStop() {
+      const jobId = window._rnJobId;
+      if (!jobId) return;
+      const btn = document.getElementById('rnStopBtn');
+      btn.disabled = true; btn.textContent = 'Stopping…';
+      try { await fetch(API + '/renewal-notice/cancel/' + encodeURIComponent(jobId), { method: 'POST' }); }
+      catch (e) { showToast('Stop failed: ' + e.message, 'error'); btn.disabled = false; btn.innerHTML = '&#9209; Stop'; }
+    }
     async function rnPoll(jobId) {
+      window._rnJobId = jobId;
       if (_rnPollTimer) clearTimeout(_rnPollTimer);
       try {
         const r = await fetch(API + '/renewal-notice/progress/' + encodeURIComponent(jobId)).then(x => x.json());
@@ -6517,7 +6529,15 @@
     function rnRender(job) {
       const pct = job.total ? Math.round(100 * job.scanned / job.total) : (job.status === 'done' ? 100 : 0);
       document.getElementById('rnProgressBar').style.width = pct + '%';
-      const statusTxt = job.status === 'running' ? 'Processing…' : job.status === 'done' ? 'Completed' : 'Error: ' + (job.error || '');
+      const statusTxt = job.status === 'running' ? 'Processing…'
+        : job.status === 'done' ? 'Completed'
+        : job.status === 'cancelled' ? 'Stopped by user'
+        : 'Error: ' + (job.error || '');
+      const stopBtn = document.getElementById('rnStopBtn');
+      if (stopBtn) {
+        if (job.status === 'running') { stopBtn.style.display = ''; stopBtn.disabled = false; stopBtn.innerHTML = '&#9209; Stop'; }
+        else stopBtn.style.display = 'none';
+      }
       document.getElementById('rnStatusLine').innerHTML =
         `<strong>${escapeHtml(statusTxt)}</strong> — ${job.scanned}/${job.total || '?'} files (${pct}%) · folder <code>${escapeHtml(job.monthFolder)}</code>`;
       const chip = (label, val, color) => `<span style="background:${color}; padding:4px 10px; border-radius:14px; font-weight:600;">${label}: ${val}</span>`;
