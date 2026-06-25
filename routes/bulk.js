@@ -5069,6 +5069,20 @@ function buildOutputRow(policy, params, rule, rateVal, marginRule, nums, note, s
     make: params.make,
     model: params.model,
     vehicle_no: params.vehicleRegNo || policy.VEHICAL_NO || policy.VEHICLE_NO || policy['VEHICLE NO'] || null,
+    // Vehicle attributes surfaced for the bulk CSV download.
+    cc: params.cc != null ? params.cc : (policy.CC != null ? policy.CC : null),
+    tonnage: params.tonnage != null ? params.tonnage : (policy.GROSS_VEHICLE_WEIGHT || policy.Tonnes || null),
+    fuel: params.fuelType || policy.FUELTYPE || policy.VEHICAL_FUELTYPE || null,
+    ncb_pct: policy.NCB != null ? policy.NCB : (params.ncbPct != null ? params.ncbPct : null),
+    business_type: params.businessType || policy.BUSINESS_TYPE_ID || null,   // Fresh / Portability / Rollover
+    vehicle_category: policy.VehicalCategoryname || policy.VehicalCategory_Updated || policy['VEHICAL CATEGORY'] || null,
+    vehicle_detail: policy.VEHICAL_TYPE_Id || policy.VehicleType || params.vehicleType || null,
+    manufacturing_year: (function () {
+      const d = policy.DATE_OF_REGISTRATION ? new Date(policy.DATE_OF_REGISTRATION) : null;
+      if (d && !isNaN(d.getTime())) return d.getFullYear();
+      if (params.vehicleAge != null) return new Date().getFullYear() - Number(params.vehicleAge);
+      return null;
+    })(),
     rto_code: params.rtoCode,
     region: params.resolvedRegion || null,
     od_premium: params.odPremium || 0,
