@@ -5070,6 +5070,8 @@ function buildOutputRow(policy, params, rule, rateVal, marginRule, nums, note, s
     model: params.model,
     vehicle_no: params.vehicleRegNo || policy.VEHICAL_NO || policy.VEHICLE_NO || policy['VEHICLE NO'] || null,
     // Vehicle attributes surfaced for the bulk CSV download.
+    ins_product: params.insProduct || null,   // Comp / SAOD / TP
+    seating: params.seatingCapacity != null ? params.seatingCapacity : (policy.SEATING_CAPACITY != null ? policy.SEATING_CAPACITY : null),
     cc: params.cc != null ? params.cc : (policy.CC != null ? policy.CC : null),
     tonnage: params.tonnage != null ? params.tonnage : (policy.GROSS_VEHICLE_WEIGHT || policy.Tonnes || null),
     fuel: params.fuelType || policy.FUELTYPE || policy.VEHICAL_FUELTYPE || null,
