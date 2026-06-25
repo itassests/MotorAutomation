@@ -116,6 +116,23 @@ async function processJob(job, empcode) {
     await scanPdfs(srcDir, files);
     job.total = files.length;
     job.log.push(`Found ${files.length} PDF file(s).`);
+    // Group by immediate subfolder (POS code) for visibility — list every
+    // subfolder found, with how many PDFs each holds (incl. nested).
+    try {
+      const cnt = {};
+      for (const f of files) {
+        const seg = path.relative(srcDir, f.full).split(path.sep);
+        const top = seg.length > 1 ? seg[0] : '(root)';
+        cnt[top] = (cnt[top] || 0) + 1;
+      }
+      const subs = (await fsp.readdir(srcDir, { withFileTypes: true }))
+        .filter(e => e.isDirectory()).map(e => e.name);
+      if (cnt['(root)']) subs.push('(root)');
+      job.folders = [...new Set(subs)]
+        .map(name => ({ name, files: cnt[name] || 0 }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      job.log.push(`${job.folders.length} folder(s) identified.`);
+    } catch (_) { /* folder listing is best-effort */ }
     if (!files.length) { job.status = 'done'; job.finishedAt = new Date().toISOString(); return; }
 
     const live = await getPrarambhPool();
@@ -188,6 +205,7 @@ router.post('/process', async (req, res, next) => {
     const job = {
       id, monthFolder, status: 'running', error: null,
       total: 0, scanned: 0, matched: 0, copied: 0, unmatched: 0, errors: 0,
+      folders: [],
       samples: { copied: [], unmatched: [], errors: [] },
       log: [], startedAt: new Date().toISOString(), finishedAt: null,
       by: req.user.empcode,
