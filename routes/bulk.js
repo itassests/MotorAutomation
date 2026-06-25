@@ -5051,7 +5051,7 @@ function buildOutputRow(policy, params, rule, rateVal, marginRule, nums, note, s
 
   return {
     policy_no: policy['POLICY NO'] || null,
-    tracker_no: policy['TRACKER NO'] || null,
+    tracker_no: (policy['TRACKER NO'] != null && policy['TRACKER NO'] !== '') ? String(policy['TRACKER NO']).trim() : null,
     submission_date: _submissionDate,
     insurer: params.insurerName,
     insurer_slug: params._insurer_slug,

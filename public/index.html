@@ -12311,7 +12311,10 @@
       };
       const cols = [
         ['Policy No',        r => asText(r.policy_no)],
-        ['Tracker No',       r => asText(r.tracker_no)],
+        // Trackers are alphanumeric (MT/DIRSW/…), never scientific-notation
+        // risks — so emit a plain trimmed value (no leading \t, no source
+        // trailing spaces) per user request.
+        ['Tracker No',       r => String(r.tracker_no == null ? '' : r.tracker_no).trim()],
         ['Insurer',          r => r.insurer || r.insurer_slug],
         ['Product',          r => r.product],
         ['Vehicle Type',     r => r.vehicle_type],
