@@ -21,8 +21,13 @@ const fsp = require('fs/promises');
 const path = require('path');
 const sql = require('mssql');
 const { getPrarambhPool } = require('../db/prarambh-connection');
+const { attachUser } = require('./auth');
 
 const router = express.Router();
+// Resolve req.user from the Bearer token (no global auth middleware in this app —
+// each router attaches it, same as ocr-bulk). Without this, POST /process saw no
+// req.user and returned 401, which the client treats as a session expiry → logout.
+router.use(attachUser());
 
 // Static base of the renewal-notice share; the caller supplies only the month
 // folder (e.g. "July26"). Override via env for other environments.
