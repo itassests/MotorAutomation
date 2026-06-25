@@ -397,6 +397,7 @@
     <div class="tab"        data-tab="statements"        title="Statements"         ><span class="tab-icon">&#128196;</span><span class="tab-label">Statements</span></div>
     <div class="tab"        data-tab="pr"                title="Premium Register"   ><span class="tab-icon">&#128203;</span><span class="tab-label">Premium Register</span></div>
     <div class="tab"        data-tab="ocr-bulk"          title="OCR Bulk Upload"    ><span class="tab-icon">&#128230;</span><span class="tab-label">OCR Bulk Upload</span></div>
+    <div class="tab"        data-tab="renewal-notice"    title="Renewal Notice"     ><span class="tab-icon">&#128196;</span><span class="tab-label">Renewal Notice</span></div>
     <div class="tab"        data-tab="bulk"              title="Bulk Calculation"   ><span class="tab-icon">&#129518;</span><span class="tab-label">Bulk Calculation</span></div>
     <div class="tab"        data-tab="payout"            title="Payout Summary"     ><span class="tab-icon">&#128181;</span><span class="tab-label">Payout Summary</span></div>
     <div class="tab"        data-tab="recon"             title="Recon Summary"      ><span class="tab-icon">&#128200;</span><span class="tab-label">Recon Summary</span></div>
@@ -1834,6 +1835,39 @@
     </div>
 
     <!-- ============ PREMIUM REGISTER PANEL ============ -->
+    <!-- ============ RENEWAL NOTICE ============ -->
+    <div class="panel" id="panel-renewal-notice">
+      <div class="card">
+        <h2><span class="icon">&#128196;</span> Renewal Notice — Attach to Prarambh</h2>
+        <p style="color:#666; font-size:13px; margin-top:-8px; margin-bottom:14px;">
+          Scans <code>\\192.168.2.254\Motor&nbsp;Renewal\2026\&lt;Month&gt;</code> for renewal-notice PDFs, matches each
+          to its Prarambh tracker (the file name is the tracker without special chars), copies it into the CRM
+          userfiles folder as <code>RenewalNotice.pdf</code>, and records a TRN_PrarambhAttachments row.
+        </p>
+        <div style="display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap;">
+          <div>
+            <label style="display:block; font-size:12px; color:#555; margin-bottom:4px;">Month folder</label>
+            <input id="rnMonthFolder" type="text" placeholder="e.g. July26" style="padding:8px 10px; border:1px solid #ddd; border-radius:6px; min-width:180px;">
+          </div>
+          <button class="btn btn-primary" id="rnProcessBtn" onclick="rnStart()">Process</button>
+          <span id="rnSourceHint" style="font-size:12px; color:#888;"></span>
+        </div>
+      </div>
+
+      <div class="card" id="rnProgressCard" style="display:none;">
+        <h2 style="margin-bottom:6px;"><span class="icon">&#9203;</span> Progress</h2>
+        <div id="rnStatusLine" style="font-size:13px; color:#444; margin-bottom:10px;"></div>
+        <div style="background:#eee; border-radius:6px; height:14px; overflow:hidden; margin-bottom:12px;">
+          <div id="rnProgressBar" style="height:100%; width:0%; background:#42a5f5; transition:width .3s;"></div>
+        </div>
+        <div id="rnCounts" style="display:flex; gap:18px; flex-wrap:wrap; font-size:13px; margin-bottom:12px;"></div>
+        <div id="rnSamples" style="font-size:12px; color:#555;"></div>
+        <details style="margin-top:10px;"><summary style="cursor:pointer; font-size:12px; color:#777;">Log</summary>
+          <pre id="rnLog" style="font-size:11px; background:#fafafa; border:1px solid #eee; border-radius:6px; padding:8px; max-height:200px; overflow:auto;"></pre>
+        </details>
+      </div>
+    </div>
+
     <!-- ============ OCR BULK UPLOAD ============ -->
     <div class="panel" id="panel-ocr-bulk">
       <div class="card">
@@ -5317,6 +5351,7 @@
       'special-rates': 'Special Rates',
       statements:      'Statements',
       pr:              'Premium Register',
+      'renewal-notice': 'Renewal Notice',
       bulk:            'Bulk Calculation',
       payout:          'Payout Summary',
       recon:           'Recon Summary',
@@ -6442,6 +6477,59 @@
         }
       }
       if (note) note.textContent = 'Auto-refreshes every 3 min · updated ' + new Date().toLocaleTimeString();
+    }
+
+    // ---- Renewal Notice ----
+    let _rnPollTimer = null;
+    async function rnStart() {
+      const monthFolder = (document.getElementById('rnMonthFolder').value || '').trim();
+      if (!monthFolder) { showToast('Enter a month folder, e.g. July26', 'error'); return; }
+      const btn = document.getElementById('rnProcessBtn');
+      btn.disabled = true; btn.textContent = 'Starting…';
+      try {
+        const r = await fetch(API + '/renewal-notice/process', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ monthFolder }),
+        }).then(x => x.json());
+        if (!r.success) throw new Error(r.error || 'failed');
+        document.getElementById('rnSourceHint').textContent = 'Source: ' + (r.source || '');
+        document.getElementById('rnProgressCard').style.display = '';
+        rnPoll(r.jobId);
+      } catch (e) {
+        showToast('Failed to start: ' + e.message, 'error');
+        btn.disabled = false; btn.textContent = 'Process';
+      }
+    }
+    async function rnPoll(jobId) {
+      if (_rnPollTimer) clearTimeout(_rnPollTimer);
+      try {
+        const r = await fetch(API + '/renewal-notice/progress/' + encodeURIComponent(jobId)).then(x => x.json());
+        if (r.success) rnRender(r.job);
+        if (r.success && (r.job.status === 'running')) {
+          _rnPollTimer = setTimeout(() => rnPoll(jobId), 1500);
+        } else {
+          const btn = document.getElementById('rnProcessBtn'); btn.disabled = false; btn.textContent = 'Process';
+        }
+      } catch (e) {
+        _rnPollTimer = setTimeout(() => rnPoll(jobId), 2500);
+      }
+    }
+    function rnRender(job) {
+      const pct = job.total ? Math.round(100 * job.scanned / job.total) : (job.status === 'done' ? 100 : 0);
+      document.getElementById('rnProgressBar').style.width = pct + '%';
+      const statusTxt = job.status === 'running' ? 'Processing…' : job.status === 'done' ? 'Completed' : 'Error: ' + (job.error || '');
+      document.getElementById('rnStatusLine').innerHTML =
+        `<strong>${escapeHtml(statusTxt)}</strong> — ${job.scanned}/${job.total || '?'} files (${pct}%) · folder <code>${escapeHtml(job.monthFolder)}</code>`;
+      const chip = (label, val, color) => `<span style="background:${color}; padding:4px 10px; border-radius:14px; font-weight:600;">${label}: ${val}</span>`;
+      document.getElementById('rnCounts').innerHTML =
+        chip('Matched', job.matched, '#e3f2fd') + chip('Copied', job.copied, '#e8f5e9') +
+        chip('Unmatched', job.unmatched, '#fff3e0') + chip('Errors', job.errors, job.errors ? '#ffebee' : '#f5f5f5');
+      const s = job.samples || {};
+      const block = (title, arr, col) => (arr && arr.length)
+        ? `<div style="margin-top:8px;"><strong style="color:${col};">${title} (showing ${arr.length}):</strong><ul style="margin:4px 0 0 18px;">${arr.map(x => '<li>' + escapeHtml(x) + '</li>').join('')}</ul></div>` : '';
+      document.getElementById('rnSamples').innerHTML =
+        block('Copied', s.copied, '#2e7d32') + block('Unmatched (no tracker)', s.unmatched, '#e65100') + block('Errors', s.errors, '#c62828');
+      document.getElementById('rnLog').textContent = (job.log || []).join('\n');
     }
 
     function ocrBulkInit() {

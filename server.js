@@ -27,6 +27,7 @@ const authRoutes = require('./routes/auth');
 const companyMarginRoutes = require('./routes/company-margin');
 const reconRoutes = require('./routes/recon');
 const ocrBulkRoutes = require('./routes/ocr-bulk');
+const renewalNoticeRoutes = require('./routes/renewal-notice');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -79,6 +80,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/company-margins', companyMarginRoutes);
 app.use('/api/recon', reconRoutes);
 app.use('/api/ocr-bulk', ocrBulkRoutes);
+app.use('/api/renewal-notice', renewalNoticeRoutes);
 app.use('/api/agent', require('./routes/agent'));
 app.use('/api/employee', require('./routes/employee'));
 app.use('/api/enablers', require('./routes/enablers'));
