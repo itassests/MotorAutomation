@@ -651,6 +651,54 @@ router.get('/', async (req, res, next) => {
 });
 
 /**
+ * GET /coverage-matrix
+ * Insurer × upload-month coverage for Premium Registers, so the user can see at
+ * a glance which insurer/month PRs are uploaded vs PENDING. Each cell carries
+ * the number of uploads + total rows for that insurer/month (absent cell =
+ * pending). Roster = insurers with a PR upload OR a rate card (the ones we
+ * actively process), so an insurer with cards but no PR shows as all-pending.
+ * Months derived from the (year, month) present across all active PR uploads.
+ */
+router.get('/coverage-matrix', async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const ups = await pool.request().query(`
+      SELECT insurer_slug,
+             MAX(insurer_label) AS insurer_label,
+             CONVERT(varchar, year) + '-' + RIGHT('0' + CONVERT(varchar, month), 2) AS ym,
+             COUNT(*) AS uploads,
+             SUM(row_count) AS total_rows,
+             MAX(uploaded_at) AS latest_at
+      FROM pr_uploads
+      WHERE status = 'active' AND year IS NOT NULL AND month IS NOT NULL
+      GROUP BY insurer_slug, year, month`);
+    const cardIns = await pool.request().query(`SELECT DISTINCT insurer FROM rate_cards WHERE insurer IS NOT NULL`);
+
+    const months = new Set();
+    const byInsurer = new Map();
+    const labelOf = new Map();
+    for (const u of ups.recordset) {
+      months.add(u.ym);
+      if (!byInsurer.has(u.insurer_slug)) byInsurer.set(u.insurer_slug, {});
+      byInsurer.get(u.insurer_slug)[u.ym] = {
+        uploads: u.uploads, rows: u.total_rows || 0, latest_at: u.latest_at,
+      };
+      if (u.insurer_label) labelOf.set(u.insurer_slug, u.insurer_label);
+    }
+    // Insurers we process (rate cards) but with no PR → appear as all-pending.
+    for (const c of cardIns.recordset) {
+      if (c.insurer && !byInsurer.has(c.insurer)) byInsurer.set(c.insurer, {});
+    }
+    const monthList = [...months].sort();
+    const rows = [...byInsurer.entries()]
+      .map(([slug, cells]) => ({ insurer_slug: slug, insurer_label: labelOf.get(slug) || slug, cells }))
+      .sort((a, b) => (a.insurer_label || '').localeCompare(b.insurer_label || ''));
+
+    res.json({ success: true, months: monthList, rows });
+  } catch (err) { next(err); }
+});
+
+/**
  * GET /find-upload?policy=<policy_no>
  * Resolve which active PR upload contains a given policy, so callers that
  * only know the policy number (e.g. the recon screen) can deep-link into the
