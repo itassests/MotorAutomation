@@ -2920,11 +2920,12 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // Bangalore/Chennai/Hyderabad metros excluded → default) and the rate.
   // This REPLACES the earlier hand-derived MH&GJ(0.45) / Rajasthan(0.30) /
   // Delhi-"Zone-1"(0.30) overrides — the last was a FABRICATED borrow of the HDFC
-  // ROBINHOOD zone structure (no Bajaj sheet has zones; user-flagged). Default 40
-  // (operator pays 40, not the grid's printed 45 ceiling). Dry-run vs operator on
-  // the 23 product-1801 CAR cars: +9 net (default 40) — the 4 op-45 GJ/MH cars are
-  // operator inconsistency (same RTO pays both 40 and 45). CD>80% cap / OEM-min /
-  // UP-West-IRDA are NOT modelled (no CD/OEM data); UP-NCB approximated to 35.
+  // ROBINHOOD zone structure (no Bajaj sheet has zones; user-flagged). Default 45
+  // (USER 2026-06-26: grid "For All Other States ... Motor 4W on OD = 45%"; the
+  // earlier dry-run-tuned 40 was wrong). 19 of 25 cycle-13 1801 cars 40->45 incl.
+  // all 7 GJ7. CD>80% cap / OEM-min / UP-West-IRDA are NOT modelled (no CD/OEM
+  // data); UP-NCB approximated to 35. NOTE MH35/1103 (Diesel NCB35) now 45 but
+  // operator wanted 10 = still-open bucket-E (why a diesel-WITH-NCB MH car = 10).
   if (insurerSlug === 'bajaj_allianz' &&
       String(params.vehicleType || '').toUpperCase() === 'CAR' &&
       /-1801-/.test(String(params._policy_no || '')) && rules.length) {

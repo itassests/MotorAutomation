@@ -13,8 +13,9 @@
  *     Tamil Nadu, Hyderabad from Telangana) — those RTOs carry their own metro
  *     grid-state in the RTO Master and fall to the default.
  *   - "All Other States" (incl. Delhi/Mumbai/Pune/Gujarat/the excluded metros) =
- *     DEFAULT 40 (the operator pays 40, not the grid's printed 45 ceiling —
- *     dry-run vs operator: default 40 → +9 net, default 45 → -9).
+ *     DEFAULT 45 (USER 2026-06-26: the grid says "For All Other States ... Motor
+ *     4W on OD = 45%"; the earlier dry-run-tuned 40 was wrong — operator-40 cars
+ *     are now grid-correct-45 divergences). Diesel/HEV w/o NCB still = 10.
  *   - NOT modelled (no data): CD>80% cap (19.5 OEM / 15 non-OEM), OEM-code 19.5
  *     minimum, UP-West "IRDA" exception (UP NCB is approximated to 35 everywhere).
  *

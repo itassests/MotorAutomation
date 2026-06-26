@@ -1,7 +1,7 @@
 {
   "_source": "Private Car- Complete Grid- .xlsx, sheet '1801' (ROBINHOOD Comprehensive). Rates are % on OD.",
-  "_rules": "Universal: Diesel w/o NCB = 10; HEV w/o NCB = 10. State grid by fuel x NCB below. Unlisted states + excluded metros (Gurgaon/Faridabad/Bangalore/Chennai/Hyderabad/Delhi/Mumbai/etc.) = default 40 (operator pays 40, not the printed 45 ceiling). CD>80% cap (19.5 OEM / 15 non-OEM) and OEM-min 19.5 are NOT modelled (no CD/OEM data).",
-  "default": 40,
+  "_rules": "Universal: Diesel w/o NCB = 10; HEV w/o NCB = 10. State grid by fuel x NCB below. Unlisted states + excluded metros (Gurgaon/Faridabad/Bangalore/Chennai/Hyderabad/Delhi/Mumbai/etc.) = default 45 (USER 2026-06-26: grid 'For All Other States ... Motor 4W on OD = 45%'; the earlier 40 dry-run-tuned value was wrong). CD>80% cap (19.5 OEM / 15 non-OEM) and OEM-min 19.5 are NOT modelled (no CD/OEM data).",
+  "default": 45,
   "dieselNoNcb": 10,
   "hevNoNcb": 10,
   "states": {
