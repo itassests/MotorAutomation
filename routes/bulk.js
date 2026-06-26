@@ -2160,6 +2160,24 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
           return out;
         })()
       : [];
+    // Bajaj rest-of-state → bare state name. rto_mappings clusters non-metro MH
+    // RTOs (e.g. MH20 Aurangabad) as "REST OF MAHARASHTRA", but Bajaj's grid has
+    // NO "REST OF MAHARASHTRA" region — its state row is the bare "MAHARASHTRA"
+    // (alongside metro rows PUNE/MUMBAI + a few city clusters like Aurangabad
+    // which only cover light bands). The initial lookup misses, then the generic
+    // STATE_REGION_MAP['MH']=[Mumbai,Pune,…] fallback matched PUNE (20-30T SATP
+    // 0.485) instead of the correct state row MAHARASHTRA (0.425). Map
+    // "REST OF <STATE>" → "<STATE>" and try it FIRST so a non-metro MH truck
+    // takes the MAHARASHTRA state rate, not Pune. (USER: Aurangabad isn't Mumbai
+    // or Pune → apply Maharashtra.) MH20/25T GCV SATP 48.5→42.5.
+    const bajajRestCandidates = (insurerSlug === 'bajaj_allianz')
+      ? (() => {
+          const out = [];
+          const m = String(resolvedRegion || '').trim().match(/^REST OF (.+)$/i);
+          if (m) out.push(m[1].trim());
+          return out;
+        })()
+      : [];
     // Tier-based candidates — Royal Sundaram (and similar) store Comp rates
     // under tier names like "Key Cities" / "Other Cities" / "Rest of State"
     // rather than per-city. The smart filter's remarks-state check then
@@ -2288,7 +2306,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         })()
       : [];
     const candidates = [
-      ...royalRestCandidates,
+      ...royalRestCandidates, ...bajajRestCandidates,
       ...clusterCandidates, ...stateCandidates,
       ...hdfcCandidates, ...iciciCandidates,
       ...relianceCandidates, ...bajajCandidates, ...sbiCandidates,
