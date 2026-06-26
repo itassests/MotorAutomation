@@ -2853,6 +2853,34 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // Bajaj Allianz PCV Staff/School Bus — pan-India VOLUME-banded payout.
+  // USER grid ("School Bus", applies to staff bus too): Comprehensive = Standalone,
+  // banded by NET-PREMIUM volume — 0-5 Lacs = 55%, 5-10 Lacs = 57.5%, >10 Lacs = 60%.
+  // The ingested CV grid only has the regional Staff-Bus COMP (0.25) / SATP
+  // (0.51-0.56) cells, so a TP-dominant Comprehensive bus took COMP 0.25 (our 25 vs
+  // operator 55). PCV 4W with seating > 10 = the "SC >10" staff-bus segment; the
+  // band rate is the same for Comp and SATP, so override rules[0]'s rate (and if the
+  // bus pooled no rule at all, synthesize one). Verified vs operator: 7 MH buses
+  // (net 0.30-0.74L) all 25/null -> 55. Bajaj+PCV+SC>10 scoped.
+  if (insurerSlug === 'bajaj_allianz' &&
+      /PCV/i.test(String(params.vehicleType || '')) &&
+      (Number(params.seatingCapacity) || 0) > 10) {
+    const _od = Number(params.odPremium) || 0;
+    const _tp = Number(params.tpPremium) || 0;
+    const _ad = Number(params.addonPremium) || 0;
+    const _net = Number(params.netPremium) || (_od + _tp + _ad);
+    const _busRate = _net > 1000000 ? 0.60 : (_net > 500000 ? 0.575 : 0.55);
+    if (rules.length) {
+      rules = [{ ...rules[0], rate_value: _busRate, sub_type: null,
+                 segment: 'PCV Staff/School Bus (volume grid)' }, ...rules.slice(1)];
+    } else {
+      rules = [{ id: -1, insurer: 'bajaj_allianz', product: 'PCV', region: resolvedRegion || '',
+                 sub_type: null, segment: 'PCV Staff/School Bus (volume grid)',
+                 rate_type: (Number(params.odPremium) || 0) > 0 ? 'COMP' : 'SATP',
+                 rate_value: _busRate, is_declined: 0 }];
+    }
+  }
+
   // Bajaj Allianz Pvt-Car Comprehensive — MH / GJ / DD / DN region grid
   // (ROBINHOOD product 1801). The Bajaj "PC" grid (sheet "PC" in the Pvt-car-comp
   // .xlsb) files an MH&GJ-specific Comprehensive payout that was NEVER ingested:
