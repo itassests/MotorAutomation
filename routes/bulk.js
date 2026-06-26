@@ -2990,6 +2990,30 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // ---- Bajaj TW Standalone-OD grid (product 1871) ----
+  // Sheet "1871" (TW_Comp grid). Business NOT under OEM codes: Motorcycle @ 5% on
+  // OD for {WB,UP,CG,BR,RJ,HR,JH,PB,JK,HP,SK,ML,AR}; Scooter @ 5% for the same
+  // list EXCEPT Chhattisgarh; "Rest of 1871 = MISP 17.5%". OEM-code business =
+  // MISP 22.5% (OEM-code not in our data -> default non-OEM). Identified by the
+  // -1871- product code (authoritative cover/grid selector, USER-confirmed). The
+  // SAOD cars otherwise mis-take the Comp TW Bike/Scooter rate (20/40 vs 17.5).
+  if (insurerSlug === 'bajaj_allianz' && productIsTw &&
+      /-1871-/.test(String(params._policy_no || ''))) {
+    const _st1871 = rtoStatePrefix(params.rtoCode);
+    // States where BOTH bike & scooter are 5% (the Scooter list = MC list minus CG).
+    const _FIVE = new Set(['WB', 'UP', 'BR', 'RJ', 'HR', 'JH', 'PB', 'JK', 'HP', 'SK', 'ML', 'AR']);
+    let _r1871;
+    if (_FIVE.has(_st1871)) _r1871 = 0.05;
+    else if (_st1871 === 'CG') _r1871 = _saodIsScooter ? 0.175 : 0.05;  // CG: scooter not on the 5% list
+    else _r1871 = 0.175;                                                 // rest -> MISP 17.5
+    const _b = rules[0];
+    const _clone = _b
+      ? { ..._b, rate_type: 'SAOD', rate_value: _r1871, segment: 'TW SAOD (1871 grid)' }
+      : { id: -1, insurer: 'bajaj_allianz', product: 'TW', region: resolvedRegion || '',
+          rate_type: 'SAOD', rate_value: _r1871, segment: 'TW SAOD (1871 grid)', is_declined: 0 };
+    rules = [_clone];
+  }
+
   // ---- HDFC Pvt-Car Zone × Fuel × NCB override ----
   // HDFC's ROBINHOOD Pvt-Car grid is Zone-1/Zone-2 × (Petrol vs Non-Petrol) ×
   // (NCB vs No-NCB), but the 4 fuel/NCB columns were mis-ingested as AGE bands
