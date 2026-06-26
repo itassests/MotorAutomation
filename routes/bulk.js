@@ -3014,6 +3014,28 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     rules = [_clone];
   }
 
+  // ---- Bajaj TW Comprehensive (product 1802) — Bajaj/Vespa/Jawa/RE make, CD>60% = MISP ----
+  // Agency 2W Grid r46: "For Renewal/Rollover of Make Bajaj/Vespa/Java and RE: rates
+  // are 5% lower than the NET rate grid; For Above 60% CD = MISP rate." MISP non-OEM =
+  // 17.5% on 2W OD (OEM-code 22.5%, but OEM-code data not in our pipeline -> non-OEM).
+  // CD = params.discountPct (Bajaj PR "Comm Disc Rate"). We implement ONLY the
+  // CD>60%->MISP leg — the "5% lower" leg needs the agent's monthly 1st-year-premium
+  // volume band, which we don't have. USER: apply regardless of the New/Renewal flag
+  // (unreliable — a rollover commonly shows as New; BG3/5294 Bajaj Discover, CD 76.57).
+  if (insurerSlug === 'bajaj_allianz' && productIsTw &&
+      /-1802-/.test(String(params._policy_no || '')) &&
+      (Number(params.discountPct) || 0) > 60) {
+    const _mk1802 = `${params.make || ''} ${params.model || ''}`.toUpperCase();
+    if (/BAJAJ|VESPA|JAWA|JAVA|ROYAL.?ENFIELD/.test(_mk1802)) {
+      const _b = rules[0];
+      const _seg = 'TW Comp 1802 (Bajaj/Vespa/Jawa/RE CD>60% MISP)';
+      rules = [_b
+        ? { ..._b, rate_value: 0.175, segment: _seg }
+        : { id: -1, insurer: 'bajaj_allianz', product: 'TW', region: resolvedRegion || '',
+            rate_type: 'COMP', rate_value: 0.175, segment: _seg, is_declined: 0 }];
+    }
+  }
+
   // ---- HDFC Pvt-Car Zone × Fuel × NCB override ----
   // HDFC's ROBINHOOD Pvt-Car grid is Zone-1/Zone-2 × (Petrol vs Non-Petrol) ×
   // (NCB vs No-NCB), but the 4 fuel/NCB columns were mis-ingested as AGE bands
