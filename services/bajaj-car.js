@@ -67,27 +67,4 @@ function resolveBajajCarRate(params) {
   return +(pct / 100).toFixed(4);
 }
 
-// ---- Bajaj Private Car SATP (standalone-TP) model-specific PO ----
-// Bajaj caps the SATP payout for a list of (mostly older / low-value) models —
-// USER-supplied. Returns the model's PO fraction (e.g. 0.15) or null when the
-// model isn't on any tier list (engine keeps the region SATP rate).
-const SATP_MODELS = require('../config/bajaj_car_satp_models.json');
-const _norm = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-function resolveBajajCarSatpModelRate(params) {
-  if (String(params.vehicleType || '').toUpperCase() !== 'CAR') return null;
-  const makeN = _norm(params.make);
-  const modelN = _norm(params.model);
-  if (!makeN && !modelN) return null;
-  for (const tier of (SATP_MODELS.tiers || [])) {
-    // make-level: every model of these makes qualifies
-    if ((tier.makes_all || []).some(m => makeN.includes(_norm(m)))) return tier.rate;
-    // per-make model-token list: make must match AND model must contain a token
-    for (const [mk, toks] of Object.entries(tier.models || {})) {
-      if (!makeN.includes(_norm(mk))) continue;
-      if ((toks || []).some(t => modelN.includes(_norm(t)))) return tier.rate;
-    }
-  }
-  return null;
-}
-
-module.exports = { resolveBajajCarRate, gridStateForRto, resolveBajajCarSatpModelRate };
+module.exports = { resolveBajajCarRate, gridStateForRto };

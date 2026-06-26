@@ -1,5 +1,5 @@
 {
-  "_comment": "Bajaj Allianz Private Car SATP (standalone-TP) model-specific PO overrides. Matching: make-level (all models of the make) via makes_all, or per-make model-token list (model name contains the token). Rates are fractions of TP. USER-supplied 2026-06-26 (15% tier).",
+  "_comment": "Raheja QBE Private Car SATP (standalone-TP) model-specific PO overrides. Matching: make-level (all models of the make) via makes_all, or per-make model-token list (model name contains the token). Rates are fractions of TP. USER-supplied 2026-06-26 (15% tier).",
   "tiers": [
     {
       "rate": 0.15,
