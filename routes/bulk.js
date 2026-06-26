@@ -2864,7 +2864,8 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // (net 0.30-0.74L) all 25/null -> 55. Bajaj+PCV+SC>10 scoped.
   if (insurerSlug === 'bajaj_allianz' &&
       /PCV/i.test(String(params.vehicleType || '')) &&
-      (Number(params.seatingCapacity) || 0) > 10) {
+      ((Number(params.seatingCapacity) || 0) > 10 ||
+       rules.some(r => /Staff\s*Bus/i.test(String(r.segment || ''))))) {
     const _od = Number(params.odPremium) || 0;
     const _tp = Number(params.tpPremium) || 0;
     const _ad = Number(params.addonPremium) || 0;
@@ -4032,57 +4033,15 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
-  // ---- Bajaj PCV Staff Bus: COMP(OD-leg) + SATP(TP-leg) premium-weighted blend ----
-  // Bajaj files the bus commission as TWO legs by rate_type: COMP = OD-leg %, SATP =
-  // TP-leg % (e.g. Gujarat "Staff Bus SC>10" COMP 0.25 / SATP 0.53). A Comprehensive
-  // bus is ~99% TP premium, so the operator's effective commission = the premium-
-  // weighted blend (COMP×OD + SATP×TP)/net ≈ the SATP rate (~53 Gujarat/Mumbai, ~48
-  // Pune). The engine was picking the flat COMP 0.25 (=25) — GJ10/1463 our 25 vs op 52.
-  // USER-confirmed: use the region's OWN SATP. The two legs are sometimes filed under
-  // DIFFERENT region labels (COMP under "GUJARAT", SATP under "GUJARAT, Daman & Diu,
-  // Dadra & Nagar Haveli"), so the SATP is fetched by a STATE-TOKEN region match, not
-  // the resolved region. Comp/Package only — SATP-only (Liability) buses already take
-  // the SATP leg directly; the 0.025 residual SATP is excluded by the rate floor.
-  if (insurerSlug === 'bajaj_allianz' &&
-      String(params.vehicleType || '').toUpperCase() === 'PCV' &&
-      /^COMP/i.test(String(params.insProduct || ''))) {
-    const compBus = rules.find(r => /Staff\s*Bus/i.test(String(r.segment || '')) &&
-                                     String(r.rate_type || '').toUpperCase() === 'COMP');
-    const odP = Number(params.odPremium) || 0;
-    const tpP = Number(params.tpPremium) || 0;
-    const net = odP + tpP;
-    if (compBus && net > 0) {
-      try {
-        const seg = compBus.segment;
-        const stTok = String(resolvedRegion || '').trim().split(/[\s,]+/)[0] || '';   // GUJARAT / PUNE / MUMBAI…
-        const sbKey = lookupKey + '||bajajBusSatp:' + seg + ':' + stTok;
-        let satpRows;
-        if (caches.lookup.has(sbKey)) satpRows = caches.lookup.get(sbKey);
-        else {
-          satpRows = (await pool.request()
-            .input('seg', seg).input('tok', '%' + stTok + '%')
-            .query(`SELECT TOP 1 rate_value FROM rate_rules
-                    WHERE insurer='bajaj_allianz' AND product='PCV' AND segment=@seg
-                      AND rate_type='SATP' AND rate_value > 0.3 AND region LIKE @tok
-                    ORDER BY rate_value DESC`)).recordset;
-          caches.lookup.set(sbKey, satpRows);
-        }
-        const satp = satpRows[0] ? Number(satpRows[0].rate_value) : null;
-        const comp = Number(compBus.rate_value) || 0;
-        if (satp != null) {
-          const blend = (comp * odP + satp * tpP) / net;
-          // Operator reports the headline as the FLOORED integer percent (52.78 and
-          // 52.91 both → 52, not rounded to 53), so floor the blend to whole-percent
-          // for the rate-match headline; od_rate/tp_rate keep the true legs for income.
-          const headline = Math.floor(blend * 100) / 100;
-          const clone = { ...compBus, rate_value: +headline.toFixed(4), is_declined: 0,
-            od_rate: +comp.toFixed(4), tp_rate: +satp.toFixed(4),
-            segment: (compBus.segment || '') + ' (Bajaj bus OD+TP)' };
-          rules = [clone, ...rules.filter(r => r !== compBus)];
-        }
-      } catch (_) { /* leave rules unchanged on any failure */ }
-    }
-  }
+  // ---- Bajaj PCV Staff Bus — SUPERSEDED ----
+  // The earlier premium-weighted COMP×OD + SATP×TP blend (~52 Gujarat/Mumbai, ~48
+  // Pune) was our reverse-engineering of the operator before the actual grid was
+  // known. The USER has since supplied the authoritative "School Bus" VOLUME grid
+  // (0-5L 55% / 5-10L 57.5% / >10L 60%, Comp = Standalone) — handled by the
+  // bajaj_allianz + PCV + (seating>10 || Staff-Bus rule pooled) override near the
+  // top of this function, which fires first and renames the segment. The blend is
+  // therefore retired (it would otherwise re-clone a 52 over the correct volume
+  // rate). See [[feedback_bajaj_pcv_bus]].
 
   // ---- Kotak MISD flat-rate override ----
   // USER-confirmed: Kotak's MISD (Miscellaneous-D) segment has only TWO payout
