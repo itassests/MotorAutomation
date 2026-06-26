@@ -2943,6 +2943,35 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
+  // ---- Bajaj Private Car SATP — model-specific PO override ----
+  // USER (2026-06-26): a list of (mostly older / low-value) models is paid a fixed
+  // SATP PO regardless of the region rate — 15% tier: Chevrolet (all), Force (all),
+  // Maruti {Alto/Zen/A-Star/800/Esteem/1000/Stingray/Omni/Eeco/Versa/Gypsy/Ritz/SX4},
+  // Tata {Indica/Old Safari/Safari Storm/Spacio/Sumo/Indigo/Nano/Bolt/Aria/Venture/
+  // Manza/Indigo Marina}. Applies to standalone-TP Pvt Car (od=0 / ins_product TP).
+  // resolveBajajCarSatpModelRate returns the model's rate or null (keep region rate).
+  // config/bajaj_car_satp_models.json (extensible for the 25% / 2.5% tiers).
+  {
+    const _ipU = String(params.insProduct || '').toUpperCase();
+    const _isTp = _ipU === 'TP' || _ipU === 'SATP' || (Number(params.odPremium) || 0) === 0;
+    if (insurerSlug === 'bajaj_allianz' &&
+        String(params.vehicleType || '').toUpperCase() === 'CAR' && _isTp) {
+      try {
+        const { resolveBajajCarSatpModelRate } = require('../services/bajaj-car');
+        const mr = resolveBajajCarSatpModelRate(params);
+        if (mr != null) {
+          const satpRules = rules.filter(r => /SATP|^TP$|ACT/i.test(String(r.rate_type || '')));
+          const base = satpRules[0] || rules[0];
+          const clone = base
+            ? { ...base, rate_type: 'SATP', rate_value: mr, segment: 'Pvt Car SATP (model PO)' }
+            : { id: -1, insurer: 'bajaj_allianz', product: 'CAR', region: resolvedRegion || '',
+                rate_type: 'SATP', rate_value: mr, segment: 'Pvt Car SATP (model PO)', is_declined: 0 };
+          rules = [clone, ...rules.filter(r => !/SATP|^TP$|ACT/i.test(String(r.rate_type || '')))];
+        }
+      } catch (_) { /* leave rules unchanged on any failure */ }
+    }
+  }
+
   // ---- HDFC Pvt-Car Zone × Fuel × NCB override ----
   // HDFC's ROBINHOOD Pvt-Car grid is Zone-1/Zone-2 × (Petrol vs Non-Petrol) ×
   // (NCB vs No-NCB), but the 4 fuel/NCB columns were mis-ingested as AGE bands

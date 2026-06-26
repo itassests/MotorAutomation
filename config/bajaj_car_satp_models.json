@@ -1,0 +1,13 @@
+{
+  "_comment": "Bajaj Allianz Private Car SATP (standalone-TP) model-specific PO overrides. Matching: make-level (all models of the make) via makes_all, or per-make model-token list (model name contains the token). Rates are fractions of TP. USER-supplied 2026-06-26 (15% tier).",
+  "tiers": [
+    {
+      "rate": 0.15,
+      "makes_all": ["CHEVROLET", "FORCE"],
+      "models": {
+        "MARUTI": ["ALTO", "ZEN", "A-STAR", "ASTAR", "A STAR", "800", "ESTEEM", "1000", "STINGRAY", "OMNI", "EECO", "VERSA", "GYPSY", "RITZ", "SX4"],
+        "TATA": ["INDICA", "OLD SAFARI", "SAFARI STORM", "SPACIO", "SUMO", "INDIGO", "NANO", "BOLT", "ARIA", "VENTURE", "MANZA", "INDIGO MARINA"]
+      }
+    }
+  ]
+}
