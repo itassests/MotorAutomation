@@ -11283,6 +11283,8 @@
               ? ` &mdash; <strong style="color:#e65100;">🔒 Finalized ${new Date(_bulkFinalizedAt).toLocaleString()}${_bulkFinalizedBy ? ' by ' + escapeHtml(_bulkFinalizedBy) : ''}</strong>
                   <span style="font-size:11px; color:#888; margin-left:8px;">— unfinalize from Admin → Cycle Snapshots</span>`
               : ` &mdash; <button class="btn btn-sm btn-outline" onclick="bulkRecomputeCycle()">Recompute from source</button>
+                  <input id="bulkRecalcKey" placeholder="Tracker / Policy No" style="height:26px; padding:2px 8px; font-size:12px; width:200px; vertical-align:middle;" onkeydown="if(event.key==='Enter'){event.preventDefault();bulkRecalcPolicy();}" />
+                  <button class="btn btn-sm btn-outline" onclick="bulkRecalcPolicy()" title="Recalculate just this one policy — fast, no full cycle re-run (overrides preserved)">Recalc policy</button>
                   <button class="btn btn-sm btn-outline" style="color:#c62828;" onclick="bulkClearCycle()">Clear snapshot</button>
                   <button class="btn btn-sm btn-primary" style="background:#e65100; border-color:#e65100;" onclick="bulkFinalizeCycle()" title="Lock this cycle — no more edits, recompute, or wipe">Finalize cycle</button>`)
           : '';
@@ -11304,6 +11306,36 @@
       } finally {
         btn.disabled = false;
         btn.textContent = 'Run Calculation';
+      }
+    }
+
+    /** Recalculate ONE policy in place (by tracker or policy no) — fast, no
+     *  full cycle re-run. Overrides are preserved by the backend. Reloads the
+     *  grid from the (now-updated) snapshot, which is a quick stored read. */
+    async function bulkRecalcPolicy() {
+      if (!_bulkActiveCycleId) { showToast('Load a cycle first', 'error'); return; }
+      const inp = document.getElementById('bulkRecalcKey');
+      const key = (inp && inp.value || '').trim();
+      if (!key) { showToast('Enter a tracker or policy number', 'error'); inp && inp.focus(); return; }
+      const btn = event && event.target && event.target.tagName === 'BUTTON' ? event.target : null;
+      if (btn) { btn.disabled = true; btn.textContent = 'Recalculating…'; }
+      try {
+        const res = await fetch(API + '/cycle-bulk/' + _bulkActiveCycleId + '/recompute-policy', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'recalculation failed');
+        const rate = data.our_rate != null ? data.our_rate + '%' : 'no-rule';
+        showToast(`Recalculated ${data.tracker_no || data.policy_no} — ${rate}` +
+                  (data.matched_segment ? ` (${data.matched_segment})` : ''), 'success');
+        if (inp) inp.value = '';
+        // Re-hydrate the grid from the updated snapshot (fast stored read, not a recompute).
+        bulkRun();
+      } catch (e) {
+        showToast('Recalc failed: ' + e.message, 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Recalc policy'; }
       }
     }
 

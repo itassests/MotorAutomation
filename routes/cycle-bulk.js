@@ -666,8 +666,19 @@ router.post('/:cycleId(\\d+)/recompute-policy', async (req, res, next) => {
   try {
     const pool = await getPool();
     const cycleId = Number(req.params.cycleId);
-    const pn = String((req.body && req.body.policy_no) || '').trim();
-    if (!pn) return res.status(400).json({ success: false, error: 'policy_no required' });
+    // Accept a policy_no, a tracker_no, or a free-text `key` that is either.
+    let pn = String((req.body && req.body.policy_no) || '').trim();
+    const key = String((req.body && (req.body.key || req.body.tracker_no)) || '').trim();
+    if (!pn && key) {
+      // Resolve to policy_no: try policy_no match first, then tracker_no.
+      const lk = await pool.request()
+        .input('cid', sql.Int, cycleId).input('k', sql.NVarChar(200), key)
+        .query(`SELECT TOP 1 policy_no FROM cycle_bulk_rows
+                 WHERE cycle_id = @cid AND (policy_no = @k OR tracker_no = @k)
+                 ORDER BY CASE WHEN policy_no = @k THEN 0 ELSE 1 END`);
+      pn = lk.recordset[0] && lk.recordset[0].policy_no;
+    }
+    if (!pn) return res.status(400).json({ success: false, error: 'Enter a tracker or policy number that exists in this cycle.' });
     const cyc = await getCycle(pool, cycleId);
     if (!cyc) return res.status(404).json({ success: false, error: 'Cycle not found' });
     const fin = await isCycleFinalized(pool, cycleId);
