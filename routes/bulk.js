@@ -1015,6 +1015,21 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     if (prRow && prRow.final_discount != null) params.discountPct = prRow.final_discount;
   }
 
+  // Bajaj: the OD discount ("Comm Disc Rate" from the Bajaj PR, captured in
+  // final_discount as a whole percent, e.g. 85) drives the CD>80% -> 10% PO cap
+  // on the 1801 Pvt-Car grid (resolveBajajCarRate). Expose it as params.discountPct
+  // (mirrors the Royal block above).
+  if (insurerSlug === 'bajaj_allianz' && prIndex && params._policy_no) {
+    const pk = String(params._policy_no).trim().toUpperCase();
+    let prRow = prIndex.get(pk) || null;
+    if (!prRow) {
+      for (const stripped of policyKeyVariants(params._policy_no)) {
+        prRow = prIndex.get(stripped); if (prRow) break;
+      }
+    }
+    if (prRow && prRow.final_discount != null) params.discountPct = prRow.final_discount;
+  }
+
   // BH-series (Bharat-series) registration override. A reg like "23BH6834D"
   // has RTO_Code "23BH" (no state), source City/StateName come through as the
   // placeholder "India", and cleanRtoCode() rejects it — so extractPolicyParams

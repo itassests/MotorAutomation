@@ -463,11 +463,17 @@ router.post('/upload', async (req, res, next) => {
     // (Royal stores it as a signed fraction, -0.85 = 85% discount). Normalised
     // to a positive percent so loadPrIndex/Royal-band logic reads it directly.
     // Case-insensitive header match; returns null when absent/blank.
+    // Bajaj's PR (HTML-as-.xls) carries the OD discount as "Comm Disc Rate"
+    // (Commercial Discount %, already a whole percent e.g. 85). Royal uses
+    // "FINALDISCOUNT" (signed fraction). Accept either header into final_discount;
+    // the normalisation below leaves a whole percent (85) as-is and scales a
+    // fraction (0.85) up — so both land as a positive percent.
     const parseFinalDiscountCell = (raw) => {
       if (!raw || typeof raw !== 'object') return null;
       let val = null;
       for (const k of Object.keys(raw)) {
-        if (String(k).replace(/[\s_]/g, '').toUpperCase() === 'FINALDISCOUNT') { val = raw[k]; break; }
+        const kn = String(k).replace(/[\s_]/g, '').toUpperCase();
+        if (kn === 'FINALDISCOUNT' || kn === 'COMMDISCRATE') { val = raw[k]; break; }
       }
       if (val == null || String(val).trim() === '' || String(val).trim() === '-') return null;
       let n = parseFloat(String(val).replace(/[%,]/g, ''));

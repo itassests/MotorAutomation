@@ -45,6 +45,10 @@ function gridStateForRto(rtoCode) {
 
 function resolveBajajCarRate(params) {
   if (String(params.vehicleType || '').toUpperCase() !== 'CAR') return null;
+  // CD > 80% cap (USER 2026-06-26): when the OD discount (Bajaj PR "Comm Disc
+  // Rate", a whole percent in params.discountPct) exceeds 80%, the payout is
+  // restricted to 10% on OD — overrides the fuel/NCB/state grid below.
+  if ((Number(params.discountPct) || 0) > 80) return 0.10;
   const fuel = String(params.fuelType || '').toUpperCase();
   const ncb = (Number(params.ncbPct) || 0) > 0;
   const diesel = /DIESEL/.test(fuel);
