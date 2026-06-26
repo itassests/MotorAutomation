@@ -2959,29 +2959,31 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
-  // ---- Raheja QBE Private Car SATP — model-specific PO override ----
-  // USER (2026-06-26): a list of (mostly older / low-value) models is paid a fixed
-  // SATP PO regardless of the region rate — 15% tier: Chevrolet (all), Force (all),
-  // Maruti {Alto/Zen/A-Star/800/Esteem/1000/Stingray/Omni/Eeco/Versa/Gypsy/Ritz/SX4},
-  // Tata {Indica/Old Safari/Safari Storm/Spacio/Sumo/Indigo/Nano/Bolt/Aria/Venture/
-  // Manza/Indigo Marina}. Applies to standalone-TP Pvt Car (od=0 / ins_product TP).
-  // resolveRahejaCarSatpModelRate returns the model's rate or null (keep region rate).
-  // config/raheja_car_satp_models.json (extensible for the 25% / 2.5% tiers).
+  // ---- Private Car SATP model-specific PO override (Raheja QBE + Bajaj) ----
+  // USER-supplied per-insurer model→PO lists (config/<slug>_car_satp_models.json),
+  // applied to standalone-TP Pvt Car (od=0 / ins_product TP):
+  //   - Raheja QBE 15% tier: Chevrolet/Force (all), older Maruti/Tata models — SET.
+  //   - Bajaj 25% tier: Swift/Beat/Fiesta/I20 = "Max 25%" — CAP (min(base, 0.25));
+  //     SWIFT excludes "Swift Dzire". Comp 1801 Swift cars (od>0) are untouched.
+  // resolveCarSatpModelRate returns {rate, cap} or null (keep the region rate).
   {
     const _ipU = String(params.insProduct || '').toUpperCase();
     const _isTp = _ipU === 'TP' || _ipU === 'SATP' || (Number(params.odPremium) || 0) === 0;
-    if (insurerSlug === 'raheja_qbe' &&
+    if ((insurerSlug === 'raheja_qbe' || insurerSlug === 'bajaj_allianz') &&
         String(params.vehicleType || '').toUpperCase() === 'CAR' && _isTp) {
       try {
-        const { resolveRahejaCarSatpModelRate } = require('../services/raheja-car');
-        const mr = resolveRahejaCarSatpModelRate(params);
-        if (mr != null) {
+        const { resolveCarSatpModelRate } = require('../services/car-satp-models');
+        const m = resolveCarSatpModelRate(insurerSlug, params);
+        if (m != null) {
           const satpRules = rules.filter(r => /SATP|^TP$|ACT/i.test(String(r.rate_type || '')));
           const base = satpRules[0] || rules[0];
+          // "cap" (Max X%) → min(base SATP rate, tier rate); otherwise set outright.
+          let rate = m.rate;
+          if (m.cap && base && Number(base.rate_value) > 0) rate = Math.min(Number(base.rate_value), m.rate);
           const clone = base
-            ? { ...base, rate_type: 'SATP', rate_value: mr, segment: 'Pvt Car SATP (model PO)' }
-            : { id: -1, insurer: 'raheja_qbe', product: 'CAR', region: resolvedRegion || '',
-                rate_type: 'SATP', rate_value: mr, segment: 'Pvt Car SATP (model PO)', is_declined: 0 };
+            ? { ...base, rate_type: 'SATP', rate_value: rate, segment: 'Pvt Car SATP (model PO)' }
+            : { id: -1, insurer: insurerSlug, product: 'CAR', region: resolvedRegion || '',
+                rate_type: 'SATP', rate_value: rate, segment: 'Pvt Car SATP (model PO)', is_declined: 0 };
           rules = [clone, ...rules.filter(r => !/SATP|^TP$|ACT/i.test(String(r.rate_type || '')))];
         }
       } catch (_) { /* leave rules unchanged on any failure */ }

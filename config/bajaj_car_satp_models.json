@@ -1,0 +1,10 @@
+{
+  "_comment": "Bajaj Allianz Private Car SATP (standalone-TP) model PO. USER 2026-06-26: Swift, Beat, Fiesta, I20 = Max 25% PO. SET to 0.25 (not cap=min(base)): the proper region SATP for these models is always >=25 (40-57.5), so set==cap, AND the engine sometimes pools a stray low model-row (e.g. Mumbai Beat base 0.05) that a min() cap would wrongly keep. SWIFT excludes 'Swift Dzire' (Dzire is a separate, lower tier). Matched by model token, any make. Extensible (e.g. Baleno/Dzire 2.5%).",
+  "tiers": [
+    {
+      "rate": 0.25,
+      "models_any": ["SWIFT", "BEAT", "FIESTA", "I20"],
+      "exclude": ["DZIRE"]
+    }
+  ]
+}
