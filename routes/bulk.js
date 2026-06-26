@@ -3036,6 +3036,27 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // ---- ICICI Pvt-Car Package — pan-India New/NCB flat grid (USER 2026-06-26) ----
+  // Product "Private Car Package", Fuel All, RTO PAN India:
+  //   New (1+3 & 3+3) = 30%; SAOD With NCB = 30%; Comp 1+1 With NCB = 30%;
+  //   Without NCB (SAOD & Comp 1+1) = 22.5%.  => (New OR NCB>0) -> 30%, else 22.5%.
+  // Comp/SAOD only (od>0); pure-TP cars untouched. Overrides the older 61-region
+  // ICICI car grid (region rates 0.15-0.30) with the flat current structure.
+  if (insurerSlug === 'icici_lombard' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR' &&
+      (Number(params.odPremium) || 0) > 0) {
+    const _icNew = /NEW/i.test(String(params.businessType || '')) || (Number(params.vehicleAge) || 0) === 0;
+    const _icNcb = (Number(params.ncbPct) || 0) > 0;
+    const _icR = (_icNew || _icNcb) ? 0.30 : 0.225;
+    const _b = rules[0];
+    const _seg = 'Pvt Car Package (ICICI pan-India ' + ((_icNew || _icNcb) ? 'New/NCB 30' : 'noNCB 22.5') + ')';
+    rules = [_b
+      ? { ..._b, rate_value: _icR, segment: _seg }
+      : { id: -1, insurer: 'icici_lombard', product: 'CAR', region: resolvedRegion || '',
+          rate_type: (Number(params.tpPremium) || 0) < 1 ? 'SAOD' : 'COMP',
+          rate_value: _icR, segment: _seg, is_declined: 0 }];
+  }
+
   // ---- HDFC Pvt-Car Zone × Fuel × NCB override ----
   // HDFC's ROBINHOOD Pvt-Car grid is Zone-1/Zone-2 × (Petrol vs Non-Petrol) ×
   // (NCB vs No-NCB), but the 4 fuel/NCB columns were mis-ingested as AGE bands
