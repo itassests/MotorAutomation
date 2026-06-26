@@ -13,6 +13,10 @@
  *   - models     : (optional) { MAKE: [tokens] } — make must match AND model
  *                  contains a token
  *   - models_any : (optional) [tokens] — model contains a token, ANY make
+ *   - fuel_any   : (optional) [tokens] — fuelType contains a token (e.g. CNG/LPG
+ *                  "no payout"); matches a CNG car of ANY model. Tier order
+ *                  matters — a fuel tier placed FIRST beats a later model tier
+ *                  (so a CNG Swift takes the CNG 2.5%, not the Swift 25%).
  *   - exclude    : (optional) [tokens] — if the model contains any, the tier is
  *                  skipped (e.g. "SWIFT" tier excludes "DZIRE" so a Swift Dzire
  *                  doesn't take the Swift rate)
@@ -34,10 +38,12 @@ function resolveCarSatpModelRate(insurerSlug, params) {
   if (!cfg || String(params.vehicleType || '').toUpperCase() !== 'CAR') return null;
   const makeN = norm(params.make);
   const modelN = norm(params.model);
-  if (!makeN && !modelN) return null;
+  const fuelN = norm(params.fuelType);
+  if (!makeN && !modelN && !fuelN) return null;
   for (const tier of (cfg.tiers || [])) {
     if ((tier.exclude || []).some(t => modelN.includes(norm(t)))) continue;
     const hit =
+      (tier.fuel_any || []).some(t => fuelN.includes(norm(t))) ||
       (tier.makes_all || []).some(m => makeN.includes(norm(m))) ||
       (tier.models_any || []).some(t => modelN.includes(norm(t))) ||
       Object.entries(tier.models || {}).some(([mk, toks]) =>
