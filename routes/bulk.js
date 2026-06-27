@@ -3057,6 +3057,31 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
           rate_value: _icR, segment: _seg, is_declined: 0 }];
   }
 
+  // ---- TATA AIG Private Car — June'26 flat grid (USER 2026-06-26) ----
+  // The real June Tata car grid lives in the "Private Car" sheet of "Grid PCI &
+  // TW- June 26", which was NEVER ingested (config matched ^pci$/^pvt car$; the
+  // sheet is named "Private Car"; the scratch "pci checks"/"cv checks" tabs got
+  // slurped instead and were deleted). Resolve it config-driven here:
+  // BizType × Section(cover) × Fuel × RTO × NCB -> rate. config/tata_car_jun26.json
+  // + services/tata-car.js (RTO->cluster via tata_rto_cluster.json).
+  if (insurerSlug === 'tata_aig' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR') {
+    try {
+      const { resolveTataCarRate } = require('../services/tata-car');
+      const tr = resolveTataCarRate(params);
+      if (tr != null) {
+        const _b = rules[0];
+        const _seg = 'Pvt Car (Tata Jun26 grid)';
+        rules = [_b
+          ? { ..._b, rate_value: tr, segment: _seg }
+          : { id: -1, insurer: 'tata_aig', product: 'CAR', region: resolvedRegion || '',
+              rate_type: (Number(params.odPremium) || 0) <= 0 ? 'SATP'
+                       : (Number(params.tpPremium) || 0) <= 0 ? 'SAOD' : 'COMP',
+              rate_value: tr, segment: _seg, is_declined: 0 }];
+      }
+    } catch (_) { /* leave rules unchanged on any failure */ }
+  }
+
   // ---- HDFC Pvt-Car Zone × Fuel × NCB override ----
   // HDFC's ROBINHOOD Pvt-Car grid is Zone-1/Zone-2 × (Petrol vs Non-Petrol) ×
   // (NCB vs No-NCB), but the 4 fuel/NCB columns were mis-ingested as AGE bands
