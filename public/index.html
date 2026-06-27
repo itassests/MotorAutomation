@@ -12361,6 +12361,22 @@
         if (v === null || v === undefined || v === '') return '';
         return '\t' + String(v);
       };
+      // Normalize the many source spellings of a vehicle category to ONE canonical
+      // name (user request): CAR / Pvt.Car -> "Pvt Car"; TW / Two Wheeler -> "TW";
+      // GCV / Commercial-Goods Carrying -> "GCV"; PCV / Commercial-Passenger
+      // Carrying -> "PCV"; Miscellaneous -> "Misc". Check goods/passenger BEFORE car
+      // (so "Commercial-Goods Carrying" isn't caught by a loose CAR match).
+      const normVehCat = (v) => {
+        const s = String(v == null ? '' : v).trim();
+        if (!s) return '';
+        const u = s.toUpperCase();
+        if (/GOODS|^GCV$/.test(u)) return 'GCV';
+        if (/PASSENGER|^PCV$/.test(u)) return 'PCV';
+        if (/TWO[\s-]?WHEEL|^TW$|\b2W\b/.test(u)) return 'TW';
+        if (/MISC/.test(u)) return 'Misc';
+        if (/PVT|PRIVATE|^CAR$|^4W$/.test(u)) return 'Pvt Car';
+        return s;   // unknown -> leave as-is
+      };
       const cols = [
         ['Policy No',        r => asText(r.policy_no)],
         // Trackers are alphanumeric (MT/DIRSW/…), never scientific-notation
@@ -12371,7 +12387,7 @@
         ['Agent Code',       r => String(r.agent_code == null ? '' : r.agent_code).trim()],
         ['Agent Name',       r => r.agent_name],
         ['Product',          r => r.product],
-        ['Vehicle Type',     r => r.vehicle_type],
+        ['Vehicle Type',     r => normVehCat(r.vehicle_type)],
         ['Make',             r => r.make],
         ['Model',            r => r.model],
         ['Policy Type',      r => r.ins_product],
@@ -12383,7 +12399,7 @@
         ['FUEL',             r => r.fuel],
         ['Make and Model',   r => [r.make, r.model].filter(Boolean).join(' ').trim()],
         ['Vehicle No',       r => r.vehicle_no],
-        ['Vehicle Category', r => r.vehicle_category],
+        ['Vehicle Category', r => normVehCat(r.vehicle_category)],
         ['Manufacturing Year', r => r.manufacturing_year],
         ['Vehicle',          r => r.vehicle_detail],
         ['RTO',              r => r.rto_code],
