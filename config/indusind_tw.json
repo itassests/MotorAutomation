@@ -1,0 +1,436 @@
+{
+ "_source": "IndusInd June TW26 (eff 1-Jun-26)",
+ "_cols": "region->{fresh15,fresh55,comp,saod,stp}",
+ "grid": [
+  {
+   "zone": "WEST",
+   "state": "Maharastra",
+   "region": "Mumbai",
+   "fresh15": 0.575,
+   "fresh55": 0.55,
+   "comp": 0.625,
+   "saod": 0.3,
+   "stp": 0.55
+  },
+  {
+   "zone": "WEST",
+   "state": "Maharastra",
+   "region": "Nagpur",
+   "fresh15": 0.525,
+   "fresh55": 0.5,
+   "comp": 0.575,
+   "saod": 0.3,
+   "stp": 0.45
+  },
+  {
+   "zone": "WEST",
+   "state": "Maharastra",
+   "region": "Pune",
+   "fresh15": 0.575,
+   "fresh55": 0.55,
+   "comp": 0.625,
+   "saod": 0.3,
+   "stp": 0.55
+  },
+  {
+   "zone": "WEST",
+   "state": "Maharastra",
+   "region": "ROM",
+   "fresh15": 0.525,
+   "fresh55": 0.5,
+   "comp": 0.575,
+   "saod": 0.3,
+   "stp": 0.45
+  },
+  {
+   "zone": "WEST",
+   "state": "MP",
+   "region": "Indore",
+   "fresh15": 0.425,
+   "fresh55": 0.4,
+   "comp": 0.475,
+   "saod": 0.3,
+   "stp": 0
+  },
+  {
+   "zone": "WEST",
+   "state": "MP",
+   "region": "Bhopal",
+   "fresh15": 0.425,
+   "fresh55": 0.4,
+   "comp": 0.475,
+   "saod": 0.3,
+   "stp": 0
+  },
+  {
+   "zone": "WEST",
+   "state": "MP",
+   "region": "Gwalior",
+   "fresh15": 0.425,
+   "fresh55": 0.4,
+   "comp": 0.475,
+   "saod": 0.3,
+   "stp": 0
+  },
+  {
+   "zone": "WEST",
+   "state": "MP",
+   "region": "Ujjain",
+   "fresh15": 0.425,
+   "fresh55": 0.4,
+   "comp": 0.475,
+   "saod": 0.3,
+   "stp": 0
+  },
+  {
+   "zone": "WEST",
+   "state": "MP",
+   "region": "Ratlam",
+   "fresh15": 0.425,
+   "fresh55": 0.4,
+   "comp": 0.475,
+   "saod": 0.3,
+   "stp": 0
+  },
+  {
+   "zone": "WEST",
+   "state": "MP",
+   "region": "Rewa",
+   "fresh15": 0.425,
+   "fresh55": 0.4,
+   "comp": 0.475,
+   "saod": 0.3,
+   "stp": 0
+  },
+  {
+   "zone": "WEST",
+   "state": "MP",
+   "region": "Rest of MP",
+   "fresh15": 0.175,
+   "fresh55": 0.15,
+   "comp": 0.225,
+   "saod": 0.3,
+   "stp": 0
+  },
+  {
+   "zone": "WEST",
+   "state": "Telangana",
+   "region": "Hyderabad",
+   "fresh15": 0.5,
+   "fresh55": 0.475,
+   "comp": 0.55,
+   "saod": 0.3,
+   "stp": 0.3
+  },
+  {
+   "zone": "South",
+   "state": "Telangana",
+   "region": "Telangana",
+   "fresh15": 0.475,
+   "fresh55": 0.45,
+   "comp": 0.525,
+   "saod": 0.3,
+   "stp": 0.3
+  },
+  {
+   "zone": "South",
+   "state": "Karnataka",
+   "region": "Banglore",
+   "fresh15": 0.475,
+   "fresh55": 0.45,
+   "comp": 0.525,
+   "saod": 0.3,
+   "stp": 0
+  },
+  {
+   "zone": "South",
+   "state": "Karnataka",
+   "region": "Karnataka",
+   "fresh15": 0.325,
+   "fresh55": 0.3,
+   "comp": 0.375,
+   "saod": 0.3,
+   "stp": 0
+  },
+  {
+   "zone": "South",
+   "state": "Karala",
+   "region": "Karala",
+   "fresh15": 0,
+   "fresh55": 0,
+   "comp": 0,
+   "saod": 0.3,
+   "stp": 0
+  },
+  {
+   "zone": "South",
+   "state": "Tamilnadu",
+   "region": "Chennai",
+   "fresh15": 0.425,
+   "fresh55": 0.4,
+   "comp": 0.475,
+   "saod": 0.3,
+   "stp": 0
+  },
+  {
+   "zone": "South",
+   "state": "Tamilnadu",
+   "region": "Coimbatore",
+   "fresh15": 0.425,
+   "fresh55": 0.4,
+   "comp": 0.475,
+   "saod": 0.3,
+   "stp": 0
+  },
+  {
+   "zone": "South",
+   "state": "Tamilnadu",
+   "region": "Tamilnadu",
+   "fresh15": 0.35,
+   "fresh55": 0.325,
+   "comp": 0.4,
+   "saod": 0.3,
+   "stp": 0
+  },
+  {
+   "zone": "NORTH",
+   "state": "Delhi",
+   "region": "Delhi",
+   "fresh15": 0.525,
+   "fresh55": 0.5,
+   "comp": 0.575,
+   "saod": 0.2,
+   "stp": 0.45
+  },
+  {
+   "zone": "NORTH",
+   "state": "Rajasthan",
+   "region": "Jaipur",
+   "fresh15": 0.5,
+   "fresh55": 0.475,
+   "comp": 0.55,
+   "saod": 0.2,
+   "stp": 0.4
+  },
+  {
+   "zone": "NORTH",
+   "state": "Rajasthan",
+   "region": "Udaipur",
+   "fresh15": 0.475,
+   "fresh55": 0.45,
+   "comp": 0.525,
+   "saod": 0.2,
+   "stp": 0.4
+  },
+  {
+   "zone": "NORTH",
+   "state": "Rajasthan",
+   "region": "Jodhpur",
+   "fresh15": 0.475,
+   "fresh55": 0.45,
+   "comp": 0.525,
+   "saod": 0.2,
+   "stp": 0.4
+  },
+  {
+   "zone": "NORTH",
+   "state": "Rajasthan",
+   "region": "Rest of Rajasthan",
+   "fresh15": 0.425,
+   "fresh55": 0.4,
+   "comp": 0.475,
+   "saod": 0.2,
+   "stp": 0.4
+  },
+  {
+   "zone": "NORTH",
+   "state": "Punjab",
+   "region": "Punjab",
+   "fresh15": 0.5,
+   "fresh55": 0.475,
+   "comp": 0.55,
+   "saod": 0.2,
+   "stp": 0.45
+  },
+  {
+   "zone": "NORTH",
+   "state": "Chandigargh UT",
+   "region": "Chandigargh UT",
+   "fresh15": 0.5,
+   "fresh55": 0.475,
+   "comp": 0.55,
+   "saod": 0.2,
+   "stp": 0.45
+  },
+  {
+   "zone": "NORTH",
+   "state": "Himanchal",
+   "region": "HP and Jammu",
+   "fresh15": 0.425,
+   "fresh55": 0.4,
+   "comp": 0.475,
+   "saod": 0.2,
+   "stp": 0.45
+  },
+  {
+   "zone": "NORTH",
+   "state": "Uttarpradesh",
+   "region": "UP and UK",
+   "fresh15": 0.525,
+   "fresh55": 0.5,
+   "comp": 0.575,
+   "saod": 0.2,
+   "stp": 0.45
+  },
+  {
+   "zone": "NORTH",
+   "state": "Uttarpradesh",
+   "region": "UP east",
+   "fresh15": 0.525,
+   "fresh55": 0.5,
+   "comp": 0.575,
+   "saod": 0.2,
+   "stp": 0.45
+  },
+  {
+   "zone": "NORTH",
+   "state": "Haryana",
+   "region": "Haryana",
+   "fresh15": 0.45,
+   "fresh55": 0.425,
+   "comp": 0.5,
+   "saod": 0.2,
+   "stp": 0.4
+  },
+  {
+   "zone": "NORTH",
+   "state": "North East",
+   "region": "North East",
+   "fresh15": 0,
+   "fresh55": 0,
+   "comp": 0,
+   "saod": 0.25,
+   "stp": 0.1
+  },
+  {
+   "zone": "East",
+   "state": "Bihar",
+   "region": "Bihar",
+   "fresh15": 0.425,
+   "fresh55": 0.4,
+   "comp": 0.475,
+   "saod": 0.25,
+   "stp": 0.4
+  },
+  {
+   "zone": "East",
+   "state": "Jarkhand",
+   "region": "Jarkhand",
+   "fresh15": 0.425,
+   "fresh55": 0.4,
+   "comp": 0.475,
+   "saod": 0.25,
+   "stp": 0.4
+  },
+  {
+   "zone": "East",
+   "state": "Orissa",
+   "region": "Bhubneshwar",
+   "fresh15": 0.475,
+   "fresh55": 0.45,
+   "comp": 0.525,
+   "saod": 0.25,
+   "stp": 0.4
+  },
+  {
+   "zone": "East",
+   "state": "Orissa",
+   "region": "Orissa",
+   "fresh15": 0.425,
+   "fresh55": 0.4,
+   "comp": 0.475,
+   "saod": 0.25,
+   "stp": 0.4
+  },
+  {
+   "zone": "East",
+   "state": "West Bengal",
+   "region": "Kolkatta",
+   "fresh15": 0.5,
+   "fresh55": 0.475,
+   "comp": 0.55,
+   "saod": 0.25,
+   "stp": 0.4
+  },
+  {
+   "zone": "East",
+   "state": "West Bengal",
+   "region": "Westbengal",
+   "fresh15": 0.425,
+   "fresh55": 0.4,
+   "comp": 0.475,
+   "saod": 0.25,
+   "stp": 0.4
+  },
+  {
+   "zone": "East",
+   "state": "Chattish Garh",
+   "region": "Chattish Garh",
+   "fresh15": 0.375,
+   "fresh55": 0.35,
+   "comp": 0.425,
+   "saod": 0.25,
+   "stp": 0.4
+  },
+  {
+   "zone": "GOA",
+   "state": "GOA",
+   "region": "GOA",
+   "fresh15": 0.5,
+   "fresh55": 0.475,
+   "comp": 0.55,
+   "saod": 0.3,
+   "stp": 0.45
+  },
+  {
+   "zone": "Gujarat",
+   "state": "Ahmedabad",
+   "region": "Ahmedabad",
+   "fresh15": 0.525,
+   "fresh55": 0.5,
+   "comp": 0.575,
+   "saod": 0.3,
+   "stp": 0.45
+  },
+  {
+   "zone": "Gujarat",
+   "state": "Gujarat",
+   "region": "Gujarat",
+   "fresh15": 0.4,
+   "fresh55": 0.475,
+   "comp": 0.55,
+   "saod": 0.3,
+   "stp": 0.45
+  },
+  {
+   "zone": "Gujarat",
+   "state": "Surat",
+   "region": "Surat",
+   "fresh15": 0.525,
+   "fresh55": 0.5,
+   "comp": 0.575,
+   "saod": 0.3,
+   "stp": 0.45
+  },
+  {
+   "zone": "Gujarat",
+   "state": "Vadodara",
+   "region": "Vadodara",
+   "fresh15": 0.525,
+   "fresh55": 0.5,
+   "comp": 0.575,
+   "saod": 0.3,
+   "stp": 0.45
+  }
+ ]
+}

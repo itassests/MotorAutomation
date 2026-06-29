@@ -3112,6 +3112,27 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
+  // ---- IndusInd Two-Wheeler — "June TW26" region grid (USER 2026-06-26) ----
+  // city/state region × {Fresh(1+5)/Comp/SAOD/STP}. config/indusind_tw.json +
+  // services/indusind-tw.js.
+  if (insurerSlug === 'indusind' &&
+      String(params.vehicleType || '').toUpperCase() === 'TW') {
+    try {
+      const { resolveIndusindTwRate } = require('../services/indusind-tw');
+      const ir = resolveIndusindTwRate(params);
+      if (ir != null) {
+        const _b = rules[0];
+        const _seg = 'TW (IndusInd Jun26 grid)';
+        rules = [_b
+          ? { ..._b, rate_value: ir, segment: _seg }
+          : { id: -1, insurer: 'indusind', product: 'TW', region: resolvedRegion || '',
+              rate_type: (Number(params.odPremium) || 0) <= 0 ? 'SATP'
+                       : (Number(params.tpPremium) || 0) <= 0 ? 'SAOD' : 'COMP',
+              rate_value: ir, segment: _seg, is_declined: 0 }];
+      }
+    } catch (_) { /* leave rules unchanged on any failure */ }
+  }
+
   // ---- HDFC Pvt-Car Zone × Fuel × NCB override ----
   // HDFC's ROBINHOOD Pvt-Car grid is Zone-1/Zone-2 × (Petrol vs Non-Petrol) ×
   // (NCB vs No-NCB), but the 4 fuel/NCB columns were mis-ingested as AGE bands
