@@ -1,0 +1,6 @@
+{
+  "insurer": "indusind",
+  "display_name": "IndusInd",
+  "file_patterns": ["IndusInd*", "Indusind*"],
+  "sheets": []
+}
