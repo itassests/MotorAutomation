@@ -1557,6 +1557,7 @@ function resolveInsurerSlug(insurerName) {
 
   const mappings = [
     { patterns: ['DIGIT', 'GO DIGIT'], slug: 'go_digit' },
+    { patterns: ['INDUSIND', 'INDUS IND'], slug: 'indusind' },
     { patterns: ['CHOLAMANDALAM', 'CHOLA MS', 'CHOLA'], slug: 'chola_ms' },
     { patterns: ['BAJAJ', 'BAJAJ ALLIANZ'], slug: 'bajaj_allianz' },
     { patterns: ['UNITED INDIA'], slug: 'united_india_insurance' },

@@ -934,7 +934,16 @@ function premiumBaseFor(params, ruleRateType) {
  * batch from ~500 DB roundtrips to a handful of unique ones. */
 async function processOnePolicy(pool, policy, marginRules, caches, statementIndex, prIndex, specialRulesByAgent, globalUpliftByAgent) {
   const params = extractPolicyParams(policy);
-  const insurerSlug = resolveInsurerSlug(params.insurerName);
+  let insurerSlug = resolveInsurerSlug(params.insurerName);
+  // IndusInd's motor book is underwritten by Reliance General from 1-Jun-26:
+  // Reliance / Reliance General policies ISSUED on/after 2026-06-01 take the
+  // IndusInd grid (USER 2026-06-26). Pre-June Reliance keeps the Reliance grid.
+  if (insurerSlug === 'reliance') {
+    try {
+      const _iss = require('../services/enablers').toIso(policy.POLICY_ISSUED_DATE);
+      if (_iss && _iss >= '2026-06-01') insurerSlug = 'indusind';
+    } catch (_) { /* leave as reliance on parse failure */ }
+  }
   params._insurer_slug = insurerSlug;
   // Pick up the StateName column directly from the remapped row — many
   // tmp_PrarambhData rows have it populated even when RTO_Code is blank.
@@ -3078,6 +3087,27 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
               rate_type: (Number(params.odPremium) || 0) <= 0 ? 'SATP'
                        : (Number(params.tpPremium) || 0) <= 0 ? 'SAOD' : 'COMP',
               rate_value: tr, segment: _seg, is_declined: 0 }];
+      }
+    } catch (_) { /* leave rules unchanged on any failure */ }
+  }
+
+  // ---- IndusInd Private Car — "June PVT COM" region grid (USER 2026-06-26) ----
+  // region-group × {Non-Diesel-Com / Diesel / SAOD / STP}; cover from premiums.
+  // config/indusind_car.json + services/indusind-car.js.
+  if (insurerSlug === 'indusind' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR') {
+    try {
+      const { resolveIndusindCarRate } = require('../services/indusind-car');
+      const ir = resolveIndusindCarRate(params);
+      if (ir != null) {
+        const _b = rules[0];
+        const _seg = 'Pvt Car (IndusInd Jun26 grid)';
+        rules = [_b
+          ? { ..._b, rate_value: ir, segment: _seg }
+          : { id: -1, insurer: 'indusind', product: 'CAR', region: resolvedRegion || '',
+              rate_type: (Number(params.odPremium) || 0) <= 0 ? 'SATP'
+                       : (Number(params.tpPremium) || 0) <= 0 ? 'SAOD' : 'COMP',
+              rate_value: ir, segment: _seg, is_declined: 0 }];
       }
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
