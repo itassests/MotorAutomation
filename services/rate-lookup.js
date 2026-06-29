@@ -369,27 +369,52 @@ async function lookupRates(pool, params) {
     const iso = (d) => d == null ? null : (d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10));
     const dated = rules.filter((r) => r._eff_from);
     if (dated.length) {
-      const cands = dated.filter((r) => iso(r._eff_from) <= eff);
-      let target = '';
-      if (cands.length) {
-        for (const r of cands) { const v = iso(r._eff_from); if (v > target) target = v; }   // latest ≤ start
-      } else {
-        target = iso(dated[0]._eff_from);
-        for (const r of dated) { const v = iso(r._eff_from); if (v < target) target = v; }    // earliest (fallback)
+      // Select the newest generation PER rate_type (cover), not one card across
+      // the whole result set. Some insurers split covers across cards (e.g. Royal
+      // files SATP on the May card and Comp on the June cards) — a single target
+      // would drop the cover that lives on an older card. Grouping by rate_type
+      // gives each cover its own "latest card ≤ date, else earliest" so a June
+      // policy uses the June Comp grid AND the (still-current) May SATP grid.
+      // USER 2026-06-26: universal — every insurer takes the grid effective on the
+      // policy date; an older grid is used only when no newer one exists for it.
+      // Cover class (COMP / SAOD / TP) from rate_type AND segment — cards encode
+      // the cover differently across generations (April Tata "HOM|Package"/"HOM|SATP"
+      // vs June Tata rate_type "HOM|All" with the cover in the segment "…SATPAll").
+      // Grouping by class lets a full-replacement card supersede the old one for its
+      // cover while complementary cards (Royal SATP-only May card) survive.
+      const coverClass = (r) => {
+        const rt = String(r.rate_type || '').toUpperCase();
+        const both = (rt + '|' + String(r.segment || '')).toUpperCase();
+        if (/SAOD|\bSOD\b/.test(both)) return 'SAOD';
+        if (/SATP/.test(both) || /\bTP\b|\bACT\b|\bNA\b|LIABILITY/.test(rt)) return 'TP';
+        return 'COMP';
+      };
+      const targetByType = {};
+      const groups = {};
+      for (const r of dated) { const t = coverClass(r); (groups[t] = groups[t] || []).push(r); }
+      for (const t in groups) {
+        const grp = groups[t];
+        const cands = grp.filter((r) => iso(r._eff_from) <= eff);
+        let target = '';
+        if (cands.length) { for (const r of cands) { const v = iso(r._eff_from); if (v > target) target = v; } }   // latest ≤ start
+        else { target = iso(grp[0]._eff_from); for (const r of grp) { const v = iso(r._eff_from); if (v < target) target = v; } }   // earliest fallback
+        targetByType[t] = target;
       }
-      // Fallback: if the selected (latest ≤ date) generation carries NO weight-
-      // banded rule for this lookup but an earlier generation does, keep those
-      // earlier weight-banded rules too. Handles a current card that lost a
-      // sub-grid (e.g. HDFC's June GCV card is 3-wheeler-only, superseding the
-      // April card that carried the 4W weight bands) — without this, 4W GCV
-      // policies on the June date would match nothing. Inert for any insurer
-      // whose current card still has weight-banded rules (the common case).
-      const targetHasWeightBand = rules.some((r) =>
-        (!r._eff_from || iso(r._eff_from) === target) &&
-        (r.weight_band_min != null || r.weight_band_max != null));
+      // Weight-band fallback (per rate_type): if the selected generation carries no
+      // weight-banded rule but an earlier one does, keep the earlier weight bands
+      // (e.g. HDFC's June GCV card is 3W-only superseding the April 4W bands).
+      const typeHasWeightBand = {};
+      for (const r of rules) {
+        const t = coverClass(r);
+        if ((!r._eff_from || iso(r._eff_from) === targetByType[t]) &&
+            (r.weight_band_min != null || r.weight_band_max != null)) typeHasWeightBand[t] = true;
+      }
       rules = rules.filter((r) => {
-        if (!r._eff_from || iso(r._eff_from) === target) return true;
-        if (!targetHasWeightBand && (r.weight_band_min != null || r.weight_band_max != null)) return true;
+        if (!r._eff_from) return true;
+        const t = coverClass(r);
+        if (targetByType[t] == null) return true;
+        if (iso(r._eff_from) === targetByType[t]) return true;
+        if (!typeHasWeightBand[t] && (r.weight_band_min != null || r.weight_band_max != null)) return true;
         return false;
       });
     }

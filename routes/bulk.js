@@ -1603,7 +1603,11 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // filterRulesByPolicy → a Diesel >1000cc Mahindra in Lucknow collapsed to 0 and
   // ended up no-rule (MT/DIRNE/UP1/16386). These generations must NOT coexist, so
   // select the card effective on the policy's risk-start date.
-  if (insurerSlug === 'bajaj_allianz' || insurerSlug === 'kotak') {
+  // USER 2026-06-26: apply the effective-date grid selection to ALL insurers (was
+  // Bajaj/Kotak only) — every policy takes the grid effective on its risk-start
+  // date; an older grid is used only when no newer one exists (the per-rate_type
+  // selection in lookupRates keeps covers that still live on an older card).
+  {
     // Always pass an effective_date so the generation filter ALWAYS runs (else a
     // null/garbage start date leaves April+May rules mixed → pickPrimary grabs the
     // wrong generation). Prefer POLICY_START_DATE, fall back to issue date, then to
@@ -1777,6 +1781,18 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   }
 
   if (rules.length > 0) rules = filterRulesByPolicy(rules, params);
+  // Soft fallback (USER 2026-06-26): the effective-date grid selection is a
+  // PREFERENCE, not a hard gate — "use the newest grid; if no newer grid has a
+  // usable rule for this policy, fall back to the older grid". If the eff-date
+  // lookup matched the newest card but that card has NO rule for this policy
+  // (e.g. a mis-ingested or partial newer card), relax the date filter for THIS
+  // policy: drop effective_date from baseLookup (which also relaxes the cluster
+  // fallback below, since it spreads baseLookup) and re-lookup across all cards.
+  if (rules.length === 0 && baseLookup.effective_date) {
+    delete baseLookup.effective_date;
+    const _fbRules = await lookupRates(pool, baseLookup);
+    if (_fbRules.length > 0) rules = filterRulesByPolicy(_fbRules, params);
+  }
   const initialAfterFilter = rules.length;
 
   // ---- Bajaj district-level rate override ----
