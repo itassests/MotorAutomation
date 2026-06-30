@@ -12401,7 +12401,7 @@
         ['Vehicle No',       r => r.vehicle_no],
         ['Vehicle Category', r => normVehCat(r.vehicle_category)],
         ['Manufacturing Year', r => r.manufacturing_year],
-        ['Vehicle',          r => r.vehicle_detail],
+        ['Vehicle',          r => normVehCat(r.vehicle_detail)],
         ['RTO',              r => r.rto_code],
         ['State',            r => r.state],
         ['Submission Date',  r => r.submission_date],
