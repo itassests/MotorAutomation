@@ -4,6 +4,7 @@ const fs = require('fs');
 const sql = require('mssql');
 const { getPool } = require('../db/connection');
 const { parseWorkbook } = require('../parsers/engine');
+const { validateCard } = require('../services/card-validation');
 
 const router = express.Router();
 
@@ -438,6 +439,11 @@ router.post('/upload', async (req, res, next) => {
       rto_count: rtoCount,
     };
 
+    // Validate the just-ingested card so a bad parse (0 rules / scratch sheet /
+    // scrambled columns / mostly-zero) is flagged at the door, not weeks later.
+    try { response.validation = await validateCard(pool, rateCardId); }
+    catch (e) { response.validation = { error: e.message }; }
+
     // If config was auto-generated, include info about detected sheets
     if (insurerConfig.auto_generated) {
       response.auto_generated = true;
@@ -452,6 +458,15 @@ router.post('/upload', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+/** GET /validate/:cardId — re-run validation on an already-uploaded card. */
+router.get('/validate/:cardId(\\d+)', async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const v = await validateCard(pool, Number(req.params.cardId));
+    res.json({ success: true, validation: v });
+  } catch (err) { next(err); }
 });
 
 /**
