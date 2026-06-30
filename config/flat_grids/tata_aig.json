@@ -1,0 +1,20 @@
+{
+  "_comment": "TATA AIG flat-grid specs. Each sheet declares its column→role mapping, region resolver, and segment classifier. Rates in the source are whole-number percents (25.5) → rate_divisor 100.",
+  "sheets": [
+    {
+      "id": "tw",
+      "products": ["TW"],
+      "sheet": "^TW\\.?$",
+      "rate_divisor": 100,
+      "columns": {
+        "biz": "Business Type",
+        "segment": "Segment",
+        "section": "Section Text",
+        "region": "RTO",
+        "rate": "Approval Grid"
+      },
+      "regionResolver": { "type": "tata_cluster", "field": "tw" },
+      "classifier": { "type": "tw" }
+    }
+  ]
+}

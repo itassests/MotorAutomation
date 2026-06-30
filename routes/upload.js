@@ -444,6 +444,15 @@ router.post('/upload', async (req, res, next) => {
     try { response.validation = await validateCard(pool, rateCardId); }
     catch (e) { response.validation = { error: e.message }; }
 
+    // Refresh any generically-handled flat grids for this insurer from the same
+    // workbook (config/flat_grids/<slug>.json) — so a re-upload auto-updates the
+    // grid data the resolver uses; no code change per month.
+    try {
+      const { refreshFromWorkbook } = require('../services/flat-grid');
+      const fg = refreshFromWorkbook(insurer, filePath);
+      if (fg.length) response.flat_grids = fg;
+    } catch (_) { /* best effort */ }
+
     // If config was auto-generated, include info about detected sheets
     if (insurerConfig.auto_generated) {
       response.auto_generated = true;

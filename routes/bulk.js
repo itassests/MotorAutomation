@@ -3130,6 +3130,31 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
+  // ---- Generic flat-grid resolver (config/flat_grids/<slug>.json + data) ----
+  // The durable parsing path: any insurer whose grid is a flat table (one row per
+  // region, dimensions in named columns) is resolved here from the generically-
+  // extracted grid data, no per-insurer code. Currently: Tata TW. Future flat
+  // grids = add a config + the upload re-extracts the data.
+  {
+    try {
+      const { resolveFlatGridRate, SPECS } = require('../services/flat-grid');
+      if (SPECS[insurerSlug]) {
+        const fr = resolveFlatGridRate(insurerSlug, params);
+        if (fr != null) {
+          const _b = rules[0];
+          const _seg = 'Flat grid (' + insurerSlug + ' ' + String(params.vehicleType || '').toUpperCase() + ')';
+          rules = [_b
+            ? { ..._b, rate_value: fr, segment: _seg }
+            : { id: -1, insurer: insurerSlug, product: String(params.vehicleType || '').toUpperCase(),
+                region: resolvedRegion || '',
+                rate_type: (Number(params.odPremium) || 0) <= 0 ? 'SATP'
+                         : (Number(params.tpPremium) || 0) <= 0 ? 'SAOD' : 'COMP',
+                rate_value: fr, segment: _seg, is_declined: 0 }];
+        }
+      }
+    } catch (_) { /* leave rules unchanged on any failure */ }
+  }
+
   // ---- IndusInd Private Car — "June PVT COM" region grid (USER 2026-06-26) ----
   // region-group × {Non-Diesel-Com / Diesel / SAOD / STP}; cover from premiums.
   // config/indusind_car.json + services/indusind-car.js.
