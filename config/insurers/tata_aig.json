@@ -2,53 +2,8 @@
   "insurer": "tata_aig",
   "display_name": "TATA AIG General Insurance",
   "file_patterns": ["Grid_Communication*", "CV Grid_Communication*", "TATA*", "Latest RTO Master*"],
+  "_removed": "Hidden scratch tabs 'cv checks' / 'pci checks' were configured here and ingested 215K junk rules. Removed 2026-06-26 so a re-upload won't re-create them; the real Tata June grids are handled by the resolvers (tata-car.js, tata-cv.js) + the flat-grid loader (TW). See feedback_tata_june_car_grid.md.",
   "sheets": [
-    {
-      "name": "cv checks",
-      "name_pattern": "^cv[\\s_]*checks?$",
-      "layout": "pivot_by_city",
-      "product": "GCV",
-      "config": {
-        "header_row": 0,
-        "data_start_row": 1,
-        "key_columns": {
-          "segment": 0,
-          "section_text": 1,
-          "vehicle_age": 2,
-          "slab": 3
-        },
-        "city_blocks": [
-          { "start_col": 4,  "end_col": 59,  "channel": "DM"  },
-          { "start_col": 61, "end_col": 116, "channel": "HOM" }
-        ],
-        "decline_markers": ["D", "NA", "Decline"],
-        "skip_zero_rates": false
-      }
-    },
-    {
-      "name": "pci checks",
-      "name_pattern": "^pci[\\s_]*checks?$",
-      "layout": "pivot_by_city",
-      "product": "CAR",
-      "config": {
-        "header_row": 0,
-        "data_start_row": 1,
-        "key_columns": {
-          "vehicle_type": 0,
-          "business_type": 1,
-          "fuel_type": 2,
-          "section_text": 3,
-          "ncb": 4,
-          "slab": 5
-        },
-        "city_blocks": [
-          { "start_col": 6,  "end_col": 58,  "channel": "DM"  },
-          { "start_col": 63, "end_col": 115, "channel": "HOM" }
-        ],
-        "decline_markers": ["D", "NA", "Decline"],
-        "skip_zero_rates": false
-      }
-    },
     {
       "name": "PCI",
       "name_pattern": "^pci$",
