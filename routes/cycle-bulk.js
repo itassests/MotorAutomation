@@ -2147,4 +2147,91 @@ router.get('/:cycleId(\\d+)/recon-file', async (req, res) => {
     name: entry ? entry.name : null, at: entry ? entry.at : null });
 });
 
+/** GET /:cycleId/audit — per insurer × product rate-audit so issues surface in
+ *  aggregate instead of tracker-by-tracker. Reliable flags only:
+ *   - no_rule  : rows that matched no rule (rate null)
+ *   - zero     : rows rated 0 (declined / grid-zero)
+ *   - stale    : NON-resolver rows whose matched card is OLDER than the newest
+ *                card that actually has rules for this insurer+product (i.e. a
+ *                newer grid exists but the policy used an old one — likely an
+ *                ingestion gap). Resolver/override-applied rows are excluded
+ *                (their rate is current even though the rule id traces to an old
+ *                card). */
+const PROD_NORM = (p) => {
+  const u = String(p || '').toUpperCase();
+  if (/CAR|PVT/.test(u)) return 'CAR';
+  if (/TW|TWO|2W/.test(u)) return 'TW';
+  if (/GCV|GOODS/.test(u)) return 'GCV';
+  if (/PCV|PASSENGER/.test(u)) return 'PCV';
+  if (/MIS/.test(u)) return 'MISC';
+  return u || '?';
+};
+// A resolver/override-applied row carries a parenthetical tag in its segment
+// (e.g. "(Tata Jun26 grid)", "(model PO)", "(ICICI pan-India …)", "(… CD>60% MISP)",
+// "(1801 grid)"). Its rate is the CURRENT grid even though matched_rule_id traces
+// to an old card, so exclude it from the stale check.
+const IS_RESOLVER_SEG = (s) => /\([^()]*(grid|model po|misp|pan-india|volume|seating|cd>|\b18\d\d\b)[^()]*\)/i.test(String(s || ''));
+
+router.get('/:cycleId(\\d+)/audit', async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const cycleId = Number(req.params.cycleId);
+    const iso = (d) => d == null ? null : (d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10));
+
+    const rows = (await pool.request().input('cid', sql.Int, cycleId).query(
+      `SELECT JSON_VALUE(row_json,'$.insurer_slug') ins,
+              JSON_VALUE(row_json,'$.vehicle_type') prod,
+              JSON_VALUE(row_json,'$.rate_pct') rate,
+              JSON_VALUE(row_json,'$.matched_segment') seg,
+              TRY_CAST(JSON_VALUE(row_json,'$.matched_rule_id') AS bigint) rid
+         FROM cycle_bulk_rows WHERE cycle_id = @cid`)).recordset;
+
+    // matched rule -> card
+    const ids = [...new Set(rows.map((r) => r.rid).filter((x) => x && x > 0))];
+    const ruleCard = {};
+    for (let i = 0; i < ids.length; i += 900) {
+      const r = await pool.request().query(`SELECT id, rate_card_id FROM rate_rules WHERE id IN (${ids.slice(i, i + 900).join(',')})`);
+      r.recordset.forEach((x) => { ruleCard[x.id] = x.rate_card_id; });
+    }
+    const cards = {};
+    (await pool.request().query('SELECT id, effective_from FROM rate_cards')).recordset
+      .forEach((x) => { cards[x.id] = iso(x.effective_from); });
+
+    // newest effective_from per insurer+product among ACTIVE cards that have rules.
+    const newestProdEff = {};
+    (await pool.request().query(
+      `SELECT rr.insurer ins, rr.product prod, MAX(rc.effective_from) eff
+         FROM rate_rules rr JOIN rate_cards rc ON rr.rate_card_id = rc.id
+        WHERE rc.status = 'active' AND (rc.effective_to IS NULL OR rc.effective_to > GETDATE())
+        GROUP BY rr.insurer, rr.product`)).recordset
+      .forEach((x) => { newestProdEff[x.ins + '|' + PROD_NORM(x.prod)] = iso(x.eff); });
+
+    const agg = {};
+    for (const row of rows) {
+      const key = (row.ins || '?') + '|' + PROD_NORM(row.prod);
+      const g = agg[key] || (agg[key] = { insurer: row.ins, product: PROD_NORM(row.prod), total: 0, no_rule: 0, zero: 0, resolver: 0, stale: 0, cards: {}, newest: newestProdEff[key] || null });
+      g.total++;
+      const rate = (row.rate == null || row.rate === '') ? null : Number(row.rate);
+      if (rate == null) { g.no_rule++; continue; }
+      if (rate === 0) g.zero++;
+      if (IS_RESOLVER_SEG(row.seg)) { g.resolver++; continue; }
+      const eff = cards[ruleCard[row.rid]];
+      if (eff) {
+        g.cards[eff] = (g.cards[eff] || 0) + 1;
+        if (g.newest && eff < g.newest) g.stale++;
+      }
+    }
+    const out = Object.values(agg).map((g) => ({
+      ...g,
+      flags: [
+        g.no_rule > 0 ? 'no_rule' : null,
+        g.zero > g.total * 0.3 ? 'mostly_zero' : null,
+        g.stale > 0 ? 'stale_card' : null,
+      ].filter(Boolean),
+    })).sort((a, b) => (b.stale + b.no_rule) - (a.stale + a.no_rule));
+
+    res.json({ success: true, cycle_id: cycleId, total_rows: rows.length, audit: out });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

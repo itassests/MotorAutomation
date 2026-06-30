@@ -11283,6 +11283,7 @@
               ? ` &mdash; <strong style="color:#e65100;">🔒 Finalized ${new Date(_bulkFinalizedAt).toLocaleString()}${_bulkFinalizedBy ? ' by ' + escapeHtml(_bulkFinalizedBy) : ''}</strong>
                   <span style="font-size:11px; color:#888; margin-left:8px;">— unfinalize from Admin → Cycle Snapshots</span>`
               : ` &mdash; <button class="btn btn-sm btn-outline" onclick="bulkRecomputeCycle()">Recompute from source</button>
+                  <button class="btn btn-sm btn-outline" style="border-color:#6a1b9a; color:#6a1b9a;" onclick="bulkGridAudit()" title="Per insurer × product audit — surfaces no-rule / stale-card / mostly-zero clusters in aggregate (run after a recompute)">Grid Audit</button>
                   <input id="bulkRecalcKey" placeholder="Tracker / Policy No" style="height:26px; padding:2px 8px; font-size:12px; width:200px; vertical-align:middle;" onkeydown="if(event.key==='Enter'){event.preventDefault();bulkRecalcPolicy();}" />
                   <button class="btn btn-sm btn-outline" onclick="bulkRecalcPolicy()" title="Recalculate just this one policy — fast, no full cycle re-run (overrides preserved)">Recalc policy</button>
                   <button class="btn btn-sm btn-outline" style="color:#c62828;" onclick="bulkClearCycle()">Clear snapshot</button>
@@ -11337,6 +11338,60 @@
       } finally {
         if (btn) { btn.disabled = false; btn.textContent = 'Recalc policy'; }
       }
+    }
+
+    /** Grid Audit — per insurer × product diagnostics so issues surface in
+     *  aggregate (no-rule / stale-card / mostly-zero clusters) instead of
+     *  tracker-by-tracker. Reads the stored snapshot, so run after a recompute. */
+    async function bulkGridAudit() {
+      if (!_bulkActiveCycleId) { showToast('Load a cycle first', 'error'); return; }
+      let box = document.getElementById('bulkAuditBox');
+      if (!box) {
+        box = document.createElement('div');
+        box.id = 'bulkAuditBox';
+        box.style.cssText = 'margin-top:14px;';
+        document.getElementById('bulkStatus').insertAdjacentElement('afterend', box);
+      }
+      box.innerHTML = '<div style="padding:10px; color:#666;">Auditing…</div>';
+      try {
+        const data = await fetch(API + '/cycle-bulk/' + _bulkActiveCycleId + '/audit').then(r => r.json());
+        if (!data.success) throw new Error(data.error || 'audit failed');
+        const rows = data.audit || [];
+        const flagged = rows.filter(r => (r.flags || []).length);
+        const chip = (f) => {
+          const c = f === 'no_rule' ? '#c62828' : f === 'stale_card' ? '#e65100' : '#f9a825';
+          const t = f === 'no_rule' ? 'no-rule' : f === 'stale_card' ? 'stale card' : 'mostly zero';
+          return `<span style="background:${c}; color:#fff; border-radius:3px; padding:1px 6px; font-size:11px; margin-right:4px;">${t}</span>`;
+        };
+        const tr = (r) => `<tr style="${(r.flags||[]).length ? 'background:#fff8e1;' : ''}">
+          <td style="padding:4px 8px;"><strong>${escapeHtml(r.insurer || '?')}</strong></td>
+          <td style="padding:4px 8px;">${escapeHtml(r.product)}</td>
+          <td style="padding:4px 8px; text-align:right;">${r.total}</td>
+          <td style="padding:4px 8px; text-align:right; ${r.no_rule ? 'color:#c62828; font-weight:600;' : 'color:#aaa;'}">${r.no_rule}</td>
+          <td style="padding:4px 8px; text-align:right; ${r.stale ? 'color:#e65100; font-weight:600;' : 'color:#aaa;'}">${r.stale}</td>
+          <td style="padding:4px 8px; text-align:right;">${r.zero}</td>
+          <td style="padding:4px 8px; text-align:right; color:#2e7d32;">${r.resolver}</td>
+          <td style="padding:4px 8px; font-size:11px; color:#888;">${r.newest || '—'}</td>
+          <td style="padding:4px 8px;">${(r.flags || []).map(chip).join('')}</td></tr>`;
+        box.innerHTML = `
+          <div style="border:1px solid #ddd; border-radius:6px; overflow:hidden;">
+            <div style="background:#6a1b9a; color:#fff; padding:8px 12px; font-weight:600;">
+              Grid Audit — cycle ${data.cycle_id} · ${data.total_rows} rows ·
+              <span style="background:#fff; color:#6a1b9a; border-radius:3px; padding:1px 7px; margin-left:6px;">${flagged.length} groups flagged</span>
+              <span style="float:right; font-weight:400; font-size:11px;">run after a recompute for current data · <a href="#" onclick="document.getElementById('bulkAuditBox').remove();return false;" style="color:#fff; text-decoration:underline;">close</a></span>
+            </div>
+            <table style="width:100%; border-collapse:collapse; font-size:12px;">
+              <thead><tr style="background:#f3e5f5; text-align:left;">
+                <th style="padding:6px 8px;">Insurer</th><th style="padding:6px 8px;">Product</th>
+                <th style="padding:6px 8px; text-align:right;">Total</th><th style="padding:6px 8px; text-align:right;">No-rule</th>
+                <th style="padding:6px 8px; text-align:right;">Stale</th><th style="padding:6px 8px; text-align:right;">Zero</th>
+                <th style="padding:6px 8px; text-align:right;">Resolver</th><th style="padding:6px 8px;">Newest card</th><th style="padding:6px 8px;">Flags</th>
+              </tr></thead>
+              <tbody>${(flagged.length ? flagged : rows).map(tr).join('')}</tbody>
+            </table>
+            <div style="padding:6px 12px; font-size:11px; color:#888;">Showing ${flagged.length ? 'flagged groups only' : 'all groups (none flagged — clean)'}. <strong>Stale</strong> = a newer card has rules for this product but the policy used an older one (likely an un-ingested grid). <strong>Resolver</strong> = rate from a code resolver (current; excluded from stale).</div>
+          </div>`;
+      } catch (e) { box.innerHTML = `<div style="padding:10px; color:#c62828;">Audit failed: ${escapeHtml(e.message)}</div>`; }
     }
 
     /** Force re-compute the current cycle's snapshot (preserves overrides). */
