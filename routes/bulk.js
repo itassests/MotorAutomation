@@ -3107,6 +3107,29 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
+  // ---- TATA AIG CV / PCV / GCV / MISC — June'26 "CV" sheet grid (USER 2026-06-26) ----
+  // The June Tata CV sheet was mis-ingested into rate_rules (tonnage in the fuel
+  // column, cover concatenated into the segment) so the standard lookup can't use
+  // it — resolve it config-driven instead. config/tata_cv_jun26.json (Segment ×
+  // Fuel × Section × Age × Region) + services/tata-cv.js (region via the tata CV
+  // cluster). Replaces the (April-fallback) pooled rules.
+  if (insurerSlug === 'tata_aig' &&
+      /PCV|GCV|MISC|MIS/.test(String(params.vehicleType || '').toUpperCase())) {
+    try {
+      const { resolveTataCvRate } = require('../services/tata-cv');
+      const tr = resolveTataCvRate(params);
+      if (tr != null) {
+        const _b = rules[0];
+        const _seg = 'CV/PCV (Tata Jun26 grid)';
+        rules = [_b
+          ? { ..._b, rate_value: tr, segment: _seg }
+          : { id: -1, insurer: 'tata_aig', product: String(params.vehicleType || 'GCV').toUpperCase(),
+              region: resolvedRegion || '', rate_type: (Number(params.odPremium) || 0) <= 0 ? 'SATP' : 'COMP',
+              rate_value: tr, segment: _seg, is_declined: 0 }];
+      }
+    } catch (_) { /* leave rules unchanged on any failure */ }
+  }
+
   // ---- IndusInd Private Car — "June PVT COM" region grid (USER 2026-06-26) ----
   // region-group × {Non-Diesel-Com / Diesel / SAOD / STP}; cover from premiums.
   // config/indusind_car.json + services/indusind-car.js.
