@@ -18,9 +18,15 @@
  * Age tiers use vehicleAge; GVW bands use tonnage (in TONNES; PDF kg→T:
  * 3500=3.5, 7500=7.5, 16500=16.5, 34000=34, 40000=40, 48000=48).
  *
+ * The OD%/TP% numbers live in config/national_motor.json (editable without code
+ * changes when the circular is revised); this function only holds the matching
+ * logic (age tiers, GVW bands, seating tiers, cover-type leg selection).
+ *
  * @param {object} p extractPolicyParams output.
  * @returns {number|null}
  */
+const CFG = require('../config/national_motor.json');
+
 function resolveNationalMotorRate(p) {
   const up = (v) => String(v == null ? '' : v).toUpperCase();
   const vt  = up(p.vehicleType);
@@ -54,123 +60,98 @@ function resolveNationalMotorRate(p) {
     return { rate: (od === tp ? od : od + tp), od, tp };
   };
 
+  const o10flag = (age != null && age > 10);   // ≤10yr vs >10yr split (unknown age = ≤10)
+  // Age → package tier key. Which tiers a section uses (and how unknown age
+  // falls) differs per section, so each keeper below picks the matching helper.
+  const carTier = isNew ? 'new' : (age != null && age <= 10) ? 'o10' : (age != null && age <= 15) ? 'o15' : 'g15';
+  const twTier  = isNew ? 'new' : (age != null && age <= 5) ? 'o5' : (age != null && age <= 10) ? 'o10' : (age != null && age <= 15) ? 'o15' : 'g15';
+  const gcvTier = isNew ? 'new' : (age == null || age <= 10) ? 'o10' : age <= 15 ? 'o15' : 'g15';
+  const tier5   = isNew ? 'new' : (age == null || age <= 5) ? 'o5' : age <= 10 ? 'o10' : age <= 15 ? 'o15' : 'g15';
+
   if (vt === 'CAR' || vt === '4W' || vt === 'PC' || vt === 'PVT.CAR') {
-    if (isTp)   return out(0, (age != null && age > 10) ? 15 : 20);  // SATP ≤10=20 / >10=15
-    if (isSaod) return out((age != null && age > 10) ? 5 : 20, 0);   // SAOD ≤10=20 / >10=5
-    if (isNew)            return out(25, 25);                        // Bundled 1+3 New = 50
-    if (age != null && age <= 10) return out(20, 20);               // Package ≤10 = 40
-    if (age != null && age <= 15) return out(15, 17.5);             // Package >10-15 = 32.5
-    return out(5, 10);                                              // Package >15 = 15
+    const c = CFG.car;
+    if (isTp)   return out(0, o10flag ? c.satp_tp.gt10 : c.satp_tp.le10);   // SATP ≤10=20 / >10=15
+    if (isSaod) return out(o10flag ? c.saod_od.gt10 : c.saod_od.le10, 0);   // SAOD ≤10=20 / >10=5
+    return out(c.package[carTier][0], c.package[carTier][1]);               // Package by age tier
   }
 
   if (vt === 'TW' || vt === '2W') {
-    if (isTp)   return out(0, (age != null && age > 10) ? 15 : 20);  // SATP ≤10=20 / >10=15
-    if (isSaod) return out((age != null && age > 10) ? 5 : 25, 0);   // SAOD ≤10=25 / >10=5
-    if (isNew)            return out(27.5, 30);                      // Bundled 1+5 New = 57.5
-    if (age != null && age <= 5)  return out(20, 20);               // Package ≤5 = 40
-    if (age != null && age <= 10) return out(20, 15);               // Package >5-10 = 35
-    if (age != null && age <= 15) return out(15, 15);               // Package >10-15 = 30
-    return out(10, 10);                                             // Package >15 = 20
+    const c = CFG.tw;
+    if (isTp)   return out(0, o10flag ? c.satp_tp.gt10 : c.satp_tp.le10);   // SATP ≤10=20 / >10=15
+    if (isSaod) return out(o10flag ? c.saod_od.gt10 : c.saod_od.le10, 0);   // SAOD ≤10=25 / >10=5
+    return out(c.package[twTier][0], c.package[twTier][1]);                 // Package by age tier
   }
 
   if (vt === 'GCV') {
     if (ton == null) return null;
-    // SATP TP-only bands (PDF groups 7500-34000 together).
+    // SATP TP-only bands (first band whose max ≥ tonnage; last = open-ended).
     if (isTp) {
-      const o10 = (age != null && age > 10);
-      if (ton <= 3.5)  return out(0, o10 ? 30 : 40);
-      if (ton <= 7.5)  return out(0, o10 ? 20 : 25);
-      if (ton <= 34)   return out(0, o10 ? 10 : 15);
-      if (ton <= 40)   return out(0, o10 ? 5 : 7.5);
-      return out(0, 2.5);
+      const b = CFG.gcv.satp_tp_bands.find((x) => x.max == null || ton <= x.max);
+      return out(0, o10flag ? b.gt10 : b.le10);
     }
     // Package OD/TP by GVW band × age tier (New / Other≤10 / >10-15 / >15).
-    const tier = isNew ? 'new' : (age == null || age <= 10) ? 'o10' : age <= 15 ? 'o15' : 'g15';
-    const G = {
-      // band: [New, Other≤10, >10-15, >15] each [od,tp]
-      a: { new: [30, 45], o10: [25, 45], o15: [20, 30], g15: [5, 20] },   // ≤3.5T
-      b: { new: [30, 30], o10: [20, 25], o15: [10, 20], g15: [5, 10] },   // 3.5-7.5T
-      c: { new: [20, 20], o10: [15, 15], o15: [10, 15], g15: [10, 10] },  // 7.5-16.5T
-      d: { new: [15, 17.5], o10: [15, 15], o15: [10, 10], g15: [10, 5] }, // 16.5-34T
-      e: { new: [15, 7.5], o10: [10, 10], o15: [5, 7.5], g15: [2.5, 2.5] }, // 34-40T
-      f: { new: [5, 2.5], o10: [5, 2.5], o15: [2.5, 2.5], g15: [0, 2.5] }, // 40-48T
-      g: { new: [5, 2.5], o10: [2.5, 2.5], o15: [0, 2.5], g15: [0, 2.5] }, // >48T
-    };
-    const band = ton <= 3.5 ? 'a' : ton <= 7.5 ? 'b' : ton <= 16.5 ? 'c'
-               : ton <= 34 ? 'd' : ton <= 40 ? 'e' : ton <= 48 ? 'f' : 'g';
-    const [od, tp] = G[band][tier];
-    return out(od, tp);
+    const b = CFG.gcv.package_bands.find((x) => x.max == null || ton <= x.max);
+    return out(b[gcvTier][0], b[gcvTier][1]);
   }
 
   if (vt === 'PCV') {
+    const c = CFG.pcv;
     const is3W = /3\s*W|3\s*WHEEL|RICK|RIKSH|AUTO/.test(cat);
     const isSchool = /SCHOOL|EDUCATION/.test(cat);
     const isBus = /BUS/.test(cat);
-    const o10 = (age != null && age > 10);
     // School / Educational / Institutional buses.
     if (isSchool) {
-      if (isTp)   return out(0, 45);                                 // SATP school = 45
-      if (isNew || (age != null && age <= 10)) return out(50, 50);  // 100
-      return out(35, 35);                                           // >10 = 70
+      if (isTp)   return out(0, c.school.satp_tp);                   // SATP school = 45
+      const legs = (isNew || (age != null && age <= 10)) ? c.school.le10 : c.school.gt10;
+      return out(legs[0], legs[1]);                                 // ≤10 = 100, >10 = 70
     }
-    // Seating-based 4W PCV (Taxi ≤6, 6-30, >30) — use seating when present.
-    const tier5 = isNew ? 'new' : (age == null || age <= 5) ? 'o5' : age <= 10 ? 'o10' : age <= 15 ? 'o15' : 'g15';
     if (is3W) {
-      if (isTp) return out(0, 10);
-      const T = { new: [30, 35], o5: [25, 25], o10: [20, 25], o15: [5, 20], g15: [0, 5] };
-      const [od, tp] = T[tier5]; return out(od, tp);
+      if (isTp) return out(0, c.three_wheeler.satp_tp);
+      const t = c.three_wheeler.tiers[tier5]; return out(t[0], t[1]);
     }
     if (seat != null && seat <= 6) {                                 // Taxi
-      if (isTp) return out(0, o10 ? 7.5 : 10);
-      const T = { new: [20, 15], o5: [20, 15], o10: [17.5, 12.5], o15: [10, 10], g15: [5, 5] };
-      const [od, tp] = T[tier5]; return out(od, tp);
+      if (isTp) return out(0, o10flag ? c.taxi_le6.satp_tp.gt10 : c.taxi_le6.satp_tp.le10);
+      const t = c.taxi_le6.tiers[tier5]; return out(t[0], t[1]);
     }
     if (seat != null && seat > 6 && seat <= 30) {                    // 6-30 pax
-      if (isTp) return out(0, o10 ? 5 : 10);
-      const T = { new: [15, 15], o5: [15, 15], o10: [12.5, 12.5], o15: [7.5, 10], g15: [0, 7.5] };
-      const [od, tp] = T[tier5]; return out(od, tp);
+      if (isTp) return out(0, o10flag ? c.seat_6_30.satp_tp.gt10 : c.seat_6_30.satp_tp.le10);
+      const t = c.seat_6_30.tiers[tier5]; return out(t[0], t[1]);
     }
     if (seat != null && seat > 30) {                                 // >30 pax
-      if (isTp) return out(0, 2.5);
-      return out(2.5, 2.5);
+      if (isTp) return out(0, c.seat_gt30.satp_tp);
+      return out(c.seat_gt30.flat[0], c.seat_gt30.flat[1]);
     }
-    // 2W PCV / fallback bus without seating.
-    if (isBus) {                                                     // generic bus → 6-30 default
-      if (isTp) return out(0, o10 ? 5 : 10);
-      const T = { new: [15, 15], o5: [15, 15], o10: [12.5, 12.5], o15: [7.5, 10], g15: [0, 7.5] };
-      const [od, tp] = T[tier5]; return out(od, tp);
+    // Fallback bus without seating → 6-30 default.
+    if (isBus) {
+      if (isTp) return out(0, o10flag ? c.seat_6_30.satp_tp.gt10 : c.seat_6_30.satp_tp.le10);
+      const t = c.seat_6_30.tiers[tier5]; return out(t[0], t[1]);
     }
     return null;                                                     // can't classify (no seating)
   }
 
   if (vt === 'MISC' || vt === 'MIS') {
-    const o10 = (age != null && age > 10);
+    const c = CFG.misc;
     const isTractor = /TRACTOR|E[-\s]?RICK|E[-\s]?CART|RICKSHAW/.test(cat) ||
                       /TRACTOR/.test(up(p.model) + ' ' + up(p.make));
     const isAmbulance = /AMBULANCE/.test(cat);
     const isClassEFG = /CLASS\s*[EFG]/.test(cat);
     if (isAmbulance) {
-      if (isTp) return out(0, 5);
-      if (age == null || age <= 10) return out(15, 5);
-      if (age <= 15) return out(10, 5);
-      return out(5, 5);
+      if (isTp) return out(0, c.ambulance.satp_tp);
+      const legs = (age == null || age <= 10) ? c.ambulance.le10 : age <= 15 ? c.ambulance.le15 : c.ambulance.gt15;
+      return out(legs[0], legs[1]);
     }
     if (isTractor) {                                                 // Agri tractor / E-rick / E-cart
-      if (isTp) return out(0, o10 ? 10 : 15);
-      const tier5 = isNew ? 'new' : (age == null || age <= 5) ? 'o5' : age <= 10 ? 'o10' : age <= 15 ? 'o15' : 'g15';
-      const T = { new: [35, 35], o5: [25, 25], o10: [20, 25], o15: [7.5, 10], g15: [7.5, 10] };
-      const [od, tp] = T[tier5]; return out(od, tp);
+      if (isTp) return out(0, o10flag ? c.tractor.satp_tp.gt10 : c.tractor.satp_tp.le10);
+      const t = c.tractor.tiers[tier5]; return out(t[0], t[1]);
     }
     if (isClassEFG) {
-      if (isTp) return out(0, 5);
-      return out(10, 5);
+      if (isTp) return out(0, c.class_efg.satp_tp);
+      return out(c.class_efg.flat[0], c.class_efg.flat[1]);
     }
     // Other Misc Class D.
-    if (isTp) return out(0, o10 ? 5 : 10);
-    if (isNew) return out(20, 10);
-    if (age == null || age <= 10) return out(15, 10);
-    if (age <= 15) return out(10, 7.5);
-    return out(5, 5);
+    if (isTp) return out(0, o10flag ? c.other.satp_tp.gt10 : c.other.satp_tp.le10);
+    const legs = isNew ? c.other.new : (age == null || age <= 10) ? c.other.le10 : age <= 15 ? c.other.le15 : c.other.gt15;
+    return out(legs[0], legs[1]);
   }
 
   return null;

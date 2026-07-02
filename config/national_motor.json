@@ -1,0 +1,50 @@
+{
+  "_source": "National Insurance — Remuneration and Reward Scheme Q1 FY2026-27 (card 407). Each leg's Commission = Remuneration + Reward.",
+  "_model": "TWO legs (OD, TP). Headline = OD + TP when the legs differ, the single value when they are equal; Stand-Alone TP = TP leg only, Stand-Alone OD = OD leg only. Package legs are written as [od, tp]. Tonnage bands are in TONNES (PDF kg÷1000). Age tier keys: new = age 0; o5 = ≤5yr; o10 = ≤10yr; o15 = ≤15yr; g15 = >15yr (see code for exactly which tiers each section uses and how unknown age falls). le10/gt10 = ≤10yr / >10yr. Edit numbers here when the circular is revised — no code change.",
+
+  "car": {
+    "satp_tp": { "le10": 20, "gt10": 15 },
+    "saod_od": { "le10": 20, "gt10": 5 },
+    "package": { "new": [25, 25], "o10": [20, 20], "o15": [15, 17.5], "g15": [5, 10] }
+  },
+
+  "tw": {
+    "satp_tp": { "le10": 20, "gt10": 15 },
+    "saod_od": { "le10": 25, "gt10": 5 },
+    "package": { "new": [27.5, 30], "o5": [20, 20], "o10": [20, 15], "o15": [15, 15], "g15": [10, 10] }
+  },
+
+  "gcv": {
+    "satp_tp_bands": [
+      { "max": 3.5,  "le10": 40,  "gt10": 30 },
+      { "max": 7.5,  "le10": 25,  "gt10": 20 },
+      { "max": 34,   "le10": 15,  "gt10": 10 },
+      { "max": 40,   "le10": 7.5, "gt10": 5 },
+      { "max": null, "le10": 2.5, "gt10": 2.5 }
+    ],
+    "package_bands": [
+      { "max": 3.5,  "new": [30, 45],   "o10": [25, 45],   "o15": [20, 30],   "g15": [5, 20] },
+      { "max": 7.5,  "new": [30, 30],   "o10": [20, 25],   "o15": [10, 20],   "g15": [5, 10] },
+      { "max": 16.5, "new": [20, 20],   "o10": [15, 15],   "o15": [10, 15],   "g15": [10, 10] },
+      { "max": 34,   "new": [15, 17.5], "o10": [15, 15],   "o15": [10, 10],   "g15": [10, 5] },
+      { "max": 40,   "new": [15, 7.5],  "o10": [10, 10],   "o15": [5, 7.5],   "g15": [2.5, 2.5] },
+      { "max": 48,   "new": [5, 2.5],   "o10": [5, 2.5],   "o15": [2.5, 2.5], "g15": [0, 2.5] },
+      { "max": null, "new": [5, 2.5],   "o10": [2.5, 2.5], "o15": [0, 2.5],   "g15": [0, 2.5] }
+    ]
+  },
+
+  "pcv": {
+    "school":         { "satp_tp": 45, "le10": [50, 50], "gt10": [35, 35] },
+    "three_wheeler":  { "satp_tp": 10, "tiers": { "new": [30, 35], "o5": [25, 25], "o10": [20, 25], "o15": [5, 20], "g15": [0, 5] } },
+    "taxi_le6":       { "satp_tp": { "le10": 10, "gt10": 7.5 }, "tiers": { "new": [20, 15], "o5": [20, 15], "o10": [17.5, 12.5], "o15": [10, 10], "g15": [5, 5] } },
+    "seat_6_30":      { "satp_tp": { "le10": 10, "gt10": 5 },   "tiers": { "new": [15, 15], "o5": [15, 15], "o10": [12.5, 12.5], "o15": [7.5, 10], "g15": [0, 7.5] } },
+    "seat_gt30":      { "satp_tp": 2.5, "flat": [2.5, 2.5] }
+  },
+
+  "misc": {
+    "ambulance": { "satp_tp": 5, "le10": [15, 5], "le15": [10, 5], "gt15": [5, 5] },
+    "tractor":   { "satp_tp": { "le10": 15, "gt10": 10 }, "tiers": { "new": [35, 35], "o5": [25, 25], "o10": [20, 25], "o15": [7.5, 10], "g15": [7.5, 10] } },
+    "class_efg": { "satp_tp": 5, "flat": [10, 5] },
+    "other":     { "satp_tp": { "le10": 10, "gt10": 5 }, "new": [20, 10], "le10": [15, 10], "le15": [10, 7.5], "gt15": [5, 5] }
+  }
+}

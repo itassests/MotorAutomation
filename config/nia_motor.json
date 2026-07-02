@@ -1,0 +1,44 @@
+{
+  "_source": "New India Assurance — Q1 FY2026-27 Commission & Incentive circular (Agents/POSP and Brokers/Web-Aggregator cards carry identical motor OD%/TP% tables).",
+  "_model": "Commission is TWO legs: an OD% applied to the OD premium + a TP% applied to the TP premium. Headline rate (what the operator reports) = OD + TP, EXCEPT when the two legs are equal it is reported as the single value. Stand-Alone TP = TP leg only; Stand-Alone OD = OD leg only. Edit the numbers below when the circular is revised — no code change needed.",
+  "_od_leg_note": "\"od_leg\" as an od value means: use the state-resolved OD leg (od_leg_uplift for cars registered in od_uplift_states, else od_leg_base).",
+
+  "car": {
+    "_uplift_note": "MH/KA OD-leg uplift REVERTED to circular base 2026-07-01 (user): od_uplift_states emptied so every state uses od_leg_base=20 (was 30 for MH/KA, an operator-derived uplift not in the circular). To re-enable, add state prefixes back to od_uplift_states.",
+    "od_uplift_states": [],
+    "od_leg_base": 20,
+    "od_leg_uplift": 30,
+    "package": {
+      "new_vehicle": { "od": 25, "tp": 15, "_note": "age 0 — bundled 1+3; OD fixed 25 (no state uplift)" },
+      "upto_10yr":   { "od": "od_leg", "tp": 15 },
+      "above_10yr":  { "od": "od_leg", "tp": 12.5 }
+    },
+    "saod": { "upto_10yr": 20, "above_10yr": 5 },
+    "satp_tp": 15
+  },
+
+  "tw": {
+    "package": {
+      "new_vehicle": { "od": 30, "tp": 10, "_note": "age 0 — bundled 1+5" },
+      "upto_10yr":   { "od": 25, "tp": 10 },
+      "above_10yr":  { "od": 25, "tp": 7.5 }
+    },
+    "saod": { "upto_10yr": 20, "above_10yr": 5 },
+    "satp_tp": 10
+  },
+
+  "gcv": {
+    "_bands": "First band whose min_tonnage is strictly below the vehicle tonnage wins (GVW in tonnes). new = age 0, old = age > 0.",
+    "bands": [
+      { "min_tonnage": 7.5, "new": { "od": 10, "tp": 2.5 }, "old": { "od": 10, "tp": 2.5 }, "_note": "GVW > 7500 kg — all vehicles" },
+      { "min_tonnage": 2,   "new": { "od": 40, "tp": 25 },  "old": { "od": 35, "tp": 25 },  "_note": "2000–7500 kg" },
+      { "min_tonnage": 0,   "new": { "od": 55, "tp": 50 },  "old": { "od": 50, "tp": 50 },  "_note": "≤ 2000 kg" }
+    ]
+  },
+
+  "pcv_misc": {
+    "school_bus":   { "od": 60, "tp": 60, "_note": "School / Institutional buses" },
+    "electric_bus": { "upto_10yr": { "od": 10, "tp": 2.5 }, "above_10yr": { "od": 0, "tp": 2.5 } },
+    "other":        { "od": 15, "tp": 2.5, "_note": "Other commercial vehicles (excl GCV / school bus / electric bus)" }
+  }
+}

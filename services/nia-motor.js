@@ -19,10 +19,16 @@
  * cloning rate_value), or null when this interpreter doesn't cover the policy
  * (PCV/MISC/unknown) so the caller leaves the existing rule untouched.
  *
+ * The OD%/TP% numbers live in config/nia_motor.json (editable without code
+ * changes when the circular is revised); this function only holds the matching
+ * logic (state uplift, age bands, tonnage bands, cover-type leg selection).
+ *
  * @param {object} p extractPolicyParams output (vehicleType, vehicleAge,
  *        insProduct, tonnage, vehicleCategory, fuelType, ...)
  * @returns {number|null} commission percentage, or null if not handled.
  */
+const CFG = require('../config/nia_motor.json');
+
 function resolveNiaMotorRate(p) {
   const up = (v) => String(v == null ? '' : v).toUpperCase();
   const vt  = up(p.vehicleType);
@@ -35,51 +41,52 @@ function resolveNiaMotorRate(p) {
   const isTp   = ip === 'TP' || ip === 'SATP' || ip === 'ACT' || ip === 'LIABILITY';
   const isComp = !isSaod && !isTp;   // Comp / Package / Bundled / blank → both legs
 
+  // Age → package band key (identical semantics to the former if/else chain:
+  // age 0 = new vehicle; 1–10 = upto_10yr; >10 OR unknown age = above_10yr).
+  const bandKey = (age === 0) ? 'new_vehicle'
+                : (age != null && age <= 10) ? 'upto_10yr' : 'above_10yr';
+  const saodKey = (age != null && age > 10) ? 'above_10yr' : 'upto_10yr';
+
   let od = null, tp = null;          // commission legs (percent)
 
   if (vt === 'CAR' || vt === '4W' || vt === 'PC' || vt === 'PVT.CAR') {
+    const c = CFG.car;
     // Regional OD-leg uplift: Maharashtra & Karnataka carry a HIGHER Pvt-Car
-    // OD-commission leg (30 vs the 20 base) on Package/Comp policies, so the
-    // operator pays 45 (30+15, 1-10yr) / 43 (30+12.5, >10yr) there versus the
-    // 35 / 32.5 base in every other state. Verified vs operator file (cycle
-    // 12+11): MH 50 uplifted / 5 base (the 5 = operator noise), KA 4 / 0; all
-    // other states (PB/UP/RJ/HR/TN/DL) stay at base. Scoped to the Comp legs —
-    // SAOD/SATP and the new-vehicle (age 0) bundled band keep the base legs so
-    // the already-matched 20→20 / 40→40 cases don't regress.
+    // OD-commission leg (30 vs the 20 base) on Package/Comp policies (config
+    // car.od_uplift_states / od_leg_uplift vs od_leg_base). BH-series (Bharat)
+    // registrations (e.g. "23BH6979D") are NOT state-registered — their rtoCode
+    // is a tracker-prefix fabrication, so the uplift must not apply.
     const stPfx = (String(p.rtoCode || '').toUpperCase().match(/^[A-Z]+/) || [''])[0];
-    // BH-series (Bharat) registrations (e.g. "23BH6979D") are NOT state-registered —
-    // their rtoCode is a tracker-prefix fabrication, so the MH/KA uplift must not
-    // apply. USER-checked MH22/5039 (Skoda Kushaq 23BH6979D, age 3): operator legs
-    // = base 20+15=35, not the MH 30+15=45.
     const isBhSeries = /^\d{2}\s*BH/i.test(String(p.vehicleRegNo || '').replace(/[\s-]/g, ''));
-    const odComp = (!isBhSeries && (stPfx === 'MH' || stPfx === 'KA')) ? 30 : 20;
-    if (age === 0)        { od = 25; tp = 15; }   // New vehicle – Bundled (1+3)
-    else if (age != null && age <= 10) { od = odComp; tp = 15; } // 1–10 yr Package
-    else                  { od = odComp; tp = 12.5; } // Above 10 yr
-    if (isSaod) { od = (age != null && age > 10) ? 5 : 20; tp = null; }
-    if (isTp)   { od = null; tp = 15; }            // Stand-Alone TP = 15 flat
+    const odLeg = (!isBhSeries && c.od_uplift_states.includes(stPfx)) ? c.od_leg_uplift : c.od_leg_base;
+    const band = c.package[bandKey];
+    od = (band.od === 'od_leg') ? odLeg : band.od;
+    tp = band.tp;
+    if (isSaod) { od = c.saod[saodKey]; tp = null; }
+    if (isTp)   { od = null; tp = c.satp_tp; }
   } else if (vt === 'TW' || vt === '2W') {
-    if (age === 0)        { od = 30; tp = 10; }   // New vehicle – Bundled (1+5)
-    else if (age != null && age <= 10) { od = 25; tp = 10; } // 1–10 yr Package
-    else                  { od = 25; tp = 7.5; }  // Above 10 yr
-    if (isSaod) { od = (age != null && age > 10) ? 5 : 20; tp = null; }
-    if (isTp)   { od = null; tp = 10; }            // Stand-Alone TP = 10 flat
+    const c = CFG.tw, band = c.package[bandKey];
+    od = band.od; tp = band.tp;
+    if (isSaod) { od = c.saod[saodKey]; tp = null; }
+    if (isTp)   { od = null; tp = c.satp_tp; }
   } else if (vt === 'GCV') {
     if (ton == null) return null;                  // can't pick weight band
-    if (ton > 7.5)        { od = 10; tp = 2.5; }   // GVW > 7500 KGS — all vehicles
-    else if (ton > 2)     { if (age === 0) { od = 40; tp = 25; } else { od = 35; tp = 25; } } // 2000–7500
-    else                  { if (age === 0) { od = 55; tp = 50; } else { od = 50; tp = 50; } } // ≤2000
+    const band = CFG.gcv.bands.find((b) => ton > b.min_tonnage) || CFG.gcv.bands[CFG.gcv.bands.length - 1];
+    const legs = (age === 0) ? band.new : band.old;
+    od = legs.od; tp = legs.tp;
     if (isSaod) tp = null;                          // SAOD → OD only
     if (isTp)   od = null;                          // Stand-Alone TP = same TP%
   } else if (vt === 'PCV' || vt === 'MISC' || vt === 'MIS') {
+    const c = CFG.pcv_misc;
     const cat = up(p.vehicleCategory);
     const isElectric = /ELECTRIC|\bEV\b|E-RICK|E RICK/.test(cat) || /ELECTRIC/.test(up(p.fuelType));
     if (/SCHOOL/.test(cat)) {                        // School / Institutional Buses
-      od = 60; tp = 60;
+      od = c.school_bus.od; tp = c.school_bus.tp;
     } else if (isElectric && /BUS/.test(cat)) {      // Electric Bus PCV (C2)
-      if (age != null && age > 10) { od = 0; tp = 2.5; } else { od = 10; tp = 2.5; }
+      const legs = c.electric_bus[saodKey];          // >10yr → 0/2.5, else 10/2.5
+      od = legs.od; tp = legs.tp;
     } else {                                          // Other Commercial Vehicles
-      od = 15; tp = 2.5;                              //   (excl GCV / school bus / electric bus)
+      od = c.other.od; tp = c.other.tp;              //   (excl GCV / school bus / electric bus)
     }
     if (isSaod) tp = null;
     if (isTp)   od = null;
