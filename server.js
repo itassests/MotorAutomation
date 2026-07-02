@@ -80,6 +80,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/company-margins', companyMarginRoutes);
 app.use('/api/recon', reconRoutes);
 app.use('/api/ocr-bulk', ocrBulkRoutes);
+app.use('/api/policy-push', require('./routes/policy-push'));
 app.use('/api/renewal-notice', renewalNoticeRoutes);
 app.use('/api/agent', require('./routes/agent'));
 app.use('/api/employee', require('./routes/employee'));
@@ -110,6 +111,12 @@ app.listen(PORT, () => {
     require('./services/ocr-worker').startWorker();
   } catch (e) {
     console.warn('[RateExtract] OCR worker failed to start:', e.message);
+  }
+  // Policy push processor — only runs when POLICY_PUSH_ENABLED=1 (ONE host).
+  try {
+    require('./services/policy-push-worker').startWorker();
+  } catch (e) {
+    console.warn('[RateExtract] Policy push worker failed to start:', e.message);
   }
 });
 
