@@ -23,14 +23,44 @@ const LUCA_HEADERS = [
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-function lucaProduct(vt) {
-  vt = String(vt || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (vt === 'CAR' || vt === '4W' || vt === 'PC' || vt === 'PVTCAR') return 'private_car';
-  if (vt === 'TW' || vt === '2W' || vt === 'TWEV') return 'two_wheeler';
-  if (vt === 'GCV') return 'gcv';
-  if (vt === 'PCV') return 'pcv';
-  if (vt === 'MISC' || vt === 'MIS') return 'miscellaneous';
-  return vt.toLowerCase();
+// Map an internal rule to the granular Luca product taxonomy:
+//   auto | bus | gcv | hcv | lcv | pcv | private_bike | private_car |
+//   scooter | taxi | tractor
+// Uses the vehicle type + segment/sub-type/sheet keywords, and weight bands for
+// the GCV light/heavy split (LCV ≤ 7.5T GVW, HCV > 7.5T — the industry default;
+// explicit LCV/MCV/HCV labels in the segment override the tonnage cut).
+function lucaProduct(vt, seg, sub, sheet, wMin, wMax) {
+  const V = String(vt || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const hay = `${seg || ''} ${sub || ''} ${sheet || ''}`.toUpperCase();
+  if (/TRACTOR/.test(hay)) return 'tractor';
+  if (V === 'CAR' || V === '4W' || V === 'PC' || V === 'PVTCAR') return 'private_car';
+  if (V === 'TW' || V === '2W' || V === 'TWEV') {
+    if (/SCOOT|SCOOTY|MOPED|ACTIVA|JUPITER|FASCINO|ACCESS|\bDIO\b|NTORQ|PLEASURE|VESPA|CHETAK|MAESTRO|BURGMAN/.test(hay)) return 'scooter';
+    return 'private_bike';
+  }
+  if (V === 'PCV') {
+    if (/\bBUS\b/.test(hay)) return 'bus';
+    if (/AUTO|E-?RICK|E-?CART|RICKSHAW|\b3\s*W|3\s*WHEEL|TREO/.test(hay)) return 'auto';
+    if (/TAXI|\bCAB\b|KAALI|MAXICAB|6\s*\+\s*1|7\s*\+\s*1/.test(hay)) return 'taxi';
+    return 'pcv';
+  }
+  if (V === 'GCV') {
+    if (/\bHCV\b|HEAVY/.test(hay)) return 'hcv';
+    if (/\bLCV\b|\bMCV\b|LIGHT/.test(hay)) return 'lcv';
+    // Tonnage from the weight band (or the largest number in the segment text).
+    let t = Number(wMax);
+    if (!Number.isFinite(t) || t <= 0) {
+      const nums = (hay.match(/\d+(?:\.\d+)?/g) || []).map(Number).filter((n) => n > 0 && n < 100);
+      t = nums.length ? Math.max(...nums) : null;
+    }
+    if (t != null) return t <= 7.5 ? 'lcv' : 'hcv';
+    return 'gcv';
+  }
+  if (V === 'MISC' || V === 'MIS') {
+    if (/AUTO|E-?RICK|RICKSHAW|\b3\s*W/.test(hay)) return 'auto';
+    return 'gcv';
+  }
+  return V.toLowerCase();
 }
 
 // Map our internal insurer slug → the short Luca insurer id (sample uses "hdfc").
@@ -65,6 +95,121 @@ function band(min, max) {
   return `${min == null ? '' : min}-${max == null ? '' : max}`;
 }
 
+// ---- Canonical Luca state slug resolver -------------------------------------
+// Maps the many source spellings of a state/region/city (rr.state or rr.region)
+// to ONE canonical Luca state slug. Handles: casing, "&"→and, "Rest of X",
+// variant spellings (Orissa→odisha, Chattisgarh→chhattisgarh), 2-letter RTO
+// prefixes (MH→maharashtra), and major cities (Chennai→tamil_nadu).
+const STATE_MAP = {};
+const _sk = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const _addState = (slug, ...variants) => { for (const v of variants) STATE_MAP[_sk(v)] = slug; };
+_addState('jammu_and_kashmir', 'jammu and kashmir', 'jammu & kashmir', 'j&k', 'jk', 'jammu kashmir', 'jammu', 'kashmir', 'ladakh', 'la');
+_addState('himachal_pradesh', 'himachal pradesh', 'himachal', 'hp');
+_addState('punjab', 'punjab', 'pb');
+_addState('uttarakhand', 'uttarakhand', 'uttaranchal', 'uk', 'ua');
+_addState('uttar_pradesh', 'uttar pradesh', 'up', 'lucknow', 'kanpur', 'noida');
+_addState('haryana', 'haryana', 'hr', 'gurgaon', 'gurugram', 'faridabad');
+_addState('delhi', 'delhi', 'new delhi', 'dl', 'delhi ncr', 'ncr');
+_addState('chandigarh', 'chandigarh', 'ch');
+_addState('bihar', 'bihar', 'br', 'patna');
+_addState('odisha', 'odisha', 'orissa', 'od', 'or', 'bhubaneshwar', 'bhubaneswar', 'cuttack');
+_addState('jharkhand', 'jharkhand', 'jh', 'ranchi');
+_addState('west_bengal', 'west bengal', 'wb', 'kolkata', 'calcutta');
+_addState('assam', 'assam', 'as', 'guwahati');
+_addState('sikkim', 'sikkim', 'sk');
+_addState('nagaland', 'nagaland', 'nl');
+_addState('meghalaya', 'meghalaya', 'ml', 'shillong');
+_addState('manipur', 'manipur', 'mn', 'imphal');
+_addState('mizoram', 'mizoram', 'mz');
+_addState('tripura', 'tripura', 'tr', 'agartala');
+_addState('arunachal_pradesh', 'arunachal pradesh', 'arunachal', 'ar');
+_addState('rajasthan', 'rajasthan', 'rj', 'jaipur');
+_addState('gujarat', 'gujarat', 'gj', 'ahmedabad', 'surat', 'vadodara');
+_addState('goa', 'goa', 'ga');
+_addState('maharashtra', 'maharashtra', 'mh', 'mumbai', 'pune', 'nagpur', 'nashik', 'thane', 'aurangabad');
+_addState('daman_and_diu', 'daman and diu', 'daman & diu', 'daman', 'diu', 'dd');
+_addState('dadra_and_nagar_haveli', 'dadra and nagar haveli', 'dadra & nagar haveli', 'dadra', 'dnh', 'dn', 'silvassa');
+_addState('andhra_pradesh', 'andhra pradesh', 'andra pradesh', 'ap', 'andhra', 'vijayawada', 'visakhapatnam');
+_addState('karnataka', 'karnataka', 'ka', 'bangalore', 'bengaluru', 'mysore', 'mysuru');
+_addState('kerala', 'kerala', 'kl', 'kochi', 'cochin', 'trivandrum', 'thiruvananthapuram');
+_addState('tamil_nadu', 'tamil nadu', 'tamilnadu', 'tn', 'chennai', 'coimbatore', 'madras');
+_addState('telangana', 'telangana', 'ts', 'tg', 'hyderabad');
+_addState('puducherry', 'puducherry', 'pondicherry', 'py', 'pondy');
+_addState('lakshadweep', 'lakshadweep', 'lakshdweep', 'ld');
+_addState('andaman_and_nicobar', 'andaman and nicobar', 'andaman & nicobar', 'andaman', 'andamans', 'nicobar', 'an');
+_addState('madhya_pradesh', 'madhya pradesh', 'mp', 'indore', 'bhopal', 'gwalior', 'jabalpur');
+_addState('chhattisgarh', 'chhattisgarh', 'chattisgarh', 'chhatisgarh', 'cg', 'raipur');
+// Full-state-name keys (length ≥ 5) for substring fallback ("MAHARASHTRA OTHERS").
+const _STATE_NAME_KEYS = Object.keys(STATE_MAP).filter((k) => k.length >= 5);
+
+function resolveStateSlug(raw) {
+  if (!raw) return null;
+  let s = String(raw).toUpperCase().trim().replace(/\s*&\s*/g, ' AND ');
+  s = s.replace(/^REST\s+OF\s+/, '').replace(/\s+(OTHERS?|REGION|ZONE|KEY\s*CITIES?|CITY|CITIES)$/g, '');
+  const k = _sk(s);
+  if (STATE_MAP[k]) return STATE_MAP[k];                 // exact
+  const m = s.match(/^([A-Z]{2})[\s-]?\d/);              // RTO code prefix (MH12 → MH)
+  if (m && STATE_MAP[_sk(m[1])]) return STATE_MAP[_sk(m[1])];
+  for (const key of _STATE_NAME_KEYS) if (k.includes(key)) return STATE_MAP[key]; // substring
+  return null;
+}
+
+/** Canonical Luca state slug from a rule's state/region (prefers state). */
+function lucaState(state, region) {
+  return resolveStateSlug(state) || resolveStateSlug(region) || '';
+}
+
+// Sanitize the vehicle_make column. rr.make is polluted in several grids with
+// non-make values: category descriptors ("All", "All Electric Make", "All
+// excluding Volvo and Scania", "Excluding Eicher", "All Other Make/Models"),
+// age bands mis-mapped into make ("0 yr", "10+ yrs", "4-5 ys", "1+ yr") and
+// stray numbers/rates ("0.7", "0.8"). Luca vehicle_make wants a SPECIFIC make
+// or blank (= all makes) — so blank out all of the above, keep real makes.
+function lucaMake(m) {
+  const s = String(m == null ? '' : m).trim();
+  if (!s) return '';
+  const u = s.toUpperCase();
+  if (/[%:_+<>]/.test(s)) return '';                                 // rate/remark/cluster/region-combo/spec leak (real makes use spaces)
+  if (/^\d+(\.\d+)?$/.test(s)) return '';                            // pure number / rate
+  if (/\b(YR|YRS|YEAR|YEARS|YS)\b/.test(u) || /^\d+\s*[-]/.test(s)) return ''; // age band
+  if (/^ALL\b/.test(u) || /^NON[\s-]/.test(u) || /^OTHERS?$/.test(u)) return ''; // "All ..." / "Non Tata" / "Other(s)"
+  if (/EXCLUD|EXCEPT|OTHER\s+MAKE|OTHER\s+MODEL|OTHER\s+THAN|\bREF\b/.test(u)) return ''; // exclusion / region-ref
+  // segment / vehicle-type / spec words (no \b so glued forms like "BackhoeLoader" are caught)
+  if (/GCV|PCV|LCV|HCV|MCV|GCCV|PCCV|\bMISC\b|SEATER|SEAT|TONNE|\bTON\b|GVW|LAKH|\bLAC\b|UPTO|DUMPER|TIPPER|BACKHOE|EXCAVATOR|LOADER|CRANE|HARVESTER|TAXI|\bBUS\b|TANKER|DRILLING|\bRIG\b|MOBILEPLANT|RICKSHAW|E-?LOADER/.test(u)) return '';
+  if (/\d\s*T\b/.test(u) || /^[A-Z]{2}\s?\d/.test(u)) return '';     // tonnage ("40T") / RTO-region code ("TN1", "HP 21")
+  if (resolveStateSlug(s)) return '';                               // the value IS a region / city / state name
+  return s;                                                          // real make
+}
+
+// Canonical Luca fuel_type: ELECTRICITY | DIESEL | INTERNAL_LPG_CNG | PETROL.
+// INBUILT = factory gas kit → CNG family. Hybrid/HEV runs on a petrol engine →
+// PETROL. Multi-fuel grid rows ("Petrol/CNG/EV", "Other than Diesel") and "All"
+// map to blank (the rate applies across fuels — Luca reads blank as all fuels).
+function lucaFuel(f) {
+  const u = String(f || '').toUpperCase().trim();
+  if (!u || u === 'ALL' || /OTHER\s+THAN/.test(u)) return '';
+  const hits = [];
+  if (/DIESEL/.test(u)) hits.push('DIESEL');
+  if (/ELECTRIC|\bEV\b|BATTERY/.test(u)) hits.push('ELECTRICITY');
+  if (/CNG|LPG|INBUILT|BI[\s-]?FUEL/.test(u)) hits.push('INTERNAL_LPG_CNG');
+  if (/PETROL|GASOLINE|HYBRID|\bHEV\b/.test(u)) hits.push('PETROL');
+  return hits.length === 1 ? hits[0] : '';
+}
+
+// Business type from segment/sub_type/rate_type keywords: new | rollover |
+// renewal | used. Blank when the rule isn't scoped to a business type (most
+// rules apply to all), so the column no longer leaks segment/CC/tonnage codes.
+// Order matters: rollover/renewal/used are checked before "new" because a
+// segment can carry both a cover tag and a bare "NEW" (e.g. "1_TRAC[NEW]").
+function lucaBusinessType(seg, sub, rateType) {
+  const hay = `${seg || ''} ${sub || ''} ${rateType || ''}`.toUpperCase();
+  if (/ROLL[\s-]?OVER/.test(hay)) return 'rollover';
+  if (/RENEW/.test(hay)) return 'renewal';
+  if (/\bUSED\b|SECOND[\s-]?HAND|PRE[\s-]?OWNED|\bOLD\b/.test(hay)) return 'used';
+  if (/BRAND[\s-]?NEW|\bNEW\b|\[NEW\]/.test(hay)) return 'new';
+  return '';
+}
+
 /**
  * @param {number|number[]} ids  rate_card id(s) to export.
  * @returns {Promise<Buffer>} xlsx buffer in Luca layout.
@@ -78,7 +223,8 @@ async function buildLucaBuffer(ids) {
   const result = await rq.query(`
     SELECT rr.insurer, rr.product, rr.sheet_name, rr.region, rr.segment, rr.make,
            rr.model, rr.sub_type, rr.fuel_type, rr.cc_band_min, rr.cc_band_max,
-           rr.age_band_min, rr.age_band_max, rr.rate_type, rr.rate_value,
+           rr.age_band_min, rr.age_band_max, rr.weight_band_min, rr.weight_band_max,
+           rr.rate_type, rr.rate_value,
            rr.remarks, rr.state, rc.effective_from
     FROM rate_rules rr
     JOIN rate_cards rc ON rc.id = rr.rate_card_id
@@ -93,8 +239,20 @@ async function buildLucaBuffer(ids) {
     const cover = ex.inferProduct(r.rate_type, r.sheet_name, r.sub_type, r.segment); // Comp / TP / SAOD
     const isTp = cover === 'TP';
     const rateP = pct(r.rate_value);
-    const coverageType = cover === 'Comp' ? 'comprehensive,own_damage'
-                       : cover === 'SAOD' ? 'own_damage' : 'liability';
+    // Luca coverage_type taxonomy: comprehensive | own_damage | third_party | hybrid.
+    // hybrid = a bundled long-term COMPREHENSIVE package where the OD and TP
+    // tenures differ (1+3, 1+5, 5+5, 3+3, bundled, long-term). Plain annual 1+1
+    // comprehensive stays 'comprehensive'. SAOD → own_damage, TP → third_party.
+    // A bundle tag is OD-tenure + TP-tenure with the TP leg ≥ 2 years (1+3, 1+5,
+    // 5+5, 3+3 …). Guard against SEATING specs ("6+1", "18+1", "6 + 1") — those
+    // have a +1 driver, so require the second number ≥ 2 (also excludes plain 1+1).
+    const covHay = `${r.segment || ''} ${r.sub_type || ''} ${r.sheet_name || ''} ${r.rate_type || ''}`.toUpperCase();
+    const bt = /(\d+)\s*\+\s*(\d+)/.exec(covHay);
+    const isBundled = /BUNDL|LONG[\s-]?TERM|\bLT\b/.test(covHay)
+                   || (bt && +bt[1] >= 1 && +bt[1] <= 5 && +bt[2] >= 2 && +bt[2] <= 5);
+    const coverageType = cover === 'Comp' ? (isBundled ? 'hybrid' : 'comprehensive')
+                       : cover === 'SAOD' ? 'own_damage'
+                       : 'third_party';
     const d = r.effective_from ? new Date(r.effective_from) : null;
     const region = String(r.region || r.state || '').trim();
 
@@ -104,7 +262,7 @@ async function buildLucaBuffer(ids) {
       insurer,                                                // insurers
       d ? d.getFullYear() : '',                               // year
       d ? MONTHS[d.getMonth()] : '',                          // month
-      lucaProduct(vt),                                        // products
+      lucaProduct(vt, r.segment, r.sub_type, r.sheet_name, r.weight_band_min, r.weight_band_max), // products
       coverageType,                                           // coverage_type
       lucaNcb(r.rate_type),                                   // ncb
       isTp ? 'TP' : 'OD',                                     // commission_on
@@ -112,14 +270,14 @@ async function buildLucaBuffer(ids) {
       isTp ? '' : rateP,                                      // irdai_commission_percentage (the outgoing OD rate)
       '', '', '', '',                                         // slab, slab_on, is_slab_on_first_tenure, flat_commission
       '',                                                     // excluded_vehicles
-      String(r.make || ''),                                   // vehicle_make
+      lucaMake(r.make),                                       // vehicle_make
       String(r.model || ''),                                  // vehicle_model
       band(r.cc_band_min, r.cc_band_max),                     // vehicle_cc
       band(r.age_band_min, r.age_band_max),                   // vehicle_age
-      String(r.fuel_type || ''),                              // fuel_type
-      String(r.segment || ''),                                // business_type
+      lucaFuel(r.fuel_type),                                  // fuel_type
+      lucaBusinessType(r.segment, r.sub_type, r.rate_type),   // business_type
       '',                                                     // zones
-      region.toLowerCase(),                                   // included_states (best-effort: region)
+      lucaState(r.state, r.region),                           // included_states (canonical state slug)
       '',                                                     // city
       '',                                                     // excluded_cities
       '',                                                     // included_rto
@@ -137,4 +295,4 @@ async function buildLucaBuffer(ids) {
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', compression: true });
 }
 
-module.exports = { buildLucaBuffer, LUCA_HEADERS };
+module.exports = { buildLucaBuffer, LUCA_HEADERS, lucaProduct, lucaState, lucaFuel, lucaMake, lucaBusinessType };
