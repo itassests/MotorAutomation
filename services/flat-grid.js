@@ -126,7 +126,21 @@ function bizCat(params) {
   const b = norm(params.businessType);
   if (/ROLL/.test(b)) return 'ROLLOVER';
   if (/RENEW/.test(b)) return 'RENEWAL';
-  if (/NEW/.test(b) || (Number(params.vehicleAge) || 0) === 0) return 'BRAND NEW';
+  // A "New" business is BRAND NEW only for a genuinely new vehicle. An existing
+  // vehicle switched to a new insurer is a "New" policy but a ROLLOVER for rating.
+  // A brand-new vehicle's first policy has NO NCB and age ~0; NCB>0 (prior
+  // no-claim years) or age>1 → the vehicle already existed → ROLLOVER. Fixes
+  // MT/DIRNE/DL7/14844 (2019 TVS Jupiter, NCB 25, biz "New") wrongly rated Brand
+  // New 49.5 instead of Rollover 48.5.
+  if (/NEW/.test(b)) {
+    // USER RULE: "new vehicle" is ONLY based on age (manufactured date). A "New"
+    // business on an age-0/1 vehicle is Brand New; on an older vehicle it is a
+    // Rollover. NCB is used only as a proxy when age is genuinely unknown.
+    const age = params.vehicleAge;
+    if (age != null && age !== '') return (Number(age) || 0) <= 1 ? 'BRAND NEW' : 'ROLLOVER';
+    return (Number(params.ncbPct) || 0) === 0 ? 'BRAND NEW' : 'ROLLOVER';
+  }
+  if ((Number(params.vehicleAge) || 0) === 0) return 'BRAND NEW';
   return 'RENEWAL';
 }
 function sectionCat(params) {
@@ -147,7 +161,10 @@ function classifySegment(spec, params) {
   if (c.type === 'tw') {
     if (/MOPED|\bTVS\s*XL\b|LUNA/.test(hay)) return 'Moped';
     if (/ACTIVA|JUPITER|FASCINO|ACCESS|DIO|BURGMAN|NTORQ|MAESTRO|AVIATOR|PLEASURE|VESPA|SCOOT|DESTINI|XOOM|\bRAY\b|ALPHA|CHETAK|IQUBE|ZEST/.test(hay)) return 'Scooter';
-    return 'Bike';
+    // The Tata TW grid labels bikes "Motor Cycle" (not "Bike"), so a plain bike
+    // must classify as 'Motor Cycle' to match the flat-grid rows — else it falls
+    // through to the ingested Motor Cycle rule. (Bike ≡ Motor Cycle.)
+    return 'Motor Cycle';
   }
   if (c.type === 'keyword') {
     for (const [seg, re] of Object.entries(c.map || {})) if (new RegExp(re, 'i').test(hay)) return seg;

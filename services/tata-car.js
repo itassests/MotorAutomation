@@ -34,7 +34,15 @@ function bizCat(params) {
   const b = norm(params.businessType);
   if (/ROLL/.test(b)) return 'Rollover';
   if (/RENEW/.test(b)) return 'Renewal';
-  if (/NEW/.test(b) || (Number(params.vehicleAge) || 0) === 0) return 'Brand New';
+  // USER RULE: "new business" ≠ "new vehicle". A "New" policy is Brand New only
+  // for a genuinely new vehicle (age ≤ 1); an existing vehicle switched to a new
+  // insurer is a Rollover. NCB only as a proxy when age is unknown.
+  if (/NEW/.test(b)) {
+    const age = params.vehicleAge;
+    if (age != null && age !== '') return (Number(age) || 0) <= 1 ? 'Brand New' : 'Rollover';
+    return (Number(params.ncbPct) || 0) === 0 ? 'Brand New' : 'Rollover';
+  }
+  if ((Number(params.vehicleAge) || 0) === 0) return 'Brand New';
   return 'Renewal';
 }
 function sectionCat(params) {
