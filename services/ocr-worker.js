@@ -263,6 +263,21 @@ async function processPdfs(app, live) {
         .input('tx', sql.VarChar(500), md.transaction_id || null)
         .query(`INSERT INTO dbo.trn_OCRBulkEntry (Trackerno, PolicyNo, FolderPath, TransactionID, CreatedDate)
                 VALUES (@t, @p, @fp, @tx, GETDATE())`);
+      // Finalize this tracker's data entry: App_BulkOcr enriches the reported
+      // fields (insurer / POS from the folder) and submits the tracker to the
+      // U/W team (IsOCR=1). It's idempotent (UPDATEs keyed by TrackerNo), so a
+      // best-effort call here is safe — a failure is logged but must NOT re-queue
+      // the PDF, which would duplicate the trn_OCRBulkEntry row just written.
+      try {
+        await live.request()
+          .input('folderId', sql.VarChar(10), String(row.upload_id))
+          .input('Trackerno', sql.VarChar(500), trackerNo)
+          .input('TransactionNo', sql.VarChar(500), md.transaction_id || null)
+          .input('filepath', sql.VarChar(sql.MAX), row.pdf_path)
+          .execute('dbo.App_BulkOcr');
+      } catch (spErr) {
+        console.warn(`[ocr-worker] App_BulkOcr failed for ${trackerNo}: ${errMsg(spErr)}`);
+      }
       await app.request().input('id', sql.Int, row.id).input('p', sql.NVarChar(200), policyNo)
         .query('UPDATE dbo.ocr_bulk_pdf SET status = 2, policy_no = @p, error = NULL, processed_at = GETDATE() WHERE id = @id');
     } catch (err) {

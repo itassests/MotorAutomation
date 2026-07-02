@@ -58,7 +58,7 @@ const PRODUCT_MAP = { Comp: 'Comprehensive', Comprehensive: 'Comprehensive', SAO
 // Folder key = the bare descriptor the processor stores in entry.FolderPath:
 // strip a leading "DD-MM-YYYY_" prefix (if any) and the ".zip" extension.
 const folderKey = (zipName) =>
-  String(zipName || '').replace(/^\d{1,2}-\d{1,2}-\d{2,4}_/, '').replace(/\.zip$/i, '').trim();
+  String(zipName || '').replace(/^\d{1,2}-\d{1,2}-\d{2,4}_/, '').replace(/\.(zip|rar|7z)$/i, '').trim();
 
 /** POST /upload — one Trn_PrarambhOCRBulkUploadDetails (Isactive=1) row per zip. */
 router.post('/upload', upload.array('files', 50), async (req, res, next) => {
@@ -314,6 +314,63 @@ router.get('/uploads/:id/export', async (req, res, next) => {
     const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="ocr_results_${id}.xlsx"`);
+    res.setHeader('Content-Length', buffer.length);
+    res.send(buffer);
+  } catch (err) { next(err); }
+});
+
+/**
+ * GET /export?from=YYYY-MM-DD&to=YYYY-MM-DD — ONE consolidated xlsx of every
+ * folder's Policy No + Tracker No whose upload CreatedDate falls in the range,
+ * with Date + Folder columns so rows can be matched without opening each folder
+ * separately. Defaults to the last 30 days when from/to are omitted.
+ */
+router.get('/export', async (req, res, next) => {
+  try {
+    const iso = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) ? String(s) : null);
+    const to = iso(req.query.to) || new Date().toISOString().slice(0, 10);
+    const from = iso(req.query.from) ||
+      new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+
+    const live = await getPrarambhPool();
+    // Folders whose upload date is in range (Isactive 1=pending / 2=done).
+    const folders = (await live.request()
+      .input('from', sql.Date, from)
+      .input('to', sql.Date, to)
+      .query(`SELECT id, FolderPath, CreatedDate
+                FROM dbo.Trn_PrarambhOCRBulkUploadDetails
+               WHERE Isactive IN (1, 2)
+                 AND CONVERT(date, CreatedDate) BETWEEN @from AND @to
+               ORDER BY CreatedDate, id`)).recordset;
+
+    const aoa = [['Date', 'Folder', 'Policy No', 'Tracker No']];
+    for (const f of folders) {
+      const key = folderKey(f.FolderPath);
+      if (!key) continue;
+      const dateStr = f.CreatedDate ? new Date(f.CreatedDate).toISOString().slice(0, 10) : '';
+      // Same per-entry lookup as the single-folder export (PolicyNo with MIS fallback).
+      const r = await live.request().input('k', sql.NVarChar(500), key).query(
+        `SELECT e.Trackerno,
+                COALESCE(NULLIF(LTRIM(RTRIM(e.PolicyNo)), ''), mis.POLICY_NO) AS PolicyNo
+           FROM dbo.trn_OCRBulkEntry e
+           OUTER APPLY (
+             SELECT TOP 1 mis.POLICY_NO
+             FROM dbo.TRN_PrarambhMain m
+             JOIN dbo.TRN_PrarambhMotorMISUpdation mis ON mis.PrarambhMainId = m.Id
+             WHERE m.TrackerNo = e.Trackerno
+               AND mis.POLICY_NO IS NOT NULL AND LTRIM(RTRIM(mis.POLICY_NO)) <> ''
+             ORDER BY mis.Id DESC
+           ) mis
+          WHERE CHARINDEX(@k, e.FolderPath) > 0 ORDER BY e.Id`);
+      for (const e of r.recordset) aoa.push([dateStr, f.FolderPath || '', e.PolicyNo || '', e.Trackerno || '']);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'OCR Results');
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="ocr_results_${from}_to_${to}.xlsx"`);
     res.setHeader('Content-Length', buffer.length);
     res.send(buffer);
   } catch (err) { next(err); }
