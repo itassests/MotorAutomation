@@ -1091,6 +1091,53 @@ router.post('/lookup', async (req, res, next) => {
       ins_product: params.insProduct,   // CAR/TW: Comp|SAOD → OD+Addon, TP → TP
     });
 
+    // PR discount — the OD discount from the operator's uploaded Premium Register
+    // (pr_rows.final_discount, i.e. the FINALDISCOUNT column, stored as a percent).
+    // If no active PR row covers this policy, flag it so the UI shows
+    // "PR not uploaded" instead of a blank/zero discount.
+    let prDiscount = { available: false, discount_pct: null, source: null };
+    try {
+      const polNo = String(policy['POLICY NO'] || policy['Policy No'] ||
+                           params._policy_no || '').trim();
+      if (polNo) {
+        // Same key-variant stripping bulk uses (slash-date, trailing -NN / space NN).
+        const up = polNo.toUpperCase();
+        const variants = [up];
+        const slash = up.split(/\s*\/\s*/)[0].trim();
+        if (slash && slash !== up) variants.push(slash);
+        const base = slash || up;
+        const dash = base.replace(/-\d{1,3}$/, '');   if (dash !== base) variants.push(dash);
+        const space = base.replace(/\s+\d{1,3}$/, ''); if (space !== base) variants.push(space);
+        const uniq = [...new Set(variants)];
+        const rq = pool.request();
+        uniq.forEach((v, i) => rq.input('pd' + i, sql.NVarChar, v));
+        const inClause = uniq.map((_, i) => '@pd' + i).join(',');
+        const prRes = await rq.query(
+          `SELECT TOP 1 pr.final_discount, u.insurer_label, u.month, u.year
+             FROM pr_rows pr INNER JOIN pr_uploads u ON u.id = pr.upload_id
+            WHERE u.status = 'active'
+              AND UPPER(LTRIM(RTRIM(pr.policy_no))) IN (${inClause})
+            ORDER BY u.year DESC, u.month DESC`
+        );
+        if (prRes.recordset.length > 0) {
+          const row = prRes.recordset[0];
+          let disc = (row.final_discount != null) ? Math.abs(Number(row.final_discount)) : null;
+          if (disc != null) {
+            if (disc <= 1) disc *= 100;              // fraction → percent (defensive)
+            disc = +disc.toFixed(2);
+          }
+          prDiscount = {
+            available: true,
+            discount_pct: disc,
+            source: [row.insurer_label, row.month && row.year ? `${row.month}/${row.year}` : null]
+              .filter(Boolean).join(' '),
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('[policy] PR discount lookup skipped:', e.message);
+    }
+
     res.json({
       success: true,
       policy,
@@ -1107,6 +1154,7 @@ router.post('/lookup', async (req, res, next) => {
       state_city_fallback: stateCityFallback,
       diagnostics,
       calculation,
+      pr_discount: prDiscount,
       filter_trace: traceBuf,
     });
   } catch (err) {
@@ -1287,18 +1335,29 @@ function extractPolicyParams(policy) {
   const ncbPct = parseFloat(get('NCB') || get('PREVIOUS NCB') || 0) || 0;
   const discountPct = parseFloat(get('OD DISCOUNT') || get('DISCOUNT') || 0) || 0;
 
-  // Vehicle age — prefer the pre-calculated field from view, else derive from registration date
+  // Vehicle age — USER RULE: "new business" ≠ "new vehicle"; a vehicle's newness
+  // is based on its MANUFACTURED date, NOT the registration date (a 2019-built
+  // vehicle insured fresh in 2026 is a 7-yr-old rollover, not a new vehicle).
+  // Prefer the operator's pre-calculated AGE OF VEHICLE, then derive from the
+  // MANUFACTURED year/date, and use the registration date only as a last resort.
   let vehicleAge = null;
   const ageOfVehicle = get('AGE OF VEHICLE');
+  const mfgDate = get('DATE OF MFG') || get('DATE_OF_MFG') || get('MANUFACTURING DATE') || get('DATE OF MANUFACTURE');
+  const mfgYear = parseInt(String(get('MFG YEAR') || get('MFG_YEAR') || get('MANUFACTURING YEAR') || '').replace(/[^0-9]/g, '').slice(0, 4), 10);
+  const _nowYr = new Date().getFullYear();
   if (ageOfVehicle != null && ageOfVehicle !== '' && !isNaN(parseInt(ageOfVehicle))) {
     vehicleAge = parseInt(ageOfVehicle, 10);
+  } else if (mfgDate && !isNaN(new Date(mfgDate).getTime())) {
+    vehicleAge = Math.floor((new Date() - new Date(mfgDate)) / (365.25 * 24 * 60 * 60 * 1000));
+  } else if (mfgYear && mfgYear > 1980 && mfgYear <= _nowYr + 1) {
+    vehicleAge = _nowYr - mfgYear;
   } else if (registrationDate) {
     const regDate = new Date(registrationDate);
     if (!isNaN(regDate.getTime())) {
-      const now = new Date();
-      vehicleAge = Math.floor((now - regDate) / (365.25 * 24 * 60 * 60 * 1000));
+      vehicleAge = Math.floor((new Date() - regDate) / (365.25 * 24 * 60 * 60 * 1000));
     }
   }
+  if (vehicleAge != null && vehicleAge < 0) vehicleAge = 0;
 
   // Map vehicle class/type to our product codes. Some insurers (ICICI especially)
   // ship policy rows with NULL VEHICAL TYPE / VEHICAL CATEGORY, so fall back to
@@ -1306,6 +1365,16 @@ function extractPolicyParams(policy) {
   let mappedVehicleType = mapVehicleType(vehicleClass || vehicleType || vehicalCategoryRaw);
   if (!mappedVehicleType) {
     mappedVehicleType = inferVehicleTypeFromMakeModel(make, model, seatingCapacity, cc);
+  }
+  // Data-quality guard: a CAR with a two-wheeler-sized engine (≤350cc) AND
+  // exactly 2 seats is a mis-typed motorcycle/scooter — the source Prarambh data
+  // types some TWs as "Pvt.Car" (Honda CB Shine 125cc, Activa 110cc, Ola S1).
+  // A real car is never ≤350cc; EVs carry a placeholder cc but seat 5+, so gate
+  // on seating === 2 to leave EV cars alone. Reclassify CAR → TW so it takes the
+  // two-wheeler rate instead of the Pvt-Car rate. USER-confirmed.
+  if ((mappedVehicleType === 'CAR' || mappedVehicleType === '4W') &&
+      Number(seatingCapacity) === 2 && Number(cc) > 0 && Number(cc) <= 350) {
+    mappedVehicleType = 'TW';
   }
 
   // Map policy type to ins_product
@@ -1387,6 +1456,10 @@ function extractPolicyParams(policy) {
     vehicleAge,
     insProduct,
     registrationDate,
+    // Policy issue date (as printed on the source row, e.g. "14-Apr-26") — the
+    // date the policy was issued, surfaced on the lookup screen.
+    issueDate: get('POLICY ISSUED DATE') || get('POLICY_ISSUED_DATE') ||
+               get('POLICY ISSUE DATE') || get('POLICY_ISSUE_DATE') || null,
     // Tenure bucket ('1+1' | '1+5' | '5+5') derived in bulk enrichment from
     // OD/TP policy term dates (TRN_PrarambhMotorMISUpdation). Drives which
     // multi-year Comp grid the policy routes to. Null when unknown.

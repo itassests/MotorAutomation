@@ -1657,7 +1657,12 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     ...(_bajajEffDate ? { effective_date: _bajajEffDate } : {}),
     // Shriram: state-name region filter must still surface national
     // (NULL/'' region = "PAN INDIA") rows.
-    include_null_region: insurerSlug === 'shriram' || unitedGcvFunnel,
+    // go_digit: JUN'26 moved TW (100% pan-India) and GCV/PCV to blank-region
+    // rate rows while April was region-specific ("Good GJ"). Without the null-
+    // region union the region filter drops every June TW/GCV rule and the policy
+    // falls back to the April card. CAR stays region-specific (0 blank rows) so
+    // it is unaffected. The effective-date selector then prefers the June card.
+    include_null_region: insurerSlug === 'shriram' || insurerSlug === 'go_digit' || unitedGcvFunnel,
     // Shriram: match the verbose card labels by substring tokens (overrides
     // region/cluster when present).
     ...(shriramRegionTokens
@@ -2747,6 +2752,62 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
        Number(r.rate_value) < 0.475)
         ? { ...r, rate_value: 0.475, _kotakUpTractorOverride: true }
         : r);
+  }
+
+  // Kotak TW JUN'26 per-RTO×Make PO grid (cards 597/598, engine kotak_tw_rto_make).
+  // The grid is keyed by RTO code (region=RTO) + make + Scooter/Bike, but kotak TW
+  // policies resolve `region` to a CITY (not the RTO) and the lookup RTO-gates TW
+  // only for SATP — so the per-RTO Comp rows never match and the policy falls to
+  // the May/April Cat grid. Additive override: fetch the June rows for THIS rto
+  // (region = code), match make-family + Scooter/Bike + cover, inject only a
+  // NON-ZERO rate. RTOs the June grid lacks (e.g. MH34) or zero/blank cells keep
+  // their existing May/April match → no regression. SAOD skipped (grid is Comp/SATP).
+  if (insurerSlug === 'kotak' && productIsTw && params.rtoCode) {
+    let code = String(params.rtoCode).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    // The grid stores zero-padded RTO codes (AP02, DL05); a policy 'DL5' must be
+    // padded to 'DL05' to match, else it wrongly falls back.
+    const _m = code.match(/^([A-Z]+)(\d+)$/);
+    if (_m) code = _m[1] + _m[2].padStart(2, '0');
+    const _od = Number(params.odPremium != null ? params.odPremium : params.od_premium) || 0;
+    const _tp = Number(params.tpPremium != null ? params.tpPremium : params.tp_premium) || 0;
+    const cover = (_od > 0 && _tp > 0) ? 'COMP' : (_od <= 0 ? 'SATP' : null);
+    if (cover) {
+      const twJune = await lookupRates(pool, {
+        insurer: 'kotak', product: ['TW'], region: code,
+        ...(baseLookup.effective_date ? { effective_date: baseLookup.effective_date } : {}),
+      });
+      if (twJune && twJune.length) {
+        const gridMake = (m) => {
+          const u = String(m || '').toUpperCase();
+          if (/BAJAJ/.test(u)) return 'BAJAJ';
+          if (/\bTVS\b/.test(u)) return 'TVS';
+          if (/ROYAL|ENFIELD/.test(u)) return 'ROYAL ENFIELD';
+          if (/SUZUKI/.test(u)) return 'SUZUKI';
+          if (/YAMAHA/.test(u)) return 'YAMAHA';
+          if (/HERO/.test(u)) return 'HERO MOTOCORP';
+          if (/HONDA/.test(u)) return 'HONDA';
+          return 'OTHERS';
+        };
+        const hay = `${params.make || ''} ${params.model || ''} ${params.vehicleCategory || ''}`.toUpperCase();
+        const seg = /ACTIVA|JUPITER|SCOOT|FASCINO|ACCESS|\bDIO\b|NTORQ|MAESTRO|PLEASURE|VESPA|CHETAK|BURGMAN|AVIATOR|\bRAY\b|DESTINI|XOOM|IQUBE/.test(hay) ? 'SCOOTER' : 'BIKE';
+        const pmk = gridMake(params.make);
+        const covRe = cover === 'COMP' ? /^COMP$/i : /^SATP$|^TP$|ACT/i;
+        const cand = (twJune || []).filter(r => String(r.segment || '').toUpperCase() === seg && covRe.test(String(r.rate_type || '')));
+        const hit = cand.find(r => gridMake(r.make) === pmk) || cand.find(r => gridMake(r.make) === 'OTHERS');
+        // The JUN'26 per-RTO×Make grid is AUTHORITATIVE for kotak TW wherever it has
+        // the RTO×make×segment×cover row — so make it the sole rule (rules=[clone]),
+        // injecting the grid value INCLUDING 0. USER-confirmed: metro RTOs where the
+        // grid declines a bike (Bike Comp 0 + Bike SATP "Declined", e.g. DL01 Honda)
+        // pay 0% / no payout, not the old rate. A plain [clone, ...filter] left the
+        // May PACKAGE row to out-score a 0 (pickPrimary prefers non-zero), so replace
+        // the whole pool. RTOs absent from the grid find no `hit` and keep their
+        // existing match; the effective_date filter on the scoped lookup keeps
+        // pre-June risk-start policies on the old grid.
+        if (hit && hit.rate_value != null) {
+          rules = [{ ...hit, _kotakTwRtoOverride: true }];
+        }
+      }
+    }
   }
 
   // Royal Sundaram EV STP grid (sheet "EV STP", region "All Geos"): a flat
@@ -5359,10 +5420,20 @@ function buildOutputRow(policy, params, rule, rateVal, marginRule, nums, note, s
     business_type: params.businessType || policy.BUSINESS_TYPE_ID || null,   // Fresh / Portability / Rollover
     vehicle_category: policy.VehicalCategoryname || policy.VehicalCategory_Updated || policy['VEHICAL CATEGORY'] || null,
     vehicle_detail: policy.VEHICAL_TYPE_Id || policy.VehicleType || params.vehicleType || null,
+    // Derived vehicle age (years) — the value used for rating (age bands). Surfaced
+    // here so the bulk output/CSV isn't blank when the age was computed & applied.
+    vehicle_age: (params.vehicleAge != null && params.vehicleAge !== '') ? Number(params.vehicleAge) : null,
     manufacturing_year: (function () {
+      // The vehicle's MANUFACTURED year (not registration). Prefer MFG_YEAR /
+      // DATE_OF_MFG; fall back to the derived age, then registration date.
+      const my = parseInt(String(policy.MFG_YEAR || policy['MFG YEAR'] || '').replace(/[^0-9]/g, '').slice(0, 4), 10);
+      if (my && my > 1980) return my;
+      const dm = policy.DATE_OF_MFG || policy['DATE OF MFG'];
+      const dmd = dm ? new Date(dm) : null;
+      if (dmd && !isNaN(dmd.getTime())) return dmd.getFullYear();
+      if (params.vehicleAge != null) return new Date().getFullYear() - Number(params.vehicleAge);
       const d = policy.DATE_OF_REGISTRATION ? new Date(policy.DATE_OF_REGISTRATION) : null;
       if (d && !isNaN(d.getTime())) return d.getFullYear();
-      if (params.vehicleAge != null) return new Date().getFullYear() - Number(params.vehicleAge);
       return null;
     })(),
     rto_code: params.rtoCode,
@@ -5591,7 +5662,7 @@ async function runBulkCalculate(body) {
     'VehicleType','VehicalCategoryname','VEHICAL_TYPE_Id','VehicalCategory_Updated',
     'VEHICAL_MAKE','VEHICAL_MODEL','Vehicle_Sub_Model',
     'FUELTYPE','VEHICAL_FUELTYPE','RTO_Code','CC','SEATING_CAPACITY',
-    'GROSS_VEHICLE_WEIGHT','Tonnes','AGE_OF_VEHICLE','DATE_OF_REGISTRATION',
+    'GROSS_VEHICLE_WEIGHT','Tonnes','AGE_OF_VEHICLE','DATE_OF_REGISTRATION','DATE_OF_MFG','MFG_YEAR',
     'VEHICLE_REGISTRATION_NO','VEHICLE_IDV',
     'BASE_OD_PREMIUM','NET_OD_PREMIUM','NET_LIABILITY_PREMIUM',
     'PREMIUM_WITHOUT_GST','ADD_ON_PREMIUM','Addon_Premium',
@@ -5678,6 +5749,8 @@ async function runBulkCalculate(body) {
     'TONNAGE':                  r.Tonnes,
     'AGE OF VEHICLE':           r.AGE_OF_VEHICLE,
     'DATE OF REGISTRATION':     r.DATE_OF_REGISTRATION,
+    'DATE OF MFG':              r.DATE_OF_MFG,
+    'MFG YEAR':                 r.MFG_YEAR,
     'VEHICLE REGISTRATION NO':  r.VEHICLE_REGISTRATION_NO,
     'VEHICLE IDV':              r.VEHICLE_IDV,
     'IDV':                      r.VEHICLE_IDV,
@@ -6450,6 +6523,29 @@ router.post('/calculate', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Canonical insurer display name from the resolved slug — mirrors the UI export
+// (public/index.html normInsurer). Consolidates the many raw source spellings +
+// bank-channel variants (ICICI LOMBARD / ICICIBank, Kotak / KotakBank, HDFC Asset
+// Management…) into ONE name per insurer. Falls back to a title-cased slug.
+const INSURER_DISPLAY = {
+  go_digit: 'Go Digit', digit: 'Go Digit', chola_ms: 'Cholamandalam MS', chola: 'Cholamandalam MS',
+  bajaj_allianz: 'Bajaj Allianz', bajaj: 'Bajaj Allianz', hdfc_ergo: 'HDFC ERGO',
+  icici_lombard: 'ICICI Lombard', tata_aig: 'Tata AIG', reliance: 'Reliance', iffco_tokio: 'IFFCO Tokio',
+  future_generali: 'Future Generali', sbi_general: 'SBI General', shriram: 'Shriram',
+  liberty_videocon: 'Liberty', liberty: 'Liberty', kotak: 'Kotak', magma_hdi: 'Magma HDI',
+  royal_sundaram: 'Royal Sundaram', universal_sompo: 'Universal Sompo',
+  united_india_insurance: 'United India', oriental_insurance: 'Oriental Insurance',
+  national_insurance: 'National Insurance', new_india_assurance: 'New India Assurance',
+  raheja_qbe: 'Raheja QBE', zuno: 'Zuno', kshema: 'Kshema', indusind: 'IndusInd',
+  acko: 'Acko', navi: 'Navi',
+};
+function insurerDisplayName(slug) {
+  const s = String(slug || '').toLowerCase().trim();
+  if (!s) return '';
+  if (INSURER_DISPLAY[s]) return INSURER_DISPLAY[s];
+  return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 /** POST /calculate.csv — same inputs as /calculate, but returns a CSV stream. */
 router.post('/calculate.csv', async (req, res, next) => {
   try {
@@ -6471,7 +6567,9 @@ router.post('/calculate.csv', async (req, res, next) => {
       return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
     const header = cols.join(',');
-    const lines = data.rows.map(r => cols.map(c => esc(r[c])).join(','));
+    const lines = data.rows.map(r => cols.map(c =>
+      esc(c === 'insurer' ? (insurerDisplayName(r.insurer_slug) || r.insurer) : r[c])
+    ).join(','));
     const csv = [header, ...lines].join('\r\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="bulk_commission.csv"');
@@ -6557,6 +6655,7 @@ router.get('/debug-bulk-policy/:tracker', async (req, res, next) => {
       'RTO': raw.RTO_Code || raw.VEHICLE_REGISTRATION_NO,
       'STATE': raw.StateName, 'STATE NAME': raw.StateName,
       'AGE OF VEHICLE': raw.AGE_OF_VEHICLE,
+      'DATE OF MFG': raw.DATE_OF_MFG, 'MFG YEAR': raw.MFG_YEAR,
       'BASE OD PREMIUM': raw.BASE_OD_PREMIUM,
       'NET OD PREMIUM': raw.NET_OD_PREMIUM,
       'TP PREMIUM': raw.LIABILITY_PREMIUM || raw.NET_LIABILITY_PREMIUM,
@@ -6690,6 +6789,7 @@ router.get('/debug-filter', async (req, res, next) => {
       'RTO': raw.RTO_Code || raw.VEHICLE_REGISTRATION_NO,
       'STATE': raw.StateName, 'STATE NAME': raw.StateName,
       'AGE OF VEHICLE': raw.AGE_OF_VEHICLE,
+      'DATE OF MFG': raw.DATE_OF_MFG, 'MFG YEAR': raw.MFG_YEAR,
       'BASE OD PREMIUM': raw.BASE_OD_PREMIUM, 'NET OD PREMIUM': raw.NET_OD_PREMIUM,
       'TP PREMIUM': raw.LIABILITY_PREMIUM || raw.NET_LIABILITY_PREMIUM,
       'PREMIUM WITHOUT GST': raw.PREMIUM_WITHOUT_GST,

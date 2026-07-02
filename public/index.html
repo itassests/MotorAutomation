@@ -397,6 +397,7 @@
     <div class="tab"        data-tab="statements"        title="Statements"         ><span class="tab-icon">&#128196;</span><span class="tab-label">Statements</span></div>
     <div class="tab"        data-tab="pr"                title="Premium Register"   ><span class="tab-icon">&#128203;</span><span class="tab-label">Premium Register</span></div>
     <div class="tab"        data-tab="ocr-bulk"          title="OCR Bulk Upload"    ><span class="tab-icon">&#128230;</span><span class="tab-label">OCR Bulk Upload</span></div>
+    <div class="tab"        data-tab="policy-push"       title="Policy Push to Mobile"><span class="tab-icon">&#128241;</span><span class="tab-label">Policy Push</span></div>
     <div class="tab"        data-tab="renewal-notice"    title="Renewal Notice"     ><span class="tab-icon">&#128196;</span><span class="tab-label">Renewal Notice</span></div>
     <div class="tab"        data-tab="bulk"              title="Bulk Calculation"   ><span class="tab-icon">&#129518;</span><span class="tab-label">Bulk Calculation</span></div>
     <div class="tab"        data-tab="payout"            title="Payout Summary"     ><span class="tab-icon">&#128181;</span><span class="tab-label">Payout Summary</span></div>
@@ -1941,6 +1942,18 @@
           <span id="ocrShowing" style="margin-left:auto; font-size:12px; color:#888;"></span>
         </div>
 
+        <!-- Consolidated date-range export: one Excel across all folders in the
+             range (Date + Folder + Policy No + Tracker No) so rows are easy to match. -->
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px; padding:8px 10px; background:#f6f8fa; border-radius:6px; font-size:13px;">
+          <span style="font-weight:600; color:#555;">Download by date:</span>
+          <label style="color:#666;">From <input type="date" id="ocrExportFrom" style="padding:4px 6px;"></label>
+          <label style="color:#666;">To <input type="date" id="ocrExportTo" style="padding:4px 6px;"></label>
+          <button class="btn btn-primary" style="padding:6px 14px;" onclick="ocrExportRange()">
+            <span style="margin-right:6px;">&#128229;</span>Download Excel
+          </button>
+          <span style="margin-left:auto; font-size:12px; color:#999;">All folders in the range in one sheet</span>
+        </div>
+
         <!-- Processing status + auto-refresh indicator. -->
         <style>
           @keyframes ocrPulse { 0%,100%{opacity:1;} 50%{opacity:0.25;} }
@@ -1985,6 +1998,68 @@
               <tr><td colspan="7" style="text-align:center; color:#999; padding:18px;">No uploads yet.</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-policy-push">
+      <h1 style="margin:0 0 4px;"><span class="icon">&#128241;</span> Policy Push to Mobile App</h1>
+      <p style="color:#667; margin:0 0 16px; font-size:13px;">Motor policies (submission date ≥ 1-Apr-2026) pushed to the mobile app in the background. Backfill runs once; new submissions enqueue daily.</p>
+
+      <!-- Backfill control + progress -->
+      <div class="card" style="margin-bottom:14px;">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <h2 style="margin:0;"><span class="icon">&#9203;</span> Backfill (one-time)</h2>
+          <button class="btn btn-primary" id="ppBackfillBtn" style="padding:6px 14px;" onclick="ppStartBackfill()">Start / Resume backfill</button>
+          <button class="btn" style="padding:6px 14px;" onclick="ppLoadBackfill()"><span style="margin-right:6px;">&#128260;</span>Refresh</button>
+          <span id="ppBackfillState" style="margin-left:auto; font-size:12px; color:#888;"></span>
+        </div>
+        <div style="margin-top:10px; background:#eef2f6; border-radius:6px; height:14px; overflow:hidden;">
+          <div id="ppBackfillBar" style="height:100%; width:0%; background:#1b8a5a; transition:width .4s;"></div>
+        </div>
+        <div id="ppBackfillText" style="font-size:12px; color:#5a6a7a; margin-top:6px;">—</div>
+      </div>
+
+      <!-- Dashboard: today / month / year × submitted / pushed / failed / pending -->
+      <div class="card" style="margin-bottom:14px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+          <h2 style="margin:0;"><span class="icon">&#128202;</span> Push Dashboard</h2>
+          <button class="btn" style="padding:6px 14px;" onclick="ppLoadSummary()"><span style="margin-right:6px;">&#128260;</span>Refresh</button>
+          <span id="ppSummaryState" style="margin-left:auto; font-size:12px; color:#888;"></span>
+        </div>
+        <div id="ppSummaryGrid"></div>
+      </div>
+
+      <!-- Failures + correct-and-repush -->
+      <div class="card">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+          <h2 style="margin:0;"><span class="icon">&#9888;</span> Failures</h2>
+          <button class="btn" style="padding:6px 14px;" onclick="ppLoadFailures()"><span style="margin-right:6px;">&#128260;</span>Refresh</button>
+          <span id="ppFailShowing" style="margin-left:auto; font-size:12px; color:#888;"></span>
+        </div>
+        <table class="data-table" style="width:100%; border-collapse:collapse; font-size:12px;">
+          <thead><tr style="text-align:left; border-bottom:2px solid #e3e8ee;">
+            <th style="padding:6px;">Tracker</th><th style="padding:6px;">Policy No</th>
+            <th style="padding:6px;">Submitted</th><th style="padding:6px;">Retry</th>
+            <th style="padding:6px;">Error</th><th style="padding:6px;">Actions</th>
+          </tr></thead>
+          <tbody id="ppFailBody"><tr><td colspan="6" style="text-align:center; color:#999; padding:18px;">No failures loaded.</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- Correct-payload editor (hidden until "Correct" is clicked) -->
+      <div id="ppEditor" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:#fff; border-radius:8px; padding:18px; width:min(680px,92vw); max-height:86vh; overflow:auto; box-shadow:0 8px 30px rgba(0,0,0,.25);">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+            <h3 style="margin:0;">Correct payload &amp; repush</h3>
+            <span id="ppEditorTracker" style="font-size:12px; color:#888;"></span>
+            <button class="btn" style="margin-left:auto; padding:4px 10px;" onclick="ppCloseEditor()">Cancel</button>
+          </div>
+          <div id="ppEditorErr" style="font-size:12px; color:#c62828; margin-bottom:6px;"></div>
+          <textarea id="ppEditorJson" spellcheck="false" style="width:100%; height:320px; font-family:monospace; font-size:12px; border:1px solid #cdd7e1; border-radius:6px; padding:8px;"></textarea>
+          <div style="margin-top:10px; text-align:right;">
+            <button class="btn btn-primary" style="padding:6px 16px;" onclick="ppSaveCorrection()">Save &amp; repush</button>
+          </div>
         </div>
       </div>
     </div>
@@ -3987,6 +4062,11 @@
           tab.style.display = (_currentUser && _currentUser.role === 'admin') ? '' : 'none';
           return;
         }
+        // Policy Push dashboard is admin-only (the /api/policy-push routes enforce the same).
+        if (k === 'policy-push') {
+          tab.style.display = (_currentUser && _currentUser.role === 'admin') ? '' : 'none';
+          return;
+        }
         // OCR Bulk Upload is locked to a single operator (empcode 107110) — not
         // even admins. The /api/ocr-bulk routes enforce the same on the server.
         if (k === 'ocr-bulk') {
@@ -4058,6 +4138,7 @@
       tab.addEventListener('click', () => {
         // Stop OCR Bulk timers when navigating away (ocrBulkInit re-starts them on entry).
         if (tab.dataset.tab !== 'ocr-bulk' && typeof ocrStopAuto === 'function') ocrStopAuto();
+        if (tab.dataset.tab !== 'policy-push' && typeof ppStopAuto === 'function') ppStopAuto();
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
@@ -4074,6 +4155,7 @@
         if (tab.dataset.tab === 'reconcile') rcInit();
         if (tab.dataset.tab === 'pr') { if (!window._prDashInited) prDashInit(); loadPrCoverageMatrix(); }
         if (tab.dataset.tab === 'ocr-bulk') ocrBulkInit();
+        if (tab.dataset.tab === 'policy-push') ppInit();
         // Margin coverage scan is expensive — defer until tab first opened.
         if (tab.dataset.tab === 'margins' && !window._marginCoverageInited) {
           window._marginCoverageInited = true;
@@ -6552,6 +6634,135 @@
       document.getElementById('rnLog').textContent = (job.log || []).join('\n');
     }
 
+    /* ==================== POLICY PUSH (mobile app) ==================== */
+    let _ppAutoTimer = null;
+
+    function ppInit() {
+      ppLoadSummary();
+      ppLoadBackfill();
+      ppLoadFailures();
+      if (_ppAutoTimer) clearInterval(_ppAutoTimer);
+      _ppAutoTimer = setInterval(() => {
+        const panel = document.getElementById('panel-policy-push');
+        if (panel && panel.classList.contains('active')) { ppLoadSummary(); ppLoadBackfill(); }
+      }, 15000);   // refresh dashboard + backfill every 15s while the tab is open
+    }
+    function ppStopAuto() { if (_ppAutoTimer) { clearInterval(_ppAutoTimer); _ppAutoTimer = null; } }
+
+    const _ppNum = n => Number(n || 0).toLocaleString('en-IN');
+    function _ppBucket(title, b) {
+      b = b || {};
+      const tile = (label, val, color) =>
+        `<div class="stat-card"${color ? ` style="background:${color.bg};"` : ''}><div class="num"${color ? ` style="color:${color.fg};"` : ''}>${_ppNum(val)}</div><div class="label">${label}</div></div>`;
+      return `<div style="margin-bottom:14px;">
+        <div style="font-size:12px; font-weight:600; color:#5a6a7a; text-transform:uppercase; margin-bottom:6px;">${title}</div>
+        <div class="stats-row">
+          ${tile('Submitted', b.submitted)}
+          ${tile('Pushed', b.pushed, { bg: '#e8f5e9', fg: '#2e7d32' })}
+          ${tile('Failed', b.failed, { bg: '#fdecea', fg: '#c62828' })}
+          ${tile('Pending', b.pending, { bg: '#fff8e1', fg: '#a06a00' })}
+          ${tile('Awaiting Policy #', b.awaiting, { bg: '#eef1f5', fg: '#5a6a7a' })}
+        </div></div>`;
+    }
+    async function ppLoadSummary() {
+      const state = document.getElementById('ppSummaryState');
+      try {
+        const d = await fetch(API + '/policy-push/summary').then(r => r.json());
+        if (!d.success) throw new Error(d.error || 'failed');
+        document.getElementById('ppSummaryGrid').innerHTML =
+          _ppBucket('Today', d.today) + _ppBucket('This Month', d.month) +
+          _ppBucket('This Year', d.year) + _ppBucket('All Time', d.all);
+        if (state) state.textContent = 'Updated ' + new Date().toLocaleTimeString();
+      } catch (e) { if (state) state.textContent = 'Error: ' + e.message; }
+    }
+    async function ppLoadBackfill() {
+      try {
+        const d = await fetch(API + '/policy-push/backfill/status').then(r => r.json());
+        if (!d.success) return;
+        const total = d.totalEstimate || 0, seeded = d.seeded || 0;
+        const pct = total > 0 ? Math.min(100, Math.round(seeded / total * 100)) : (d.done ? 100 : 0);
+        document.getElementById('ppBackfillBar').style.width = pct + '%';
+        const started = d.started_at ? new Date(d.started_at).toLocaleString() : null;
+        document.getElementById('ppBackfillState').textContent =
+          d.done ? 'Complete' : (started ? 'Running' : 'Not started');
+        document.getElementById('ppBackfillText').textContent =
+          `Seeded ${_ppNum(seeded)} of ~${_ppNum(total)} motor policies (${pct}%)` +
+          (d.done ? ' — done.' : '') + (started ? ` · started ${started}` : '') +
+          (d.last_daily_date ? ` · daily up to ${String(d.last_daily_date).slice(0, 10)}` : '');
+      } catch (_) { /* keep last */ }
+    }
+    async function ppStartBackfill() {
+      const btn = document.getElementById('ppBackfillBtn');
+      btn.disabled = true;
+      try {
+        const d = await fetch(API + '/policy-push/backfill', { method: 'POST' }).then(r => r.json());
+        if (!d.success) throw new Error(d.error || 'failed');
+        showToast(d.done ? 'Backfill already complete' : 'Backfill started — draining in the background', 'success');
+        ppLoadBackfill();
+      } catch (e) { showToast('Backfill error: ' + e.message, 'error'); }
+      finally { btn.disabled = false; }
+    }
+    async function ppLoadFailures() {
+      const body = document.getElementById('ppFailBody');
+      try {
+        const d = await fetch(API + '/policy-push/failures?size=100').then(r => r.json());
+        if (!d.success) throw new Error(d.error || 'failed');
+        const rows = d.rows || [];
+        document.getElementById('ppFailShowing').textContent = `${_ppNum(d.count)} failed`;
+        if (rows.length === 0) { body.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#2e7d32; padding:18px;">No failures 🎉</td></tr>'; return; }
+        body.innerHTML = rows.map(r => `<tr style="border-bottom:1px solid #eef2f6;">
+          <td style="padding:6px; font-family:monospace;">${r.tracker_no || ''}</td>
+          <td style="padding:6px;">${r.policy_no || '<span style="color:#bbb;">—</span>'}</td>
+          <td style="padding:6px;">${r.submission_date ? String(r.submission_date).slice(0, 10) : ''}</td>
+          <td style="padding:6px; text-align:center;">${r.retry || 0}</td>
+          <td style="padding:6px; color:#c62828; max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${(r.error || '').replace(/"/g, '&quot;')}">${r.error || ''}</td>
+          <td style="padding:6px; white-space:nowrap;">
+            <button class="btn" style="padding:3px 8px; font-size:11px;" onclick="ppRepush(${r.id})">Repush</button>
+            <button class="btn" style="padding:3px 8px; font-size:11px; color:#6a1b9a; border-color:#ce93d8;" onclick="ppOpenCorrect(${r.id})">Correct</button>
+          </td></tr>`).join('');
+      } catch (e) { body.innerHTML = `<tr><td colspan="6" style="color:#c62828; padding:12px;">Error: ${e.message}</td></tr>`; }
+    }
+    async function ppRepush(id) {
+      try {
+        const d = await fetch(API + '/policy-push/repush/' + id, { method: 'POST' }).then(r => r.json());
+        if (!d.success) throw new Error(d.error || 'failed');
+        showToast('Re-queued for push', 'success');
+        ppLoadFailures(); ppLoadSummary();
+      } catch (e) { showToast('Repush error: ' + e.message, 'error'); }
+    }
+    async function ppOpenCorrect(id) {
+      try {
+        const d = await fetch(API + '/policy-push/policy/' + id).then(r => r.json());
+        if (!d.success) throw new Error(d.error || 'failed');
+        const row = d.row;
+        let payload = {};
+        try { payload = row.payload_json ? JSON.parse(row.payload_json) : {}; } catch (_) { payload = {}; }
+        document.getElementById('ppEditor').dataset.id = id;
+        document.getElementById('ppEditorTracker').textContent = row.tracker_no || ('#' + id);
+        document.getElementById('ppEditorErr').textContent = '';
+        document.getElementById('ppEditorJson').value = JSON.stringify(payload, null, 2);
+        document.getElementById('ppEditor').style.display = 'flex';
+      } catch (e) { showToast('Load error: ' + e.message, 'error'); }
+    }
+    function ppCloseEditor() { document.getElementById('ppEditor').style.display = 'none'; }
+    async function ppSaveCorrection() {
+      const id = document.getElementById('ppEditor').dataset.id;
+      let payload;
+      try { payload = JSON.parse(document.getElementById('ppEditorJson').value); }
+      catch (e) { document.getElementById('ppEditorErr').textContent = 'Invalid JSON: ' + e.message; return; }
+      try {
+        const d = await fetch(API + '/policy-push/policy/' + id, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ payload }),
+        }).then(r => r.json());
+        if (!d.success) throw new Error(d.error || 'failed');
+        ppCloseEditor();
+        showToast('Corrected & re-queued', 'success');
+        ppLoadFailures(); ppLoadSummary();
+      } catch (e) { document.getElementById('ppEditorErr').textContent = 'Save error: ' + e.message; }
+    }
+    /* ================== END POLICY PUSH ================== */
+
     function ocrBulkInit() {
       // Populate the insurer dropdown from the master list (once), then refresh.
       if (!window._ocrInsurersLoaded) {
@@ -6645,6 +6856,19 @@
       } catch (e) {
         msg.textContent = ''; showToast(e.message, 'error');
       } finally { btn.disabled = false; }
+    }
+
+    /** Consolidated OCR export across all folders whose upload date is in the
+     *  chosen range (defaults to last 30 days when the inputs are blank). */
+    function ocrExportRange() {
+      const today = new Date();
+      const iso = d => d.toISOString().slice(0, 10);
+      const to = (document.getElementById('ocrExportTo').value) || iso(today);
+      const from = (document.getElementById('ocrExportFrom').value) ||
+        iso(new Date(today.getTime() - 30 * 864e5));
+      if (from > to) { showToast('“From” date must be on or before “To” date', 'error'); return; }
+      const url = `${API}/ocr-bulk/export?from=${from}&to=${to}&token=` + encodeURIComponent(_authToken || '');
+      window.location.href = url;
     }
 
     async function ocrLoadList() {
@@ -9214,8 +9438,15 @@
         <div class="stat-card"><div class="num">\u20B9 ${(params.netPremium || 0).toLocaleString('en-IN')}</div><div class="label">Net Premium</div></div>
         <div class="stat-card"><div class="num">\u20B9 ${(params.annualPremium || 0).toLocaleString('en-IN')}</div><div class="label">Annual Premium</div></div>
         <div class="stat-card"><div class="num">${params.vehicleAge != null ? params.vehicleAge + ' yr' : '-'}</div><div class="label">Vehicle Age</div></div>
+        <div class="stat-card"><div class="num" style="font-size:15px;">${params.issueDate || '-'}</div><div class="label">Issue Date</div></div>
       `;
-      document.getElementById('policyStats').innerHTML = statsHTML;
+      // Discount from the operator's uploaded Premium Register (PR). When no PR
+      // row covers this policy, show "PR not uploaded" instead of a blank value.
+      const prd = data.pr_discount || { available: false };
+      const discHTML = prd.available
+        ? `<div class="stat-card"><div class="num">${prd.discount_pct != null ? prd.discount_pct + '%' : '—'}</div><div class="label">Discount (PR)${prd.source ? ' · ' + prd.source : ''}</div></div>`
+        : `<div class="stat-card"><div class="num" style="font-size:13px; color:#c62828;">PR not uploaded</div><div class="label">Discount (PR)</div></div>`;
+      document.getElementById('policyStats').innerHTML = statsHTML + discHTML;
 
       // Raw data table
       const rawHTML = '<table style="width:100%; font-size:12px;">' +
@@ -12452,13 +12683,33 @@
         if (/PVT|PRIVATE|^CAR$|^4W$/.test(u)) return 'Pvt Car';
         return s;   // unknown -> leave as-is
       };
+      // Canonical insurer NAME (user request): the source `insurer` string arrives
+      // in many spellings + bank-channel variants (ICICI LOMBARD / ICICIBank /
+      // KotakBank / HDFC Asset Management Company Limited / Hdfc Ergo General).
+      // The engine already resolves every policy to one `insurer_slug`, so map
+      // that slug → the canonical display name (from the loaded insurer list) so
+      // the export shows ONE consistent name per insurer. Fall back to a tidy
+      // title-cased slug, then to the raw string.
+      const _insDisplay = {};
+      ['bulkInsurer', 'calcInsurer', 'searchInsurer'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        for (const o of el.options) if (o.value) _insDisplay[String(o.value).toLowerCase()] = o.textContent;
+      });
+      const _titleCase = (s) => String(s == null ? '' : s).toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+      const normInsurer = (r) => {
+        const slug = String(r.insurer_slug || '').toLowerCase().trim();
+        if (slug && _insDisplay[slug]) return _insDisplay[slug];
+        if (slug) return _titleCase(slug.replace(/_/g, ' '));
+        return _titleCase(r.insurer || r.insurer_slug || '');
+      };
       const cols = [
         ['Policy No',        r => asText(r.policy_no)],
         // Trackers are alphanumeric (MT/DIRSW/…), never scientific-notation
         // risks — so emit a plain trimmed value (no leading \t, no source
         // trailing spaces) per user request.
         ['Tracker No',       r => String(r.tracker_no == null ? '' : r.tracker_no).trim()],
-        ['Insurer',          r => r.insurer || r.insurer_slug],
+        ['Insurer',          r => normInsurer(r)],
         ['Agent Code',       r => String(r.agent_code == null ? '' : r.agent_code).trim()],
         ['Agent Name',       r => r.agent_name],
         ['Product',          r => r.product],
