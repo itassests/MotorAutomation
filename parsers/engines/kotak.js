@@ -758,6 +758,43 @@ function parseMsgFile(filePath) {
   return [];
 }
 
+// ----------------------------------------------------------------------------
+// Sheet kind: kotak_tw_rto_make — JUN'26 per-RTO×Make TW PO tables
+// ("TW 1+1 and SATP PO grid", "Brand New TW - RTA Groups"). Columns (fixed
+// positions — the header row mislabels the SATP columns, so we can't key by
+// name): Grouping | RTO Code | District | Tier | Theft Flag | Make | then rate
+// column groups declared in config (scooter/bike × Comp/SATP). Emits one rule
+// per RTO×Make×(Scooter|Bike)×cover, keyed like the GCV RTO grid
+// (region=sub_type=RTO) plus make so the lookup gates on RTO + make + segment.
+// ----------------------------------------------------------------------------
+function parseTwRtoMake(aoa, cfg, meta) {
+  const ds = cfg.data_start_row != null ? cfg.data_start_row : 1;
+  const rules = [];
+  const emit = (row, rto, make, colIdx, seg, cover) => {
+    if (colIdx == null) return;
+    const rate = asRate(row[colIdx]);
+    if (rate == null) return;
+    rules.push({
+      product: 'TW', sheet_name: meta.sheetName, region: rto, sub_type: rto,
+      segment: seg, make, rate_type: cover, applied_on: cover === 'SATP' ? 'TP' : 'OD',
+      rate_value: rate, is_declined: false,
+      remarks: `Kotak TW | ${rto} | ${make} | ${seg} | ${cover}`,
+      rate_text: `Kotak TW | ${rto} | ${make} | ${seg} | ${cover} | ${(rate * 100).toFixed(2)}%`,
+    });
+  };
+  for (let r = ds; r < aoa.length; r++) {
+    const row = aoa[r] || [];
+    const rto = cell(row[cfg.rto_col]);
+    const make = cell(row[cfg.make_col]);
+    if (!rto || !make) continue;
+    emit(row, rto, make, cfg.scooter_comp_col, 'Scooter', 'COMP');
+    emit(row, rto, make, cfg.bike_comp_col,    'Bike',    'COMP');
+    emit(row, rto, make, cfg.scooter_satp_col, 'Scooter', 'SATP');
+    emit(row, rto, make, cfg.bike_satp_col,    'Bike',    'SATP');
+  }
+  return rules;
+}
+
 function parse(sheetData, sheetConfig, meta) {
   const kind = sheetConfig?.config?.sheet_kind || sheetConfig?.kind;
   switch (kind) {
@@ -770,6 +807,7 @@ function parse(sheetData, sheetConfig, meta) {
     case 'kotak_rto_gcv_2_5_3_5':
     case 'kotak_rto_gcv_3_5_7_5':
       return parseGcvRto(sheetData, meta, kind);
+    case 'kotak_tw_rto_make':       return parseTwRtoMake(sheetData, sheetConfig, meta);
     case 'kotak_satp_rto':          return parseSatpRto(sheetData, meta);
     default:
       console.warn(`[kotak] unknown sheet_kind: ${kind}`);

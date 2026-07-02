@@ -152,6 +152,83 @@
       }
     },
     {
+      "_note": "JUN'26 layout: Robinhood renamed+restructured the car/TW sheets into Comp/SAOD + SATP splits (matching the CV sheets). Old PC/PCTP/TW Comp&TP/TW SOD entries above stay for pre-June files; these 4 handle June. Headers: PC Comp&SAOD r1, PC SATP r1=fuel/r2=cc, TW sheets r1=Bike/Scooter/r2=subhdr.",
+      "name": "PC Comp & SAOD",
+      "name_pattern": "^PC\\s*Comp",
+      "layout": "liberty_grid",
+      "file_pattern": "Robinhood",
+      "config": {
+        "product": "CAR",
+        "data_start_row": 2,
+        "region_col": 0,
+        "column_groups": [
+          { "ins_product": "Comp", "applied_on": "OD", "fuel_type": "Petrol", "ncb_min": 1, "ncb_max": 99, "start_col": 1, "variant_label": "Petrol Comp NCB", "ages": [null] },
+          { "ins_product": "Comp", "applied_on": "OD", "fuel_type": "Petrol", "ncb_min": 0, "ncb_max": 0, "start_col": 2, "variant_label": "Petrol Comp No-NCB", "ages": [null] },
+          { "ins_product": "Comp", "applied_on": "OD", "fuel_types": ["Diesel","CNG","Electric"], "ncb_min": 1, "ncb_max": 99, "start_col": 3, "variant_label": "Diesel/CNG/EV Comp NCB", "ages": [null] },
+          { "ins_product": "Comp", "applied_on": "OD", "fuel_types": ["Diesel","CNG","Electric"], "ncb_min": 0, "ncb_max": 0, "start_col": 4, "variant_label": "Diesel/CNG/EV Comp No-NCB", "ages": [null] },
+          { "ins_product": "SAOD", "applied_on": "OD", "ncb_min": 1, "ncb_max": 99, "start_col": 5, "variant_label": "SAOD NCB", "ages": [null] },
+          { "ins_product": "SAOD", "applied_on": "OD", "ncb_min": 0, "ncb_max": 0, "start_col": 6, "variant_label": "SAOD Non-NCB", "ages": [null] }
+        ]
+      }
+    },
+    {
+      "name": "PC SATP",
+      "name_pattern": "^PC\\s*SATP",
+      "layout": "liberty_grid",
+      "file_pattern": "Robinhood",
+      "config": {
+        "product": "CAR",
+        "data_start_row": 3,
+        "region_col": 0,
+        "column_groups": [
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "Petrol", "cc_band_min": 0,    "cc_band_max": 1000, "start_col": 1, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "Petrol", "cc_band_min": 1000, "cc_band_max": 1500, "start_col": 2, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "Petrol", "cc_band_min": 1500, "cc_band_max": 9999, "start_col": 3, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "Diesel", "cc_band_min": 0,    "cc_band_max": 1000, "start_col": 4, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "Diesel", "cc_band_min": 1000, "cc_band_max": 1500, "start_col": 5, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "Diesel", "cc_band_min": 1500, "cc_band_max": 9999, "start_col": 6, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "CNG",    "cc_band_min": 0,    "cc_band_max": 1000, "start_col": 7, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "CNG",    "cc_band_min": 1000, "cc_band_max": 1500, "start_col": 8, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "fuel_type": "CNG",    "cc_band_min": 1500, "cc_band_max": 9999, "start_col": 9, "ages": [null] }
+        ]
+      }
+    },
+    {
+      "name": "TW Comp & SAOD",
+      "name_pattern": "^TW\\s*Comp",
+      "layout": "liberty_grid",
+      "file_pattern": "Robinhood",
+      "config": {
+        "product": "TW",
+        "data_start_row": 3,
+        "region_col": 0,
+        "column_groups": [
+          { "ins_product": "Comp", "applied_on": "OD", "sub_type": "Bike",    "start_col": 1, "ages": [null] },
+          { "ins_product": "SAOD", "applied_on": "OD", "sub_type": "Bike",    "start_col": 2, "ages": [null] },
+          { "ins_product": "Comp", "applied_on": "OD", "sub_type": "Scooter", "start_col": 3, "ages": [null] },
+          { "ins_product": "SAOD", "applied_on": "OD", "sub_type": "Scooter", "start_col": 4, "ages": [null] }
+        ]
+      }
+    },
+    {
+      "name": "TW SATP",
+      "name_pattern": "^TW\\s*SATP",
+      "layout": "liberty_grid",
+      "file_pattern": "Robinhood",
+      "config": {
+        "product": "TW",
+        "data_start_row": 3,
+        "region_col": 0,
+        "column_groups": [
+          { "ins_product": "TP", "applied_on": "TP", "sub_type": "Bike",    "cc_band_min": 0,   "cc_band_max": 75,   "start_col": 1, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "sub_type": "Bike",    "cc_band_min": 75,  "cc_band_max": 150,  "start_col": 2, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "sub_type": "Bike",    "cc_band_min": 150, "cc_band_max": 350,  "start_col": 3, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "sub_type": "Bike",    "cc_band_min": 350, "cc_band_max": 9999, "start_col": 4, "ages": [null] },
+          { "ins_product": "TP", "applied_on": "TP", "sub_type": "Scooter", "cc_band_min": 0,   "cc_band_max": 150,  "start_col": 5, "ages": [null] }
+        ]
+      }
+    },
+    {
       "name": "Geo Cluster",
       "name_pattern": "Geo\\s*Cluster",
       "layout": "rto_mapping",

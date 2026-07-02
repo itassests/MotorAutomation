@@ -14,7 +14,10 @@
   "sheets": [
     {
       "name": "BROKER GRID MAR 26",
-      "name_pattern": "broker[\\s_]*grid",
+      "_note": "Main 4W/CV/PCV/MISC grid. Sheet name drifts monthly ('BROKER GRID MAR 26' → 'GRID MAY 26'), so match by content signature (its unique 'BROKER' rate column; PCV-short-term uses 'PAYOUT%', TW sheets use 'Average Net PO') and only fall back to name. Fixes June where 'GRID MAY 26' matched nothing → CAR/GCV/MISC dropped.",
+      "content_signature": ["state", "products", "broker"],
+      "content_scan_rows": 20,
+      "name_pattern": "(broker[\\s_]*)?grid[\\s_]+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)",
       "layout": "shriram_grid",
       "config": { "sheet_kind": "broker_grid", "data_start_row": 1 },
       "metro_lookup": { "sheet": "Metro RTO Codes" }

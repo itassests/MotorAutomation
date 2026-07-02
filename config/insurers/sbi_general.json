@@ -32,8 +32,9 @@
       "config": { "sheet_kind": "pcv_misd_tw", "data_start_row": 4 }
     },
     {
+      "_note": "JUN'26 renamed the Pvt-Car SATP sheet to 'PV SATP Apr-26'. Match 'PV SATP ...' too, but exclude the 'PV SATP Decline make and Model' list sheet via negative lookahead.",
       "name": "PVT car SATP-Apr26",
-      "name_pattern": "pvt[\\s_]*car[\\s_]*satp|pvtcar[\\s_]*satp",
+      "name_pattern": "pvt[\\s_]*car[\\s_]*satp|pvtcar[\\s_]*satp|pv[\\s_]*satp(?![\\s_]*decline)",
       "layout": "sbi_pvt_satp",
       "product": "CAR",
       "config": {

@@ -37,25 +37,44 @@
       "config": { "sheet_kind": "kotak_rto_pvt_car" }
     },
     {
-      "_comment": "GCV acceptable RTO.xlsx — Upto 2.5 ton sheet",
+      "_comment": "GCV per-RTO commission. JUN'26 renamed file 'GCV acceptable RTO.xlsx' → 'GCV Pan India Working' and sheets gained a ' GCV' suffix ('Upto 2.5 Ton GCV'). Same RTO|cat|Commission layout, so broaden file_pattern + add name_pattern.",
       "name": "Upto 2.5 ton",
-      "file_pattern": "GCV[ _]acceptable|gcv[ _]rto",
+      "name_pattern": "^upto\\s*2\\.?5\\s*ton",
+      "file_pattern": "GCV[ _]Pan[ _]India|GCV[ _]acceptable|gcv[ _]rto",
       "layout": "kotak",
       "config": { "sheet_kind": "kotak_rto_gcv_upto_2_5" }
     },
     {
-      "_comment": "GCV acceptable RTO.xlsx — 2.5-3.5 ton sheet",
+      "_comment": "GCV 2.5-3.5 ton — JUN sheet ' 2.5 Ton To 3.5 Ton GCV'",
       "name": "2.5 ton 3.5 ton ",
-      "file_pattern": "GCV[ _]acceptable|gcv[ _]rto",
+      "name_pattern": "2\\.?5\\s*ton\\s*to\\s*3\\.?5\\s*ton",
+      "file_pattern": "GCV[ _]Pan[ _]India|GCV[ _]acceptable|gcv[ _]rto",
       "layout": "kotak",
       "config": { "sheet_kind": "kotak_rto_gcv_2_5_3_5" }
     },
     {
-      "_comment": "GCV acceptable RTO.xlsx — 3.5-7.5 ton sheet",
+      "_comment": "GCV 3.5-7.5 ton — JUN sheet '3.5 ton to 7.5 ton GCV'",
       "name": "3.5 to 7.5 Ton",
-      "file_pattern": "GCV[ _]acceptable|gcv[ _]rto",
+      "name_pattern": "3\\.?5\\s*ton\\s*to\\s*7\\.?5\\s*ton",
+      "file_pattern": "GCV[ _]Pan[ _]India|GCV[ _]acceptable|gcv[ _]rto",
       "layout": "kotak",
       "config": { "sheet_kind": "kotak_rto_gcv_3_5_7_5" }
+    },
+    {
+      "_comment": "JUN'26 TW 1+1 & SATP per-RTO×Make PO grid. Cols: Grouping|RTO(1)|District|Tier|Theft|Make(5)|Scooter-Comp(6)|Bike-Comp(7)|_|Scooter-SATP(9)|Bike-SATP(10). Header mislabels SATP cols so positions are fixed. data from row 4.",
+      "name": "1+1 and SATP TW RTO wise PO",
+      "name_pattern": "1\\+1\\s*and\\s*satp\\s*tw|tw\\s*rto\\s*wise\\s*po",
+      "file_pattern": "1.1[ _]and[ _]SATP|TW[ _]1.1|SATP[ _]PO[ _]grid",
+      "layout": "kotak",
+      "config": { "sheet_kind": "kotak_tw_rto_make", "data_start_row": 4, "rto_col": 1, "make_col": 5, "scooter_comp_col": 6, "bike_comp_col": 7, "scooter_satp_col": 9, "bike_satp_col": 10 }
+    },
+    {
+      "_comment": "JUN'26 Brand-New TW 1+5 per-RTO×Make PO grid (Comp only, new vehicle). Header row 0, data from row 1. Cols: Grouping|RTO(1)|District|Tier|Theft|Make(5)|Scooter(6)|Bike(7).",
+      "name": "1+5 TW brand New PO",
+      "name_pattern": "1\\+5\\s*tw\\s*brand\\s*new|brand\\s*new.*tw.*po",
+      "file_pattern": "Brand[ _]New[ _]TW|1.5[ _]TW[ _]brand",
+      "layout": "kotak",
+      "config": { "sheet_kind": "kotak_tw_rto_make", "data_start_row": 1, "rto_col": 1, "make_col": 5, "scooter_comp_col": 6, "bike_comp_col": 7 }
     },
     {
       "_comment": "Tractor RTO file — per-RTO commission with state tier",
