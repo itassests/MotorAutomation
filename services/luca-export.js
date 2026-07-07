@@ -74,12 +74,19 @@ function lucaInsurer(slug) {
   return s.split('_')[0] || s;
 }
 
-// rate_value is stored as a fraction (0.275). Luca wants the % number (27.5).
+// rate_value → Luca % number. The column is INCONSISTENT: most rows are fractions
+// (0.275 → 27.5) but some insurers/cards store the percent directly (shriram, and
+// mis-ingested tata/go_digit rows: 40 = 40%). A blind ×100 turned those into
+// 4-digit values (4000). Fix: only scale fractions (|v| < 1) — values ≥ 1 are
+// already percents. Commission % can't be negative, so use the magnitude
+// (a few go_digit/chola rows carry a stray minus sign).
 function pct(v) {
   if (v == null || v === '') return '';
-  const n = Number(v);
+  let n = Number(v);
   if (!Number.isFinite(n)) return '';
-  return +(n * 100).toFixed(3);
+  n = Math.abs(n);
+  if (n < 1) n = n * 100;                 // fraction → percent; ≥1 already a percent
+  return +n.toFixed(3);
 }
 
 // NCB qualifier (TRUE / FALSE / blank) from the rate_type tag.
