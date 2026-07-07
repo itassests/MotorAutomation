@@ -413,6 +413,9 @@
     <div class="tab"             data-tab="admin"   title="Admin"   style="color:#c62828; font-weight:600;"><span class="tab-icon">&#9881;</span><span class="tab-label">Admin</span></div>
     <div class="tab"             data-tab="agent-view" title="Agent View" style="color:#0082C8; font-weight:600;"><span class="tab-icon">&#128100;</span><span class="tab-label">Agent View</span></div>
     <div class="tab"             data-tab="employee-view" title="Business Dashboard" style="color:#2e7d32; font-weight:600;"><span class="tab-icon">&#128202;</span><span class="tab-label">Business Dashboard</span></div>
+    <a id="brdSidebarLink" href="/brd.html" target="_blank" rel="noopener" title="Business Requirements Document (opens in a new tab)"
+       style="display:flex; align-items:center; gap:10px; padding:9px 16px; margin-top:8px; color:inherit; text-decoration:none; opacity:.8; border-top:1px solid rgba(128,128,128,.18);"
+       onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.8"><span class="tab-icon">&#128209;</span><span class="tab-label">BRD / Docs</span></a>
   </nav>
 
   <div class="container">
@@ -4040,6 +4043,9 @@
      *  reading from permFor(screenKey).hidden_columns. */
     function applyPermissions() {
       const isAgent = !!(_currentUser && _currentUser.role === 'agent');
+      // BRD/docs link — internal; hidden from agents.
+      const _brd = document.getElementById('brdSidebarLink');
+      if (_brd) _brd.style.display = isAgent ? 'none' : 'flex';
       document.querySelectorAll('.tabs .tab').forEach(tab => {
         const k = tab.dataset.tab;
         // Agents (POSLG logins) see ONLY the Agent View tab.

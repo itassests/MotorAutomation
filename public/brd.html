@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RateExtract — BRD</title></head><body>
+<title>BRD — Motor Commission Rate Extraction Engine</title>
+<style>
+  :root{
+    --ink:#14243B; --paper:#F7F8FA; --card:#FFFFFF; --accent:#1F5C8A;
+    --accent-soft:#E8EFF5; --grey:#56637A; --hair:#E2E7EE;
+    --good:#2E7D46; --warn:#A9740C; --crit:#B23B3B;
+    --code-bg:#F0F3F7; --ink-2:#2C3B52;
+    --serif:"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;
+    --sans:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",sans-serif;
+    --mono:"Cascadia Code","Consolas","SF Mono",ui-monospace,monospace;
+    --measure:74ch;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+    font-size:15.5px;line-height:1.62;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 28px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  :focus-visible{outline:2.5px solid var(--accent);outline-offset:2px;border-radius:3px}
+
+  /* ---- Cover ---- */
+  .cover{border-bottom:1px solid var(--hair);background:
+    linear-gradient(180deg,#fff, var(--paper));padding:52px 0 30px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--accent);font-weight:600}
+  h1{font-family:var(--serif);font-weight:600;font-size:clamp(30px,4.4vw,46px);line-height:1.08;
+    margin:.35em 0 .2em;text-wrap:balance;letter-spacing:-.01em;max-width:20ch}
+  .sub{color:var(--grey);font-size:17px;max-width:60ch;margin:0}
+  .control{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
+    background:var(--hair);border:1px solid var(--hair);border-radius:8px;overflow:hidden;margin-top:30px}
+  .control div{background:var(--card);padding:12px 15px}
+  .control .k{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--grey)}
+  .control .v{font-weight:600;font-size:14.5px;margin-top:2px;font-variant-numeric:tabular-nums}
+  .pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:20px;
+    background:var(--accent-soft);color:var(--accent);vertical-align:middle}
+
+  /* ---- Nav ---- */
+  nav.toc{position:sticky;top:0;z-index:20;background:rgba(247,248,250,.92);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--hair)}
+  nav.toc .wrap{display:flex;gap:4px;overflow-x:auto;padding:9px 28px;scrollbar-width:thin}
+  nav.toc a{font-size:12.5px;color:var(--ink-2);white-space:nowrap;padding:4px 10px;border-radius:6px;font-weight:500}
+  nav.toc a:hover{background:var(--accent-soft);text-decoration:none}
+
+  main{padding:14px 0 80px}
+  section{scroll-margin-top:60px;padding:30px 0;border-bottom:1px solid var(--hair)}
+  .col{max-width:var(--measure)}
+  .snum{font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:600}
+  h2{font-family:var(--serif);font-weight:600;font-size:27px;line-height:1.14;margin:.15em 0 .55em;
+    text-wrap:balance;letter-spacing:-.01em}
+  h2::after{content:"";display:block;width:44px;height:3px;background:var(--accent);margin-top:12px;border-radius:2px}
+  h3{font-family:var(--serif);font-weight:600;font-size:19.5px;margin:1.6em 0 .4em}
+  h4{font-size:14px;font-weight:700;letter-spacing:.02em;margin:1.3em 0 .3em;color:var(--ink-2)}
+  p{margin:.5em 0}
+  ul,ol{margin:.5em 0;padding-left:1.3em}
+  li{margin:.28em 0}
+  strong{color:var(--ink)}
+  code{font-family:var(--mono);font-size:.86em;background:var(--code-bg);padding:1px 5px;border-radius:4px;color:#243855}
+  .lead{font-size:17px;color:var(--ink-2)}
+
+  /* ---- Requirement / callout ---- */
+  .req{border:1px solid var(--hair);border-left:3px solid var(--accent);background:var(--card);
+    border-radius:0 8px 8px 0;padding:12px 16px;margin:12px 0}
+  .req .tag{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--accent)}
+  .note{background:#FBF7EE;border:1px solid #EBDDBF;border-radius:8px;padding:12px 16px;margin:14px 0;font-size:14px}
+  .note b{color:var(--warn)}
+  .ex{background:var(--accent-soft);border:1px solid #CFE0EE;border-radius:10px;padding:14px 16px 6px;margin:16px 0}
+  .ex .ex-h{font-family:var(--mono);font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+  .ex .tw{background:#fff}
+  .ex td.num,.ex th.num{text-align:right}
+
+  /* ---- Tables ---- */
+  .tw{overflow-x:auto;margin:14px 0;border:1px solid var(--hair);border-radius:8px}
+  table{border-collapse:collapse;width:100%;font-size:13.5px}
+  th,td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--hair);vertical-align:top}
+  th{background:#EEF1F6;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--grey);
+    font-weight:700;position:sticky;top:0}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:nth-child(even){background:#FAFBFC}
+  td.mono,.num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12.5px}
+
+  /* ---- Insurer cards ---- */
+  .ins{background:var(--card);border:1px solid var(--hair);border-radius:10px;padding:20px 22px;margin:16px 0;
+    box-shadow:0 1px 2px rgba(20,36,59,.04)}
+  .ins > .hd{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--hair);padding-bottom:10px;margin-bottom:4px}
+  .ins .name{font-family:var(--serif);font-size:20px;font-weight:600}
+  .ins .slug{font-family:var(--mono);font-size:12px;color:var(--grey)}
+  .ins .oneline{color:var(--ink-2);font-size:14.5px;margin:8px 0 2px}
+  .tags{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+  .chip{font-size:11px;font-weight:600;padding:2px 9px;border-radius:5px;background:var(--accent-soft);color:var(--accent)}
+  .chip.decline{background:#FBEBEA;color:var(--crit)}
+  .chip.twoleg{background:#EAF3EC;color:var(--good)}
+  .chip.pdf{background:#F1EDF7;color:#6A3FA0}
+
+  .badge{font-family:var(--mono);font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:.03em}
+  .b-conf{background:#EAF3EC;color:var(--good)}
+  .b-dec{background:#FBEBEA;color:var(--crit)}
+  .b-rule{background:#FBF3E3;color:var(--warn)}
+
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;font-size:13.5px;margin:6px 0}
+
+  footer{padding:30px 0 60px;color:var(--grey);font-size:13px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--grey);margin:10px 0}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:9px;height:9px;border-radius:2px;display:inline-block}
+</style>
+
+<div class="cover">
+  <div class="wrap">
+    <div class="eyebrow">Business Requirements Document · v1.0 Draft</div>
+    <h1>Motor Commission Rate Extraction &amp; Payout Engine</h1>
+    <p class="sub">How the platform ingests every insurer's commission grid, matches each motor policy to the correct rate, reconciles payouts, and pushes verified data downstream — including the insurer-by-insurer logic and the decisions behind it.</p>
+    <div class="control">
+      <div><div class="k">Product</div><div class="v">RateExtract</div></div>
+      <div><div class="k">Domain</div><div class="v">Motor Insurance · Payout</div></div>
+      <div><div class="k">Version</div><div class="v">1.0 — Draft</div></div>
+      <div><div class="k">Status</div><div class="v"><span class="pill">In Review</span></div></div>
+      <div><div class="k">Audience</div><div class="v">Product · Ops · Eng</div></div>
+      <div><div class="k">Cadence</div><div class="v">Monthly cycle</div></div>
+    </div>
+  </div>
+</div>
+
+<nav class="toc"><div class="wrap">
+  <a href="#summary">1 · Summary</a>
+  <a href="#scope">2 · Scope</a>
+  <a href="#glossary">3 · Glossary</a>
+  <a href="#modules">4 · Functional Modules</a>
+  <a href="#engine">5 · Matching Logic</a>
+  <a href="#insurers">6 · Insurer-wise Logic</a>
+  <a href="#data">7 · Data &amp; Sources</a>
+  <a href="#nfr">8 · Non-Functional</a>
+  <a href="#open">9 · Assumptions &amp; Open Items</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- 1 -->
+<section id="summary">
+  <div class="col">
+    <div class="snum">Section 1</div>
+    <h2>Executive Summary</h2>
+    <p class="lead">Every motor insurer pays intermediaries commission from a periodically-revised grid that varies by insurer, product, cover, vehicle attributes, geography, and business type. These grids arrive as inconsistent spreadsheets and PDFs. RateExtract turns them into a single, auditable engine that assigns the correct commission rate to each policy, computes the payout, reconciles it against the operator's own records, and surfaces exceptions.</p>
+    <p>The platform is operated on a <strong>monthly payout cycle</strong>. For a cycle, tens of thousands of policies are rated in bulk against the effective grids, then reconciled against the Premium Register and commission statements. The core challenge — and the bulk of this document — is that <strong>no two insurers structure their grid the same way</strong>. Section 6 records the per-insurer logic and the decisions taken to make each one match what the insurer actually pays.</p>
+    <div class="req"><span class="tag">GOAL</span><br>Assign a defensible commission rate to every motor policy in a cycle, matching the insurer's published grid and the operator's paid records, with a full audit trail from source grid → matched rule → rate → payout.</div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section id="scope">
+  <div class="col">
+    <div class="snum">Section 2</div>
+    <h2>Purpose &amp; Scope</h2>
+    <h4>In scope</h4>
+    <ul>
+      <li>Ingestion and version-management of insurer commission grids (rate cards) — Excel, HTML-as-xls, and PDF-derived tables.</li>
+      <li>The rate-matching engine: resolving each policy to the correct rule across insurer / product / cover / vehicle band / region / business type.</li>
+      <li>Bulk calculation of commission for a monthly cycle, with per-policy overrides and payout finalisation.</li>
+      <li>Reconciliation against the Premium Register (PR) and insurer commission statements.</li>
+      <li>Grid-health tooling so monthly grid refreshes are self-service (audit, upload validation, generic flat-grid loader).</li>
+      <li>Downstream exports: the Luca commission-rule file, and the Policy Push to the agent mobile app.</li>
+      <li>Operational tooling: single-policy lookup, OCR bulk tracker generation.</li>
+    </ul>
+    <h4>Out of scope</h4>
+    <ul>
+      <li>Policy issuance, premium calculation, and the core policy-admin system (these are upstream, in Prarambh).</li>
+      <li>The mobile app itself and the OneInsure OCR/token APIs (consumed as external services).</li>
+      <li>Non-motor lines of business (health, life) — the engine is motor-only (<code>InsuranceType = 16</code>).</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 3 -->
+<section id="glossary">
+  <div class="col">
+    <div class="snum">Section 3</div>
+    <h2>Glossary</h2>
+  </div>
+  <div class="tw" style="max-width:var(--measure)">
+    <table>
+      <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Rate card / Grid</strong></td><td>An insurer's commission table for a period, ingested into <code>rate_cards</code> + <code>rate_rules</code>. Each card has an effective-from/to window.</td></tr>
+        <tr><td><strong>Rule</strong></td><td>One row of a grid — a rate for a specific segment, region, band and cover.</td></tr>
+        <tr><td><strong>Cover class</strong></td><td>Derived from premiums: <b>Comprehensive/Package</b> (OD&gt;0 &amp; TP&gt;0), <b>SAOD</b> (OD&gt;0, TP≤0), <b>SATP</b> (OD≤0, TP-only).</td></tr>
+        <tr><td><strong>Segment</strong></td><td>The grid's vehicle/product classification — encodes vehicle type, tonnage, seating, age depending on the insurer.</td></tr>
+        <tr><td><strong>NCB</strong></td><td>No-Claim Bonus. Often splits a grid (with-NCB vs no-NCB) and, for some insurers, is encoded in the rate type.</td></tr>
+        <tr><td><strong>PR</strong></td><td>Premium Register — the operator's own export of policy premiums and discounts; used to reconcile and to source fields (e.g. Royal's OD discount).</td></tr>
+        <tr><td><strong>Tracker No</strong></td><td>The operator's stable per-policy reference (e.g. <code>MT/DIRSW/MH26/545/FY26-27/1</code>); prefix encodes line of business and booking location.</td></tr>
+        <tr><td><strong>Cycle</strong></td><td>A monthly payout run; policies are rated into <code>cycle_bulk_rows</code> and finalised.</td></tr>
+        <tr><td><strong>Region / Cluster</strong></td><td>Insurer-specific geography — resolved from the vehicle RTO (or, for some insurers, the booking location) via <code>rto_mappings</code> plus per-insurer overrides.</td></tr>
+        <tr><td><strong>Resolver</strong></td><td>Insurer-specific code + JSON config used when a grid can't be represented as flat single-rate rules (two-leg, PDF, or mis-ingestible formats).</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 4 -->
+<section id="modules">
+  <div class="col">
+    <div class="snum">Section 4</div>
+    <h2>Functional Modules</h2>
+    <p>The platform is a set of modules over a shared rate/rule store and the upstream policy database.</p>
+  </div>
+  <div class="tw">
+    <table>
+      <thead><tr><th>#</th><th>Module</th><th>What it does</th><th>Key requirement</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">FR-1</td><td><strong>Rate-card ingestion</strong></td><td>Upload a grid; parse to rules; version by effective date; validate at upload.</td><td>Re-uploading a corrected grid supersedes the prior card for that cover-class without breaking already-matched policies.</td></tr>
+        <tr><td class="mono">FR-2</td><td><strong>Matching engine</strong></td><td>Resolve each policy to the correct rule (see §5–6).</td><td>Deterministic, auditable rule selection with a stated tie-break; no silent wrong-region/band matches.</td></tr>
+        <tr><td class="mono">FR-3</td><td><strong>Bulk calculation &amp; cycles</strong></td><td>Rate a cycle's policies; apply margins/overrides; finalise payout.</td><td>Overrides survive recompute; finalised cycles lock; recompute is idempotent per insurer.</td></tr>
+        <tr><td class="mono">FR-4</td><td><strong>PR / statement reconciliation</strong></td><td>Match engine output to the operator's PR and insurer statements; flag variance.</td><td>Every policy carries a reconciliation status (matched / variance / not-in-record).</td></tr>
+        <tr><td class="mono">FR-5</td><td><strong>Grid robustness</strong></td><td>Per-cycle grid audit; upload validation; generic flat-grid loader.</td><td>Monthly grid refresh is self-service; no-rule / stale-card / zero-cluster conditions are flagged before they hit payout.</td></tr>
+        <tr><td class="mono">FR-6</td><td><strong>Policy lookup</strong></td><td>Trace one policy: params, resolved region, matched rule, rate, PR discount, issue date.</td><td>Shows exactly why a rate was assigned, for dispute resolution.</td></tr>
+        <tr><td class="mono">FR-7</td><td><strong>Luca export</strong></td><td>Emit the commission rules in the Luca taxonomy (product, coverage, NCB, states, fuel, business type, rates).</td><td>Canonical taxonomy values; rates normalised to a valid 0–100%.</td></tr>
+        <tr><td class="mono">FR-8</td><td><strong>OCR bulk upload</strong></td><td>Operators upload ZIPs of policy PDFs; system generates trackers + OCRs the policy number.</td><td>Durable background processing; per-folder + consolidated date-range export.</td></tr>
+        <tr><td class="mono">FR-9</td><td><strong>Policy push</strong></td><td>Push motor policies to the agent mobile app via the OneInsure API.</td><td>Background, throttled, resumable; upsert-by-policy-number; admin dashboard with failure &amp; repush.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <h3>4.1 Rate-card ingestion &amp; management</h3>
+    <p>An operator uploads a grid; it is parsed to <code>rate_rules</code> under a <code>rate_cards</code> row with an effective window. Uploads are content-sniffed — a portal "xls" that is really an HTML <code>&lt;table&gt;</code> is parsed as HTML, not read as garbled text. Re-uploading a corrected grid creates a newer card; the matching engine's newest-per-cover-class selection (§5.2) means it supersedes the prior card for the covers it contains without disturbing others. Where a grid cannot be represented as flat single-rate rules, it is handled by an insurer resolver or the generic flat-grid loader (§4.5, §7).</p>
+    <div class="req"><span class="tag">FR-1</span><br>A corrected grid re-uploaded mid-cycle takes effect on re-computation for its own cover-classes and effective window only; already-correct policies on other covers are unchanged.</div>
+
+    <h3>4.2 Matching engine</h3>
+    <p>The heart of the platform — resolving each policy to the right rule. Its cross-insurer principles are in <a href="#engine">§5</a> and every insurer-specific behaviour in <a href="#insurers">§6</a>.</p>
+
+    <h3>4.3 Bulk calculation &amp; the payout cycle</h3>
+    <p>For a cycle, the engine reads the period's policies, rates each one, and writes a full computed row to <code>cycle_bulk_rows</code>. The commission maths runs on a <strong>premium base</strong> chosen by product and cover:</p>
+    <ul>
+      <li>GCV / PCV / MISC → the <strong>net premium</strong> base;</li>
+      <li>Private car / two-wheeler → <strong>OD + add-on</strong> for Comp/SAOD, or <strong>TP</strong> for TP-only;</li>
+      <li>Two-leg insurers (New India, National) instead apply OD% to the OD premium and TP% to the TP premium and sum the legs.</li>
+    </ul>
+    <p>From the matched rate the engine derives three figures the payout is built on:</p>
+    <div class="tw" style="max-width:var(--measure)"><table>
+      <thead><tr><th>Figure</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Income</strong></td><td>Total commission earned on the policy = rate% × premium base (or the two-leg sum).</td></tr>
+        <tr><td><strong>Outgoing</strong></td><td>What is paid out to the agent = outgoing% × base, where <code>outgoing% = rate% − effective margin%</code>.</td></tr>
+        <tr><td><strong>Savings</strong></td><td>What the company retains = Income − Outgoing (the margin the platform applies on top of the base rate).</td></tr>
+      </tbody>
+    </table></div>
+    <p>Margins come from margin rules (with special-rate overrides and global uplifts layered on). Any of rate / margin / outgoing can be <strong>overridden per policy</strong> by an inline edit; overrides are stored separately and <strong>survive recomputation</strong>, so re-running a cycle never discards manual corrections. Rows can be excluded from payout or moved to another cycle. A finalised cycle <strong>locks</strong> — rates and actions freeze — and settlement is tracked against a UTR/bank upload (paid amount, UTR, paid date). Each row also carries compliance context (e.g. POS-agent + IDV threshold) and the agent's POS-match status.</p>
+    <div class="req"><span class="tag">FR-3</span><br>Recompute is idempotent per insurer and preserves overrides, notes, paid status and exclusions; finalisation is irreversible without an explicit re-open.</div>
+
+    <div class="ex">
+      <div class="ex-h">Worked example · single-rate (Royal Pvt-Car, Comprehensive)</div>
+      <div class="tw"><table>
+        <thead><tr><th>Input / step</th><th class="num">Value</th></tr></thead>
+        <tbody>
+          <tr><td>OD premium (base) + add-on</td><td class="num">₹ 10,000</td></tr>
+          <tr><td>Matched rate (discount band)</td><td class="num">40%</td></tr>
+          <tr><td>Company margin</td><td class="num">6%</td></tr>
+          <tr><td><strong>Income</strong> = 40% × 10,000</td><td class="num">₹ 4,000</td></tr>
+          <tr><td>Outgoing rate = 40% − 6%</td><td class="num">34%</td></tr>
+          <tr><td><strong>Outgoing</strong> (to agent) = 34% × 10,000</td><td class="num">₹ 3,400</td></tr>
+          <tr><td><strong>Savings</strong> (company keeps) = 4,000 − 3,400</td><td class="num">₹ 600</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="ex">
+      <div class="ex-h">Worked example · two-leg (New India, Tata Tigor, MH, age 8, Comprehensive)</div>
+      <div class="tw"><table>
+        <thead><tr><th>Leg</th><th class="num">Rate</th><th class="num">Premium</th><th class="num">Commission</th></tr></thead>
+        <tbody>
+          <tr><td>OD leg (1–10 yr, base)</td><td class="num">20%</td><td class="num">₹ 3,985</td><td class="num">₹ 797.00</td></tr>
+          <tr><td>TP leg (flat)</td><td class="num">15%</td><td class="num">₹ 3,991</td><td class="num">₹ 598.65</td></tr>
+          <tr><td><strong>Headline rate = 20 + 15</strong></td><td class="num">35%</td><td class="num">—</td><td class="num"><strong>₹ 1,395.65</strong></td></tr>
+        </tbody>
+      </table></div>
+      <p style="font-size:13px;color:var(--grey);margin:6px 0 0">Income is the sum of the two legs, each on its own premium — not a single rate on a blended base.</p>
+    </div>
+
+    <h3>4.4 Reconciliation — Premium Register &amp; statements</h3>
+    <p>Rated output is checked against two operator records:</p>
+    <ul>
+      <li><strong>Premium Register (PR).</strong> The operator's own premium export (<code>pr_rows</code> / <code>pr_uploads</code>) is matched by policy number (with insurer-specific key variants). It surfaces PR Net / Gross / OD / TP alongside the engine's figures, and is also a <em>source</em> of fields the staging feed lacks — most notably Royal's OD discount (<code>FINALDISCOUNT</code>) and fallback tonnage / region.</li>
+      <li><strong>Commission statements.</strong> The insurer's own commission statement (<code>statement_rows</code> / <code>statement_uploads</code>) is reconciled against the computed income; each policy lands in a status bucket (matched / variance / not-in-statement) with the variance amount, feeding a recon summary.</li>
+    </ul>
+    <div class="req"><span class="tag">FR-4</span><br>Every policy carries a reconciliation status and, where applicable, a signed variance against the operator's paid/stated amount, so exceptions are a filtered list rather than a manual hunt.</div>
+
+    <div class="ex">
+      <div class="ex-h">Worked example · statement variance</div>
+      <div class="tw"><table>
+        <thead><tr><th>Source</th><th class="num">Amount</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Engine income (computed)</td><td class="num">₹ 4,000</td><td>—</td></tr>
+          <tr><td>Insurer statement (paid)</td><td class="num">₹ 3,800</td><td>—</td></tr>
+          <tr><td><strong>Variance</strong> = 3,800 − 4,000</td><td class="num">−₹ 200</td><td><span class="badge b-rule">variance</span></td></tr>
+        </tbody>
+      </table></div>
+      <p style="font-size:13px;color:var(--grey);margin:6px 0 0">A policy in the statement with a non-zero variance is an exception to review; one absent from the statement is flagged not-in-statement rather than treated as a match.</p>
+    </div>
+
+    <h3>4.5 Grid robustness &amp; audit</h3>
+    <p>Because grids are refreshed monthly by non-developers, three layers keep the refresh self-service:</p>
+    <ol>
+      <li><strong>Per-cycle grid audit</strong> — flags no-rule, stale-card and zero-rate clusters per insurer × product, so a mis-ingested month is visible before payout.</li>
+      <li><strong>Upload validation</strong> — at upload, flags 0-rule sheets, scratch/checks tabs, and scrambled columns with a clear banner, so junk (e.g. a "cv checks" scratch tab slurping hundreds of thousands of bogus rules) never lands silently.</li>
+      <li><strong>Generic flat-grid loader</strong> — a config-driven parser (config + extracted data per insurer) that reads and resolves flat tables without bespoke code and re-extracts on upload; the strategic direction is to migrate resolvers onto it.</li>
+    </ol>
+
+    <h3>4.6 Policy lookup</h3>
+    <p>A single-policy trace by tracker or policy number: it shows the extracted parameters, the resolved region/cluster, the matched rule and rate, the effective card chosen, the PR discount, and the policy's issue and start dates. It is the dispute-resolution tool — it answers "why did this policy get this rate?" reproducibly.</p>
+
+    <h3>4.7 Luca export</h3>
+    <p>Emits the commission rules in the downstream <strong>Luca</strong> taxonomy (34 columns), mapping the internal model to Luca's canonical values:</p>
+    <div class="tw"><table>
+      <thead><tr><th>Field</th><th>Canonical values / rule</th></tr></thead>
+      <tbody>
+        <tr><td><strong>products</strong></td><td><code>auto · bus · gcv · hcv · lcv · pcv · private_bike · private_car · scooter · taxi · tractor</code> — from vehicle type + segment; the LCV/HCV split is at 7.5T GVW (explicit LCV/MCV/HCV labels override).</td></tr>
+        <tr><td><strong>coverage_type</strong></td><td><code>comprehensive · own_damage · third_party · hybrid</code>; hybrid = a bundled long-term package (1+3 / 1+5 / 5+5) where OD and TP tenures differ.</td></tr>
+        <tr><td><strong>business_type</strong></td><td><code>new · rollover · renewal · used</code> — derived from segment/rate-type keywords; blank when the rule isn't business-type-scoped (fixed a bug that dumped segment codes here).</td></tr>
+        <tr><td><strong>fuel_type</strong></td><td><code>ELECTRICITY · DIESEL · INTERNAL_LPG_CNG · PETROL</code>.</td></tr>
+        <tr><td><strong>included_states</strong></td><td>Resolved to the 36 canonical state slugs.</td></tr>
+        <tr><td><strong>vehicle_make</strong></td><td>Sanitised — strips segment/tonnage/region/spec leakage and exclusion tokens (garbage make values).</td></tr>
+        <tr><td><strong>rate columns</strong></td><td>Normalised to a valid 0–100%: fractions (0.40) are ×100; values already stored as a percent (40, in shriram and mis-ingested tata/go_digit rows) pass through; stray negatives use magnitude — fixing the earlier 4-digit and negative outputs.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>4.8 OCR bulk upload</h3>
+    <p>An operator uploads ZIP folders of policy PDFs. For each PDF the system, in a durable background worker: generates a tracker number (via the tracker SP with the operator's derived identity), OCRs the PDF through the OneInsure two-step API to extract the policy number, writes the <code>(tracker, policy)</code> result, and calls the finalisation SP that submits the tracker to the underwriting team. Progress is per-folder; results download per folder or as one <strong>consolidated date-range export</strong> (Policy No + Tracker No across every folder in a window), since folder-by-folder matching is impractical. State lives in the DB so processing resumes after any restart.</p>
+
+    <h3>4.9 Policy push to the mobile app</h3>
+    <p>Motor policies (submission date ≥ 1-Apr-2026) are pushed to the agent mobile app via the OneInsure API — a token call then a multipart data call per policy. A one-time <strong>backfill</strong> seeds the whole history; thereafter a guarded <strong>daily</strong> job enqueues the previous day's submissions. A throttled background worker drains the queue: it builds the ~70-field payload from the live motor view (dates <code>DD-MM-YYYY</code>, booleans <code>0/1</code>, business type <code>motor_*</code>), fetches a cached token, and pushes. The API <strong>upserts by policy number</strong>, so retries and corrections are safe; a policy without a number yet is <em>deferred</em> until issued. An admin dashboard shows daily/monthly/yearly submitted / pushed / failed / awaiting counts, with per-row error, repush, and correct-and-repush. It ships gated off, dry-run by default, and only runs on one host.</p>
+    <div class="req"><span class="tag">FR-9</span><br>The push is resumable and idempotent (unique key + upsert-by-policy-number); PII leaves the trust boundary only under an explicit, authorised, human-initiated go-live.</div>
+  </div>
+</section>
+
+<!-- 5 -->
+<section id="engine">
+  <div class="col">
+    <div class="snum">Section 5</div>
+    <h2>Rate-Matching Logic — General Principles</h2>
+    <p>These cross-insurer rules govern the engine before any insurer-specific handling in §6.</p>
+
+    <h3>5.1 Cover class from premiums</h3>
+    <p>The cover is derived from the OD and TP premium legs, not a text field: <strong>SATP</strong> when OD≤0 (TP-only), <strong>SAOD</strong> when OD&gt;0 and TP≤0, <strong>Comprehensive/Package</strong> when both are positive. This drives which column/segment of a grid applies.</p>
+
+    <h3>5.2 Effective-date card selection</h3>
+    <p>A policy takes the grid <strong>effective on its risk-start date</strong>, universally across insurers (not just the two it began with). The lookup selects the <strong>newest card per cover-class</strong> (Comp / SAOD / TP resolved from rate type + segment), so a June-14 card supersedes a June-1 card for June-14+ policies while May policies still take the earlier card. A soft fallback re-queries without the date filter if no dated rule matches, so a mis-dated card never forces a no-rule.</p>
+    <div class="note"><b>Decision.</b> When multiple cards are effective, "newest per cover-class" — not "newest overall" — is the selector, because insurers revise one cover at a time. Cards should carry an <code>effective_to</code> only when a true successor exists; otherwise the newest-per-cover-class logic hands off cleanly on its own.</div>
+
+    <h3>5.3 Vehicle-type mapping</h3>
+    <p>A policy's vehicle type is mapped to a product family (<code>CAR / TW / GCV / PCV / MISC</code>). <strong>GCV/PCV are tested before CAR</strong> — a segment like <code>GCV - 4W 12-20Tn</code> contains the token "4W" and would otherwise mis-map to CAR. A guard reclassifies a 2-seat, ≤350cc "car" as a two-wheeler (mis-typed motorcycles). MISC construction equipment (cranes, loaders) labelled "Tractor" is kept out of the Tractor bucket; goods-carrying MISC with a recoverable GVW is reclassified to GCV.</p>
+
+    <h3>5.4 Band boundaries</h3>
+    <p>For both tonnage and vehicle-age bands, the <strong>lower band owns a shared edge</strong> (e.g. exactly 40T belongs to "20–40", not "40–45"). A precise GVW only refines a coarse category band when it falls strictly inside it, so the operator's classification governs at the edges.</p>
+
+    <h3>5.5 Business type ≠ new vehicle</h3>
+    <p>"New business" (new to the insurer) is distinct from a "new vehicle" (age-based). A New-business policy on an existing vehicle is a <strong>Rollover</strong>, not Brand New. New-vehicle status is derived from vehicle age (manufactured date preferred over registration), falling back to NCB as a proxy only when age is unknown.</p>
+
+    <h3>5.6 Fuel, region &amp; dedup</h3>
+    <ul>
+      <li><strong>Fuel.</strong> Factory gas kits arriving as <code>INBUILT</code> map to the CNG family; "Other than Diesel" grid columns score against any non-diesel fuel.</li>
+      <li><strong>Region.</strong> Resolved from the vehicle RTO via <code>rto_mappings</code> to an insurer-specific region/cluster, with per-insurer overrides (some insurers key on booking location or district — §6).</li>
+      <li><strong>Selection.</strong> Among surviving rules, a scored match with a stated tie-break picks the primary rate; declines (grid-listed excluded RTOs/segments) force a null rate rather than a fallback.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 6 -->
+<section id="insurers">
+  <div class="col">
+    <div class="snum">Section 6</div>
+    <h2>Insurer-wise Logic &amp; Decisions</h2>
+    <p class="lead">Each insurer's grid has its own structure and quirks. This section records, per insurer, how the grid is read and the specific decisions taken to match what the insurer actually pays.</p>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--good)"></span> confirmed with business/operator</span>
+      <span><span class="dot" style="background:var(--warn)"></span> engine rule / interpretation</span>
+      <span><span class="dot" style="background:var(--crit)"></span> decline / hard exclusion</span>
+    </div>
+  </div>
+
+  <!-- ROYAL -->
+  <div class="ins">
+    <div class="hd"><span class="name">Royal Sundaram</span><span class="slug">royal_sundaram</span>
+      <span class="tags"><span class="chip">Discount-banded</span><span class="chip">Make-family GCV</span><span class="chip decline">RTO decline</span></span></div>
+    <p class="oneline">The most structurally varied grid: Pvt-Car commission is banded by OD discount; GCV splits by make-family and Nil-Dep; STP grids split by fuel; several geography and EV special cases.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Area</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Pvt-Car Comp</td><td>Banded by OD-discount <code>volume_tier</code> (<code>Upto 20 / 20-50 / 50-60 / 60-70 / &gt;70</code>). The discount is the PR <code>FINALDISCOUNT</code> (a signed fraction in the PR raw row), not the blank tmp OD_DISCOUNT. Bands are lower-exclusive / upper-inclusive, except the open <code>&gt;N</code> band which wins its own boundary.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>Key Cities</td><td>For MH, "Key Cities" = <strong>Mumbai + Pune only</strong>; Aurangabad / Nashik / Nagpur fall to "Other Cities" (PR state field is authoritative).</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>Chandigarh</td><td>A <strong>separate grid</strong> from Punjab; PB/HR-prefixed RTOs in the Chandigarh cluster are forced to the Chandigarh "Rest of State" rate.</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>GCV make-family</td><td>Tonnage bands split by make in the rule's make column — <code>Tata / Ashok Leyland / Eicher</code> specific rows plus a blank-make "Other than TATA &amp; AL" wildcard (rate 0). A CV make-family matcher handles glued/suffixed makes so trucks don't fall to the 0% wildcard. Segment-text make gate handles the plain-Comp "Other Than" catch-all.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>Nil-Dep split</td><td><code>Comp_NilDep</code> vs <code>Comp_NoNilDep</code> selected by the LIVE <code>Depreciation</code> flag (not in PR/tmp) keyed by policy id.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>PC STP</td><td>A single SATP rate split by <strong>fuel × CC</strong> (Diesel columns vs Non-Diesel), not ACT/PACK.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>EV STP</td><td>Electric standalone-TP lives under region "All Geos" (3W E-Rickshaw 0.54, PCV-4W 0.47, TW 0.50). Package e-rickshaws take a dedicated 3W-E-Rickshaw Comp grid (Delhi NCR / TN / Pan India).</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>TW CC-band</td><td>Grid has only a "Bike &lt;150CC" band; a &gt;150cc bike takes no-rule (= operator 0), not the &lt;150 rate. Rest-of-state Comp label is <code>&lt;STATE&gt;_OTHERS</code>.</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>BH-series</td><td>Bharat-series regs (<code>23BH…</code>) have no real RTO; region derived from PR (State_For_TP / Key_City_Group).</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>June cards</td><td>Cards re-uploaded per cycle; the CV-STP sheet of the STP file was initially missed (ingest gap) → re-ingested so pre-14-June GCV standalone-TP resolves. GCV Mumbai override applied per operator (12–20 &amp; 20–40T → 40%, 45–48T &gt;5yr → 34%).</td><td><span class="badge b-conf">conf</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- BAJAJ -->
+  <div class="ins">
+    <div class="hd"><span class="name">Bajaj Allianz</span><span class="slug">bajaj_allianz</span>
+      <span class="tags"><span class="chip">Policy-code driven</span><span class="chip">Per-district</span></span></div>
+    <p class="oneline">The 4-digit code embedded in the policy number authoritatively selects the grid and cover; SATP is per-district with residual catch-alls.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Area</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Product code</td><td>Policy-number 4-digit code picks grid + cover: <code>1801</code> Car-Comp, <code>1802</code> TW-Comp, <code>1805</code> Car-SATP, <code>1806</code> TW-SATP, <code>1812</code> PCV-Comp, <code>1831</code> GCV/PCV-SATP, <code>1871</code> TW-SAOD (rest = MISP 17.5%).</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>SATP residual</td><td>Per-district grid carries a residual catch-all (<code>sub_type='Others'</code>, ~2.5%) beside the real district PO row; the residual is dropped when a non-residual sibling exists at the same rate type.</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>CAR-SATP make rows</td><td>"Make-specific" rows are really <strong>model</strong>-specific (remarks name the model + rate); non-listed models fall to the make="All" district PO row.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>RTO → district</td><td>District SATP rates are region-named rows that override the state row; an RTO→district map (<code>bajaj_rto_district.json</code>) re-queries the district region because <code>rto_mappings</code> only carried the state.</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>Pvt-Car MH&amp;GJ Comp</td><td>An un-ingested ROBINHOOD 1801 grid for MH/GJ (CD≤80%): With-NCB 0.45, Petrol 0.45, Diesel/HEV 0.10. Follow-ups: Rajasthan 0.30 (NCB&gt;0), Delhi Zone-1 0.30.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>HTML-as-xls</td><td>Portal exports an HTML <code>&lt;table&gt;</code> named <code>.xls</code>; content-sniffed and parsed so it ingests (was 0 rows).</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>Card selection</td><td>Issue-date-first effective-date selection (OD/TP/PR start dates, then issue date).</td><td><span class="badge b-rule">rule</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- TATA -->
+  <div class="ins">
+    <div class="hd"><span class="name">Tata AIG</span><span class="slug">tata_aig</span>
+      <span class="tags"><span class="chip">City-cluster</span><span class="chip">Resolver-driven</span></span></div>
+    <p class="oneline">June grids were mis-ingestible (tonnage in the fuel column; sheets never matched), so Pvt-Car and CV are resolved config-driven against flat grids keyed by city cluster.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Area</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Pvt-Car (June)</td><td>Flat grid keyed on Business Type × Section(cover) × Fuel × RTO × NCB; resolver <code>tata-car.js</code> + <code>tata_car_jun26.json</code>. SATP rows read the <strong>TP column</strong> (not the OD column, which was 0); bizCat is age-based (New + NCB / old → Rollover).</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>City clusters</td><td>Grids keyed by city cluster, not state; RTO → cluster via <code>tata_rto_cluster.json</code>.</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>CV / GCV / PCV</td><td>Resolver <code>tata-cv.js</code> + <code>tata_cv_jun26.json</code> (Segment × Fuel × Section × Age × Region). Case-insensitive region match.</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>Non-tractor guard</td><td>Pick-n-carry cranes / loaders arriving as category "MISC - D - Tractor" are kept out of the Tractor bucket (0% in some clusters) and rated as Misc (e.g. 27%).</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>Goods-MISC → GCV</td><td>A goods truck typed MISC with a recoverable GVW (from the model, e.g. Mahindra Furio 11 ≈ 12T) is rated as GCV, not the flat Misc rate.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>Null-tonnage GCV</td><td>When the source has no tonnage, the GVW class is inferred from the truck model code (LPT/SE/SK NNNN → first two digits; 407 = 7.5T) so heavy trucks don't default to the smallest, highest-commission band.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>NCB rate type</td><td>NCB encoded after a colon in the rate type (<code>Comp|NCB:GT0 / :None</code>); the gate recognises the colon/equals qualifier (mixed-case safe).</td><td><span class="badge b-conf">conf</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- NIA -->
+  <div class="ins">
+    <div class="hd"><span class="name">New India Assurance</span><span class="slug">new_india_assurance</span>
+      <span class="tags"><span class="chip twoleg">Two-leg OD+TP</span><span class="chip">Config-driven</span></span></div>
+    <p class="oneline">Commission is published as two legs — an OD% on OD premium and a TP% on TP premium; the operator reports the sum. The tables live in editable JSON.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Area</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Two-leg model</td><td>Headline = OD% + TP% (or the single value when the legs are equal); SATP = TP leg, SAOD = OD leg. Income = OD%×OD-premium + TP%×TP-premium.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>Age bands (Car)</td><td>New (0): 25/15 = 40. 1–10 yr: OD-leg/15 = 35. &gt;10 yr: OD-leg/12.5 = 32.5.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>MH/KA uplift</td><td>An operator-derived Pvt-Car OD-leg uplift (30 vs 20 base) for MH/KA was <strong>reverted to the circular's 20 base</strong> after audit — it wasn't in the published circular.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>Config</td><td>Numbers moved from hardcoded literals to <code>config/nia_motor.json</code>; resolver keeps only matching logic (byte-identical verified).</td><td><span class="badge b-rule">rule</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- NATIONAL -->
+  <div class="ins">
+    <div class="hd"><span class="name">National Insurance</span><span class="slug">national_insurance</span>
+      <span class="tags"><span class="chip twoleg">Two-leg (Rem+Reward)</span><span class="chip">Config-driven</span></span></div>
+    <p class="oneline">Same two-leg structure as New India, where each leg's commission = Remuneration + Reward, and the operator pays the summed legs.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Area</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Two-leg</td><td>OD + TP where each leg = Remuneration + Reward; headline = sum (single value when equal). The ingested grid stored only the Remuneration leg, undervaluing the payout — corrected in the resolver.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>GCV</td><td>Seven GVW bands × four age tiers (New / ≤10 / 10–15 / &gt;15); SATP TP-only bands.</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>PCV</td><td>Seating-based (Taxi ≤6 / 6–30 / &gt;30), plus School/Institutional buses and 3-wheelers.</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>MISC</td><td>Ambulance, agri-tractor / e-rick, Class E/F/G, and other Class-D each rated distinctly.</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>Config</td><td>Tables in <code>config/national_motor.json</code>; resolver holds only matching logic (byte-identical verified).</td><td><span class="badge b-rule">rule</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- SHRIRAM -->
+  <div class="ins">
+    <div class="hd"><span class="name">Shriram General</span><span class="slug">shriram</span>
+      <span class="tags"><span class="chip">Booking-location region</span><span class="chip decline">RTO decline</span><span class="chip">Seating PCV</span></span></div>
+    <p class="oneline">Rates key on the policy's booking location rather than the vehicle's RTO state, and the grid remarks can hard-decline specific RTO districts.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Area</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Region</td><td>By <strong>policy booking location</strong> (tmp Branch = "DIR &lt;State&gt;"), not the vehicle RTO state — cross-state-booked policies took the wrong-state grid until fixed. Region is the full state name; national rows sit under a null region ("Pan India").</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>RTO decline</td><td>Grid remarks list declined districts (e.g. "UP 70,75,79 … IS DECLINED"); those are force-declined (null rate), not fallback-rated.</td><td><span class="badge b-dec">decline</span></td></tr>
+        <tr><td>SATP age band</td><td>GCV older tier is 6–15 for Package but <strong>6–25 for STP</strong>; old TP-only LCVs were mis-capped at 15.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>PCV seating</td><td>4W PCV banded by seating (Upto 6+1 / 7-to-10 / Corporate Bus / School Bus), gated on parsed seat count + remark variant — a ≤6-seat taxi takes "Upto 6+1", not "Corporate Bus".</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>3W E-cart</td><td>E-rickshaw filed as one combined PCV product per region; GCV e-carts also search PCV.</td><td><span class="badge b-conf">conf</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- ICICI + GO DIGIT -->
+  <div class="ins">
+    <div class="hd"><span class="name">ICICI Lombard</span><span class="slug">icici_lombard</span>
+      <span class="tags"><span class="chip">NCB in rate-type</span></span></div>
+    <p class="oneline">NCB is encoded inside the rate type after a colon, and used-car rows are a restricted cover.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Area</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>NCB rate-type</td><td>Encoded as <code>Comp|NCB:None</code> / <code>Comp|NCB:GT0</code> / <code>SAOD|NCB:None</code> / <code>TP|NCB:No</code> (qualifier after a colon, not an <code>NON_NCB</code> prefix). The gate recognises the colon qualifier so a Non-NCB row isn't mis-read as positive-NCB.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>Used-car gate</td><td><code>*_USED</code> rows are no-NCB non-TP only: an NCB&gt;0 used car takes the regular <code>NCB:GT0</code> fuel rate; a pure-TP used car takes the Act-only column.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>Region</td><td>City-region carrier — booking branch used as the region proxy; region names aliased to the card's own labels.</td><td><span class="badge b-rule">rule</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- GO DIGIT -->
+  <div class="ins">
+    <div class="hd"><span class="name">Go Digit</span><span class="slug">go_digit</span>
+      <span class="tags"><span class="chip">NCB in rate-type</span><span class="chip">Blank-region June</span></span></div>
+    <p class="oneline">NCB is carried in the rate type (as ICICI/Tata); the June refresh restructured geography so the region filter has to admit blank-region rows.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Area</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>NCB rate-type</td><td>NCB encoded in the rate type; the same colon/qualifier gate as ICICI applies (mixed-case safe).</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>June geography</td><td>The June card moved TW to a flat <strong>100% pan-India</strong> rate and GCV/PCV to <strong>blank-region</strong> rows, while April was region-specific ("Good GJ"). Without a null-region union the region filter drops every June TW/GCV/PCV rule and the policy silently falls back to the April card.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>Fix</td><td><code>include_null_region</code> is set for Go Digit so pan-India rows stay in play; CAR remains region-specific (no blank rows) and is unaffected. Effective-date selection then prefers the June card.</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>Policy key</td><td>PR/policy keys carry a composite form (<code>D245987778 / 04042026</code>); the slash suffix is stripped for PR matching.</td><td><span class="badge b-rule">rule</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- UNIVERSAL SOMPO -->
+  <div class="ins">
+    <div class="hd"><span class="name">Universal Sompo</span><span class="slug">universal_sompo</span>
+      <span class="tags"><span class="chip">State + cluster</span><span class="chip decline">Cluster decline</span></span></div>
+    <p class="oneline">Rates key on the UPPERCASE state name plus a set of internal clusters; unresolved regions must be seeded from the RTO state, and heavy GCV outside a cluster's bands is declined rather than borrowed.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Area</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Region model</td><td>Full UPPERCASE state names plus cluster regions (GJ/DD, DL-NCR, UP-1/2/3, RJ-1/2/3) and a few city groups.</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>Region seeding</td><td>When the RTO map doesn't resolve a region, the primary region is derived from the RTO state — otherwise an empty region returns ALL-state rules and the dedup can land on the wrong state (e.g. a Maharashtra GCV matching a J&K rate). The first entry is primary; the rest feed the fallback.</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>Cluster decline</td><td>The UP-2 cluster carries only light GCV bands (≤7.5T); heavier GCV is <strong>declined</strong>, not cross-cluster-borrowed from UP-1.</td><td><span class="badge b-dec">decline</span></td></tr>
+        <tr><td>PR vehicle fallback</td><td>A PR row matched only by vehicle number may be a different policy year, so NCB and product are <strong>not</strong> backfilled from it (only cc / fuel / tonnage / seating). This corrected a batch of NCB clobbers.</td><td><span class="badge b-conf">conf</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- UNITED INDIA -->
+  <div class="ins">
+    <div class="hd"><span class="name">United India</span><span class="slug">united_india</span>
+      <span class="tags"><span class="chip pdf">PDF-sourced</span><span class="chip">CC×fuel×make</span></span></div>
+    <p class="oneline">The commission table is a PDF that mis-parsed into flat RTO rows; Pvt-Car is resolved from the real dimensional grid plus a preferred-RTO annexure.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Area</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Source</td><td>Commission is a PDF (card 469); Pvt-Car was mis-parsed to flat per-RTO rows.</td><td><span class="badge pdf" style="padding:1px 6px">PDF</span></td></tr>
+        <tr><td>Pvt-Car grid</td><td>Real grid = policy-type × segment (CC / fuel / make) × EV. Resolved via <code>united-car.js</code>.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>Preferred RTO</td><td>A Sub-Annexure-3 preferred-city-RTO list → 40% (<code>united_pref_rtos.json</code>).</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>Open</td><td>GCV / PCV / TW state grids still to be lifted from the PDF.</td><td><span class="badge b-rule">rule</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- ZUNO -->
+  <div class="ins">
+    <div class="hd"><span class="name">Zuno (Edelweiss)</span><span class="slug">zuno</span>
+      <span class="tags"><span class="chip">Off-grid SAOD/NCB floor</span></span></div>
+    <p class="oneline">Two commission rules live outside the regional grids and never pool with them; they are routed on the live TP leg and NCB.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Area</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Car SAOD</td><td>A flat SAOD rate (24) that sits outside the regional grids; routed by the live TP-leg + NCB.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>NCB=0 floor</td><td>A no-NCB floor (15) applied when NCB is zero, computed against the raw net liability.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>Open</td><td>OD-discount ≥85/90% overrides remain (discount source not yet wired for Zuno).</td><td><span class="badge b-rule">rule</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- IFFCO -->
+  <div class="ins">
+    <div class="hd"><span class="name">iffco Tokio</span><span class="slug">iffco_tokio</span>
+      <span class="tags"><span class="chip">Pan-India CV</span><span class="chip decline">Red = declined</span></span></div>
+    <p class="oneline">CV commission is a single pan-India rate driven by gross weight; seating only decides eligibility, not the rate.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Area</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>CV rate</td><td>Pan-India rate (17.5 / 20 by GWP, base 15%). No regional variation.</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>Seating</td><td>Seating drives only Green/Red eligibility; <strong>Red = declined</strong>. It does not change the rate.</td><td><span class="badge b-dec">decline</span></td></tr>
+        <tr><td>Status</td><td>Only the April card is ingested; a full May-2026 rebuild is deferred. An interim PCV-decline fix is in place.</td><td><span class="badge b-rule">rule</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- KOTAK -->
+  <div class="ins">
+    <div class="hd"><span class="name">Kotak</span><span class="slug">kotak</span>
+      <span class="tags"><span class="chip">Format changes monthly</span></span></div>
+    <p class="oneline">The grid's very structure changes month to month, so Kotak leans on effective-date card selection and rejects placeholder dates.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Area</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Format drift</td><td>April used a make-category grid; May/June switched to CC × fuel. Kotak is included in effective-date card selection so each month's card applies to its own policies.</td><td><span class="badge b-conf">conf</span></td></tr>
+        <tr><td>Placeholder dates</td><td>Placeholder OD dates (<code>1999-12-31</code>) are rejected so a June TP-only policy doesn't inherit the April card via a junk date.</td><td><span class="badge b-conf">conf</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- SBI -->
+  <div class="ins">
+    <div class="hd"><span class="name">SBI General</span><span class="slug">sbi_general</span>
+      <span class="tags"><span class="chip">As-per-grid</span></span></div>
+    <p class="oneline">Residual GCV differences are operator inconsistency, not a grid error — the card is verified correct and left as-is.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Area</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>GCV column noise</td><td>Off-by-one GCV differences come from the operator paying the Comp vs SATP column inconsistently on TP-dominant trucks. The ingested card is verified correct.</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>Decision</td><td>Do <strong>not</strong> re-ingest; a blanket column flip was net-negative and was reverted. These are flagged as as-per-grid candidates for manual review.</td><td><span class="badge b-conf">conf</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- INDUSIND -->
+  <div class="ins">
+    <div class="hd"><span class="name">IndusInd</span><span class="slug">indusind</span>
+      <span class="tags"><span class="chip">New insurer</span><span class="chip">Issue-date redirect</span></span></div>
+    <p class="oneline">A new insurer, Reliance-underwritten: Reliance business issued from June 2026 is redirected to IndusInd and rated on its own grids.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Area</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Redirect</td><td>Reliance policies <strong>issued on/after 1-Jun-2026</strong> redirect to the <code>indusind</code> slug.</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>Products</td><td>Four-product resolver + override — Car / TW / CV, all effective Jun'26 (<code>indusind_*.json</code> + <code>indusind-*.js</code>).</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>Status</td><td>Forward-looking (no policies in the current cycle yet). Short-Term PCV Taxi sheet pending.</td><td><span class="badge b-rule">rule</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- ORIENTAL / HDFC / FG / CHOLA -->
+  <div class="ins">
+    <div class="hd"><span class="name">Oriental Insurance</span><span class="slug">oriental_insurance</span>
+      <span class="tags"><span class="chip">Pan-India MISC</span></span></div>
+    <p class="oneline">Special-category vehicles are rated on a pan-India table by cover.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Area</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Ambulance / MISC</td><td>Ambulance (MISC-D) is a pan-India rate — SATP 10%, Comprehensive 20% — selected by the policy's cover (TP-only → SATP).</td><td><span class="badge b-conf">conf</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="ins">
+    <div class="hd"><span class="name">HDFC Ergo</span><span class="slug">hdfc_ergo</span>
+      <span class="tags"><span class="chip">City-region</span></span></div>
+    <p class="oneline">Rates are keyed by city, so region comes from booking location with name normalisation.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Area</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Region</td><td>City-region carrier — booking branch is the region proxy when no RTO resolves. Labels are aliased to the card's own names (e.g. MEHSANA → "Rest of Gujarat", GURGAON → "Delhi NCR").</td><td><span class="badge b-rule">rule</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="ins">
+    <div class="hd"><span class="name">Future Generali &amp; Chola MS</span><span class="slug">future_generali · chola_ms</span>
+      <span class="tags"><span class="chip pdf">PDF / flat</span></span></div>
+    <p class="oneline">Two more grids with their own quirks.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Insurer</th><th>Logic / decision</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Future Generali</td><td>Pvt-Car resolved against a PDF-derived grid ("FG max"); tonnage fallback from the Premium Register where the source is sparse.</td><td><span class="badge b-rule">rule</span></td></tr>
+        <tr><td>Chola MS</td><td>Tractor rates filed under product = GCV with segment <code>1_TRAC[NEW]</code> / <code>[RENEWAL]</code>; the MISC product family must query the GCV grid to reach them. A few rows carry a stray minus sign (normalised on export).</td><td><span class="badge b-rule">rule</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section id="data">
+  <div class="col">
+    <div class="snum">Section 7</div>
+    <h2>Data Sources &amp; Model</h2>
+    <p>Three databases back the platform, kept deliberately separate.</p>
+  </div>
+  <div class="tw"><table>
+    <thead><tr><th>Store</th><th>Holds</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td><strong>RateExtract</strong></td><td><code>rate_cards</code>, <code>rate_rules</code>, <code>rto_mappings</code>, <code>cycle_bulk_rows</code>, margins, PR/statement uploads, and the Node-owned job queues.</td><td>The engine's own store — rates, matched output, and orchestration state.</td></tr>
+      <tr><td><strong>Prarambh (UAT)</strong></td><td><code>tmp_PrarambhData</code> — the staging policy feed the bulk engine reads.</td><td>Source of policy attributes and premiums for rating.</td></tr>
+      <tr><td><strong>Prarambh (Live)</strong></td><td><code>TRN_PrarambhMain</code> + the motor download view; the authoritative issued-policy record.</td><td>Read-only source for lookup, OCR, and the mobile-app push payload.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="col">
+    <p>Rate cards are versioned by effective date; rules carry region, segment, make, fuel, cc/weight/age/seating bands, rate type and value. Where a grid can't be represented as flat single-rate rules, an insurer <strong>resolver</strong> (code + JSON) computes the rate instead — the durable direction is the generic <strong>flat-grid loader</strong> (config + extracted data), which re-extracts on upload and retires bespoke resolvers.</p>
+  </div>
+</section>
+
+<!-- 8 -->
+<section id="nfr">
+  <div class="col">
+    <div class="snum">Section 8</div>
+    <h2>Non-Functional Requirements</h2>
+    <div class="req"><span class="tag">NFR — Auditability</span><br>Every rated policy traces source grid → matched rule → resolved region/band → rate → payout, reproducible on demand via the lookup screen.</div>
+    <div class="req"><span class="tag">NFR — Performance &amp; scale</span><br>Cycles rate tens of thousands of policies; queries use lean projections (never <code>SELECT *</code> over the wide policy tables), pagination, and batched writes. Background workers (OCR, policy push) are throttled and must not degrade interactive use.</div>
+    <div class="req"><span class="tag">NFR — Durability &amp; resumability</span><br>Long-running work (OCR, policy push, backfill) is queue-backed in the DB with per-item status, so a restart or wake resumes without duplication (unique keys) or loss.</div>
+    <div class="req"><span class="tag">NFR — Correctness under change</span><br>Config/resolver refactors that must not alter output are proven byte-identical against the prior version before shipping; grid re-ingests are diffed against the baseline (no-rule and match-rate deltas).</div>
+    <div class="req"><span class="tag">NFR — Security</span><br>Admin-gated operations (payout, policy push) behind authenticated roles; secrets in environment config, never in source or git; PII sent to external services only under explicit, authorised, human-run action.</div>
+  </div>
+</section>
+
+<!-- 9 -->
+<section id="open">
+  <div class="col">
+    <div class="snum">Section 9</div>
+    <h2>Assumptions, Dependencies &amp; Open Items</h2>
+    <h4>Assumptions</h4>
+    <ul>
+      <li>Grids are refreshed monthly and re-uploaded per cycle; the operator provides the source files.</li>
+      <li>The operator's Premium Register and statements are the ground truth for reconciliation; the insurer circular is ground truth for rates.</li>
+      <li>Motor scope only (<code>InsuranceType = 16</code>); dummy trackers (<code>/DUM/</code>) are excluded from downstream flows.</li>
+    </ul>
+    <h4>Dependencies</h4>
+    <ul>
+      <li>Upstream Prarambh policy data quality (tonnage, fuel, dates are frequently sparse and are recovered via fallbacks).</li>
+      <li>External OneInsure services: OCR (tracker/policy extraction) and the mobile-app token + data-push APIs.</li>
+    </ul>
+    <h4>Open items</h4>
+    <ul>
+      <li>Migration of remaining bespoke resolvers to the generic flat-grid loader.</li>
+      <li>True Excel-upload self-service for the two-leg insurers (New India, National) — currently JSON-editable + restart.</li>
+      <li>Full self-service for PDF-sourced grids (United India GCV/PCV/TW state grids).</li>
+      <li>Policy-push payload fields not present in the motor view (add-on flags, document bytes) — sent blank pending confirmation of which are required.</li>
+    </ul>
+  </div>
+</section>
+
+<footer class="wrap">
+  <p>Business Requirements Document · Motor Commission Rate Extraction &amp; Payout Engine · v1.0 Draft · prepared for review. Section 6 is the living record of insurer decisions and is updated as grids and operator confirmations evolve.</p>
+</footer>
+</main>
+
+</body></html>
