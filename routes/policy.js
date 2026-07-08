@@ -1323,12 +1323,18 @@ function extractPolicyParams(policy) {
   const addonPremium = parseFloat(get('ADD ON PREMIUM') || get('ADDON PREMIUM') || 0) || 0;
   const annualPremium = parseFloat(get('MOTOR ANNUAL PREMIUM') || get('ANNUAL PREMIUM') || 0) || 0;
 
-  // If TP premium is 0 but we have net premium, derive TP = Net - OD. The OD
-  // premium (NET_OD_PREMIUM) ALREADY INCLUDES the add-on (BASE_OD + add-on), so
-  // add-on must NOT be subtracted again — doing so double-removes it and
-  // understates TP. (e.g. GJ4/32503: Net 18515 − OD 6223 = 12292, not 9472.)
+  // If TP premium is 0 but we have net premium, derive TP = Net - OD. Normally the
+  // OD premium (NET_OD_PREMIUM) already INCLUDES the add-on (NET_OD = BASE_OD +
+  // add-on), so add-on must NOT be subtracted again (e.g. GJ4/32503: Net 18515 −
+  // OD 6223 = 12292 TP). BUT some rows carry NET_OD == BASE_OD with the add-on
+  // stored SEPARATELY (ADD_ON_PREMIUM) — there Net − OD leftover is the ADD-ON,
+  // not TP, so an SAOD+addon policy (real TP = 0) was mis-read as Package. Detect
+  // that case (NET_OD ≈ BASE_OD and a non-zero add-on) and subtract the add-on too.
+  // DL8/9514 (Fronx SAOD, LIABILITY_PREMIUM=0, addon 4621): 10556 − 5935 − 4621 = 0.
   if (tpPremium === 0 && netPremium > 0) {
-    tpPremium = Math.max(0, netPremium - odPremium);
+    const baseOd = parseFloat(get('BASE OD PREMIUM') || 0) || 0;
+    const addonSeparate = baseOd > 0 && addonPremium > 0 && Math.abs(odPremium - baseOd) < 1;
+    tpPremium = Math.max(0, netPremium - odPremium - (addonSeparate ? addonPremium : 0));
   }
 
   // NCB / Discount
