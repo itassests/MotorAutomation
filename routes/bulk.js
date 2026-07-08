@@ -3788,11 +3788,23 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       if (ip === 'TP' || ip === 'SATP') rtClause = "rate_type='SATP'";
       else if (ip === 'SAOD') rtClause = "rate_type='SAOD'";
       else if (age === 0 && isScooter) { seg = 'TW Scooter'; rtClause = "rate_type IN ('COMP_1+5','COMP_5+5')"; }
-      if (twReg) {
-        const mr = await pool.request().input('reg', sql.NVarChar(80), twReg).input('seg', sql.NVarChar(40), seg)
+      // Reliance TW SAOD is ZONE-based in the grid ("June TW26" SAOD column: North
+      // states 0.20, East + North-East 0.25, everything else 0.30) — NOT the mis-
+      // ingested make=All 0.40/0.45 rate_rules value. Override for SAOD (make grid is
+      // Hero/Honda/TVS/Yamaha/Bajaj; SAOD is make-uniform within a zone). MH34/172
+      // (Nagpur) 0.40→0.30 = operator.
+      let saodOverride = null;
+      if (ip === 'SAOD') {
+        const st2 = code.slice(0, 2);
+        const NORTH = new Set(['DL', 'RJ', 'PB', 'CH', 'HR', 'HP', 'JK', 'UP', 'UK', 'UA']);
+        const EAST_NE = new Set(['BR', 'JH', 'OD', 'OR', 'WB', 'CG', 'AS', 'ML', 'MN', 'MZ', 'NL', 'TR', 'SK', 'AR']);
+        saodOverride = NORTH.has(st2) ? 0.20 : (EAST_NE.has(st2) ? 0.25 : 0.30);
+      }
+      if (twReg || saodOverride != null) {
+        const mr = await pool.request().input('reg', sql.NVarChar(80), twReg || '').input('seg', sql.NVarChar(40), seg)
           .query(`SELECT MAX(rate_value) AS mx FROM rate_rules WHERE insurer LIKE '%reliance%'
                   AND segment=@seg AND region=@reg AND ${rtClause} AND rate_value IS NOT NULL`);
-        const mx = mr.recordset[0] && mr.recordset[0].mx;
+        const mx = saodOverride != null ? saodOverride : (mr.recordset[0] && mr.recordset[0].mx);
         if (mx != null) {
           const base = rules[0] || { id: -1, insurer: insurerSlug };
           const clone = { ...base, rate_type: 'COMP', rate_value: mx, region: twReg, segment: seg + ' (Reliance)' };
