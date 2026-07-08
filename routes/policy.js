@@ -1382,6 +1382,28 @@ function extractPolicyParams(policy) {
       Number(seatingCapacity) === 2 && Number(cc) > 0 && Number(cc) <= 350) {
     mappedVehicleType = 'TW';
   }
+  // Data-quality guard (inverse): a "TW" that carries a GVW (tonnage), seats >2,
+  // or has a car/truck-sized engine is a mis-typed 4-wheeler — the source types
+  // some heavy vehicles as "TW" (Volvo XC60 2400cc → car, Tata LPT 3118 35T →
+  // GCV truck, Maruti 1490cc → car). No two-wheeler carries a GVW or seats >2, and
+  // a car-only make at ≥800cc is never a bike. Re-type: tonnage/goods-truck → GCV,
+  // >2 seats → CAR, else ≥800cc on a non-bike make → CAR. Bike-capable makes
+  // (Honda/Suzuki/Yamaha/Kawasaki/KTM/RE/Triumph/Harley/Ducati/BMW/…) stay TW
+  // unless they carry a tonnage or >2 seats (a genuine superbike is left alone).
+  if (mappedVehicleType === 'TW') {
+    const _cc = Number(cc) || 0;
+    const _ton = Number(tonnage) || 0;
+    const _seat = Number(seatingCapacity) || 0;
+    const _hay = `${make || ''} ${model || ''}`.toUpperCase();
+    // Bike-capable make (incl. EV 2W + 3W-auto makes like Piaggio) → NEVER re-type
+    // on cc/tonnage/seat, because bikes sometimes carry garbage tonnage/seat data
+    // (Honda Unicorn ton=16200, Jawa ton=29300). Only an explicit TRUCK model name
+    // overrides. Non-bike makes re-type by GVW (→GCV) or engine/seats (→CAR).
+    const isBike = /HERO|HONDA|BAJAJ|\bTVS\b|YAMAHA|SUZUKI|KAWASAKI|\bKTM\b|ROYAL\s*ENFIELD|TRIUMPH|HARLEY|DUCATI|BENELLI|APRILIA|\bBMW\b|VESPA|\bAPE\b|PIAGGIO|JAWA|\bOLA\b|ATHER|OKINAWA|ULTRAVIOLETTE|HUSQVARNA|MOTO\s*GUZZI|\bINDIAN\b/.test(_hay);
+    const TRUCK = /\bLPT\b|\bLPK\b|\bLPO\b|\bLPS\b|TIPPER|TRAILER|\bTRUCK\b|\bHYVA\b|GOODS\s*CARR|ASHOK\s*LEYLAND|BHARATBENZ|\bDOST\b|\bFURIO\b/.test(_hay);
+    if (TRUCK || (_ton > 0 && !isBike)) mappedVehicleType = 'GCV';
+    else if (!isBike && (_seat > 2 || _cc >= 800)) mappedVehicleType = 'CAR';
+  }
 
   // Map policy type to ins_product
   const insProduct = mapInsProduct(policyType);
