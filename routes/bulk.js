@@ -2754,6 +2754,52 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         : r);
   }
 
+  // SBI MISC Agricultural Tractor — direct re-query override. SBI's MISC grid carries
+  // both "Agricultural Tractor & Harvester" (age-banded: age 0 → e.g. 0.57, age 1-99 →
+  // e.g. 0.52 in MH) and "GCV Tractor" rows, but a farm tractor's region ("MH") never
+  // matches the grid's verbose region labels ("MAHARASHTRA"/"MH - Rest") on the strict
+  // lookup, so it fell through the cluster fallback to the cheaper age-agnostic
+  // GCV-Tractor rate (0.43). Re-query the Agricultural-Tractor row directly for the
+  // policy's STATE + cover + age band, newest active card, and inject it. Scoped SBI +
+  // MISC + genuine farm-tractor make (GCV road-tractors Tata/AL/BharatBenz untouched).
+  if (insurerSlug === 'sbi_general' &&
+      /MISC|MIS/.test(String(params.vehicleType || '').toUpperCase()) &&
+      /ESCORT|MAHINDRA|KUBOTA|SONALIKA|EICHER|SWARAJ|JOHN\s*DEERE|NEW\s*HOLLAND|FARMTRAC|POWERTRAC|MASSEY|FORCE\s*MOTOR|INTERNATIONAL|SOLIS|CAPTAIN|PREET|INDO\s*FARM|\bVST\b|\bDEERE\b|SAME\s*DEUTZ/i
+        .test(`${params.make || ''} ${params.model || ''}`)) {
+    try {
+      const SBI_TRAC_STATE = {
+        MH: 'MAHARASHTRA', UP: 'UTTAR PRADESH', GJ: 'GUJARAT', PB: 'PUNJAB',
+        TN: 'TAMIL NADU', TS: 'TELANGANA', AP: 'ANDHRA PRADESH', WB: 'WEST BENGAL',
+        BR: 'BIHAR', JH: 'JHARKHAND', OD: 'ODISHA', GA: 'GOA', JK: 'JAMMU & KASHMIR',
+      };
+      const st = String(rtoStatePrefix(params.rtoCode) || '').toUpperCase();
+      const full = SBI_TRAC_STATE[st];
+      if (full) {
+        const cover = (Number(params.odPremium) || 0) <= 0 ? 'SATP' : 'COMP';
+        const age = Number(params.vehicleAge) || 0;
+        const q = await pool.request()
+          .input('full', full).input('dash', st + ' -%')
+          .input('cover', cover).input('age', age)
+          .query(`SELECT TOP 1 rr.rate_value FROM rate_rules rr
+                    JOIN rate_cards rc ON rr.rate_card_id = rc.id
+                   WHERE rr.insurer='sbi_general' AND rr.product IN ('MISC','MIS','Misc')
+                     AND rr.segment LIKE 'Agricultural%' AND rr.rate_type=@cover
+                     AND (UPPER(rr.region)=@full OR UPPER(rr.region) LIKE @dash)
+                     AND @age BETWEEN ISNULL(rr.vehicle_age_min,0) AND ISNULL(rr.vehicle_age_max,999)
+                     AND rc.status='active' AND rr.rate_value IS NOT NULL AND rr.rate_value>0
+                   ORDER BY rc.effective_from DESC, rr.rate_value DESC`);
+        const rv = q.recordset[0] && Number(q.recordset[0].rate_value);
+        if (rv > 0) {
+          const _b = rules[0];
+          rules = [_b
+            ? { ..._b, rate_value: rv, segment: 'Agricultural Tractor (SBI grid)' }
+            : { id: -1, insurer: 'sbi_general', product: 'MISC', region: resolvedRegion || '',
+                rate_type: cover, rate_value: rv, segment: 'Agricultural Tractor (SBI grid)', is_declined: 0 }];
+        }
+      }
+    } catch (_) { /* leave rules unchanged on any failure */ }
+  }
+
   // Kotak TW JUN'26 per-RTO×Make PO grid (cards 597/598, engine kotak_tw_rto_make).
   // The grid is keyed by RTO code (region=RTO) + make + Scooter/Bike, but kotak TW
   // policies resolve `region` to a CITY (not the RTO) and the lookup RTO-gates TW
@@ -3212,6 +3258,52 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
                          : (Number(params.tpPremium) || 0) <= 0 ? 'SAOD' : 'COMP',
                 rate_value: fr, segment: _seg, is_declined: 0 }];
         }
+      }
+    } catch (_) { /* leave rules unchanged on any failure */ }
+  }
+
+  // ---- GO DIGIT Private Car — June'26 "Large Broker Grid" Comp+SAOD summary ----
+  // The June re-ingestion mis-read the two-table sheet and loaded the LEFT
+  // make-block into rate_rules (make/segment blank) so every make collapsed to
+  // one wrong rate. The operator pays on the RIGHT summary block: Cluster ×
+  // {SAOD,Comp} × {Non-NCB,NCB} + HEV. Resolve it config-driven from the already-
+  // resolved cluster (region). config/go_digit_car_jun26.json + services/go-digit-car.js.
+  if (insurerSlug === 'go_digit' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR') {
+    try {
+      const { resolveGoDigitCarRate } = require('../services/go-digit-car');
+      const gr = resolveGoDigitCarRate(params, resolvedRegion);
+      if (gr != null) {
+        const _b = rules[0];
+        const _seg = 'Pvt Car (Go Digit Jun26 grid)';
+        rules = [_b
+          ? { ..._b, rate_value: gr, segment: _seg }
+          : { id: -1, insurer: 'go_digit', product: 'CAR', region: resolvedRegion || '',
+              rate_type: (Number(params.tpPremium) || 0) <= 0 ? 'SAOD' : 'COMP',
+              rate_value: gr, segment: _seg, is_declined: 0 }];
+      }
+    } catch (_) { /* leave rules unchanged on any failure */ }
+  }
+
+  // ---- GO DIGIT Two-Wheeler — June'26 "2W Grid 1+1 & SATP" Max CD2 ----
+  // The operator pays the grid's Max CD2 column (Comp→1+1 MaxCD2, TP→SATP MaxCD2);
+  // the June ingestion stored wrong rate_rules values. Resolve config-driven from the
+  // already-resolved cluster. config/go_digit_tw_jun26.json + services/go-digit-tw.js.
+  if (insurerSlug === 'go_digit' && productIsTw) {
+    try {
+      const { resolveGoDigitTwRate } = require('../services/go-digit-tw');
+      const gr = resolveGoDigitTwRate(params, resolvedRegion);
+      if (gr != null) {
+        const _b = rules[0];
+        const _seg = 'TW (Go Digit Jun26 grid)';
+        // Force a MAX_CD2 rate_type — the pool's first rule may be a `1+1_CD1`
+        // discount row, and pickPrimaryRateRule DROPS any CD1 rate_type, so
+        // inheriting it would null the rate. SATP for TP, COMP_MAX_CD2 for Comp.
+        const _rt = (Number(params.odPremium) || 0) <= 0 ? 'SATP_MAX_CD2' : 'COMP_MAX_CD2';
+        rules = [_b
+          ? { ..._b, rate_value: gr, segment: _seg, rate_type: _rt, is_declined: 0 }
+          : { id: -1, insurer: 'go_digit', product: 'TW', region: resolvedRegion || '',
+              rate_type: _rt, rate_value: gr, segment: _seg, is_declined: 0 }];
       }
     } catch (_) { /* leave rules unchanged on any failure */ }
   }

@@ -11,7 +11,8 @@
         "segment": "Segment",
         "section": "Section Text",
         "region": "RTO",
-        "rate": "Approval Grid"
+        "rate": "Approval Grid For OD",
+        "rate_tp": "Approval Grid For TP"
       },
       "regionResolver": { "type": "tata_cluster", "field": "tw" },
       "classifier": { "type": "tw" }

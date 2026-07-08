@@ -71,14 +71,20 @@ function extractFlatGrid(rows, sheet) {
     const r = rows[i];
     if (!r) continue;
     const region = idx.region >= 0 ? String(r[idx.region] ?? '').trim() : '';
-    const rateRaw = idx.rate >= 0 ? r[idx.rate] : null;
+    const section = idx.section >= 0 ? String(r[idx.section] ?? '').trim() : '';
+    // A SATP (standalone-TP) row's real rate lives in the TP column, not the OD
+    // column (which is 0 for a TP-only cover). If the sheet has a separate TP
+    // rate column (config role `rate_tp`), use it for SATP rows. (Same trap as
+    // the Tata CAR SATP fix — OD=0 must not become the SATP rate.)
+    const rateIdx = (idx.rate_tp >= 0 && /SATP|^TP\b|LIABILITY/i.test(section)) ? idx.rate_tp : idx.rate;
+    const rateRaw = rateIdx >= 0 ? r[rateIdx] : null;
     if (!region || rateRaw === '' || rateRaw == null) continue;
     const rate = Number(rateRaw);
     if (!Number.isFinite(rate)) continue;
     out.push({
       biz: idx.biz >= 0 ? String(r[idx.biz] ?? '').trim() : '',
       segment: idx.segment >= 0 ? String(r[idx.segment] ?? '').trim() : '',
-      section: idx.section >= 0 ? String(r[idx.section] ?? '').trim() : '',
+      section,
       fuel: idx.fuel >= 0 ? String(r[idx.fuel] ?? '').trim() : '',
       age: idx.age >= 0 ? String(r[idx.age] ?? '').trim() : '',
       region, rate,
@@ -124,24 +130,15 @@ function ageBand(age) {
 }
 function bizCat(params) {
   const b = norm(params.businessType);
+  // USER RULE: "new business" ≠ "new vehicle". BRAND NEW applies ONLY to a
+  // genuinely new vehicle — vehicle age EXACTLY 0. New business on any older OR
+  // unknown-age vehicle is a ROLLOVER (new-to-insurer, not a new vehicle). No NCB
+  // proxy: an unknown age is treated as an existing vehicle, never Brand New.
+  const age = (params.vehicleAge != null && params.vehicleAge !== '') ? Number(params.vehicleAge) : null;
   if (/ROLL/.test(b)) return 'ROLLOVER';
   if (/RENEW/.test(b)) return 'RENEWAL';
-  // A "New" business is BRAND NEW only for a genuinely new vehicle. An existing
-  // vehicle switched to a new insurer is a "New" policy but a ROLLOVER for rating.
-  // A brand-new vehicle's first policy has NO NCB and age ~0; NCB>0 (prior
-  // no-claim years) or age>1 → the vehicle already existed → ROLLOVER. Fixes
-  // MT/DIRNE/DL7/14844 (2019 TVS Jupiter, NCB 25, biz "New") wrongly rated Brand
-  // New 49.5 instead of Rollover 48.5.
-  if (/NEW/.test(b)) {
-    // USER RULE: "new vehicle" is ONLY based on age (manufactured date). A "New"
-    // business on an age-0/1 vehicle is Brand New; on an older vehicle it is a
-    // Rollover. NCB is used only as a proxy when age is genuinely unknown.
-    const age = params.vehicleAge;
-    if (age != null && age !== '') return (Number(age) || 0) <= 1 ? 'BRAND NEW' : 'ROLLOVER';
-    return (Number(params.ncbPct) || 0) === 0 ? 'BRAND NEW' : 'ROLLOVER';
-  }
-  if ((Number(params.vehicleAge) || 0) === 0) return 'BRAND NEW';
-  return 'RENEWAL';
+  if (/NEW/.test(b)) return age === 0 ? 'BRAND NEW' : 'ROLLOVER';
+  return age === 0 ? 'BRAND NEW' : 'RENEWAL';
 }
 function sectionCat(params) {
   const od = Number(params.odPremium) || 0;

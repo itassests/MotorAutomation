@@ -1,0 +1,202 @@
+{
+  "_source": "Large Broker Grid Jun 26.xlsx / Pvt Car Comp+SAOD Grid (right summary block)",
+  "_note": "Go Digit Pvt Car Comp/SAOD commission = cluster x cover x NCB (+ HEV for hybrids). Rates are percents. TP is a separate grid.",
+  "grid": {
+    "ANDAMAN": {
+      "saodNonNcb": 22,
+      "saodNcb": 22,
+      "compNonNcb": 24.5,
+      "compNcb": 24.5,
+      "hev": 19.5
+    },
+    "AP_TS": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 22,
+      "compNcb": 28,
+      "hev": 19.5
+    },
+    "ASSAM": {
+      "saodNonNcb": 22,
+      "saodNcb": 22,
+      "compNonNcb": 24,
+      "compNcb": 24,
+      "hev": 19.5
+    },
+    "BAD_UP": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 22,
+      "compNcb": 27,
+      "hev": 19.5
+    },
+    "BIHAR": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 22,
+      "compNcb": 27,
+      "hev": 19.5
+    },
+    "BLR": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 22,
+      "compNcb": 28,
+      "hev": 24
+    },
+    "DL": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 26.5,
+      "compNcb": 26.5,
+      "hev": 24
+    },
+    "GJ_GOOD": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 22,
+      "compNcb": 28,
+      "hev": 19.5
+    },
+    "GOA": {
+      "saodNonNcb": 24,
+      "saodNcb": 24,
+      "compNonNcb": 24,
+      "compNcb": 24,
+      "hev": 19.5
+    },
+    "HP__HR": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 22,
+      "compNcb": 25,
+      "hev": 19.5
+    },
+    "HYDERABAD": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 26.5,
+      "compNcb": 26.5,
+      "hev": 24
+    },
+    "J_K": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 22,
+      "compNcb": 27,
+      "hev": 19.5
+    },
+    "JH": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 22,
+      "compNcb": 26,
+      "hev": 19.5
+    },
+    "KL": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 23.5,
+      "compNcb": 23.5,
+      "hev": 19.5
+    },
+    "MP__CG": {
+      "saodNonNcb": 22,
+      "saodNcb": 22,
+      "compNonNcb": 23.5,
+      "compNcb": 23.5,
+      "hev": 19.5
+    },
+    "MUM": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 22,
+      "compNcb": 28,
+      "hev": 24
+    },
+    "NE": {
+      "saodNonNcb": 22,
+      "saodNcb": 22,
+      "compNonNcb": 23.5,
+      "compNcb": 23.5,
+      "hev": 19.5
+    },
+    "ORISSA": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 23.5,
+      "compNcb": 23.5,
+      "hev": 19.5
+    },
+    "PB_CH": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 22,
+      "compNcb": 28,
+      "hev": 19.5
+    },
+    "PUNE": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 22,
+      "compNcb": 28,
+      "hev": 24
+    },
+    "REST_OF_GJ": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 22,
+      "compNcb": 28,
+      "hev": 19.5
+    },
+    "REST_OF_KA": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 22,
+      "compNcb": 27,
+      "hev": 19.5
+    },
+    "RJ": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 22,
+      "compNcb": 26,
+      "hev": 19.5
+    },
+    "ROM": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 22,
+      "compNcb": 28,
+      "hev": 19.5
+    },
+    "TN": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 22,
+      "compNcb": 25,
+      "hev": 19.5
+    },
+    "UK": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 26.5,
+      "compNcb": 26.5,
+      "hev": 19.5
+    },
+    "UP": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 22,
+      "compNcb": 28,
+      "hev": 19.5
+    },
+    "WB": {
+      "saodNonNcb": 19.5,
+      "saodNcb": 24,
+      "compNonNcb": 25.5,
+      "compNcb": 25.5,
+      "hev": 19.5
+    }
+  }
+}
