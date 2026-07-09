@@ -3993,7 +3993,9 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         UA: 'UK', CG: 'CG', BR: 'BH', AN: 'AN', AS: 'AS/ML/TR/AR/NL/SK', ML: 'AS/ML/TR/AR/NL/SK',
         TR: 'AS/ML/TR/AR/NL/SK', AR: 'AS/ML/TR/AR/NL/SK', NL: 'AS/ML/TR/AR/NL/SK', SK: 'AS/ML/TR/AR/NL/SK' };
       const code = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-      const reg = TREG[code.slice(0, 2)];
+      // Authoritative Chola RTO reference splits MH (Mumbai-cluster vs ROM), TN
+      // (Chennai vs ROTN) and UP (UP-East vs UP); other states → the prefix map.
+      const reg = require('../services/chola-region').cholaRegion(code) || TREG[code.slice(0, 2)];
       if (reg) {
         const band = (Number(params.vehicleAge) || 0) < 1 ? 'NEW' : 'RENEWAL';
         const trKey = lookupKey + '||cholaTrac:' + reg + ':' + band;
@@ -4091,17 +4093,10 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         BR:'BH', AN:'AN', AS:'AS/ML/TR/AR/NL/SK', ML:'AS/ML/TR/AR/NL/SK', TR:'AS/ML/TR/AR/NL/SK',
         AR:'AS/ML/TR/AR/NL/SK', NL:'AS/ML/TR/AR/NL/SK', SK:'AS/ML/TR/AR/NL/SK' };
       const code = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-      let reg = GREG[code.slice(0, 2)];
-      // Maharashtra GCV splits Mumbai/Pune/Central-MH vs ROM (Rest of MH). Chola's
-      // rto_mappings only carry the Mumbai/Pune/Central-MH RTOs (→ MUMBAI THANE /
-      // CENTRAL MH / PUNE); MH RTOs ABSENT from the master are ROM (lower rates, e.g.
-      // ≤3.5T "Other" 0.35 vs Mumbai-cluster 0.45). MH15/MH24 (unmapped) → ROM.
-      if (/^MH/.test(code) && reg) {
-        const rm = await pool.request().input('c', sql.NVarChar(12), code)
-          .query("SELECT TOP 1 region FROM rto_mappings WHERE insurer LIKE '%chola%' AND REPLACE(rto_code,'-','')=@c");
-        const rg = rm.recordset[0] && rm.recordset[0].region;
-        reg = (rg && /MUMBAI|CENTRAL|PUNE|THANE/i.test(rg)) ? 'Mumbai/GA/Pune/Central MH' : 'ROM';
-      }
+      // Authoritative Chola RTO reference (config/chola_rto_cluster.json) drives the
+      // splits a plain prefix can't: MH → Mumbai/Pune/Central-MH cluster vs ROM,
+      // TN → Chennai vs ROTN, UP → UP-East vs UP. Other states → the prefix map.
+      const reg = require('../services/chola-region').cholaRegion(code) || GREG[code.slice(0, 2)];
       const cat = String(params.vehicleCategory || '').toUpperCase();
       const is3W = /\b3\s*W\b|3\s*WH/.test(cat);
       const isElectric = /ELECTRIC/i.test(String(params.fuelType || '')) || /E-?RIK|E-?RICK/i.test(cat);
