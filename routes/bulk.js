@@ -1883,6 +1883,40 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // ---- Kotak MISC Tractor exact-RTO override ----
+  // Kotak's tractor grid ("Tractor RTO - State wise Dec'25 onwards", card548:
+  // product MIS / segment 'Tractor') is keyed by sub_type = RTO CODE, per-district
+  // Category payout (UP41 Barabanki = 0.40 "Uttar Pradesh_2", UP30 Hardoi = 0.47
+  // "Uttar Pradesh_1", AP01 = 0.35 "Telangana_1"). The initial MISC lookup gates on
+  // the booking-tracker RTO ("UP1") which matches nothing → falls to an arbitrary
+  // district (0.35). Re-query by the enriched VEHICLE RTO so the exact district's
+  // payout lands. Scoped Kotak + MISC + farm-tractor (make/model/category).
+  if (insurerSlug === 'kotak' &&
+      /MISC|MIS/.test(String(params.vehicleType || '').toUpperCase()) &&
+      params.rtoCode &&
+      (/TRACTOR/i.test(`${params.vehicleCategory || ''} ${params.vehicleCategoryUpdated || ''} ${params.model || ''}`) ||
+       /ESCORT|MAHINDRA|KUBOTA|SONALIKA|EICHER|SWARAJ|JOHN\s*DEERE|NEW\s*HOLLAND|FARMTRAC|POWERTRAC|MASSEY|SOLIS|CAPTAIN|PREET|INDO\s*FARM|\bVST\b|\bDEERE\b|FORCE|SAME\s*DEUTZ/i.test(String(params.make || '')))) {
+    try {
+      const kt = String(params.rtoCode).toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const ktVars = new Set([kt]);
+      const m = kt.match(/^([A-Z]{2})0*(\d+)$/);
+      if (m) { const n = String(parseInt(m[2], 10)); ktVars.add(m[1] + n); ktVars.add(m[1] + n.padStart(2, '0')); }
+      for (const v of ktVars) {
+        const tr = await pool.request().input('sub', sql.NVarChar(12), v)
+          .query(`SELECT TOP 1 rr.rate_value FROM rate_rules rr JOIN rate_cards rc ON rr.rate_card_id = rc.id
+                  WHERE rr.insurer='kotak' AND rr.segment LIKE '%Tractor%' AND rr.rate_type='COMP'
+                    AND REPLACE(UPPER(rr.sub_type),'-','')=@sub AND rr.rate_value > 0
+                  ORDER BY rc.effective_from DESC`);
+        if (tr.recordset[0]) {
+          const base = rules[0] || { id: -1, insurer: insurerSlug };
+          rules = [{ ...base, rate_type: 'COMP', rate_value: Number(tr.recordset[0].rate_value),
+            is_declined: 0, sub_type: v, segment: 'Tractor (Kotak RTO ' + v + ')' }];
+          break;
+        }
+      }
+    } catch (_) { /* leave rules unchanged on failure */ }
+  }
+
   // ---- Kotak Pvt-Car Comp / SAOD (NCB × fuel × new/used, flat) ----
   // USER grid (Jun'26): Kotak has NO Pvt-Car Comp rate_rules (only SATP), so Comp/
   // SAOD cars wrongly matched the SATP district grid. Flat structure:
@@ -2797,26 +2831,11 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         : r);
   }
 
-  // Kotak MISC Tractor — Uttar Pradesh uniform top-tier. Kotak's tractor grid is
-  // district-tiered (0.30-0.475); within UP it splits western-UP/Kanpur-Lucknow
-  // (0.47-0.475) vs eastern-UP districts (0.40, e.g. Sultanpur/Jaunpur/Ayodhya/
-  // Ambedkar Nagar/Amethi/Barabanki). But the operator pays ~48 to ALL UP tractors
-  // — verified vs operator file (cycle 12+11): 6/6 western-UP (0.475) match 48,
-  // 12/12 eastern-UP (0.40) miss at 48. So the eastern-UP 0.40 tier is too low;
-  // bump every UP tractor COMP rule below 0.475 up to 0.475 (→47.5, within ±0.5 of
-  // 48). The already-0.475 western-UP rows are left alone (zero-regression). Scoped
-  // Kotak + MISC + Tractor + UP state; other states (no tractor data) untouched.
-  if (insurerSlug === 'kotak' &&
-      String(params.vehicleType || '').toUpperCase() === 'MISC' &&
-      String(rtoStatePrefix(params.rtoCode) || '').toUpperCase() === 'UP' &&
-      rules.length > 0) {
-    rules = rules.map(r =>
-      (/tractor/i.test(String(r.segment || '')) &&
-       /^COMP$/i.test(String(r.rate_type || '')) &&
-       Number(r.rate_value) < 0.475)
-        ? { ...r, rate_value: 0.475, _kotakUpTractorOverride: true }
-        : r);
-  }
+  // (Kotak UP-tractor uniform-0.475 override REMOVED — the earlier cycle-11/12 hack
+  // bumped eastern-UP tractors 0.40→0.475 to match an operator that then paid ~48
+  // pan-UP. The Jun'26 grid ("Tractor RTO - State wise Dec'25 onwards", card548) is
+  // per-RTO Category: UP_1 districts = 0.47, UP_2 = 0.40 (e.g. UP41 Barabanki 0.40).
+  // USER-confirmed from the grid → use card548's exact rate, no uniform bump.)
 
   // SBI MISC Agricultural Tractor — direct re-query override. SBI's MISC grid carries
   // both "Agricultural Tractor & Harvester" (age-banded: age 0 → e.g. 0.57, age 1-99 →
@@ -4687,13 +4706,13 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // therefore retired (it would otherwise re-clone a 52 over the correct volume
   // rate). See [[feedback_bajaj_pcv_bus]].
 
-  // ---- Kotak MISD flat-rate override ----
-  // USER-confirmed: Kotak's MISD (Miscellaneous-D) segment has only TWO payout
-  // rates — Tractor = 47.5% (any tractor on the acceptable-RTO list; the sheet's
-  // per-RTO "CD" column 47%/40% is a category marker, NOT the payout, so the
-  // engine wrongly surfaced 0.40/0.47) and Others (Garbage/Cash vans) = 35%.
-  // Override the rate on the matched MIS row accordingly. Tractors whose RTO
-  // isn't on the list resolve to no-rule (NIL PO) and are left untouched.
+  // ---- Kotak MISD flat-rate override (NON-tractor only) ----
+  // Non-tractor MISD (Miscellaneous-D — Garbage / Cash vans) pays a flat 35%.
+  // TRACTORS are handled by the Kotak MISC Tractor exact-RTO override above, which
+  // reads the grid's per-RTO "Payout" column (UP41 Barabanki 0.40, UP30 Hardoi 0.47,
+  // AP01 0.35 …). USER-corrected: the Payout column IS the per-RTO rate — supersedes
+  // the earlier "category marker → flat 47.5/35" reading. So skip tractors here and
+  // leave the exact-RTO payout intact.
   if (insurerSlug === 'kotak' &&
       ['MISC', 'MIS'].includes(String(params.vehicleType || '').toUpperCase()) &&
       rules.length > 0) {
@@ -4701,17 +4720,12 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     const cat  = String(params.vehicleCategory || '').toUpperCase();
     const isTractor = /TRACTOR/.test(seg0) || /TRACTOR/.test(cat) ||
                       /TRACTOR/.test(String(params.model || '') + ' ' + String(params.make || ''));
-    const base = rules[0];
-    // MISD pays only 47.5% or 35%. For tractors the sheet's per-RTO category
-    // (carried as the ingested CD value: high tier ~47% → 47.5% payout; low
-    // tier 40% → 35% payout) selects which. Non-tractor MISD (Garbage/Cash
-    // vans) → 35%.
-    const cd = Number(base.rate_value) || 0;
-    const target = isTractor ? (cd >= 0.45 ? 0.475 : 0.35) : 0.35;
-
-    const clone = { ...base, rate_value: target, is_declined: 0,
-      segment: (base.segment || 'MISD') + ' (Kotak MISD)' };
-    rules = [clone, ...rules.filter(r => r !== base)];
+    if (!isTractor) {
+      const base = rules[0];
+      const clone = { ...base, rate_value: 0.35, is_declined: 0,
+        segment: (base.segment || 'MISD') + ' (Kotak MISD)' };
+      rules = [clone, ...rules.filter(r => r !== base)];
+    }
   }
 
   // ---- Kotak PCV flat 65% ----
