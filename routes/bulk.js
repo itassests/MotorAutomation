@@ -4159,16 +4159,24 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         else segClause = "segment LIKE '10[_]%'";
         // Only exclude the [Electric] rows for non-electric vehicles.
         const elecFilter = isElectric ? '' : "AND segment NOT LIKE '%Electric%'";
+        // MAX across cards picks the highest real rate; COUNT tells whether the band
+        // exists at all. If the band is present but every row is 0 (Chola declines
+        // that weight in that region — e.g. GJ >47.5T), DECLINE (rate 0) rather than
+        // returning nothing, which would let the generic engine mis-pick a wrong
+        // segment (a 55T truck grabbing PCV "2_4W_LT_1500CC" 12.5).
         const mr = await pool.request().input('reg', sql.NVarChar(80), reg)
-          .query(`SELECT MAX(rate_value) AS mx FROM rate_rules
+          .query(`SELECT MAX(rate_value) AS mx, COUNT(*) AS n FROM rate_rules
                   WHERE insurer LIKE '%chola%' AND region=@reg AND sub_type='GCCV'
-                    AND rate_type='PACK' AND rate_value > 0 ${elecFilter}
+                    AND rate_type='PACK' AND rate_value IS NOT NULL ${elecFilter}
                     AND ${segClause}`);
         const mx = mr.recordset[0] && mr.recordset[0].mx;
-        if (mx != null) {
+        const nBand = (mr.recordset[0] && mr.recordset[0].n) || 0;
+        if (nBand > 0) {
           const base = rules[0] || { id: -1, insurer: insurerSlug };
-          const clone = { ...base, rate_type: 'PACK', rate_value: mx, region: reg,
-            sub_type: 'GCCV', segment: 'GCCV (Chola ' + reg + ')' };
+          const declined = !(mx > 0);
+          const clone = { ...base, rate_type: 'PACK', rate_value: declined ? 0 : mx,
+            is_declined: declined ? 1 : 0, region: reg, sub_type: 'GCCV',
+            segment: 'GCCV (Chola ' + reg + ')' + (declined ? ' — declined' : '') };
           rules = [clone, ...rules.filter(r => r !== base)];
         }
       }
