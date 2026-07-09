@@ -1411,6 +1411,15 @@ function extractPolicyParams(policy) {
     const _pcvSig = `${get('VEHICAL_TYPE_Id') || ''} ${get('VehicalCategory_Updated') || ''}`.toUpperCase();
     if (/PASSENGER\s*CARRY|\bPCV\b|STAFF\s*BUS|\bBUS\b/.test(_pcvSig)) mappedVehicleType = 'PCV';
   }
+  // Data-quality guard: an explicit "MOTORCYCLE" make on a commercial (GCV/PCV) type
+  // with a bike-sized engine (≤350cc) is a mis-typed two-wheeler — the source keys
+  // some bikes as "Commercial-Goods Carrying" (Honda CB Shine 125cc → GCV 2.5-3.5Tn).
+  // Gate on the MOTORCYCLE make so genuine cargo 3-wheelers (Bajaj RE / Piaggio Ape,
+  // ~200-450cc — NOT "motorcycles") stay GCV/PCV. Re-type → TW.
+  if ((mappedVehicleType === 'GCV' || mappedVehicleType === 'PCV') &&
+      /MOTOR\s*CYCLE/i.test(String(make || '')) && Number(cc) > 0 && Number(cc) <= 350) {
+    mappedVehicleType = 'TW';
+  }
   // Data-quality guard: a CAR with a two-wheeler-sized engine (≤350cc) AND
   // exactly 2 seats is a mis-typed motorcycle/scooter — the source Prarambh data
   // types some TWs as "Pvt.Car" (Honda CB Shine 125cc, Activa 110cc, Ola S1).
