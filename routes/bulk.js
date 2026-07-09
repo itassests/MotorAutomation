@@ -1925,6 +1925,25 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on failure */ }
   }
 
+  // ---- Kotak TW SAOD → declined (no TW SAOD in the June grid) ----
+  // Kotak's June TW grid ("kotak_TW_1_1_and_SATP") carries only 1+1 (Comp) + SATP
+  // (TP) — NO SAOD — so Kotak pays no standalone-OD on two-wheelers. insProduct is
+  // often blank (policyType doesn't read Product_Type_Id), so the engine treated a
+  // TW SAOD as Comp and matched the Comp scooter rate (45). Detect SAOD via the raw
+  // product-type and decline (NIL PO). USER-confirmed. Kotak + TW scoped.
+  if (insurerSlug === 'kotak' &&
+      String(params.vehicleType || '').toUpperCase() === 'TW' &&
+      /SAOD|STANDALONE|\bSOD\b/i.test(`${params.insProduct || ''} ${params.productTypeName || ''}`)) {
+    let stmtT = null, prT = null;
+    const keyT = String(params._policy_no || '').trim().toUpperCase();
+    if (keyT) {
+      if (statementIndex) stmtT = statementIndex.get(keyT) || null;
+      if (prIndex) { prT = prIndex.get(keyT) || null; if (!prT) for (const s of policyKeyVariants(keyT)) { prT = prIndex.get(s); if (prT) break; } }
+    }
+    return buildOutputRow(policy, params, null, null, null, null,
+      'Declined by kotak — no TW SAOD in the June grid (1+1 + SATP only)', stmtT, prT);
+  }
+
   // ---- Kotak MISC Tractor exact-RTO override ----
   // Kotak's tractor grid ("Tractor RTO - State wise Dec'25 onwards", card548:
   // product MIS / segment 'Tractor') is keyed by sub_type = RTO CODE, per-district
