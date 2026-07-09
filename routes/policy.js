@@ -1400,6 +1400,17 @@ function extractPolicyParams(policy) {
   if (!mappedVehicleType) {
     mappedVehicleType = inferVehicleTypeFromMakeModel(make, model, seatingCapacity, cc);
   }
+  // Data-quality guard: a CAR whose authoritative commercial-type field says
+  // passenger-carrying / PCV is a mis-typed PCV — the source sets vehicleClass /
+  // vehicleType = "Pvt.Car" on some buses (Tata Star Bus LP 810/52, 41 seats) even
+  // though VEHICAL_TYPE_Id = "Commercial-Passenger Carrying" and the category =
+  // "PCV-Staff Bus". Trust the explicit passenger-carrier signal → PCV. Genuine
+  // private SUVs (Scorpio/Tavera, 9-10 seats) keep VEHICAL_TYPE_Id "Pvt.Car" → stay
+  // CAR. Seating>8 avoids re-typing a 5-seat commercial car (rare taxi mislabel).
+  if (mappedVehicleType === 'CAR' && Number(seatingCapacity) > 8) {
+    const _pcvSig = `${get('VEHICAL_TYPE_Id') || ''} ${get('VehicalCategory_Updated') || ''}`.toUpperCase();
+    if (/PASSENGER\s*CARRY|\bPCV\b|STAFF\s*BUS|\bBUS\b/.test(_pcvSig)) mappedVehicleType = 'PCV';
+  }
   // Data-quality guard: a CAR with a two-wheeler-sized engine (≤350cc) AND
   // exactly 2 seats is a mis-typed motorcycle/scooter — the source Prarambh data
   // types some TWs as "Pvt.Car" (Honda CB Shine 125cc, Activa 110cc, Ola S1).
