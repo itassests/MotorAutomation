@@ -1901,6 +1901,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       const ktVars = new Set([kt]);
       const m = kt.match(/^([A-Z]{2})0*(\d+)$/);
       if (m) { const n = String(parseInt(m[2], 10)); ktVars.add(m[1] + n); ktVars.add(m[1] + n.padStart(2, '0')); }
+      let matched = false;
       for (const v of ktVars) {
         const tr = await pool.request().input('sub', sql.NVarChar(12), v)
           .query(`SELECT TOP 1 rr.rate_value FROM rate_rules rr JOIN rate_cards rc ON rr.rate_card_id = rc.id
@@ -1911,8 +1912,25 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
           const base = rules[0] || { id: -1, insurer: insurerSlug };
           rules = [{ ...base, rate_type: 'COMP', rate_value: Number(tr.recordset[0].rate_value),
             is_declined: 0, sub_type: v, segment: 'Tractor (Kotak RTO ' + v + ')' }];
+          matched = true;
           break;
         }
+      }
+      // RTO not on the acceptable-RTO list (the grid lists only accepted districts) →
+      // Kotak DECLINES it → NIL PO. USER-confirmed (UP53 absent → decline; the engine
+      // otherwise fell to an arbitrary district's 0.475). Return a clean declined row
+      // (mirrors the Shriram RTO-decline path) rather than a rate-0 clone that the
+      // downstream filters drop to a misleading "no-rule". Only when a real vehicle
+      // RTO code is present (m matched).
+      if (!matched && m) {
+        let stmtK = null, prK = null;
+        const keyK = String(params._policy_no || '').trim().toUpperCase();
+        if (keyK) {
+          if (statementIndex) stmtK = statementIndex.get(keyK) || null;
+          if (prIndex) { prK = prIndex.get(keyK) || null; if (!prK) for (const s of policyKeyVariants(keyK)) { prK = prIndex.get(s); if (prK) break; } }
+        }
+        return buildOutputRow(policy, params, null, null, null, null,
+          `Declined by kotak — tractor RTO ${kt} not on the acceptable-RTO list (NIL PO)`, stmtK, prK);
       }
     } catch (_) { /* leave rules unchanged on failure */ }
   }
