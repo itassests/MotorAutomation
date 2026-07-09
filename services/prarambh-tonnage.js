@@ -203,4 +203,30 @@ async function fetchDepreciationMap(pool, ids) {
   return out;
 }
 
-module.exports = { fetchTonnage, fetchTonnageMap, normaliseTonnes, fetchRtoMap, fetchTenureMap, fetchDepreciationMap };
+// PA_Cover (Compulsory Personal Accident premium) per PrarambhMainId. 0 = CPA
+// NOT collected → some insurers (Chola) deduct a penalty from the OD payout.
+async function fetchPaCoverMap(pool, ids) {
+  const out = new Map();
+  if (!pool || !ids || ids.length === 0) return out;
+  const clean = [...new Set(ids.filter(Boolean).map(String))];
+  for (let i = 0; i < clean.length; i += 1000) {
+    const batch = clean.slice(i, i + 1000);
+    const inList = batch.map(id => Number(id)).filter(Number.isFinite).join(',');
+    if (!inList) continue;
+    try {
+      const r = await pool.request().query(
+        `SELECT PrarambhMainId, PA_Cover
+         FROM TRN_PrarambhMotorDetails WHERE PrarambhMainId IN (${inList})`
+      );
+      for (const row of r.recordset) {
+        const v = parseFloat(row.PA_Cover);
+        if (Number.isFinite(v)) out.set(String(row.PrarambhMainId), v);
+      }
+    } catch (e) {
+      console.warn('[prarambh-tonnage] PA_Cover batch lookup failed:', e.message);
+    }
+  }
+  return out;
+}
+
+module.exports = { fetchTonnage, fetchTonnageMap, normaliseTonnes, fetchRtoMap, fetchTenureMap, fetchDepreciationMap, fetchPaCoverMap };

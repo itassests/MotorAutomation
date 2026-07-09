@@ -952,6 +952,9 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // Nil-Dep (zero-dep) cover flag from Prarambh_Live (1=Yes / 2=No), stamped on
   // the row by the bulk pre-fetch. Drives Royal GCV Comp_NilDep vs Comp_NoNilDep.
   if (policy._depreciation != null) params._depreciation = Number(policy._depreciation);
+  // PA_Cover (CPA premium): 0 = CPA not collected. Chola deducts 1.5% of the OD
+  // payout when it's 0 (see the Chola CPA block).
+  if (policy._pa_cover != null) params._pa_cover = Number(policy._pa_cover);
 
   // PR (Premium Register) reconciliation — the operator's own export is the
   // authoritative source for the key rating factors. When a PR row matches (by
@@ -4211,6 +4214,24 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on failure */ }
   }
 
+  // ---- Chola CPA (Compulsory Personal Accident) not-collected penalty ----
+  // Chola guideline: if CPA is not collected in the individual's name, 1.5% is
+  // deducted from the pay-out. PA_Cover (Prarambh_Live.TRN_PrarambhMotorDetails) = 0
+  // means CPA wasn't collected → deduct 1.5 points from the grid rate. Applies across
+  // covers: the operator deducts even on Liability/TP policies (MH41/28 Liability
+  // ACT 30 → 28.5), so this is NOT gated to OD-only despite the guideline's wording.
+  // Runs after every Chola resolver so it applies to whichever rule they picked;
+  // skips declined rules. Chola-scoped.
+  if (insurerSlug === 'chola_ms' && Number(params._pa_cover) === 0 && rules.length) {
+    const w = rules[0];
+    if (Number(w.rate_value) > 0 && !w.is_declined) {
+      const cut = (v) => Math.max(0, +(Number(v) - 0.015).toFixed(4));
+      rules[0] = { ...w, rate_value: cut(w.rate_value),
+        segment: (w.segment || '') + ' (−1.5% CPA)' };
+      if (w.od_rate != null) rules[0].od_rate = cut(w.od_rate);
+    }
+  }
+
   // ---- Future Generali CV (GCV / PCV) interpreter ----
   // FG's CV commission = OD rate + TP rate (Comp); TP-only → TP; SAOD → OD. The grid
   // is keyed by Region × Weight-category (services/fg-cv.js, from the IMD sheet's
@@ -6215,10 +6236,11 @@ async function runBulkCalculate(body) {
   let trnRtoById = new Map();
   let tenureById = new Map();
   let depById = new Map();
+  let paCoverById = new Map();
   try {
     const rtoIds = rowsResult.recordset.map(r => r.ID || r.PrarambhMainId).filter(Boolean);
     if (rtoIds.length > 0) {
-      const { fetchRtoMap, fetchTenureMap, fetchDepreciationMap } = require('../services/prarambh-tonnage');
+      const { fetchRtoMap, fetchTenureMap, fetchDepreciationMap, fetchPaCoverMap } = require('../services/prarambh-tonnage');
       const { getPrarambhPool } = require('../db/prarambh-connection');
       const ppool = await getPrarambhPool();
       trnRtoById = await fetchRtoMap(ppool, rtoIds);
@@ -6229,6 +6251,9 @@ async function runBulkCalculate(body) {
       // "with Nil Dep" (Comp_NilDep) and "without Nil Dep" (Comp_NoNilDep)
       // rates; Depreciation (1=Nil-Dep, 2=No) picks the right one.
       depById = await fetchDepreciationMap(ppool, rtoIds);
+      // PA_Cover (CPA premium): 0 = CPA not collected → Chola deducts 1.5% of the
+      // OD payout (params._pa_cover, applied in the Chola blocks).
+      paCoverById = await fetchPaCoverMap(ppool, rtoIds);
     }
   } catch (e) {
     console.warn('[bulk] TRN RTO/tenure/depreciation pre-fetch failed:', e.message);
@@ -6261,6 +6286,8 @@ async function runBulkCalculate(body) {
       const mainId = r.ID || r.PrarambhMainId;
       const dep = mainId != null ? depById.get(String(mainId)) : undefined;
       if (dep != null) r._depreciation = dep;
+      const pac = mainId != null ? paCoverById.get(String(mainId)) : undefined;
+      if (pac != null) r._pa_cover = pac;
     }
     // Locate the PR row once (by policy_no, then by existing registration).
     // A VEHICLE-matched PR row may be a DIFFERENT policy year for the same
