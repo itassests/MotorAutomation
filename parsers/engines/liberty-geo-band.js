@@ -15,14 +15,37 @@
  * (matched downstream via liberty's RTO→cluster mappings).
  */
 
+// GCV 4W weight band → the LCV/MCV/HCV segment label Liberty's matching path
+// expects (same convention as the April `liberty_grid` cards: LCV ≤7.5T,
+// MCV 7.5-20T, HCV ≥20T). A generic "GCV" segment is dropped by the engine's
+// heavy-GCV segment match, which triggers the no-rule fallback that strips the
+// effective_date filter and reverts to the April card — so the class label must
+// match for the June grid to actually be selected.
+function gcvClass(wmin, wmax) {
+  if (wmax != null && wmax <= 7.5) return 'GCV LCV';
+  if (wmin != null && wmin >= 20)  return 'GCV HCV';
+  return 'GCV MCV';
+}
 function parseBand(label) {
   const s = String(label || '').trim();
   if (/pcv\s*3\s*w/i.test(s))                return { product: 'PCV',  segment: 'PCV 3W', label: s };
   if (/gcv\s*3\s*w/i.test(s))                return { product: 'GCV',  segment: 'GCV 3W', label: s };
-  if (/mis[\s-]?d|tractor/i.test(s))         return { product: 'MISC', segment: 'MISD Tractor', label: s };
+  if (/mis[\s-]?d|tractor/i.test(s))         return { product: 'MISC', segment: 'MISC Tractor', label: s };
   const m = s.match(/([\d.]+)\s*[-–]\s*([\d.]+)\s*T/i);
-  if (m) return { product: 'GCV', segment: 'GCV', wmin: parseFloat(m[1]), wmax: parseFloat(m[2]), label: s };
+  if (m) {
+    const wmin = parseFloat(m[1]), wmax = parseFloat(m[2]);
+    return { product: 'GCV', segment: gcvClass(wmin, wmax), wmin, wmax, label: s };
+  }
   return null;
+}
+// Compose the Liberty rate_type tag the matching path + effective-date cover
+// grouping expect: Comp → PACK_LIBERTY_OD, TP/SATP → SATP_LIBERTY_TP, SAOD →
+// SAOD_LIBERTY (mirrors parsers/engines/liberty-grid.js).
+function composeRateType(rt) {
+  const u = String(rt || 'COMP').toUpperCase();
+  if (/SAOD|\bSOD\b/.test(u)) return 'SAOD_LIBERTY';
+  if (/SATP|\bTP\b/.test(u))  return 'SATP_LIBERTY_TP';
+  return 'PACK_LIBERTY_OD';
 }
 
 function parseAge(label) {
@@ -80,13 +103,14 @@ function parse(sheetData, sheetConfig, meta) {
         product: cc.band.product,
         sheet_name: meta.sheetName,
         segment: cc.band.segment,
+        sub_type: cc.band.segment,
         region: geo,
         make: 'All',
         weight_band_min: cc.band.wmin != null ? cc.band.wmin : null,
         weight_band_max: cc.band.wmax != null ? cc.band.wmax : null,
         vehicle_age_min: cc.age.min,
         vehicle_age_max: cc.age.max,
-        rate_type: rt,
+        rate_type: composeRateType(rt),
         rate_value: rate === 0 ? null : rate,
         is_declined: rate === 0,
         rate_text: `${geo} | ${cc.band.label} | ${cc.age.label}`,
