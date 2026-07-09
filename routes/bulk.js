@@ -4524,6 +4524,33 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
+  // ---- Oriental GCV 3-wheeler → PCV 3W grid (no GCV-3W grid exists) ----
+  // Oriental's GCCV grid is 4W GVW-banded; a GCV 3-wheeler (category "GCV - 3W",
+  // e-cart / 3W goods carrier) has no GCV-3W rate and wrongly matched GCCV ≤2000 kg
+  // (55%). USER: apply the PCV 3W grid ([3W PCV]: COMP 0.425 new / 0.35 age 1-15,
+  // SATP 0.05). Oriental + GCV + 3-wheeler scoped.
+  if (insurerSlug === 'oriental_insurance' &&
+      String(params.vehicleType || '').toUpperCase() === 'GCV' &&
+      /\b3\s*-?\s*W\b|3\s*WH|RICKSHAW|E-?RIK/i.test(`${params.vehicleCategoryUpdated || ''} ${params.vehicleCategory || ''}`)) {
+    try {
+      const isLiab = /LIABILITY|^TP$|SATP/.test(String(params.insProduct || '').toUpperCase()) ||
+                     /LIABILITY/i.test(String(params.productTypeName || ''));
+      const cover = isLiab ? 'SATP' : 'COMP';
+      const age = Number(params.vehicleAge) || 0;
+      const pr = await pool.request().input('rt', sql.NVarChar(10), cover).input('age', sql.Int, age)
+        .query(`SELECT TOP 1 rr.rate_value FROM rate_rules rr JOIN rate_cards rc ON rr.rate_card_id = rc.id
+                WHERE rr.insurer='oriental_insurance' AND rr.segment='3W PCV' AND rr.rate_type=@rt
+                  AND (@age BETWEEN ISNULL(rr.vehicle_age_min,0) AND ISNULL(rr.vehicle_age_max,99))
+                  AND rr.rate_value > 0 ORDER BY rc.effective_from DESC, rr.rate_value DESC`);
+      if (pr.recordset[0]) {
+        const base = rules[0] || { id: -1, insurer: insurerSlug };
+        rules = [{ ...base, rate_type: cover, rate_value: Number(pr.recordset[0].rate_value),
+          is_declined: 0, region: base.region || 'Pan India', sub_type: null,
+          segment: '3W PCV (Oriental, GCV-3W→PCV)' }];
+      }
+    } catch (_) { /* leave rules unchanged on failure */ }
+  }
+
   // ---- Oriental PCV School / Staff Bus (use-based, not seating-banded) ----
   // Oriental prices Educational-Institution/School & Staff buses by USE: Package =
   // 60% on Net (OD+TP), Liability = 45% on TP (grid Sr 42/43). The generic matcher
