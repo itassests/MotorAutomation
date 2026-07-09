@@ -1883,6 +1883,48 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // ---- Kotak Pvt-Car SATP — make × RTO × fuel × CC grid ----
+  // The 11th-June "SATP Private car Pan india June2026 onwards" grid prices Pvt-Car
+  // SATP by RTO × MAKE × fuel × CC-band (config/kotak_satp_pvtcar.json) — supersedes
+  // the older COA grid (card547, no make → generic 32.15 for every make). Rows:
+  // MAKE → {P,C,D}[<1000, 1000-1500, >1500]; "Declined"/0 = NIL PO; a make absent for
+  // the RTO falls to that RTO's "OTHERS" row. Scoped Kotak + CAR + TP-only (od=0).
+  if (insurerSlug === 'kotak' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR' &&
+      (/TP|SATP|ACT/i.test(String(params.insProduct || '')) ||
+       (Number(params.odPremium) || 0) === 0)) {
+    try {
+      const cfg = require('../config/kotak_satp_pvtcar.json');
+      const rto0 = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const cand = [rto0];
+      const mm = rto0.match(/^([A-Z]{2})0*(\d+)$/);
+      if (mm) { const nn = String(parseInt(mm[2], 10)); cand.push(mm[1] + nn, mm[1] + nn.padStart(2, '0')); }
+      let rc = null; for (const c of cand) { if (cfg[c]) { rc = cfg[c]; break; } }
+      if (rc) {
+        const s = String(params.make || '').toUpperCase();
+        const nm = /MARUTI/.test(s) ? 'MARUTI' : /HYUNDAI/.test(s) ? 'HYUNDAI' : /MAHINDRA/.test(s) ? 'MAHINDRA'
+                 : /TATA/.test(s) ? 'TATA' : /TOYOTA/.test(s) ? 'TOYOTA' : /HONDA/.test(s) ? 'HONDA'
+                 : /KIA/.test(s) ? 'KIA' : 'OTHERS';
+        const row = rc[nm] || rc['OTHERS'];
+        if (row) {
+          const fu = String(params.fuelType || '').toUpperCase();
+          const fk = /CNG|LPG/.test(fu) ? 'C' : /DIESEL/.test(fu) ? 'D' : 'P';
+          const cc = Number(params.cc) || 0;
+          const ci = (cc > 0 && cc < 1000) ? 0 : (cc <= 1500 ? 1 : 2);
+          const v = row[fk] && row[fk][ci];
+          const base = rules[0] || { id: -1, insurer: insurerSlug };
+          if (v === 'DECL') {
+            rules = [{ ...base, rate_type: 'SATP', rate_value: 0, is_declined: 1,
+              sub_type: rto0, segment: `Pvt Car SATP (Kotak ${rto0}/${nm} — declined)` }];
+          } else if (typeof v === 'number') {
+            rules = [{ ...base, rate_type: 'SATP', rate_value: v, is_declined: v === 0 ? 1 : 0,
+              sub_type: rto0, make: nm, segment: `Pvt Car SATP (Kotak ${rto0}/${nm})` }];
+          }
+        }
+      }
+    } catch (_) { /* leave rules unchanged on failure */ }
+  }
+
   // ---- Kotak MISC Tractor exact-RTO override ----
   // Kotak's tractor grid ("Tractor RTO - State wise Dec'25 onwards", card548:
   // product MIS / segment 'Tractor') is keyed by sub_type = RTO CODE, per-district
