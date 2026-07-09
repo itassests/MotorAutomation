@@ -1883,6 +1883,54 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // ---- Kotak Pvt-Car Comp / SAOD (NCB × fuel × new/used, flat) ----
+  // USER grid (Jun'26): Kotak has NO Pvt-Car Comp rate_rules (only SATP), so Comp/
+  // SAOD cars wrongly matched the SATP district grid. Flat structure:
+  //   1+3 NEW VEHICLE (age 0)      → 45%
+  //   1+1 Comp  with NCB (>0)      → 30%   (Petrol OR other fuel, both 30)
+  //             Nil NCB (=0)       → 15%
+  //   SAOD      with NCB, Petrol   → 27.5%   Other fuel → 25%
+  //             Nil NCB            → 15%
+  //   USED car → settled on the WITH-NCB grid (treat as with-NCB)
+  //   All HEV without NCB          → Nil PO (0)
+  // Fires only for od>0 (Comp/SAOD); TP-only stays on the SATP override above.
+  if (insurerSlug === 'kotak' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR' &&
+      (Number(params.odPremium) || 0) > 0) {
+    const _od = Number(params.odPremium) || 0;
+    const _tp = Number(params.tpPremium) || 0;
+    const _prod = String(params.insProduct || '').toUpperCase();
+    const isSaod = _prod === 'SAOD' || (_tp <= 0 && _prod !== 'COMP');
+    const withNcb = (Number(params.ncbPct) || 0) > 0;
+    // Classify on SUB_BUSINESS_TYPE_ID (authoritative): "New Vehicle" = genuine new
+    // (1+3 @ 45); "…Rollover"/"Used" = used (settled on with-NCB grid); "Renewal" =
+    // 1+1 (NCB-banded). vehicleAge is unreliable and BUSINESS_TYPE_ID "New Business"
+    // covers rollovers too, so DON'T use them. NB "reNEWal" contains "new" — match
+    // "NEW VEHICLE" explicitly, never a bare /NEW/.
+    const _sub = String(params.subBusinessType || '').toUpperCase();
+    const isUsed = /ROLL\s*-?\s*OVER|USED/.test(_sub);
+    const isNew = /NEW\s*VEHICLE/.test(_sub) || (!_sub && !isUsed && Number(params.vehicleAge) === 0);
+    const isPetrol = /PETROL/i.test(String(params.fuelType || ''));
+    const hay = `${params.fuelType || ''} ${params.model || ''} ${params.vehicleSubModel || ''}`.toUpperCase();
+    const isHev = /\bHEV\b|HYBRID|STRONG\s*HYBRID|SELF\s*CHARGING/.test(hay);
+    let rate = null, tag = '';
+    if (isHev && !withNcb) { rate = 0; tag = 'HEV nil-NCB Nil-PO'; }
+    else if (!isSaod) {                                   // Comprehensive
+      if (isNew) { rate = 0.45; tag = '1+3 new'; }
+      else if (withNcb || isUsed) { rate = 0.30; tag = 'Comp with-NCB'; }
+      else { rate = 0.15; tag = 'Comp nil-NCB'; }
+    } else {                                              // SAOD
+      if (withNcb || isUsed) { rate = isPetrol ? 0.275 : 0.25; tag = 'SAOD with-NCB ' + (isPetrol ? 'petrol' : 'other'); }
+      else { rate = 0.15; tag = 'SAOD nil-NCB'; }
+    }
+    if (rate != null) {
+      const base = rules[0] || { id: -1, insurer: insurerSlug };
+      rules = [{ ...base, rate_type: isSaod ? 'SAOD' : 'COMP', rate_value: rate,
+        is_declined: rate === 0 ? 1 : 0, sub_type: null,
+        segment: 'Pvt Car (Kotak ' + tag + ')' }];
+    }
+  }
+
   // ---- Kotak GCV (LCV) exact-RTO override ----
   // Kotak files GCV commission as COMP-only, keyed by sub_type=RTO code, in two
   // duplicate segments — "LCV" (<7.5T: bands ≤2.5 / 2.5-3.5 / 3.5-7.5) and "GCV"
@@ -5928,7 +5976,7 @@ async function runBulkCalculate(body) {
     'BASE_OD_PREMIUM','NET_OD_PREMIUM','NET_LIABILITY_PREMIUM',
     'PREMIUM_WITHOUT_GST','ADD_ON_PREMIUM','Addon_Premium',
     'ANNUAL_PREMIUM','NCB','OD_DISCOUNT',
-    'BUSINESS_TYPE_ID','SubmissionDate','POLICY_ISSUED_DATE','POLICY_START_DATE','City','BooKedLocation','Branch',
+    'BUSINESS_TYPE_ID','SUB_BUSINESS_TYPE_ID','SubmissionDate','POLICY_ISSUED_DATE','POLICY_START_DATE','City','BooKedLocation','Branch',
     // OD/TP period dates → odTenure/tpTenure → bundledTag ("1+1"/"1+3"/"3+3"); used by the
     // go_digit CAR bundled-vs-annual tenure routing (3+3 new car → 3+3_CD2, not annual).
     'OD_Start_Date','OD_End_Date','TP_POLICY_START_DATE','TP_POLICY_END_DATE',

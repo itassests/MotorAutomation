@@ -1328,7 +1328,11 @@ function extractPolicyParams(policy) {
   const carrierType = (get('CARRIER TYPE') || get('BODY TYPE') || get('BODYTYPE') || '').toString().trim();
 
   // Business type — NEW / ROLLOVER / RENEWAL
-  const businessTypeRaw = (get('REPORTED BUSINESS TYPE') || get('BUSINESS TYPE') || get('POLICY NATURE') || get('BUSINESSTYPE') || '').toString().trim().toUpperCase();
+  const businessTypeRaw = (get('REPORTED BUSINESS TYPE') || get('BUSINESS TYPE') || get('POLICY NATURE') || get('BUSINESSTYPE') || get('BUSINESS_TYPE_ID') || '').toString().trim().toUpperCase();
+  // Sub-business type (New Vehicle / Renewal / Rollover / Used Rollover) — the
+  // authoritative new-vs-renewal-vs-used signal (pipeline vehicleAge is unreliable,
+  // and BUSINESS_TYPE_ID="New Business" covers rollovers too). Scoped consumers.
+  const subBusinessTypeRaw = (get('SUB_BUSINESS_TYPE_ID') || get('SUB BUSINESS TYPE') || '').toString().trim();
   let businessType = '';
   if (businessTypeRaw) {
     if (/ROLL[\s-]*OVER/.test(businessTypeRaw)) businessType = 'Rollover';
@@ -1493,6 +1497,7 @@ function extractPolicyParams(policy) {
     tonnageCoarse,
     carrierType,
     businessType,
+    subBusinessType: subBusinessTypeRaw,   // raw New Vehicle / Renewal / Rollover / Used Rollover
     // Customer / proposer name — used by Fleet rate overrides (a per-customer
     // flat rate for all that customer's vehicles, scoped to an insurer).
     proposerName: (get('FULL NAME') || get('PROPOSER NAME') || get('FULLNAME_PROPOSER') ||
