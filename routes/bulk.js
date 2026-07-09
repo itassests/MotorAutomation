@@ -3936,7 +3936,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     try {
       // Haryana (HR) has no own Chola Pvt-Car region — it takes the PB (Punjab) grid
       // (USER-confirmed).
-      const ST2REG = { GJ:'GJ', MH:'MH/GA', GA:'MH/GA', AP:'AP/TS', TS:'AP/TS', TG:'AP/TS',
+      const ST2REG = { GJ:'GJ', DN:'GJ', DD:'GJ', MH:'MH/GA', GA:'MH/GA', AP:'AP/TS', TS:'AP/TS', TG:'AP/TS',
         KA:'KA', DL:'DL', TN:'TN', RJ:'RJ', PB:'PB', HR:'PB', HP:'HP', UP:'UP', OD:'OD', OR:'OD',
         JH:'JH', JK:'JK', MP:'MP', WB:'WB', UK:'UK', UA:'UK', CG:'CG', BR:'BH', AN:'AN',
         AS:'AS/ML/TR/AR/NL', ML:'AS/ML/TR/AR/NL', TR:'AS/ML/TR/AR/NL', AR:'AS/ML/TR/AR/NL', NL:'AS/ML/TR/AR/NL' };
@@ -3996,7 +3996,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   if (insurerSlug === 'chola_ms' &&
       /\bTRACTOR\b/i.test(`${params.vehicleCategory || ''} ${params.model || ''}`)) {
     try {
-      const TREG = { GJ: 'GJ', MH: 'Mumbai/GA/Pune/Central MH', GA: 'Mumbai/GA/Pune/Central MH',
+      const TREG = { GJ: 'GJ', DN: 'GJ', DD: 'GJ', MH: 'Mumbai/GA/Pune/Central MH', GA: 'Mumbai/GA/Pune/Central MH',
         AP: 'AP', TS: 'TS', TG: 'TS', KA: 'KA', DL: 'DL', TN: 'TN-Chennai', RJ: 'RJ', PB: 'PB',
         HP: 'HP', UP: 'UP', OD: 'OD', OR: 'OD', JH: 'JH', JK: 'JK', MP: 'MP', WB: 'WB', UK: 'UK',
         UA: 'UK', CG: 'CG', BR: 'BH', AN: 'AN', AS: 'AS/ML/TR/AR/NL/SK', ML: 'AS/ML/TR/AR/NL/SK',
@@ -4058,7 +4058,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       (/\bJCB\b|EXCAVATOR|BACKHOE|BULLDOZER|BULLGRADER|ROAD\s*ROLLER|FORK\s*-?\s*LIFT|FORKLIFT|EARTH\s*MOVER|TELEHANDLER|LIFT\s*ALL|\bLOADER\b|\bCRANE\b|\bHYDRA\b/i.test(_cholaCeHay) ||
         rules.some(r => /EXCAVATOR/i.test(String(r.segment || ''))))) {
     try {
-      const CEREG = { GJ: 'GJ', MH: 'Mumbai/GA/Pune/Central MH', GA: 'Mumbai/GA/Pune/Central MH',
+      const CEREG = { GJ: 'GJ', DN: 'GJ', DD: 'GJ', MH: 'Mumbai/GA/Pune/Central MH', GA: 'Mumbai/GA/Pune/Central MH',
         AP: 'AP', TS: 'TS', TG: 'TS', KA: 'KA', DL: 'DL', TN: 'TN-Chennai', RJ: 'RJ', PB: 'PB',
         HP: 'HP', UP: 'UP', OD: 'OD', OR: 'OD', JH: 'JH', JK: 'JK', MP: 'MP', WB: 'WB', UK: 'UK',
         UA: 'UK', CG: 'CG', BR: 'BH', AN: 'AN', AS: 'AS/ML/TR/AR/NL/SK', ML: 'AS/ML/TR/AR/NL/SK',
@@ -4107,7 +4107,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       // 20-40T 35 vs excavator 30).
       !(/\bJCB\b|EXCAVATOR|BACKHOE|BULLDOZER|BULLGRADER|ROAD\s*ROLLER|FORK\s*-?\s*LIFT|FORKLIFT|EARTH\s*MOVER|TELEHANDLER|LIFT\s*ALL|\bLOADER\b|\bCRANE\b|\bHYDRA\b/i.test(_cholaCeHay))) {
     try {
-      const GREG = { GJ:'GJ', MH:'Mumbai/GA/Pune/Central MH', GA:'Mumbai/GA/Pune/Central MH',
+      const GREG = { GJ:'GJ', DN:'GJ', DD:'GJ', MH:'Mumbai/GA/Pune/Central MH', GA:'Mumbai/GA/Pune/Central MH',
         AP:'AP', TS:'TS', TG:'TS', KA:'KA', DL:'DL', TN:'TN-Chennai', RJ:'RJ', PB:'PB', HP:'HP',
         UP:'UP', OD:'OD', OR:'OD', JH:'JH', JK:'JK', MP:'MP', WB:'WB', UK:'UK', UA:'UK', CG:'CG',
         BR:'BH', AN:'AN', AS:'AS/ML/TR/AR/NL/SK', ML:'AS/ML/TR/AR/NL/SK', TR:'AS/ML/TR/AR/NL/SK',
