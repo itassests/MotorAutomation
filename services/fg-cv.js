@@ -1,10 +1,13 @@
 // Future Generali Commercial-Vehicle (GCV / PCV) rate resolver.
 //
 // FG's CV commission = OD rate + TP rate (Comprehensive); TP-only → TP; SAOD → OD.
-// The grid (config/fg_cv_grid.json, generated from "CV payout IMD…xlsx", TP cols
-// "wef 10-Feb-2026") is keyed by Region × Weight-category, each carrying an OD
-// out-flow and 3 TP out-flows (premium bands <50K / 50K-2L / >2L). The premium
-// band isn't reliably derivable, so we take the MAX TP for the cell ("match max").
+// The grid (config/fg_cv_grid.json, generated from "CV payout IMD…xlsx") is keyed
+// by Region × Weight-category, each carrying an OD out-flow and 3 TP out-flows
+// (premium bands <50K / 50K-2L / >2L). The premium band isn't reliably derivable,
+// so we take the MAX TP for the cell ("match max"). TP columns are the
+// "wef 1st-June-2026" set for every cell FG operates in June; cells FG DECLINES in
+// June (Operate="No") keep their earlier "wef 10-Feb-2026" TP — the operator kept
+// paying the Feb rate there, so we leave it rather than force a decline.
 //
 // Region comes from the FG RTO master (config/fg_rto_zone.json: RTA → state, zone).
 // Region = state, EXCEPT Maharashtra which splits by zone: MUMBAI → "MAHARASHTRA"
