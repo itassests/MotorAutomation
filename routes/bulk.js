@@ -4110,14 +4110,15 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         let segClause;
         if (is3W) segClause = isElectric ? "segment LIKE '%GCCV_3W%Electric%'" : "segment LIKE '%GCCV_3W%'";
         else if (ton <= 3.5) {
-          // ≤3.5T GCV has a MAKE split: Tata/Maruti → "TATA/ Maruti/ Mahindra" rows
-          // (2_UPTO_3.5T); everything else (incl. Mahindra Bolero, Ashok Leyland
-          // Dost) → "All Other Make/Models" (GJ 0.58 / MH 0.45). Operator treats
-          // Mahindra as "Other" here despite the label. segment IS NOT NULL drops the
-          // null-segment artifact (MH 0.55) so the real "" Other row wins. ELECTRIC
-          // goods carriers (Euler / E-rickshaw) use the "[Electric]" variant (≤3.5T
-          // Other 0.375) — not the non-electric blank row.
-          const isTMM = /\bTATA\b|MARUTI/i.test(String(params.make || ''));
+          // ≤3.5T GCV has a MAKE split: Tata/Maruti/Mahindra → the make-specific
+          // "TATA/ Maruti/ Mahindra" row (2_UPTO_3.5T, GJ 0.50); every other make
+          // (Ashok Leyland Dost, etc.) → "All Other Make/Models" (GJ 0.58 / MH 0.45).
+          // The grid's section header names Mahindra explicitly, so a Mahindra model
+          // (e.g. Bolero) takes the make row per the grid rule. segment IS NOT NULL
+          // drops the null-segment artifact (MH 0.55) so the real "" Other row wins.
+          // ELECTRIC goods carriers (Euler / E-rickshaw) use the "[Electric]" variant
+          // (≤3.5T Other 0.375) — not the non-electric blank row.
+          const isTMM = /\bTATA\b|MARUTI|MAHINDRA/i.test(String(params.make || ''));
           if (isElectric) segClause = "segment LIKE '%UPTO[_]3.5%Electric%'";
           else segClause = isTMM
             ? "make LIKE '%TATA%' AND segment LIKE '%UPTO[_]3.5%'"
