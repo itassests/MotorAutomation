@@ -3938,10 +3938,16 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         JH:'JH', JK:'JK', MP:'MP', WB:'WB', UK:'UK', UA:'UK', CG:'CG', BR:'BH', AN:'AN',
         AS:'AS/ML/TR/AR/NL', ML:'AS/ML/TR/AR/NL', TR:'AS/ML/TR/AR/NL', AR:'AS/ML/TR/AR/NL', NL:'AS/ML/TR/AR/NL' };
       const code = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-      // UP16 (Noida) takes Chola's "UP- East" grid, not plain UP — USER-confirmed
-      // (DL7/14263 Creta diesel NCB-0: operator paid the UP-East 1000-1500 base 25,
-      // plain-UP base is 20; neighbouring UP14/15/17 verified on plain UP).
-      const reg = code.startsWith('UP16') ? 'UP- East' : ST2REG[code.slice(0, 2)];
+      // Chola's Pvt-Car grid only sub-splits UP (East-UP vs plain UP). The
+      // authoritative RTO reference (config/chola_rto_cluster.json) lists the
+      // East-UP district codes → "UP- East" (e.g. UP72 base 25 vs plain-UP 20).
+      // UP16 (Noida) is ALSO treated as UP-East — USER-confirmed (DL7/14263 Creta
+      // NCB-0 operator paid 25), though it isn't in the official East-UP list.
+      let reg = ST2REG[code.slice(0, 2)];
+      if (code.slice(0, 2) === 'UP') {
+        reg = (require('../services/chola-region').cholaRegion(code) === 'UP- East'
+               || code.startsWith('UP16')) ? 'UP- East' : 'UP';
+      }
       if (reg) {
         const cc = Number(params.cc) || 0;
         const ccBand = cc > 0 && cc <= 1000 ? 'UPTO 1000 CC'
