@@ -1468,6 +1468,7 @@ function extractPolicyParams(policy) {
            get('city_name') || '').toString().trim(),
     vehicleCategory: (vehicalCategoryRaw || vehicleClass || '').toString().trim(),
     productTypeName: productTypeNameRaw,   // raw tmp product-type, scoped consumers only
+    vehicleCategoryUpdated: (get('VehicalCategory_Updated') || '').toString().trim(),  // authoritative tmp category (e.g. "PCV-Staff Bus"), scoped consumers
     make: (make || '').toString().trim(),
     model: (model || '').toString().trim(),
     vehicleSubModel: (vehicleSubModel || '').toString().trim(),

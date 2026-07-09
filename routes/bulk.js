@@ -4524,6 +4524,36 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
+  // ---- Oriental PCV School / Staff Bus (use-based, not seating-banded) ----
+  // Oriental prices Educational-Institution/School & Staff buses by USE: Package =
+  // 60% on Net (OD+TP), Liability = 45% on TP (grid Sr 42/43). The generic matcher
+  // otherwise picks the seating-band segment ("4W PCV >36 pax" = 5%). The vehicle's
+  // category ("PCV-Staff Bus" / "PCV-School Bus") identifies it → route to the
+  // [Staff Bus]/[School Bus] segment for the policy's cover. Oriental + PCV scoped.
+  if (insurerSlug === 'oriental_insurance' &&
+      String(params.vehicleType || '').toUpperCase() === 'PCV') {
+    const _busHay = `${params.vehicleCategoryUpdated || ''} ${params.vehicleCategory || ''} ${params.model || ''}`.toUpperCase();
+    const busSeg = /SCHOOL\s*BUS/.test(_busHay) ? 'School Bus'
+                 : (/STAFF\s*BUS/.test(_busHay) ? 'Staff Bus' : null);
+    if (busSeg) {
+      try {
+        const isLiab = /LIABILITY|^TP$|SATP/.test(String(params.insProduct || '').toUpperCase()) ||
+                       /LIABILITY/i.test(String(params.productTypeName || ''));
+        const cover = isLiab ? 'SATP' : 'COMP';
+        const br = await pool.request().input('seg', sql.NVarChar(40), busSeg).input('rt', sql.NVarChar(10), cover)
+          .query(`SELECT TOP 1 rr.rate_value FROM rate_rules rr JOIN rate_cards rc ON rr.rate_card_id = rc.id
+                  WHERE rr.insurer='oriental_insurance' AND rr.segment=@seg AND rr.rate_type=@rt AND rr.rate_value > 0
+                  ORDER BY rc.effective_from DESC, rr.rate_value DESC`);
+        if (br.recordset[0]) {
+          const base = rules[0] || { id: -1, insurer: insurerSlug };
+          rules = [{ ...base, rate_type: cover, rate_value: Number(br.recordset[0].rate_value),
+            is_declined: 0, region: base.region || 'Pan India', sub_type: null,
+            segment: busSeg + ' (Oriental)' }];
+        }
+      } catch (_) { /* leave rules unchanged on failure */ }
+    }
+  }
+
   // ---- Oriental new-vehicle BUNDLED OD+TP sum (all vehicle types) ----
   // Oriental's grid (image, USER-confirmed): a NEW vehicle sold as a Bundled Policy
   // pays an OD-leg % on OD premium + a TP-leg % on TP premium for the 1st year, and
