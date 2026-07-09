@@ -4045,8 +4045,14 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // EXCAVATOR segment when CC>1500 (MH23/9363 UP JCB → 12.5 vs UP PACK 17.5 their=18).
   // Resolve region, pick the EXCAVATOR rate for the policy's cover (ACT if Liability/od=0,
   // else PACK) from the CURRENT card; rate 0 or no-row → decline. Chola + JCB/excavator.
+  // Match the grid's construction-equipment list (Loader, Excavators/Earth Movers,
+  // Crane, Bulldozers/Bullgraders, Road Rollers, Fork Lift Trucks) across MAKE +
+  // category + model — JCB (a pure construction-equipment maker) sits in the make
+  // field, and models like "LIFT ALL"/telehandlers don't carry the keyword in the
+  // category. GCV goods carriers never hit these terms.
+  const _cholaCeHay = `${params.make || ''} ${params.vehicleCategory || ''} ${params.model || ''}`;
   if (insurerSlug === 'chola_ms' &&
-      (/\bJCB\b|EXCAVATOR|BACKHOE/i.test(`${params.vehicleCategory || ''} ${params.model || ''}`) ||
+      (/\bJCB\b|EXCAVATOR|BACKHOE|BULLDOZER|BULLGRADER|ROAD\s*ROLLER|FORK\s*-?\s*LIFT|FORKLIFT|EARTH\s*MOVER|TELEHANDLER|LIFT\s*ALL|\bLOADER\b|\bCRANE\b|\bHYDRA\b/i.test(_cholaCeHay) ||
         rules.some(r => /EXCAVATOR/i.test(String(r.segment || ''))))) {
     try {
       const CEREG = { GJ: 'GJ', MH: 'Mumbai/GA/Pune/Central MH', GA: 'Mumbai/GA/Pune/Central MH',
@@ -4091,7 +4097,12 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // tonnage→band, take MAX GCCV/PACK (>0, non-electric). ≤3.5T pools blank+UPTO_3.5T+
   // 3W so GJ's blank 0.58 wins. Chola-GCV scoped; unresolved region → keep engine rule.
   if (insurerSlug === 'chola_ms' &&
-      String(params.vehicleType || '').toUpperCase() === 'GCV') {
+      String(params.vehicleType || '').toUpperCase() === 'GCV' &&
+      // Skip construction equipment (JCB/loader/crane/forklift) — it's priced by the
+      // excavator resolver above, not the GCV goods-carrier tonnage bands; without
+      // this guard the GCCV block clobbers the excavator rate (JCB "LIFT ALL" → GCCV
+      // 20-40T 35 vs excavator 30).
+      !(/\bJCB\b|EXCAVATOR|BACKHOE|BULLDOZER|BULLGRADER|ROAD\s*ROLLER|FORK\s*-?\s*LIFT|FORKLIFT|EARTH\s*MOVER|TELEHANDLER|LIFT\s*ALL|\bLOADER\b|\bCRANE\b|\bHYDRA\b/i.test(_cholaCeHay))) {
     try {
       const GREG = { GJ:'GJ', MH:'Mumbai/GA/Pune/Central MH', GA:'Mumbai/GA/Pune/Central MH',
         AP:'AP', TS:'TS', TG:'TS', KA:'KA', DL:'DL', TN:'TN-Chennai', RJ:'RJ', PB:'PB', HP:'HP',
