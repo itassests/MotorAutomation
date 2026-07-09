@@ -4553,9 +4553,15 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         .map(r => Number(r.rate_value) || 0)
         .filter(v => v > 0);
       if (legs.length >= 2) {
-        const sum   = legs.reduce((a, b) => a + b, 0);
+        // The bundle has exactly TWO legs (OD% + TP%), but the pooled lookup returns
+        // them once PER card (COMP_1+5 lives on 3 Oriental cards) — reduce()-summing
+        // all rows double/triple-counts (0.2+0.8 per card → 2.0/3.0), which the
+        // `rateVal > 1 → /100` normalisation then mangles to 0.02 → 2%. Sum the two
+        // DISTINCT legs (min OD + max TP) so the headline is 1.0 (=100) regardless of
+        // how many cards carry the rows.
         const odLeg = Math.min(...legs);   // OD leg (smaller %)
         const tpLeg = Math.max(...legs);   // TP leg (larger %)
+        const sum   = odLeg + tpLeg;
         const base = rules.find(r => String(r.rate_type || '').toUpperCase() === bundledRt) || rules[0];
         const clone = { ...base, rate_type: base.rate_type || bundledRt,
           rate_value: +sum.toFixed(4), is_declined: 0,
