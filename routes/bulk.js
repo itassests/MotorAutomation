@@ -1925,13 +1925,36 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on failure */ }
   }
 
+  // ---- Kotak TW pre-11-June → old flat grid (card454) ----
+  // The new RTO×make TW grid (card597/598) is effective 11-Jun-2026 (USER). A TW whose
+  // risk-start (_bajajEffDate = OD_Start / policy-start) is BEFORE that uses the OLD
+  // Pan-India flat grid: Bike Comp 30 / Scooter Comp 55 / Bike SAOD 22 / Scooter SAOD
+  // 32 / Bike SATP 30 / Scooter SATP 50. Runs BEFORE the new-grid RTO-decline / SAOD-
+  // decline (those apply only from 11-Jun, so they're gated on !_kotakTwOld below).
+  const _kotakTwOld = insurerSlug === 'kotak' &&
+    String(params.vehicleType || '').toUpperCase() === 'TW' &&
+    !!_bajajEffDate && _bajajEffDate < '2026-06-11';
+  if (_kotakTwOld) {
+    const _twHay = `${params.vehicleCategory || ''} ${params.vehicleCategoryUpdated || ''} ${params.model || ''}`.toUpperCase();
+    const isScooter = /SCOOT|ACTIVA|JUPITER|NTORQ|\bDIO\b|ACCESS|MAESTRO|FASCINO|VESPA|PLEASURE|BURGMAN|AVENIS|GRAZIA|AEROX|\bPEP\b|CHETAK|IQUBE/.test(_twHay) && !/\bBIKE\b/.test(_twHay);
+    const seg = isScooter ? 'Scooter' : 'Bike';
+    const prodT = String(params.productTypeName || params.insProduct || '').toUpperCase();
+    const cover = /SAOD|STANDALONE|\bSOD\b/.test(prodT) ? 'SAOD'
+                : ((Number(params.odPremium) || 0) === 0 ? 'SATP' : 'COMP');
+    const RATES = { Bike: { COMP: 0.30, SAOD: 0.22, SATP: 0.30 }, Scooter: { COMP: 0.55, SAOD: 0.32, SATP: 0.50 } };
+    const rv = RATES[seg][cover];
+    const base = rules[0] || { id: -1, insurer: insurerSlug };
+    rules = [{ ...base, rate_type: cover, rate_value: rv, is_declined: 0, sub_type: null,
+      make: null, segment: `TW ${seg} (Kotak old grid pre-11Jun)` }];
+  }
+
   // ---- Kotak TW off-grid RTO → declined ----
   // The Kotak TW grid (card598 "kotak_TW_1_1_and_SATP", sub_type = RTO code) lists
   // only ACCEPTED districts (MH02/04/40… present, MH34 absent). A TW whose RTO isn't
   // on the list is declined (NIL PO) — otherwise the generic TW match borrows another
   // district's rate. USER-confirmed (MH34 not in grid). Only when a real vehicle RTO
   // code is present. Scoped Kotak + TW.
-  if (insurerSlug === 'kotak' &&
+  if (insurerSlug === 'kotak' && !_kotakTwOld &&
       String(params.vehicleType || '').toUpperCase() === 'TW' &&
       params.rtoCode) {
     const kt = String(params.rtoCode).toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -1966,7 +1989,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // often blank (policyType doesn't read Product_Type_Id), so the engine treated a
   // TW SAOD as Comp and matched the Comp scooter rate (45). Detect SAOD via the raw
   // product-type and decline (NIL PO). USER-confirmed. Kotak + TW scoped.
-  if (insurerSlug === 'kotak' &&
+  if (insurerSlug === 'kotak' && !_kotakTwOld &&
       String(params.vehicleType || '').toUpperCase() === 'TW' &&
       /SAOD|STANDALONE|\bSOD\b/i.test(`${params.insProduct || ''} ${params.productTypeName || ''}`)) {
     let stmtT = null, prT = null;
@@ -3005,7 +3028,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // (region = code), match make-family + Scooter/Bike + cover, inject only a
   // NON-ZERO rate. RTOs the June grid lacks (e.g. MH34) or zero/blank cells keep
   // their existing May/April match → no regression. SAOD skipped (grid is Comp/SATP).
-  if (insurerSlug === 'kotak' && productIsTw && params.rtoCode) {
+  if (insurerSlug === 'kotak' && productIsTw && params.rtoCode && !_kotakTwOld) {
     let code = String(params.rtoCode).toUpperCase().replace(/[^A-Z0-9]/g, '');
     // The grid stores zero-padded RTO codes (AP02, DL05); a policy 'DL5' must be
     // padded to 'DL05' to match, else it wrongly falls back.
