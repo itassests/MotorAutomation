@@ -3767,6 +3767,35 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on failure */ }
   }
 
+  // ---- Future Generali Pvt-Car TP slab — 1st cycle = HIGHEST band (USER 2026-07-09) ----
+  // FG's Pvt-Car TP commission is volume-banded by monthly GWP (<2L 25% / >2L 30%).
+  // The band isn't derivable per policy. USER RULE: use the HIGHEST slab in the 1st
+  // cycle (monthly volume not yet established → grant the top band), and the ACTUAL
+  // slab in the 2nd cycle (real volume known by then). Operator confirms for the June
+  // 1st cycle: 17/19 FG Pvt-Car TP paid 30 (the top band), 2 paid 25. Take the MAX FG
+  // Pvt-Car TP rate. Scoped FG + CAR + TP-only (od<=0); COMP cars keep the FG Comp
+  // take-max above. NOTE (2nd cycle): when a 2nd-cycle book is processed, this should
+  // be gated OFF so the actual volume-band rate applies — there is no 2nd-cycle data
+  // in the system yet, so the 1st-cycle top-slab is correct for the current book.
+  if (insurerSlug === 'future_generali' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR' &&
+      (Number(params.odPremium != null ? params.odPremium : params.od_premium) || 0) <= 0) {
+    try {
+      const mr = await pool.request().query(`SELECT MAX(rate_value) AS mx FROM rate_rules
+        WHERE insurer='future_generali' AND segment LIKE '%Pvt Car%'
+          AND (rate_type='TP' OR rate_type='SATP' OR rate_type LIKE '%TP%')
+          AND rate_value IS NOT NULL`);
+      const mx = mr.recordset[0] && mr.recordset[0].mx;
+      if (mx != null) {
+        const base = rules.find(r => /TP|SATP/i.test(String(r.rate_type || ''))) || rules[0];
+        if (base) {
+          const clone = { ...base, rate_value: mx, segment: 'Pvt Car TP (FG 1st-cycle max slab)' };
+          rules = [clone, ...rules.filter(r => r !== base)];
+        }
+      }
+    } catch (_) { /* leave rules unchanged on failure */ }
+  }
+
   // ---- Reliance TW (state grid × segment × tenure rate_type) ----
   // Reliance TW = STATE grid (from RTO) × rate_type. rate_types: COMP / SAOD / SATP(TP)
   // for annual, and COMP_1+5 / COMP_5+5 long-term bundles under segment "TW Scooter".
