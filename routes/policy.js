@@ -702,6 +702,20 @@ router.post('/lookup', async (req, res, next) => {
     // decide via segment tokens instead.
     const productIsTw = String(resolvedProduct).toUpperCase().includes('TW') ||
                         String(resolvedProduct).toUpperCase().includes('2W');
+    // Effective-date grid selection — MUST mirror the cycle path (routes/bulk.js
+    // `_bajajEffDate`): pick the rate-card generation effective on the policy's
+    // RISK-START date so this single-policy lookup uses the June grid for a June
+    // policy (not April). Without it lookupRates pools ALL generations and
+    // pickPrimary lands on the wrong (usually older/higher) card — which is why the
+    // UI lookup showed April clusters while the recompute correctly used June.
+    const _en = require('../services/enablers');
+    const _vd = (d) => { const s = _en.toIso(d); return (s && s >= '2020-01-01') ? s : null; };
+    const _effDate =
+      _vd(policy.OD_Start_Date) || _vd(policy['OD START DATE']) || _vd(policy['OD_START_DATE']) ||
+      _vd(policy.POLICY_START_DATE) || _vd(policy['POLICY START DATE']) ||
+      _vd(policy.TP_POLICY_START_DATE) || _vd(policy['TP POLICY START DATE']) ||
+      _vd(policy.POLICY_ISSUED_DATE) || _vd(policy['POLICY ISSUED DATE']) ||
+      _vd(policy.POLICY_ISSUE_DATE) || '2000-01-01';
     const lookupParams = {
       insurer: insurerSlug,
       product: productList,
@@ -710,6 +724,7 @@ router.post('/lookup', async (req, res, next) => {
       vehicle_age: params.vehicleAge,
       fuel_type: productIsTw ? '' : (params.fuelType || ''),
       ins_product: params.insProduct || '',
+      effective_date: _effDate,
       // Shriram: state-name region filter must still surface national
       // (NULL/'' region = "PAN INDIA") rows.
       include_null_region: insurerSlug === 'shriram',
