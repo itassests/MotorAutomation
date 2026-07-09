@@ -1925,6 +1925,41 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on failure */ }
   }
 
+  // ---- Kotak TW off-grid RTO → declined ----
+  // The Kotak TW grid (card598 "kotak_TW_1_1_and_SATP", sub_type = RTO code) lists
+  // only ACCEPTED districts (MH02/04/40… present, MH34 absent). A TW whose RTO isn't
+  // on the list is declined (NIL PO) — otherwise the generic TW match borrows another
+  // district's rate. USER-confirmed (MH34 not in grid). Only when a real vehicle RTO
+  // code is present. Scoped Kotak + TW.
+  if (insurerSlug === 'kotak' &&
+      String(params.vehicleType || '').toUpperCase() === 'TW' &&
+      params.rtoCode) {
+    const kt = String(params.rtoCode).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const km = kt.match(/^([A-Z]{2})0*(\d+)$/);
+    if (km) {
+      const nn = String(parseInt(km[2], 10));
+      const cand = [kt, km[1] + nn, km[1] + nn.padStart(2, '0')];
+      try {
+        const gr = await pool.request()
+          .input('a', sql.NVarChar(12), cand[0]).input('b', sql.NVarChar(12), cand[1]).input('c', sql.NVarChar(12), cand[2])
+          .query(`SELECT TOP 1 1 AS ok FROM rate_rules
+                  WHERE insurer LIKE '%kotak%' AND rate_card_id=598
+                    AND (segment LIKE '%Scoot%' OR segment LIKE '%Bike%')
+                    AND REPLACE(UPPER(sub_type),'-','') IN (@a,@b,@c)`);
+        if (!gr.recordset.length) {
+          let stmtG = null, prG = null;
+          const keyG = String(params._policy_no || '').trim().toUpperCase();
+          if (keyG) {
+            if (statementIndex) stmtG = statementIndex.get(keyG) || null;
+            if (prIndex) { prG = prIndex.get(keyG) || null; if (!prG) for (const s of policyKeyVariants(keyG)) { prG = prIndex.get(s); if (prG) break; } }
+          }
+          return buildOutputRow(policy, params, null, null, null, null,
+            `Declined by kotak — TW RTO ${kt} not on the acceptable-RTO grid (NIL PO)`, stmtG, prG);
+        }
+      } catch (_) { /* leave to normal path on failure */ }
+    }
+  }
+
   // ---- Kotak TW SAOD → declined (no TW SAOD in the June grid) ----
   // Kotak's June TW grid ("kotak_TW_1_1_and_SATP") carries only 1+1 (Comp) + SATP
   // (TP) — NO SAOD — so Kotak pays no standalone-OD on two-wheelers. insProduct is
