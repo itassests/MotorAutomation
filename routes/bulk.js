@@ -1646,6 +1646,19 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
                  || '2000-01-01';
   }
 
+  // Magma GCV rated-GVW band (USER 2026-07-08): heavy trucks whose MODEL encodes a
+  // 37-tonne rated GVW class (37xx / Truxo 37 / Blazo 37 / Pro 6037 / Signa|LPT|LPK|
+  // AL|U 3718/3723 …) carry a registered/laden GVW up to ~43,500 kg that pushes them
+  // into the 40T+ band (low rate 18-19), but Magma rates these in the 20-40T band for
+  // BOTH Comp and TP (= operator: PB1 3718 32, GJ2 Blazo 35). Force the tonnage to the
+  // rated 37T so it lands in [20-40]. Magma + GCV scoped; the rated class comes from
+  // the model, not the laden weight.
+  if (insurerSlug === 'magma_hdi' &&
+      /GCV/.test(String(params.vehicleType || '').toUpperCase()) &&
+      /37\d{2}|6037|(TRUXO|BLAZO)[\s-]*37/i.test(`${params.make || ''} ${params.model || ''}`)) {
+    params.tonnage = 37;
+  }
+
   const baseLookup = {
     insurer: insurerSlug,
     product: productList,
