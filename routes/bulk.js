@@ -4007,7 +4007,13 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       const reg = require('../services/chola-region').cholaRegion(code) || TREG[code.slice(0, 2)];
       if (reg) {
         const band = (Number(params.vehicleAge) || 0) < 1 ? 'NEW' : 'RENEWAL';
-        const trKey = lookupKey + '||cholaTrac:' + reg + ':' + band;
+        // Cover: Liability/TP-only tractor pays the ACT column (GJ REN 0.20), Comp/
+        // Package pays PACK (GJ 0.485). insProduct is often blank for MISC, so also
+        // read the raw product-type (ProductTypeName="Liability"). SAOD → OD → PACK.
+        const _tprod = String(params.insProduct || '').toUpperCase();
+        const isLiab = /^TP$|SATP|LIAB|\bACT\b/.test(_tprod) || /LIABILITY/i.test(String(params.productTypeName || ''));
+        const cover = isLiab ? 'ACT' : 'PACK';
+        const trKey = lookupKey + '||cholaTrac:' + reg + ':' + band + ':' + cover;
         let trRows;
         if (caches.lookup.has(trKey)) trRows = caches.lookup.get(trKey);
         else {
@@ -4018,21 +4024,21 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
           const trSql = (segParam) => `SELECT TOP 1 rr.rate_value FROM rate_rules rr
               JOIN rate_cards rc ON rr.rate_card_id = rc.id
               WHERE rr.insurer='chola_ms' AND rr.region=@reg AND rr.segment LIKE ${segParam}
-                AND rr.rate_value > 0 ORDER BY rc.effective_from DESC, rr.rate_value DESC`;
-          trRows = (await pool.request().input('reg', sql.NVarChar(60), reg)
-            .input('seg', '%TRAC[[]' + band + ']%').query(trSql('@seg'))).recordset;
-          // fallback: region has no band-specific tractor row → try the other band
+                AND rr.rate_type=@rt AND rr.rate_value > 0 ORDER BY rc.effective_from DESC, rr.rate_value DESC`;
+          const runTr = (segLike) => pool.request().input('reg', sql.NVarChar(60), reg)
+            .input('rt', sql.NVarChar(10), cover).input('seg', sql.NVarChar(40), segLike).query(trSql('@seg'));
+          trRows = (await runTr('%TRAC[[]' + band + ']%')).recordset;
+          // fallback: region has no band-specific row for this cover → try the other band
           if (!trRows.length) {
             const other = band === 'NEW' ? 'RENEWAL' : 'NEW';
-            trRows = (await pool.request().input('reg', sql.NVarChar(60), reg)
-              .input('seg', '%TRAC[[]' + other + ']%').query(trSql('@seg'))).recordset;
+            trRows = (await runTr('%TRAC[[]' + other + ']%')).recordset;
           }
           caches.lookup.set(trKey, trRows);
         }
         if (trRows[0]) {
           const base = rules[0] || { id: -1, insurer: insurerSlug };
-          const clone = { ...base, rate_type: 'PACK', rate_value: Number(trRows[0].rate_value),
-            is_declined: 0, region: reg, sub_type: 'MSV', segment: '1_TRAC[' + band + '] (Chola ' + reg + ')' };
+          const clone = { ...base, rate_type: cover, rate_value: Number(trRows[0].rate_value),
+            is_declined: 0, region: reg, sub_type: 'MSV', segment: '1_TRAC[' + band + '] (Chola ' + reg + ' ' + cover + ')' };
           rules = [clone];
         }
       }

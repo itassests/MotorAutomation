@@ -1196,6 +1196,11 @@ function extractPolicyParams(policy) {
 
   const insurerName = get('INSURER NAME') || get('ShortName') || get('INSURER') || get('Insurer') || '';
   const policyType = get('PRODUCT TYPE') || get('POLICY TYPE') || get('PolicyType') || '';
+  // Raw product-type from tmp (ProductTypeName/Product_Type_Id: "Comprehensive" /
+  // "Liability" / "SAOD" / "Motor"). Exposed as a SEPARATE param — NOT folded into
+  // insProduct — because "Motor" is ambiguous and populating insProduct globally is
+  // risky. Consumed narrowly (e.g. Chola tractor Comp-vs-Liability cover split).
+  const productTypeNameRaw = (get('ProductTypeName') || get('Product_Type_Id') || '').toString().trim();
   const vehicleClass = get('MOTOR VEHICAL TYPE') || get('VEHICAL TYPE') || get('VEHICLE CLASS') || '';
   const vehicleType = get('MOTOR VEHICAL TYPE') || get('VEHICAL TYPE') || get('VEHICLE TYPE') || '';
   // Sub-category discriminator: "TW - Scooty" / "TW - Motorcycle" / "Car" / "Taxi" etc.
@@ -1451,6 +1456,7 @@ function extractPolicyParams(policy) {
     city: (get('City Name') || get('CLIENT CITY NAME') || get('VEHICLE CITY') ||
            get('city_name') || '').toString().trim(),
     vehicleCategory: (vehicalCategoryRaw || vehicleClass || '').toString().trim(),
+    productTypeName: productTypeNameRaw,   // raw tmp product-type, scoped consumers only
     make: (make || '').toString().trim(),
     model: (model || '').toString().trim(),
     vehicleSubModel: (vehicleSubModel || '').toString().trim(),
