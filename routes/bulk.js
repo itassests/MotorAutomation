@@ -4118,7 +4118,11 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       // TN → Chennai vs ROTN, UP → UP-East vs UP. Other states → the prefix map.
       const reg = require('../services/chola-region').cholaRegion(code) || GREG[code.slice(0, 2)];
       const cat = String(params.vehicleCategory || '').toUpperCase();
-      const is3W = /\b3\s*W\b|3\s*WH/.test(cat);
+      // 3-wheeler goods carriers arrive with category "E-Rikshaw-Good Carrying" /
+      // "3W …" / "…Rickshaw" — match the rickshaw/auto spellings, not just "3W", so
+      // e-autos take the 1_GCCV_3W[Electric] rate (DL 0.50) instead of the 4W ≤3.5T
+      // electric band (0.375).
+      const is3W = /\b3\s*W\b|3\s*WH|RIK?SHAW|RICKSHAW|E-?RIK/i.test(cat);
       const isElectric = /ELECTRIC/i.test(String(params.fuelType || '')) || /E-?RIK|E-?RICK/i.test(cat);
       const ton = Number(params.tonnage) || 0;
       if (reg) {

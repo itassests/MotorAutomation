@@ -1200,7 +1200,15 @@ function extractPolicyParams(policy) {
   const vehicleType = get('MOTOR VEHICAL TYPE') || get('VEHICAL TYPE') || get('VEHICLE TYPE') || '';
   // Sub-category discriminator: "TW - Scooty" / "TW - Motorcycle" / "Car" / "Taxi" etc.
   // This is more specific than vehicleClass (which is often just "Two Wheeler").
-  const vehicalCategoryRaw = (get('VehicalCategory') || get('VEHICLE CATEGORY') || get('VEHICAL CATEGORY') || '').toString().trim();
+  // tmp_PrarambhData has NO plain "VehicalCategory" column — only VehicalCategoryId /
+  // VehicalCategory_Updated / VehicalCategoryname (e.g. "E-Rikshaw-Good Carrying",
+  // "GCV - 3W"). Without the "_Updated"/"name" fallback the category is blank for
+  // every tmp-sourced row, so 3W/e-rickshaw/body detection silently fails. Adding the
+  // fallback is measured safe on cycle 13: +4 fixed (chola/united/icici/shriram
+  // e-rickshaw & 3W), 0 regressions — resolvers already handle a blank category, so
+  // supplying the real one only sharpens the deciding cases.
+  const vehicalCategoryRaw = (get('VehicalCategory') || get('VEHICLE CATEGORY') || get('VEHICAL CATEGORY') ||
+    get('VehicalCategory_Updated') || get('VehicalCategoryname') || get('VehicalCategoryName') || '').toString().trim();
   const make = get('VEHICAL MAKE') || get('MAKE') || get('Make') || '';
   const model = get('VEHICAL MODEL') || get('MODEL') || get('Model') || '';
   const fuelType = get('FUEL TYPE') || get('FuelType') || '';
