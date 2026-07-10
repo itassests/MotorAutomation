@@ -2595,13 +2595,23 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     ].filter(r => {
       if (seen.has(r)) return false; seen.add(r); return true;
     });
+    // Universal Sompo: this candidate loop IS the region resolver for RTOs absent
+    // from rto_mappings (e.g. GJ21 → generic "GUJARAT", but the grid keys Gujarat
+    // as "GJ/DD"). The soft fallback above deleted baseLookup.effective_date when
+    // the region-mismatched primary returned 0, so without this the GJ/DD match
+    // would pool BOTH card generations and the tighter age band of the OLD (April)
+    // card wins (GJ7/35530 age-6 → April 0.22 instead of June 0.23). Re-apply the
+    // risk-start date so the matched region still takes its effective generation.
+    // Scoped to universal_sompo; the date is folded into the cache key.
+    const _usFbEff = (insurerSlug === 'universal_sompo' && _bajajEffDate) ? _bajajEffDate : null;
+    const _usEffOpt = _usFbEff ? { effective_date: _usFbEff } : {};
     for (const r of candidates) {
-      const fbKey = lookupKey + '||fb:' + r;
+      const fbKey = lookupKey + '||fb:' + r + (_usFbEff ? '||eff:' + _usFbEff : '');
       let attempt;
       if (caches.lookup.has(fbKey)) {
         attempt = caches.lookup.get(fbKey);
       } else {
-        attempt = await lookupRates(pool, { ...baseLookup, region: r, cluster: '', region_match_mode: 'token' });
+        attempt = await lookupRates(pool, { ...baseLookup, region: r, cluster: '', region_match_mode: 'token', ..._usEffOpt });
         caches.lookup.set(fbKey, attempt);
       }
       // SAOD-as-Comp 2nd pass inside the fallback chain — Royal Sundaram
@@ -2614,7 +2624,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         if (caches.lookup.has(fbKeyComp)) {
           attempt = caches.lookup.get(fbKeyComp);
         } else {
-          attempt = await lookupRates(pool, { ...baseLookup, ins_product: 'Comp', region: r, cluster: '', region_match_mode: 'token' });
+          attempt = await lookupRates(pool, { ...baseLookup, ins_product: 'Comp', region: r, cluster: '', region_match_mode: 'token', ..._usEffOpt });
           caches.lookup.set(fbKeyComp, attempt);
         }
       }
@@ -2629,7 +2639,7 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
         if (caches.lookup.has(fbKeyComp)) {
           attempt = caches.lookup.get(fbKeyComp);
         } else {
-          attempt = await lookupRates(pool, { ...baseLookup, ins_product: 'Comp', region: r, cluster: '', region_match_mode: 'token' });
+          attempt = await lookupRates(pool, { ...baseLookup, ins_product: 'Comp', region: r, cluster: '', region_match_mode: 'token', ..._usEffOpt });
           caches.lookup.set(fbKeyComp, attempt);
         }
       }
