@@ -4,110 +4,110 @@
  "grid": [
   {
    "region": "MUMBAI/PUNE/GOA",
-   "nonDieselCom": 0.3,
-   "diesel": 0.15,
-   "saod": 0.3,
+   "nonDieselCom": 0.225,
+   "diesel": 0.1,
+   "saod": 0.225,
    "stp": 0
   },
   {
    "region": "REST OF MAHARASTRA",
-   "nonDieselCom": 0.3,
-   "diesel": 0.15,
-   "saod": 0.3,
+   "nonDieselCom": 0.2,
+   "diesel": 0.1,
+   "saod": 0.225,
    "stp": 0
   },
   {
    "region": "GUJARAT",
-   "nonDieselCom": 0.3,
-   "diesel": 0.15,
-   "saod": 0.3,
+   "nonDieselCom": 0.175,
+   "diesel": 0.1,
+   "saod": 0.225,
    "stp": 0
   },
   {
    "region": "MADYAPRADESH",
-   "nonDieselCom": 0.3,
-   "diesel": 0.15,
-   "saod": 0.3,
+   "nonDieselCom": 0.15,
+   "diesel": 0.05,
+   "saod": 0.125,
    "stp": 0
   },
   {
    "region": "Banglore ,Hyderabad",
-   "nonDieselCom": 0.3,
-   "diesel": 0.15,
-   "saod": 0.3,
+   "nonDieselCom": 0.175,
+   "diesel": 0.1,
+   "saod": 0.225,
    "stp": 0
   },
   {
    "region": "Rest of KA,TS,AP",
-   "nonDieselCom": 0.3,
-   "diesel": 0.15,
-   "saod": 0.3,
+   "nonDieselCom": 0.125,
+   "diesel": 0.05,
+   "saod": 0.225,
    "stp": 0
   },
   {
    "region": "Kerala",
-   "nonDieselCom": 0.3,
-   "diesel": 0.15,
-   "saod": 0.3,
+   "nonDieselCom": 0.1,
+   "diesel": 0.05,
+   "saod": 0.225,
    "stp": 0
   },
   {
    "region": "Tamilnadu",
-   "nonDieselCom": 0.3,
-   "diesel": 0.15,
-   "saod": 0.3,
+   "nonDieselCom": 0.1,
+   "diesel": 0.05,
+   "saod": 0.175,
    "stp": 0
   },
   {
    "region": "Delhi",
-   "nonDieselCom": 0.3,
-   "diesel": 0.15,
-   "saod": 0.3,
+   "nonDieselCom": 0.2,
+   "diesel": 0.1,
+   "saod": 0.175,
    "stp": 0
   },
   {
    "region": "Punjab,HP and JK",
-   "nonDieselCom": 0.3,
-   "diesel": 0.15,
-   "saod": 0.3,
+   "nonDieselCom": 0.175,
+   "diesel": 0.075,
+   "saod": 0.175,
    "stp": 0
   },
   {
    "region": "UP ,Haryana,Rajasthan",
-   "nonDieselCom": 0.3,
-   "diesel": 0.15,
-   "saod": 0.3,
+   "nonDieselCom": 0.1,
+   "diesel": 0.05,
+   "saod": 0.125,
    "stp": 0
   },
   {
    "region": "NE,Odisha,Chattishgarh",
-   "nonDieselCom": 0.3,
-   "diesel": 0.15,
-   "saod": 0.3,
+   "nonDieselCom": 0.125,
+   "diesel": 0.1,
+   "saod": 0.225,
    "stp": 0
   },
   {
    "region": "Bihar,Jharkhand",
-   "nonDieselCom": 0.3,
-   "diesel": 0.15,
-   "saod": 0.3,
+   "nonDieselCom": 0.175,
+   "diesel": 0.1,
+   "saod": 0.225,
    "stp": 0
   },
   {
    "region": "Kolkatta",
-   "nonDieselCom": 0.3,
-   "diesel": 0.15,
-   "saod": 0.3,
+   "nonDieselCom": 0.175,
+   "diesel": 0.1,
+   "saod": 0.225,
    "stp": 0
   },
   {
    "region": "West Bengal",
-   "nonDieselCom": 0.3,
-   "diesel": 0.15,
-   "saod": 0.3,
+   "nonDieselCom": 0.125,
+   "diesel": 0.1,
+   "saod": 0.225,
    "stp": 0
   }
  ],
- "_note": "Effective payout is FLAT per cover (base region grid + uniform volume/enabler+bonanza uplift resolves to: Non-Diesel Comp 0.30, Diesel Comp 0.15, SAOD 0.30, STP 0 across ALL regions — verified vs June-1 operator reconciliation, nearly all IndusInd cars were mismatched at the region base). Region rows kept for structure; values flattened. Revert: restore region-specific values from the June PVT COM sheet.",
+ "_note": "Region-specific base grid (June PVT COM, eff 1-Jun-26). UN-FLATTENED per USER (HR26 Haryana Diesel=5%): the earlier uniform 30/15/30/0 flattening was wrong. NON-NCB payout is 5% lesser than grid (not yet modelled). Revert: see git.",
  "_base_grid_note": "Original region base (April PO grid): MUMBAI/PUNE/GOA nonDieselCom 0.225 etc — superseded by the flat enabler-inclusive payout."
 }

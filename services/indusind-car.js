@@ -66,7 +66,10 @@ function resolveIndusindCarRate(params) {
   let rate;
   if (od <= 0) rate = row.stp;                         // TP-only
   else if (tp <= 0) rate = row.saod;                   // standalone OD
-  else rate = /DIESEL/.test(norm(params.fuelType)) ? row.diesel : row.nonDieselCom;
+  // Diesel tier (lower). Source fuel is sometimes the single-letter code "D"
+  // (Mahindra Thar "LX HARD TOP DIESEL" arrives fuel="D"), so match "D" too — else
+  // a diesel wrongly takes the Non-Diesel rate (Thar HR26: 15 vs 30).
+  else rate = /DIESEL|^D$/.test(norm(params.fuelType)) ? row.diesel : row.nonDieselCom;
   return rate == null ? null : +Number(rate).toFixed(4);
 }
 
