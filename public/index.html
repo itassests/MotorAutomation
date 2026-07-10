@@ -392,6 +392,7 @@
     <button class="sidebar-toggle" id="sidebarToggle" title="Collapse sidebar" aria-label="Toggle sidebar">&#9776;</button>
     <div class="tab active" data-tab="upload"            title="Upload Rate Card"   ><span class="tab-icon">&#128228;</span><span class="tab-label">Upload Rate Card</span></div>
     <div class="tab"        data-tab="search"            title="Search Rates"       ><span class="tab-icon">&#128269;</span><span class="tab-label">Search Rates</span></div>
+    <div class="tab"        data-tab="rate-changes"      title="Rate Changes"       ><span class="tab-icon">&#128200;</span><span class="tab-label">Rate Changes</span></div>
     <div class="tab"        data-tab="margins"           title="Margins"            ><span class="tab-icon">&#128202;</span><span class="tab-label">Margins</span></div>
     <div class="tab"        data-tab="special-rates"     title="Special Rates"      ><span class="tab-icon">&#11088;</span><span class="tab-label">Special Rates</span></div>
     <div class="tab"        data-tab="statements"        title="Statements"         ><span class="tab-icon">&#128196;</span><span class="tab-label">Statements</span></div>
@@ -1013,6 +1014,84 @@
         <div id="enablerPreview" style="display:none; border:1px solid #cfe3ff; border-radius:8px; padding:12px; margin-bottom:14px; background:#f7fbff;"></div>
         <h3 style="font-size:14px; margin:12px 0 6px;">Active Enabler Deals</h3>
         <div id="enablerList" style="font-size:13px;">Loading…</div>
+      </div>
+    </div>
+
+    <!-- ============ RATE CHANGES PANEL ============ -->
+    <div class="panel" id="panel-rate-changes">
+      <div class="card" style="background:linear-gradient(135deg,#EBF8FF,#BFE5FF); border:1px solid #8ED3FF;">
+        <h2 style="color:#00243E;"><span class="icon">&#128200;</span> Rate Change Tracking</h2>
+        <p style="color:#00243E; font-size:13px; margin:0;">
+          Which insurers <b>raised</b> or <b>cut</b> commission rates between grid generations —
+          sliced by month, product (vehicle type), region and every grid parameter. Compares the
+          same grid cell across each insurer's dated rate-card versions.
+        </p>
+      </div>
+
+      <div class="card">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Insurer</label>
+            <select id="rcInsurer"><option value="all">All insurers</option></select>
+          </div>
+          <div class="form-group">
+            <label>Product / Vehicle type</label>
+            <select id="rcProduct">
+              <option value="">All</option><option>CAR</option><option>TW</option>
+              <option>GCV</option><option>PCV</option><option>MISC</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Direction</label>
+            <select id="rcDirection">
+              <option value="all">All changes</option>
+              <option value="up">Increased &#9650;</option>
+              <option value="down">Decreased &#9660;</option>
+              <option value="declined">Newly declined</option>
+              <option value="reinstated">Reinstated</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Region (optional)</label>
+            <input type="text" id="rcRegion" placeholder="e.g. MAHARASHTRA">
+          </div>
+          <div class="form-group" style="align-self:end;">
+            <button class="btn btn-primary" onclick="rcLoad()" style="width:100%;">Load changes</button>
+          </div>
+        </div>
+        <div id="rcStatus" style="font-size:13px; color:#666; margin-top:6px;"></div>
+      </div>
+
+      <!-- Summary: which insurers changed rates -->
+      <div class="card">
+        <h2><span class="icon">&#127942;</span> Who changed rates <span id="rcSummaryScope" style="font-size:12px;color:#888;font-weight:400;"></span></h2>
+        <div style="overflow-x:auto;">
+          <table class="data-table" id="rcSummaryTable" style="font-size:13px; width:100%; border-collapse:collapse;">
+            <thead><tr>
+              <th>Insurer</th><th style="text-align:right;">&#9650; Up</th>
+              <th style="text-align:right;">&#9660; Down</th><th style="text-align:right;">Declined</th>
+              <th style="text-align:right;">Net</th><th style="text-align:right;">Avg &#916; (pts)</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="rcMonths" style="margin-top:14px;"></div>
+      </div>
+
+      <!-- Detail: individual cell changes -->
+      <div class="card">
+        <h2><span class="icon">&#128203;</span> Changes <span id="rcDetailCount" style="font-size:12px;color:#888;font-weight:400;"></span></h2>
+        <div style="overflow-x:auto;">
+          <table class="data-table" id="rcDetailTable" style="font-size:12px; width:100%; border-collapse:collapse;">
+            <thead><tr>
+              <th>Insurer</th><th>Prod</th><th>Region</th><th>Segment</th><th>Band</th>
+              <th>Fuel</th><th>Cover</th><th style="text-align:right;">Old</th>
+              <th style="text-align:right;">New</th><th style="text-align:right;">&#916;</th>
+              <th style="text-align:right;">%</th><th>Effective</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -4150,6 +4229,7 @@
         tab.classList.add('active');
         document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
         if (tab.dataset.tab === 'admin') adminLoad();
+        if (tab.dataset.tab === 'rate-changes' && !window._rcInited) { window._rcInited = true; rcInitTab(); }
         if (tab.dataset.tab === 'upload' && typeof loadEnablers === 'function') loadEnablers();
         if (tab.dataset.tab === 'upload' && typeof loadFleets === 'function') loadFleets();
         if (tab.dataset.tab === 'agent-view') loadAgentView();
@@ -4169,6 +4249,105 @@
         }
       });
     });
+
+    // ============ RATE CHANGES ============
+    const _rcPct = (v) => v == null ? '—' : (Math.round(v * 1000) / 10) + '%';
+    const _rcEsc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+    async function rcInitTab() {
+      try {
+        const r = await fetch('/api/rate-changes/insurers').then(x => x.json());
+        const sel = document.getElementById('rcInsurer');
+        (r.insurers || []).forEach(i => {
+          const o = document.createElement('option');
+          o.value = i.insurer;
+          o.textContent = `${i.insurer} (${i.generations} gens · ${i.first_effective}→${i.last_effective})`;
+          sel.appendChild(o);
+        });
+      } catch (e) { /* ignore */ }
+      rcLoad();
+    }
+
+    async function rcLoad() {
+      const insurer = document.getElementById('rcInsurer').value || 'all';
+      const product = document.getElementById('rcProduct').value || '';
+      const direction = document.getElementById('rcDirection').value || 'all';
+      const region = document.getElementById('rcRegion').value.trim();
+      const status = document.getElementById('rcStatus');
+      status.textContent = 'Loading…';
+      document.getElementById('rcSummaryScope').textContent = product ? `· ${product}` : '';
+      const qs = (o) => Object.entries(o).filter(([, v]) => v).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&');
+      try {
+        const [sum, tl] = await Promise.all([
+          fetch('/api/rate-changes/summary?' + qs({ product })).then(x => x.json()),
+          fetch('/api/rate-changes/timeline?' + qs({ insurer, product, region, direction, limit: 1000 })).then(x => x.json()),
+        ]);
+        rcRenderSummary(sum);
+        rcRenderDetail(tl);
+        status.textContent = `Loaded — ${tl.total} change${tl.total === 1 ? '' : 's'} across grid generations.`;
+      } catch (e) {
+        status.textContent = 'Error: ' + e.message;
+      }
+    }
+
+    function rcRenderSummary(sum) {
+      const tb = document.querySelector('#rcSummaryTable tbody');
+      tb.innerHTML = (sum.by_insurer || []).map(x => {
+        const netColor = x.net > 0 ? '#0a7c2f' : x.net < 0 ? '#c0392b' : '#666';
+        const avgColor = x.avg_delta > 0 ? '#0a7c2f' : x.avg_delta < 0 ? '#c0392b' : '#666';
+        return `<tr>
+          <td><b>${_rcEsc(x.insurer)}</b></td>
+          <td style="text-align:right; color:#0a7c2f;">${x.up}</td>
+          <td style="text-align:right; color:#c0392b;">${x.down}</td>
+          <td style="text-align:right;">${x.declined || 0}</td>
+          <td style="text-align:right; color:${netColor}; font-weight:600;">${x.net > 0 ? '+' : ''}${x.net}</td>
+          <td style="text-align:right; color:${avgColor};">${x.avg_delta > 0 ? '+' : ''}${x.avg_delta}</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="6" style="text-align:center; color:#888;">No rate changes found</td></tr>';
+
+      const mEl = document.getElementById('rcMonths');
+      const months = sum.by_month || [];
+      mEl.innerHTML = months.length ? '<div style="font-size:12px; color:#666; margin-bottom:6px;">By effective month:</div>' +
+        '<div style="display:flex; gap:8px; flex-wrap:wrap;">' + months.map(m =>
+          `<div style="border:1px solid #d9e6f2; border-radius:8px; padding:8px 12px; background:#fff;">
+             <div style="font-weight:600; color:#00243E;">${m.month}</div>
+             <div style="font-size:12px;"><span style="color:#0a7c2f;">&#9650; ${m.up}</span> &nbsp;
+             <span style="color:#c0392b;">&#9660; ${m.down}</span>${m.declined ? ` &nbsp;<span style="color:#888;">&#8856; ${m.declined}</span>` : ''}</div>
+           </div>`).join('') + '</div>' : '';
+    }
+
+    function rcRenderDetail(tl) {
+      const changes = tl.changes || [];
+      document.getElementById('rcDetailCount').textContent = `· showing ${changes.length} of ${tl.total}`;
+      const band = (c) => {
+        if (c.weight_band_min != null || c.weight_band_max != null) return `${c.weight_band_min ?? ''}-${c.weight_band_max ?? ''}T`;
+        if (c.cc_band_min != null || c.cc_band_max != null) return `${c.cc_band_min ?? ''}-${c.cc_band_max ?? ''}cc`;
+        if (c.vehicle_age_min != null || c.vehicle_age_max != null) return `age ${c.vehicle_age_min ?? ''}-${c.vehicle_age_max ?? ''}`;
+        return '';
+      };
+      const tb = document.querySelector('#rcDetailTable tbody');
+      tb.innerHTML = changes.map(c => {
+        const arrow = c.direction === 'up' ? '<span style="color:#0a7c2f;">&#9650;</span>'
+          : c.direction === 'down' ? '<span style="color:#c0392b;">&#9660;</span>'
+          : c.direction === 'declined' ? '<span style="color:#888;">&#8856;</span>'
+          : '<span style="color:#0082C8;">&#8635;</span>';
+        const dColor = c.direction === 'up' ? '#0a7c2f' : c.direction === 'down' ? '#c0392b' : '#666';
+        const oldTxt = c.old_declined ? 'decl' : _rcPct(c.old_rate);
+        const newTxt = c.new_declined ? 'decl' : _rcPct(c.new_rate);
+        const deltaTxt = c.delta == null ? '' : (c.delta > 0 ? '+' : '') + Math.round(c.delta * 1000) / 10 + 'pt';
+        return `<tr>
+          <td>${_rcEsc(c.insurer)}</td><td>${_rcEsc(c.product)}</td>
+          <td>${_rcEsc(c.region)}</td><td>${_rcEsc(c.segment)}</td>
+          <td>${_rcEsc(band(c))}</td><td>${_rcEsc(c.fuel_type)}</td>
+          <td>${_rcEsc(c.rate_type)}</td>
+          <td style="text-align:right;">${oldTxt}</td>
+          <td style="text-align:right; font-weight:600;">${arrow} ${newTxt}</td>
+          <td style="text-align:right; color:${dColor};">${deltaTxt}</td>
+          <td style="text-align:right; color:${dColor};">${c.pct_change == null ? '' : (c.pct_change > 0 ? '+' : '') + c.pct_change + '%'}</td>
+          <td style="white-space:nowrap;">${c.from_date}→${c.to_date}</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="12" style="text-align:center; color:#888;">No changes match the filter</td></tr>';
+    }
 
     // ============ AGENT VIEW ============
     // Self-service dashboard for POSLG agents (and admins inspecting an agent).
@@ -7417,6 +7596,159 @@
     }
 
     // ============ SEARCH RATES ============
+    /* ============ RATE ADMIN (manual edit/add on Search Rates) ============ */
+    let _raSource = { editable: false, source: 'rate_rules', note: '', file: null };
+    const raIsAdmin = () => !!(_currentUser && _currentUser.role === 'admin');
+
+    async function raCheckSource(insurer, product) {
+      _raSource = { editable: false, source: 'rate_rules', note: '', file: null };
+      if (insurer && raIsAdmin()) {
+        try {
+          const d = await fetch(API + '/rate-admin/source?insurer=' + encodeURIComponent(insurer) + '&product=' + encodeURIComponent(product || '')).then(r => r.json());
+          if (d && d.success) _raSource = d;
+        } catch (_) { /* leave default */ }
+      }
+      raRenderBanner();
+    }
+    function raRenderBanner() {
+      let el = document.getElementById('raBanner');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'raBanner';
+        el.style.cssText = 'margin:0 0 12px; padding:10px 14px; border-radius:8px; font-size:13px; display:none;';
+        const rc = document.getElementById('searchResultCard');
+        if (rc && rc.parentNode) rc.parentNode.insertBefore(el, rc);
+      }
+      if (!raIsAdmin() || !document.getElementById('searchInsurer').value) { el.style.display = 'none'; return; }
+      el.style.display = 'block';
+      if (_raSource.editable) {
+        el.style.background = '#e8f5e9'; el.style.border = '1px solid #b7dfc0'; el.style.color = '#1b5e20';
+        el.innerHTML = '&#9998; <b>Editable</b> — click the pencil on a rate to update it, or '
+          + '<button onclick="raOpenAdd()" style="border:1px solid #1b8a5a;background:#fff;color:#1b5e20;border-radius:5px;padding:2px 10px;margin:0 2px;cursor:pointer;font-weight:600;">+ Add rule</button>'
+          + ' to create one (prefilled from your search — use this when a rate is <b>not available</b>).';
+      } else {
+        el.style.background = '#fff3e0'; el.style.border = '1px solid #f0d3a0'; el.style.color = '#8a5a00';
+        el.innerHTML = '&#9888; ' + (_raSource.note || 'This insurer×product is config-driven — not editable here.');
+      }
+    }
+    /** Rate cell for the results table — adds an inline edit pencil for admins when editable. */
+    function raRateCell(r, isDiscountOnly) {
+      const disp = isDiscountOnly ? '-'
+        : (r.is_declined ? '<span class="declined">DECLINED</span>'
+          : '<span class="rate-value">' + (r.rate_value != null ? (r.rate_value * 100).toFixed(1) + '%' : '-') + '</span>');
+      const canEdit = raIsAdmin() && _raSource.editable && !isDiscountOnly && r.id != null;
+      const btn = canEdit
+        ? ' <button title="Edit this rate" onclick="raEditRate(' + r.id + ',' + (r.rate_value != null ? r.rate_value : 'null') + ')" '
+          + 'style="border:1px solid #cdd7e1;background:#fff;border-radius:4px;cursor:pointer;padding:0 5px;margin-left:4px;font-size:11px;color:#1F5C8A;">&#9998;</button>'
+        : '';
+      return '<td>' + disp + btn + '</td>';
+    }
+
+    function raModal(innerHtml) {
+      let m = document.getElementById('raModal');
+      if (!m) {
+        m = document.createElement('div');
+        m.id = 'raModal';
+        m.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:2000; display:flex; align-items:center; justify-content:center;';
+        document.body.appendChild(m);
+      }
+      m.innerHTML = '<div style="background:#fff; border-radius:10px; padding:18px 20px; width:min(560px,94vw); max-height:88vh; overflow:auto; box-shadow:0 10px 34px rgba(0,0,0,.25);">' + innerHtml + '</div>';
+      m.style.display = 'flex';
+    }
+    function raClose() { const m = document.getElementById('raModal'); if (m) m.style.display = 'none'; }
+
+    function raEditRate(id, cur) {
+      raModal(
+        '<h3 style="margin:0 0 4px;">Update rate</h3>'
+        + '<div style="font-size:12px;color:#888;margin-bottom:12px;">rate_rules id <b>' + id + '</b></div>'
+        + '<label style="font-size:13px;color:#555;">New rate value (raw, as stored — e.g. <code>0.40</code> for 40%)</label>'
+        + '<input id="raEditVal" type="number" step="0.0001" value="' + (cur != null ? cur : '') + '" style="width:100%;padding:8px;margin:6px 0 12px;border:1px solid #cdd7e1;border-radius:6px;font-family:monospace;">'
+        + '<label style="font-size:13px;color:#555;">Note (optional, logged)</label>'
+        + '<input id="raEditNote" type="text" placeholder="reason for change" style="width:100%;padding:8px;margin:6px 0 6px;border:1px solid #cdd7e1;border-radius:6px;">'
+        + '<div id="raEditErr" style="color:#c62828;font-size:12px;min-height:16px;"></div>'
+        + '<div style="text-align:right;margin-top:8px;"><button onclick="raClose()" style="padding:7px 14px;margin-right:6px;">Cancel</button>'
+        + '<button class="btn btn-primary" style="padding:7px 16px;" onclick="raSaveRate(' + id + ')">Save</button></div>'
+      );
+    }
+    async function raSaveRate(id) {
+      const v = parseFloat(document.getElementById('raEditVal').value);
+      const err = document.getElementById('raEditErr');
+      if (!Number.isFinite(v) || v < 0) { err.textContent = 'Enter a valid non-negative number.'; return; }
+      try {
+        const d = await fetch(API + '/rate-admin/rule/' + id, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rate_value: v, note: document.getElementById('raEditNote').value }),
+        }).then(r => r.json());
+        if (!d.success) throw new Error(d.error || 'failed');
+        raClose(); showToast('Rate updated: ' + d.old_rate + ' → ' + d.new_rate, 'success');
+        searchRates();
+      } catch (e) { err.textContent = 'Save failed: ' + e.message; }
+    }
+
+    function raOpenAdd() {
+      const g = (id) => (document.getElementById(id) || {}).value || '';
+      const cover = g('searchInsProduct');
+      const rt = cover === 'TP' ? 'SATP' : cover === 'SAOD' ? 'SAOD' : 'COMP';
+      const insurer = g('searchInsurer'), product = g('searchProduct');
+      const field = (label, id, val, ph) => '<label style="font-size:12px;color:#666;display:block;margin-top:8px;">' + label + '</label>'
+        + '<input id="' + id + '" value="' + String(val || '').replace(/"/g, '&quot;') + '" placeholder="' + (ph || '') + '" style="width:100%;padding:7px;border:1px solid #cdd7e1;border-radius:6px;">';
+      raModal(
+        '<h3 style="margin:0 0 4px;">Add rule</h3>'
+        + '<div style="font-size:12px;color:#888;margin-bottom:8px;"><b>' + insurer + '</b> · ' + product + ' · prefilled from your search</div>'
+        + '<div id="raAddCardWrap" style="margin-bottom:4px;"></div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px;">'
+        + field('Region', 'raAddRegion', g('searchRegion'))
+        + field('Rate type', 'raAddRateType', rt)
+        + field('Segment', 'raAddSegment', g('searchSegment'))
+        + field('Fuel type', 'raAddFuel', g('searchFuelType'))
+        + field('Make', 'raAddMake', g('searchMake'))
+        + field('Sub type', 'raAddSubType', g('searchSubType'))
+        + field('CC min', 'raAddCcMin', g('searchCcMin')) + field('CC max', 'raAddCcMax', g('searchCcMax'))
+        + field('Tonnage min', 'raAddWMin', g('searchTonMin')) + field('Tonnage max', 'raAddWMax', g('searchTonMax'))
+        + field('Age min', 'raAddAgeMin', g('searchAgeMin')) + field('Age max', 'raAddAgeMax', g('searchAgeMax'))
+        + '</div>'
+        + '<label style="font-size:13px;color:#555;display:block;margin-top:12px;font-weight:600;">Rate value (raw, e.g. 0.40)</label>'
+        + '<input id="raAddVal" type="number" step="0.0001" placeholder="0.40" style="width:100%;padding:8px;margin:6px 0 6px;border:1px solid #1F5C8A;border-radius:6px;font-family:monospace;">'
+        + '<div id="raAddErr" style="color:#c62828;font-size:12px;min-height:16px;"></div>'
+        + '<div style="text-align:right;margin-top:8px;"><button onclick="raClose()" style="padding:7px 14px;margin-right:6px;">Cancel</button>'
+        + '<button class="btn btn-primary" style="padding:7px 16px;" onclick="raSaveAdd()">Add rule</button></div>'
+      );
+      // Load card picker (target rate_card)
+      fetch(API + '/rate-admin/cards?insurer=' + encodeURIComponent(insurer)).then(r => r.json()).then(d => {
+        const wrap = document.getElementById('raAddCardWrap'); if (!wrap) return;
+        const cards = (d && d.cards) || [];
+        if (!cards.length) { wrap.innerHTML = '<div style="font-size:12px;color:#c62828;">No rate card exists for this insurer to add to.</div>'; return; }
+        wrap.innerHTML = '<label style="font-size:12px;color:#666;">Target rate card</label><select id="raAddCard" style="width:100%;padding:7px;border:1px solid #cdd7e1;border-radius:6px;">'
+          + cards.map(c => '<option value="' + c.id + '">#' + c.id + ' · ' + (c.effective_from ? String(c.effective_from).slice(0, 10) : '') + ' · ' + (c.file_name || '') + '</option>').join('') + '</select>';
+      });
+    }
+    async function raSaveAdd() {
+      const g = (id) => (document.getElementById(id) || {}).value;
+      const v = parseFloat(g('raAddVal'));
+      const err = document.getElementById('raAddErr');
+      if (!Number.isFinite(v) || v < 0) { err.textContent = 'Enter a valid rate value.'; return; }
+      const payload = {
+        insurer: document.getElementById('searchInsurer').value,
+        product: document.getElementById('searchProduct').value,
+        rate_card_id: g('raAddCard'),
+        region: g('raAddRegion'), segment: g('raAddSegment'), make: g('raAddMake'), sub_type: g('raAddSubType'),
+        fuel_type: g('raAddFuel'), rate_type: g('raAddRateType'),
+        cc_band_min: g('raAddCcMin'), cc_band_max: g('raAddCcMax'),
+        weight_band_min: g('raAddWMin'), weight_band_max: g('raAddWMax'),
+        vehicle_age_min: g('raAddAgeMin'), vehicle_age_max: g('raAddAgeMax'),
+        rate_value: v,
+      };
+      try {
+        const d = await fetch(API + '/rate-admin/rule', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        }).then(r => r.json());
+        if (!d.success) throw new Error(d.error || 'failed');
+        raClose(); showToast('Rule added (id ' + d.id + ') to card ' + d.rate_card_id, 'success');
+        searchRates();
+      } catch (e) { err.textContent = 'Add failed: ' + e.message; }
+    }
+    /* ============ END RATE ADMIN ============ */
+
     async function searchRates() {
       const getNum = (id) => {
         const v = document.getElementById(id).value;
@@ -7489,6 +7821,7 @@
       };
 
       if (!body.insurer) { showToast('Please select an insurer', 'error'); return; }
+      raCheckSource(body.insurer, body.product);   // updates the editable/config banner
 
       try {
         // Vehicle Type is Excel-style (Pvt car / TW / GCV / PCV / MIS) — expand to DB products
@@ -7997,7 +8330,7 @@
             + `<td>${r._ten.tp !== '' ? r._ten.tp : '-'}</td>`
             + `<td><span class="badge badge-orange">${r._discount}</span></td>`
             + `<td>${isDiscountOnly ? '<span style="color:#999">Discount only</span>' : '<span class="badge badge-blue">' + (r.rate_type || '-') + '</span>'}</td>`
-            + `<td>${isDiscountOnly ? '-' : (r.is_declined ? '<span class="declined">DECLINED</span>' : '<span class="rate-value">' + (r.rate_value != null ? (r.rate_value * 100).toFixed(1) + '%' : '-') + '</span>')}</td>`
+            + raRateCell(r, isDiscountOnly)
             + `<td>${r._ao || '-'}</td>`
             + `<td>${r.is_declined ? '<span class="badge badge-red">Declined</span>' : '<span class="badge badge-green">Active</span>'}</td>`
             + `<td>${r.is_conditional ? '<span class="badge badge-orange" title="' + (r.rate_text || '').replace(/"/g, '&quot;') + '">Conditional</span>' : '-'}</td>`
@@ -8152,7 +8485,7 @@
           + `<td>${r._ten.tp !== '' ? r._ten.tp : '-'}</td>`
           + `<td><span class="badge badge-orange">${r._discount}</span></td>`
           + `<td>${isDiscountOnly ? '<span style="color:#999">Discount only</span>' : '<span class="badge badge-blue">' + (r.rate_type || '-') + '</span>'}</td>`
-          + `<td>${isDiscountOnly ? '-' : (r.is_declined ? '<span class="declined">DECLINED</span>' : '<span class="rate-value">' + (r.rate_value != null ? (r.rate_value * 100).toFixed(1) + '%' : '-') + '</span>')}</td>`
+          + raRateCell(r, isDiscountOnly)
           + `<td>${r._ao || '-'}</td>`
           + `<td>${r.is_declined ? '<span class="badge badge-red">Declined</span>' : '<span class="badge badge-green">Active</span>'}</td>`
           + `<td>${r.is_conditional ? '<span class="badge badge-orange" title="' + (r.rate_text || '').replace(/"/g, '&quot;') + '">Conditional</span>' : '-'}</td>`
