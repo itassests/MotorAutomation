@@ -56,7 +56,21 @@ const STATE_DEF = {
   MZ: 'NORTH EAST', NL: 'NORTH EAST', TR: 'NORTH EAST', SK: 'NORTH EAST',
 };
 
+let CV_RTO_MASTER = null;
+function cvRtoMaster() {
+  if (!CV_RTO_MASTER) { try { CV_RTO_MASTER = require('../config/reliance_rto_master.json').map || {}; } catch (_) { CV_RTO_MASTER = {}; } }
+  return CV_RTO_MASTER;
+}
 function cvRegion(params) {
+  // Authoritative Reliance/IndusInd RTO master wins — its Region_City labels match the
+  // CV grid region keys exactly (DELHI, UP1, ROM, GUJ 1, HYDERABAD…). e.g. UP14 (Noida)
+  // → DELHI (NCR), where PCV-taxi ≤6 non-diesel = 0.375, vs UP1 = 0 (declined).
+  const rk = norm(params.rtoCode).replace(/[^A-Z0-9]/g, '');
+  const mm = cvRtoMaster()[rk];
+  if (mm && mm.region) {
+    const R = norm(mm.region);
+    if (GRID[R]) return R;
+  }
   const city = norm(params.city || params.cityName || params._cityName);
   for (const [re, reg] of CITY) if (re.test(city)) return reg;
   const st = norm(params.rtoCode).replace(/[^A-Z]/g, '').slice(0, 2);
