@@ -1647,6 +1647,17 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
                  || _vd(_pr && _pr.pr_start_date)
                  || _vd(policy.POLICY_ISSUED_DATE)
                  || '2000-01-01';
+    // Universal Sompo EXCEPTION (USER 2026-07: Universal-only): its April-vs-June
+    // grid cutoff (5-Jun-2026) is decided by the policy ISSUE date, NOT the
+    // risk-start date that governs every other insurer. e.g. MH4/25386 issued
+    // 04-Jun but risk-start 05-Jun → April grid (issue < 5-Jun). Override the
+    // generation date to the issue date so BOTH card selection and the GCV +1%
+    // uplift gate key off it consistently. Falls back to risk-start if issue date
+    // is missing/placeholder.
+    if (insurerSlug === 'universal_sompo') {
+      const _uiss = _vd(policy.POLICY_ISSUED_DATE);
+      if (_uiss) _bajajEffDate = _uiss;
+    }
   }
 
   // Magma GCV rated-GVW band (USER 2026-07-08): heavy trucks whose MODEL encodes a
