@@ -3535,7 +3535,10 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       String(params.vehicleType || '').toUpperCase() === 'CAR') {
     try {
       const { resolveIndusindCarRate } = require('../services/indusind-car');
-      const ir = resolveIndusindCarRate(params);
+      let ir = resolveIndusindCarRate(params);
+      // IndusInd CPA condition (USER): CPA not collected (PA_Cover=0, from
+      // Prarambh_Live.TRN_PrarambhMotorDetails) → 1% deduction from the payout.
+      if (ir != null && ir > 0 && Number(params._pa_cover) === 0) ir = +Math.max(0, ir - 0.01).toFixed(4);
       if (ir != null) {
         const _b = rules[0];
         const _seg = 'Pvt Car (IndusInd Jun26 grid)';

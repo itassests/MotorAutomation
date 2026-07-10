@@ -4,23 +4,23 @@
  "grid": [
   {
    "region": "MUMBAI/PUNE/GOA",
-   "nonDieselCom": 0.225,
-   "diesel": 0.1,
-   "saod": 0.225,
+   "nonDieselCom": 0.3,
+   "diesel": 0.15,
+   "saod": 0.3,
    "stp": 0
   },
   {
    "region": "REST OF MAHARASTRA",
-   "nonDieselCom": 0.2,
-   "diesel": 0.1,
-   "saod": 0.225,
+   "nonDieselCom": 0.3,
+   "diesel": 0.15,
+   "saod": 0.3,
    "stp": 0
   },
   {
    "region": "GUJARAT",
-   "nonDieselCom": 0.175,
-   "diesel": 0.1,
-   "saod": 0.225,
+   "nonDieselCom": 0.3,
+   "diesel": 0.15,
+   "saod": 0.3,
    "stp": 0
   },
   {
@@ -60,9 +60,9 @@
   },
   {
    "region": "Delhi",
-   "nonDieselCom": 0.2,
-   "diesel": 0.1,
-   "saod": 0.175,
+   "nonDieselCom": 0.275,
+   "diesel": 0.15,
+   "saod": 0.275,
    "stp": 0
   },
   {
@@ -108,6 +108,6 @@
    "stp": 0
   }
  ],
- "_note": "Region-specific base grid (June PVT COM, eff 1-Jun-26). UN-FLATTENED per USER (HR26 Haryana Diesel=5%): the earlier uniform 30/15/30/0 flattening was wrong. NON-NCB payout is 5% lesser than grid (not yet modelled). Revert: see git.",
+ "_note": "Region-specific base grid (June PVT COM, eff 1-Jun-26). UN-FLATTENED per USER (HR26 Haryana Diesel=5%): the earlier uniform 30/15/30/0 flattening was wrong. NON-NCB payout is 5% lesser than grid (not yet modelled). Revert: see git. | Approval grid (ROBINHOOD 11BRG286) overrides Maharashtra/Gujarat=30/15/30 & Delhi=27.5/15/27.5; other regions keep the June PVT COM base. CPA: no-CPA (PA_Cover=0) -> 1% deduction (bulk.js).",
  "_base_grid_note": "Original region base (April PO grid): MUMBAI/PUNE/GOA nonDieselCom 0.225 etc — superseded by the flat enabler-inclusive payout."
 }
