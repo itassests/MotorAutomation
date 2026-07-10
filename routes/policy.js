@@ -1427,6 +1427,18 @@ function extractPolicyParams(policy) {
     const _pcvSig = `${get('VEHICAL_TYPE_Id') || ''} ${get('VehicalCategory_Updated') || ''}`.toUpperCase();
     if (/PASSENGER\s*CARRY|\bPCV\b|STAFF\s*BUS|\bBUS\b/.test(_pcvSig)) mappedVehicleType = 'PCV';
   }
+  // Data-quality guard (reverse): a passenger car mis-typed as MISC/GCV/PCV via a
+  // bad VehicalCategory. Source had a Maruti Alto with VEHICAL_TYPE_Id="Pvt Car"
+  // (correct) but VehicalCategory_Updated="MISC - D - Tractor" (data-entry error),
+  // so it mapped to MISC and took the tractor rate. Trust the explicit "Pvt Car"
+  // type over the category when the make is a PASSENGER-CAR-ONLY brand (never a
+  // tractor/truck maker) → CAR. Whitelist (not a tractor blacklist) keeps genuine
+  // Tata/Mahindra commercials untouched. 1 row in the dataset (UP1/16422).
+  if ((mappedVehicleType === 'MISC' || mappedVehicleType === 'GCV' || mappedVehicleType === 'PCV') &&
+      /^\s*PVT\.?\s*CAR\s*$/i.test(String(get('VEHICAL_TYPE_Id') || '')) &&
+      /MARUTI|SUZUKI|HYUNDAI|HONDA|TOYOTA|\bKIA\b|RENAULT|NISSAN|DATSUN|VOLKSWAGEN|\bVW\b|SKODA|\bFORD\b|\bMG\b|FIAT|CHEVROLET|\bAUDI\b|\bBMW\b|MERCEDES|VOLVO|JAGUAR|LAND\s*ROVER|LEXUS|\bMINI\b|CITROEN|\bBYD\b|POLESTAR/i.test(String(make || ''))) {
+    mappedVehicleType = 'CAR';
+  }
   // Data-quality guard: an explicit "MOTORCYCLE" make on a commercial (GCV/PCV) type
   // with a bike-sized engine (≤350cc) is a mis-typed two-wheeler — the source keys
   // some bikes as "Commercial-Goods Carrying" (Honda CB Shine 125cc → GCV 2.5-3.5Tn).
