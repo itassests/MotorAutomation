@@ -5645,10 +5645,12 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
 
   let rateVal = Number(primary.rate_value || 0);
   if (rateVal > 1) rateVal = rateVal / 100;
-  // Universal Sompo GCV — operator pays a uniform +1% over the grid (confirmed
-  // via file recon: every GCV rate is exactly our grid + 1%). Insurer+product
-  // scoped, applied to the resolved (non-zero) rate.
-  if (insurerSlug === 'universal_sompo' && String(params.vehicleType || '').toUpperCase() === 'GCV' && rateVal > 0) {
+  // Universal Sompo GCV — the APRIL grid pays a uniform +1% over the grid rate
+  // (confirmed via file recon on the April cards). The JUNE grid (effective
+  // 5-Jun-2026, see rate_cards 572/573) is already the FINAL rate — no +1%. So
+  // gate the uplift to pre-5-Jun risk-start only. Insurer+product scoped. USER.
+  if (insurerSlug === 'universal_sompo' && String(params.vehicleType || '').toUpperCase() === 'GCV' &&
+      rateVal > 0 && (!_bajajEffDate || _bajajEffDate < '2026-06-05')) {
     rateVal = +(rateVal + 0.01).toFixed(6);
   }
   let premiumBase = premiumBaseFor(params, primary.rate_type);
