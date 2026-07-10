@@ -5631,7 +5631,23 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   if (insurerSlug === 'universal_sompo' && String(params.vehicleType || '').toUpperCase() === 'GCV' && rateVal > 0) {
     rateVal = +(rateVal + 0.01).toFixed(6);
   }
-  const premiumBase = premiumBaseFor(params, primary.rate_type);
+  let premiumBase = premiumBaseFor(params, primary.rate_type);
+  // Universal Sompo Pvt-Car ">5yr vehicle without addon — paid on net premium"
+  // cells (rate_type COMP/SAOD, applied_on='NET', 0.22/0.23) are explicitly paid
+  // on the FULL NET premium, not the OD/insProduct default. Without this the
+  // engine paid 0.22 on OD (GJ7/35530: 4904→1078.88 instead of 8380→1843.6).
+  // Scoped to universal_sompo: ALL 112 of its applied_on='NET' rules are exactly
+  // these ">5yr without addon on net" cells (verified). NOT global — 43k other
+  // rules (bajaj TW, magma CAR…) carry a dormant NET tag but are correctly paid
+  // on OD, so a blanket honor would massively regress them.
+  if (insurerSlug === 'universal_sompo' &&
+      String(primary.applied_on || '').toUpperCase() === 'NET') {
+    const _od = Number(params.odPremium) || 0;
+    const _tp = Number(params.tpPremium) || 0;
+    const _ad = Number(params.addonPremium) || 0;
+    const _net = Number(params.netPremium) || (_od + _tp + _ad);
+    if (_net > 0) premiumBase = _net;
+  }
   // OD+TP rates: when a rule carries SEPARATE OD and TP commission legs
   // (rule.od_rate / rule.tp_rate, as fractions), the commission is OD% applied
   // to the OD premium + TP% applied to the TP premium — NOT a single headline
