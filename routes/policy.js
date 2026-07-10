@@ -470,6 +470,18 @@ const US_STATE_REGION = {
   LA: ['J&K/LA'],
   AS: ['ASSAM'],
   SK: ['SIKKIM'],
+  // North-East "7 Sisters": the Universal grid prices the whole NE bloc under the
+  // ASSAM region (only ASSAM + SIKKIM are published for the NE). The other six
+  // sisters — Nagaland/Manipur/Meghalaya/Mizoram/Tripura/Arunachal — carry no
+  // dedicated region, so map them to ASSAM. Without this an NL/MN/… RTO resolves
+  // to null region and borrows an unrelated state's rule (NL01 28T GCV wrongly
+  // took UP-1 20-45T = 0.16 instead of ASSAM 0.23). USER "NL RTO = 7S region".
+  NL: ['ASSAM'],
+  MN: ['ASSAM'],
+  ML: ['ASSAM'],
+  MZ: ['ASSAM'],
+  TR: ['ASSAM'],
+  AR: ['ASSAM'],
   PY: ['PUDUCHERRY'],
 };
 
