@@ -2687,7 +2687,17 @@ function filterRulesByPolicy(rules, params, _trace) {
       let primary = '';
       if (/DIESEL/.test(pf)) primary = 'DIESEL';
       else if (/ELECTRIC|BATTERY|\bEV\b/.test(pf)) primary = 'ELECTRIC';
-      else if (/PETROL|HYBRID|BIFUEL/.test(pf)) primary = 'PETROL'; // incl. PETROL/CNG bi-fuel
+      else if (/PETROL|HYBRID|BIFUEL/.test(pf)) {
+        // Bi-fuel ("PETROL/CNG" / "BIFUEL"): most insurers rate it as a petrol
+        // vehicle with a gas kit → PETROL family (dearer "Other Than Diesel" rate).
+        // EXCEPTION — Universal Sompo files a dedicated "Bifuel" SATP column priced
+        // WITH CNG/Diesel (0.22), not with Petrol (0.24), so a PETROL/CNG car takes
+        // that cheaper Bifuel rate. Gate on the rule's insurer so only Universal
+        // flips; pure PETROL (no gas) always stays PETROL. USER-confirmed GJ7/35408.
+        const isBiFuel = /BIFUEL/.test(pf) || (/PETROL/.test(pf) && /CNG|LPG/.test(pf));
+        primary = (isBiFuel && String(rule.insurer || '').toLowerCase() === 'universal_sompo')
+          ? 'CNG' : 'PETROL';
+      }
       else if (/CNG|LPG/.test(pf)) primary = 'CNG';                 // pure CNG / LPG
       // Classify the rule's fuel into the same families.
       const rfIsDiesel   = /DIESEL/.test(rf) && !/OTHER\s*THAN/.test(rf);
