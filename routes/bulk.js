@@ -5079,7 +5079,22 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // resolver returns null → pool untouched. SAOD high-end & Extended-Warranty (20%) are
   // intentionally left as default (operator data showed no clean luxury-SAOD rule).
   if (insurerSlug === 'reliance' && String(params.vehicleType || '').toUpperCase() === 'CAR') {
-    const _relCar = require('../services/reliance-car').resolveRelianceCarRate(params, params.resolvedRegion || resolvedRegion);
+    // Authoritative Reliance RTO master (config/reliance_rto_master.json, shared with
+    // IndusInd): RTO → region group. Overrides the resolved region so NCR RTOs
+    // (HR26/HR98/UP14…) rate as Delhi etc. The master's coarse group maps to a
+    // Reliance-keyword region the resolver's regionGroup understands.
+    let _relRegion = params.resolvedRegion || resolvedRegion;
+    try {
+      const _rk = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const _mm = require('../config/reliance_rto_master.json').map[_rk];
+      const IG2REL = { 'MUMBAI/PUNE/GOA': 'Mumbai/Pune/Goa', 'REST OF MAHARASTRA': 'Rest of Maharashtra',
+        'GUJARAT': 'Gujarat', 'MADYAPRADESH': 'Madhya Pradesh', 'BANGLORE ,HYDERABAD': 'Bangalore/Hyderabad',
+        'REST OF KA,TS,AP': 'Karnataka', 'KERALA': 'Kerala', 'TAMILNADU': 'Tamil Nadu', 'DELHI': 'Delhi',
+        'PUNJAB,HP AND JK': 'Punjab', 'UP ,HARYANA,RAJASTHAN': 'Uttar Pradesh', 'NE,ODISHA,CHATTISHGARH': 'Odisha',
+        'BIHAR,JHARKHAND': 'Bihar', 'KOLKATTA': 'Kolkata', 'WEST BENGAL': 'West Bengal' };
+      if (_mm && IG2REL[_mm.indus]) _relRegion = IG2REL[_mm.indus];
+    } catch (_) { /* keep resolved region on failure */ }
+    const _relCar = require('../services/reliance-car').resolveRelianceCarRate(params, _relRegion);
     if (_relCar) {
       const _base = rules[0] || {};
       const _rt = (Number(params.tpPremium) || 0) < 1 ? 'SAOD' : 'COMP';

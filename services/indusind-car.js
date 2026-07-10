@@ -27,9 +27,19 @@ function rtoKey(rtoCode) {
   const m = c.match(/^([A-Z]+)(\d+)$/);
   return m ? m[1] + String(parseInt(m[2], 10)).padStart(2, '0') : c;
 }
+let RTO_MASTER = null;
+function rtoMaster() {
+  if (!RTO_MASTER) { try { RTO_MASTER = require('../config/reliance_rto_master.json').map || {}; } catch (_) { RTO_MASTER = {}; } }
+  return RTO_MASTER;
+}
 function regionGroup(params) {
-  const st = rtoKey(params.rtoCode).replace(/\d+$/, '');   // state prefix
   const rk = rtoKey(params.rtoCode);
+  // Authoritative Reliance/IndusInd RTO master (config/reliance_rto_master.json):
+  // RTO → IndusInd region group. Wins over the state-prefix heuristic (e.g. HR26
+  // Faridabad → DELHI (NCR), not UP/Haryana/Rajasthan). USER-confirmed.
+  const _mm = rtoMaster()[rk] || rtoMaster()[String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '')];
+  if (_mm && _mm.indus) return _mm.indus;
+  const st = rtoKey(params.rtoCode).replace(/\d+$/, '');   // state prefix (fallback)
   const city = norm(params.city || params.cityName || params._cityName);
   const isMumPune = /MUMBAI|PUNE|THANE|NAVI MUMBAI/.test(city) || MUMBAI_PUNE.has(rk);
   const isBlr = /BANGALORE|BENGALURU/.test(city) || BANGALORE.has(rk);
