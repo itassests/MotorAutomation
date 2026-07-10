@@ -2595,18 +2595,28 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     ].filter(r => {
       if (seen.has(r)) return false; seen.add(r); return true;
     });
-    // Universal Sompo: this candidate loop IS the region resolver for RTOs absent
-    // from rto_mappings (e.g. GJ21 → generic "GUJARAT", but the grid keys Gujarat
-    // as "GJ/DD"). The soft fallback above deleted baseLookup.effective_date when
-    // the region-mismatched primary returned 0, so without this the GJ/DD match
-    // would pool BOTH card generations and the tighter age band of the OLD (April)
-    // card wins (GJ7/35530 age-6 → April 0.22 instead of June 0.23). Re-apply the
-    // risk-start date so the matched region still takes its effective generation.
-    // Scoped to universal_sompo; the date is folded into the cache key.
-    const _usFbEff = (insurerSlug === 'universal_sompo' && _bajajEffDate) ? _bajajEffDate : null;
-    const _usEffOpt = _usFbEff ? { effective_date: _usFbEff } : {};
+    // EFFECTIVE-DATE GENERATION IN THE REGION FALLBACK (ALL insurers).
+    // This candidate loop IS the region resolver for RTOs absent from rto_mappings
+    // or whose resolved name doesn't match the grid's region label (e.g. universal
+    // GJ21 → generic "GUJARAT", but the grid keys Gujarat as "GJ/DD"; Kotak/Zuno
+    // with zero mappings; cluster/alias mismatches). The soft fallback above
+    // DELETED baseLookup.effective_date when the region-mismatched primary returned
+    // 0, so these fallback lookups otherwise run DATELESS — pooling every card
+    // generation, and the OLD card's tighter band silently wins even for a policy
+    // whose risk-start is in the newest grid's window. That is the systemic "always
+    // takes the old grid" bug: the effective-date rule was only honored on the
+    // primary path, never on the region fallback. Re-inject the risk-start date
+    // (_bajajEffDate, computed for every insurer) so the matched fallback region
+    // still takes its effective generation. SAFE for all insurers: the eff-date
+    // filter picks "newest card ≤ date, else earliest", so a cover the newest card
+    // lacks still falls back to the older card — no rule is lost, only the right
+    // generation is chosen. A genuine "newest card lacks this rule for the SAME
+    // region" case is already handled by the soft-fallback re-lookup BEFORE this
+    // loop. Date folded into the fb cache key.
+    const _fbEff = _bajajEffDate || null;
+    const _usEffOpt = _fbEff ? { effective_date: _fbEff } : {};
     for (const r of candidates) {
-      const fbKey = lookupKey + '||fb:' + r + (_usFbEff ? '||eff:' + _usFbEff : '');
+      const fbKey = lookupKey + '||fb:' + r + (_fbEff ? '||eff:' + _fbEff : '');
       let attempt;
       if (caches.lookup.has(fbKey)) {
         attempt = caches.lookup.get(fbKey);
