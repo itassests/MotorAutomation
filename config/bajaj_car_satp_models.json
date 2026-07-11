@@ -1,15 +1,4 @@
 {
-  "_comment": "Bajaj Allianz Private Car SATP (standalone-TP) model PO, USER 2026-06-26. Tiers are FIRST-match-wins, so order matters. (1) 2.5% no-payout tier FIRST: CNG/LPG fuel (any model) + Baleno/Dzire models — a CNG Swift is 2.5%, not 25%. (2) 25% tier: Swift/Beat/Fiesta/I20, SET to 0.25 (region SATP always >=25; a min cap would keep stray low rows e.g. Mumbai Beat 0.05). SWIFT excludes 'Swift Dzire' so it falls to the 2.5% tier (Dzire). All matched by model/fuel token, any make.",
-  "tiers": [
-    {
-      "rate": 0.025,
-      "fuel_any": ["CNG", "LPG"],
-      "models_any": ["BALENO", "DZIRE"]
-    },
-    {
-      "rate": 0.25,
-      "models_any": ["SWIFT", "BEAT", "FIESTA", "I20"],
-      "exclude": ["DZIRE"]
-    }
-  ]
+  "_comment": "RETIRED 2026-07-11 (USER): the 26-Jun model-PO tiers (Baleno/Dzire/CNG->2.5, Swift/Beat/Fiesta/I20->25) DIVERGED from the filed Bajaj Pvt-Car SATP grid and the operator flagged the results as wrong. Emptied so resolveCarSatpModelRate returns null and the engine uses the filed region rate_rules instead (Mumbai: 'All' Petrol 57.5, Ertiga/Eeco 2.5 IRDA, Swift/Beat/Fiesta/I20 Diesel|CNG 25, XUV500/VERNA 40, Innova 45). Old override is in git history to restore.",
+  "tiers": []
 }
