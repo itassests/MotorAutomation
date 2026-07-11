@@ -1695,6 +1695,17 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     ...(shriramRegionTokens
       ? { region_list: shriramRegionTokens, region_match_mode: 'contains' }
       : {}),
+    // Bajaj CV (PCV/GCV/MISC): the "SATP - CV" / "CV Comp" sheets file regions as
+    // VERBOSE labels ("JAMMU & KASHMIR, Ladakh", "GUJARAT, Daman & Diu, Dadra &
+    // Nagar Haveli", "TAMIL NADU, Lakshadweep", "ASSAM, SIKKIM, 6 OTHER NORTH
+    // EASTERN STATES"), but the policy resolves to the short state name ("JAMMU &
+    // KASHMIR"). Exact match misses the base grid and only the "Additional Cohorts"
+    // April overlay (which uses the short label) matches → a June J&K PCV-3W took
+    // the stale 0.55 overlay instead of the 0.58 SATP-CV June rate (JK1/1179).
+    // Substring-match so the short state name hits the verbose label.
+    ...(insurerSlug === 'bajaj_allianz' &&
+        /PCV|GCV|MISC/.test(String(params.vehicleType || '').toUpperCase())
+      ? { region_match_mode: 'contains' } : {}),
     // Kotak MISC (tractor / cash van / garbage van): the MIS grid is keyed by
     // RTO CODE in sub_type (region = city, e.g. region='AMETHI' sub_type='UP36').
     // Kotak has 0 rto_mappings so region never resolves; an empty region matches
