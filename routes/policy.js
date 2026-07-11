@@ -2071,6 +2071,16 @@ function filterRulesByPolicy(rules, params, _trace) {
   // SAOD; the -6 demotion dropped it below "Moped" 24.
   const hasEvScooterVariant = rules.some(r => /\bSC[_\s]+EV\b|SCOOTER[_\s]+EV/i.test(String(r.segment || '')));
 
+  // E-Rickshaw vs PCV3W-auto split (Go Digit ships BOTH for a region). An ELECTRIC
+  // 3-wheeler is an E-Rickshaw (Sah Yatri/Treo/TVS King/Citylife — 55% TP); a CNG/
+  // diesel 3-wheeler is a PCV3W auto (Bajaj RE/Piaggio). Both segments match the
+  // generic RICKSHAW keyword, so without this an electric e-rickshaw wrongly takes
+  // the PCV3W-auto rate (UP1/16374 42 instead of 55). Only relevant when BOTH
+  // families are in the candidate pool.
+  const hasERickSeg = rules.some(r => /E[\s-]?RIKSHAW|E[\s-]?RICKSHAW/i.test(String(r.segment || '')));
+  const hasPcv3wAutoSeg = rules.some(r => { const s = String(r.segment || ''); return /PCV\s*3\s*W|PCV3W/i.test(s) && !/E[\s-]?RIK/i.test(s); });
+  const polFuelElectric = /ELECTRIC|BATTERY|\bEV\b/i.test(String(params.fuelType || ''));
+
   // Royal Comp discount-band: collect the thresholds of any ">N" open band
   // among the candidate rules. A discount sitting exactly on a closed band's
   // upper bound must defer to an open ">N" band when one exists at that bound
@@ -3703,6 +3713,15 @@ function filterRulesByPolicy(rules, params, _trace) {
             // set, a 3-wheeler policy must NOT borrow a generic Taxi rate —
             // drop Taxi-only segments so the rickshaw segment wins outright.
             else if (hasDedicatedRickshawSeg && CAT_KEYWORDS.TAXI.test(seg) && !CAT_KEYWORDS.RICKSHAW.test(seg)) matches = false;
+            // E-Rickshaw (electric) vs PCV3W-auto (CNG/diesel) split, when both exist:
+            // an electric 3W drops the PCV3W-auto rows; a non-electric 3W drops the
+            // E-Rickshaw rows. (Sah Yatri electric → E-Rickshaw 55; Bajaj RE CNG → PCV3W.)
+            else if (matches && hasERickSeg && hasPcv3wAutoSeg) {
+              const segE = /E[\s-]?RIKSHAW|E[\s-]?RICKSHAW/i.test(seg);
+              const segP = /PCV\s*3\s*W|PCV3W/i.test(seg) && !segE;
+              if (polFuelElectric && segP) matches = false;
+              else if (!polFuelElectric && segE) matches = false;
+            }
           } else if (policyIsGcv) {
             // GCV 3W cargo (Atul Elite Cargo, Piaggio Ape Xtra, Mahindra
             // Treo Zor, etc.) is often priced under generic small-CV
