@@ -1868,6 +1868,46 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // ---- Bajaj volume-tier: 1st-cycle-of-month → HIGHEST slab ----
+  // Bajaj's Agency 2W COMP/SAOD grid bands the rate by a GWP VOLUME tier
+  // ("0-50K" / "50K-1L" / "1-2L" / "2-3L" / "3L+"), the rate rising with volume.
+  // The slab is otherwise mis-selected to the LOWEST tier (0-50K) from the tiny
+  // per-policy premium. USER RULE: for the FIRST cycle of a month take the HIGHEST
+  // slab; the 2nd cycle uses the actual slab from accumulated GWP (same insurer +
+  // same vehicle). Cycle 13 = June 1st cycle → take the top tier. (2nd-cycle GWP
+  // branch is TODO — USER will specify.) Bajaj-scoped; keeps the policy's matched
+  // make/cover sub-row family, only lifts it to the highest volume tier.
+  if (insurerSlug === 'bajaj_allianz' && rules.length > 0 &&
+      rules.some(r => String(r.volume_tier || '').trim() !== '')) {
+    const rank = (vt) => {
+      const s = String(vt || '').toUpperCase().replace(/\s/g, '');
+      if (/\+/.test(s)) return 1e12;                       // "3L+" = top
+      const toNum = (t) => { const m = t.match(/(\d+(?:\.\d+)?)(K|L)?/); if (!m) return 0; let n = parseFloat(m[1]); if (m[2] === 'K') n *= 1e3; else if (m[2] === 'L') n *= 1e5; return n; };
+      const parts = s.split('-'); return toNum(parts[parts.length - 1]);   // upper bound
+    };
+    const vKey = lookupKey + '||bajajVolMax';
+    let vRules;
+    if (caches.lookup.has(vKey)) vRules = caches.lookup.get(vKey);
+    else { vRules = await lookupRates(pool, { ...baseLookup, volume_tier: '' }); caches.lookup.set(vKey, vRules); }
+    // Lift each volume-tier rate_type present in `rules` to its highest tier, within
+    // the SAME segment + make family as the currently-matched row (so a Hero 'All'
+    // bike stays on the 'All' ladder, a Bajaj-make renewal on the 'Bajaj' -5% ladder).
+    const tieredTypes = [...new Set(rules.filter(r => String(r.volume_tier || '').trim() !== '').map(r => String(r.rate_type || '').toUpperCase()))];
+    for (const rt of tieredTypes) {
+      const base = rules.find(r => String(r.rate_type || '').toUpperCase() === rt && String(r.volume_tier || '').trim() !== '');
+      if (!base) continue;
+      const fam = vRules.filter(r =>
+        String(r.rate_type || '').toUpperCase() === rt &&
+        String(r.segment || '') === String(base.segment || '') &&
+        String(r.make || '').toUpperCase() === String(base.make || '').toUpperCase() &&
+        String(r.volume_tier || '').trim() !== '');
+      if (!fam.length) continue;
+      const maxR = Math.max(...fam.map(r => rank(r.volume_tier)));
+      const top = fam.find(r => rank(r.volume_tier) === maxR);
+      if (top && top.id !== base.id) rules = rules.map(r => r === base ? top : r);
+    }
+  }
+
   // ---- Kotak Pvt-Car SATP exact-RTO (Category) override ----
   // Kotak's Pvt-Car SATP rate is keyed by the EXACT RTO code in rule.sub_type,
   // which encodes the Category × Fuel: GJ05 = Category-1 (Diesel/CNG/LPG 25%,
