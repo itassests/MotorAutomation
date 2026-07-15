@@ -72,10 +72,18 @@ function resolveUnitedCarRate(params) {
   const pol = policyBucket(ip, age);
 
   if (isEV) {
-    if (pol === 'BUNDLED') return 0.275;
-    if (pol === 'PACKAGE') return 0.17;
-    // SAOD / SATP electric: Brand-New (age 0) 22.5%, Renewal/Rollover 17%
-    return isNewVehicle(age) ? 0.225 : 0.17;
+    // USER 2026-07-14: EVs of the BIG makes (Tata/Maruti/Mahindra/Toyota/Hyundai/Honda/
+    // Kia) follow the normal fuel/make SEGMENT (non-diesel → Segment C = 20% Package/SATP,
+    // 27.5% Bundled, + the preferred-RTO override), NOT United's flat Electric line.
+    // (UP1/16396 Mahindra XUV400 renewal 17 → 20.) Other EV makes keep the Electric line.
+    const evBigMake = LOW_MAKES.some(m => norm(params.make).includes(m));
+    if (!evBigMake) {
+      if (pol === 'BUNDLED') return 0.275;
+      if (pol === 'PACKAGE') return 0.17;
+      // SAOD / SATP electric: Brand-New (age 0) 22.5%, Renewal/Rollover 17%
+      return isNewVehicle(age) ? 0.225 : 0.17;
+    }
+    // big-make EV → fall through to segBucket (yields Segment C for a non-diesel car)
   }
 
   const seg = segBucket(fuel, params.cc, params.make);
@@ -98,10 +106,17 @@ function resolveUnitedCarRate(params) {
 
 // ---- GCV preferred-RTO override (Sub Annexure-2) ----
 // GCV from "excluded states" registered in specific preferred RTOs gets a higher
-// commission per GVW band: <=2000kg(UP)->57.5%, 2000-3500kg(UP/HR/TN/RJ)->50%,
+// commission per GVW band: <=2000kg(UP)->57.5%, 2000-3500kg(UP/HR/TN/RJ)->56.5%,
 // 3500-7500kg(UP/HR/TN/RJ)->27.5%. RTO-based (like the Pvt-Car 40%). Returns the
 // band rate when the policy's RTO is listed for its tonnage band, else null
 // (leave the engine's existing rule — no regression on un-listed RTOs).
+//
+// NOTE (June-1 reconciliation): the full GVW×state grid (PDF Annexure A2) was NOT
+// implemented as a base rate because the operator is INCONSISTENT on the 2000-3500
+// band — it pays BOTH 50 (PDF "other states") and 56.5 (revised GGCV) for identical
+// MH/WB/JK trucks, and 56.5 is the majority. The mis-ingested flat ~56.5 base already
+// matches that majority, so a full grid net-regressed (fixed 21 / broke 23). Left as
+// preferred-RTO-only; the ~22 GCV paying 50/15/0 are operator-timing noise.
 const GCV_PREF = require('../config/united_gcv_pref.json');
 const GCV_BANDS = GCV_PREF.bands.map(b => ({ maxTonnes: b.maxTonnes, rate: b.rate, set: new Set(b.rtos.map(norm)) }));
 function resolveUnitedGcvRate(params) {

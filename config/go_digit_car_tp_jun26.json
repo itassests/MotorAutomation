@@ -1,0 +1,4533 @@
+{
+ "_source": "Large Broker Grid Jun'26.xlsx / 'Pvt Car TP Grid' + 'Updated Connect_RTO Mapping' (4W TP block cols 21->22)",
+ "_note": "Go Digit Pvt-Car SATP commission = 4W-TP cluster x fuel/cc segment x age(<10/>10). Percents. Comp/SAOD is a separate grid+cluster (PB_CH etc.).",
+ "rtoCluster": {
+  "AN01": "Andaman",
+  "AN02": "Andaman",
+  "AP01": "South_Ref",
+  "AP02": "South_Ref",
+  "AP03": "AP TS_BAD",
+  "AP04": "South_Ref",
+  "AP05": "AP TS_GOOD2",
+  "AP06": "AP TS_GOOD2",
+  "AP07": "AP TS_BAD",
+  "AP08": "AP TS_BAD",
+  "AP09": "AP TS_GOOD1",
+  "AP10": "AP TS_GOOD1",
+  "AP11": "AP TS_GOOD1",
+  "AP12": "AP TS_GOOD1",
+  "AP13": "AP TS_GOOD1",
+  "AP14": "South_Ref",
+  "AP15": "South_Ref",
+  "AP16": "AP TS_GOOD2",
+  "AP17": "AP TS_GOOD2",
+  "AP18": "AP TS_GOOD2",
+  "AP19": "AP TS_GOOD2",
+  "AP20": "South_Ref",
+  "AP21": "South_Ref",
+  "AP22": "South_Ref",
+  "AP23": "AP TS_GOOD2",
+  "AP24": "South_Ref",
+  "AP25": "AP TS_BAD",
+  "AP26": "South_Ref",
+  "AP27": "South_Ref",
+  "AP28": "AP TS_GOOD2",
+  "AP29": "AP TS_GOOD2",
+  "AP30": "South_Ref",
+  "AP31": "AP TS_GOOD1",
+  "AP32": "AP TS_GOOD1",
+  "AP33": "AP TS_GOOD1",
+  "AP34": "AP TS_GOOD1",
+  "AP35": "AP TS_GOOD2",
+  "AP36": "South_Ref",
+  "AP37": "AP TS_GOOD2",
+  "AP38": "AP TS_GOOD2",
+  "AP39": "AP TS_GOOD1",
+  "AP40": "AP TS_GOOD1",
+  "AP43": "AP TS_GOOD1",
+  "AR01": "North_East",
+  "AR02": "North_East",
+  "AR03": "North_East",
+  "AR04": "North_East",
+  "AR05": "North_East",
+  "AR06": "North_East",
+  "AR07": "North_East",
+  "AR08": "North_East",
+  "AR09": "North_East",
+  "AR10": "North_East",
+  "AR11": "North_East",
+  "AR12": "North_East",
+  "AR13": "North_East",
+  "AR14": "North_East",
+  "AR15": "North_East",
+  "AR16": "North_East",
+  "AR17": "North_East",
+  "AR18": "North_East",
+  "AR19": "North_East",
+  "AR20": "North_East",
+  "AR21": "NE_Ref",
+  "AR22": "North_East",
+  "AR23": "NE_Ref",
+  "AR24": "NE_Ref",
+  "AR25": "NE_Ref",
+  "AR26": "NE_Ref",
+  "AS01": "NE_Ref",
+  "AS02": "NE_Ref",
+  "AS03": "Assam_Good",
+  "AS04": "Assam_Good",
+  "AS05": "Assam_Good",
+  "AS06": "Assam_Good",
+  "AS08": "NE_Ref",
+  "AS09": "NE_Ref",
+  "AS10": "NE_Ref",
+  "AS11": "NE_Ref",
+  "AS12": "NE_Ref",
+  "AS13": "NE_Ref",
+  "AS14": "NE_Ref",
+  "AS15": "NE_Ref",
+  "AS16": "NE_Ref",
+  "AS17": "NE_Ref",
+  "AS18": "NE_Ref",
+  "AS19": "NE_Ref",
+  "AS20": "NE_Ref",
+  "AS21": "NE_Ref",
+  "AS22": "NE_Ref",
+  "AS23": "Assam_Good",
+  "AS24": "NE_Ref",
+  "AS25": "NE_Ref",
+  "AS26": "NE_Ref",
+  "AS27": "NE_Ref",
+  "AS28": "NE_Ref",
+  "AS29": "Assam_Good",
+  "AS30": "NE_Ref",
+  "AS31": "NE_Ref",
+  "AS32": "NE_Ref",
+  "AS33": "NE_Ref",
+  "AS34": "NE_Ref",
+  "BR01": "Bihar_Good",
+  "BR02": "Bihar_Good",
+  "BR03": "Bihar_Bad",
+  "BR04": "Bihar_Good",
+  "BR05": "Bihar_Good",
+  "BR06": "Bihar_Good",
+  "BR07": "Bihar_Good",
+  "BR08": "Bihar_Good",
+  "BR09": "Bihar_Good",
+  "BR10": "Bihar_Good",
+  "BR11": "Bihar_Bad",
+  "BR12": "Jharkhand",
+  "BR13": "Jharkhand",
+  "BR14": "Jharkhand",
+  "BR15": "JH_BAD",
+  "BR16": "JH_BAD",
+  "BR17": "Jharkhand",
+  "BR18": "Jharkhand",
+  "BR19": "Bihar_Good",
+  "BR20": "Jharkhand",
+  "BR21": "Bihar_Bad",
+  "BR22": "Bihar_Good",
+  "BR23": "JH_BAD",
+  "BR24": "Bihar_Bad",
+  "BR25": "Bihar_Bad",
+  "BR26": "Bihar_Bad",
+  "BR27": "Bihar_Bad",
+  "BR28": "Bihar_Good",
+  "BR29": "Bihar_Good",
+  "BR30": "Bihar_Good",
+  "BR31": "Bihar_Good",
+  "BR32": "Bihar_Good",
+  "BR33": "Bihar_Good",
+  "BR34": "Bihar_Good",
+  "BR35": "Jharkhand",
+  "BR36": "Jharkhand",
+  "BR37": "Bihar_Bad",
+  "BR38": "Bihar_Bad",
+  "BR39": "Bihar_Bad",
+  "BR40": "Jharkhand",
+  "BR41": "Jharkhand",
+  "BR42": "Jharkhand",
+  "BR43": "Bihar_Bad",
+  "BR44": "Bihar_Bad",
+  "BR45": "Bihar_Bad",
+  "BR46": "Bihar_Good",
+  "BR47": "JH_BAD",
+  "BR48": "JH_BAD",
+  "BR50": "Bihar_Bad",
+  "BR51": "Bihar_Good",
+  "BR52": "Bihar_Good",
+  "BR53": "Bihar_Good",
+  "BR55": "Bihar_Good",
+  "BR56": "Bihar_Bad",
+  "BR57": "Bihar_Bad",
+  "CG01": "CG_Good",
+  "CG02": "CG_Good",
+  "CG03": "CG_Good",
+  "CG04": "CG_Good",
+  "CG05": "All_India_Decline",
+  "CG06": "All_India_Decline",
+  "CG07": "All_India_Decline",
+  "CG08": "All_India_Decline",
+  "CG09": "All_India_Decline",
+  "CG10": "All_India_Decline",
+  "CG11": "All_India_Decline",
+  "CG12": "All_India_Decline",
+  "CG13": "All_India_Decline",
+  "CG14": "All_India_Decline",
+  "CG15": "All_India_Decline",
+  "CG16": "All_India_Decline",
+  "CG17": "All_India_Decline",
+  "CG18": "All_India_Decline",
+  "CG19": "All_India_Decline",
+  "CG20": "All_India_Decline",
+  "CG21": "All_India_Decline",
+  "CG22": "All_India_Decline",
+  "CG23": "All_India_Decline",
+  "CG24": "All_India_Decline",
+  "CG25": "All_India_Decline",
+  "CG26": "All_India_Decline",
+  "CG27": "All_India_Decline",
+  "CG28": "All_India_Decline",
+  "CG29": "All_India_Decline",
+  "CG30": "All_India_Decline",
+  "CG31": "CG_Good",
+  "CH01": "Chd_Tricity",
+  "CH02": "Chd_Tricity",
+  "CH03": "Chd_Tricity",
+  "CH04": "Chd_Tricity",
+  "DD01": "GJ_GOOD",
+  "DD02": "GJ_GOOD",
+  "DD03": "GJ_GOOD",
+  "DL01": "DELHI",
+  "DL02": "DELHI",
+  "DL03": "DELHI",
+  "DL04": "DELHI",
+  "DL05": "DELHI",
+  "DL06": "DELHI",
+  "DL07": "DELHI",
+  "DL08": "DELHI",
+  "DL09": "DELHI",
+  "DL10": "DELHI",
+  "DL11": "DELHI",
+  "DL12": "DELHI",
+  "DL13": "DELHI",
+  "DL14": "NCR",
+  "DL15": "NCR",
+  "DL16": "NCR",
+  "DL17": "NCR",
+  "DL18": "NCR",
+  "DL1A": "DELHI",
+  "DL1B": "DELHI",
+  "DL1C": "DELHI",
+  "DL1D": "DELHI",
+  "DL1E": "DELHI",
+  "DL1F": "DELHI",
+  "DL1G": "DELHI",
+  "DL1H": "DELHI",
+  "DL1I": "DELHI",
+  "DL1J": "DELHI",
+  "DL1K": "DELHI",
+  "DL1L": "DELHI",
+  "DL1M": "DELHI",
+  "DL1N": "DELHI",
+  "DL1O": "DELHI",
+  "DL1P": "DELHI",
+  "DL1Q": "DELHI",
+  "DL1R": "DELHI",
+  "DL1S": "DELHI",
+  "DL1T": "DELHI",
+  "DL1U": "DELHI",
+  "DL1V": "DELHI",
+  "DL1W": "DELHI",
+  "DL1X": "DELHI",
+  "DL1Y": "DELHI",
+  "DL1Z": "DELHI",
+  "DL2A": "DELHI",
+  "DL2B": "DELHI",
+  "DL2C": "DELHI",
+  "DL2D": "DELHI",
+  "DL2E": "DELHI",
+  "DL2F": "DELHI",
+  "DL2G": "DELHI",
+  "DL2H": "DELHI",
+  "DL2I": "DELHI",
+  "DL2J": "DELHI",
+  "DL2K": "DELHI",
+  "DL2L": "DELHI",
+  "DL2M": "DELHI",
+  "DL2N": "DELHI",
+  "DL2O": "DELHI",
+  "DL2P": "DELHI",
+  "DL2Q": "DELHI",
+  "DL2R": "DELHI",
+  "DL2S": "DELHI",
+  "DL2T": "DELHI",
+  "DL2U": "DELHI",
+  "DL2V": "DELHI",
+  "DL2W": "DELHI",
+  "DL2X": "DELHI",
+  "DL2Y": "DELHI",
+  "DL2Z": "DELHI",
+  "DL30": "DELHI",
+  "DL3A": "DELHI",
+  "DL3B": "DELHI",
+  "DL3C": "DELHI",
+  "DL3D": "DELHI",
+  "DL3E": "DELHI",
+  "DL3F": "DELHI",
+  "DL3G": "DELHI",
+  "DL3H": "DELHI",
+  "DL3I": "DELHI",
+  "DL3J": "DELHI",
+  "DL3K": "DELHI",
+  "DL3L": "DELHI",
+  "DL3M": "DELHI",
+  "DL3N": "DELHI",
+  "DL3O": "DELHI",
+  "DL3P": "DELHI",
+  "DL3Q": "DELHI",
+  "DL3R": "DELHI",
+  "DL3S": "DELHI",
+  "DL3T": "DELHI",
+  "DL3U": "DELHI",
+  "DL3V": "DELHI",
+  "DL3W": "DELHI",
+  "DL3X": "DELHI",
+  "DL3Y": "DELHI",
+  "DL3Z": "DELHI",
+  "DL4A": "DELHI",
+  "DL4B": "DELHI",
+  "DL4C": "DELHI",
+  "DL4D": "DELHI",
+  "DL4E": "DELHI",
+  "DL4F": "DELHI",
+  "DL4G": "DELHI",
+  "DL4H": "DELHI",
+  "DL4I": "DELHI",
+  "DL4J": "DELHI",
+  "DL4K": "DELHI",
+  "DL4L": "DELHI",
+  "DL4M": "DELHI",
+  "DL4N": "DELHI",
+  "DL4O": "DELHI",
+  "DL4P": "DELHI",
+  "DL4Q": "DELHI",
+  "DL4R": "DELHI",
+  "DL4S": "DELHI",
+  "DL4T": "DELHI",
+  "DL4U": "DELHI",
+  "DL4V": "DELHI",
+  "DL4W": "DELHI",
+  "DL4X": "DELHI",
+  "DL4Y": "DELHI",
+  "DL4Z": "DELHI",
+  "DL51": "DELHI",
+  "DL52": "DELHI",
+  "DL53": "DELHI",
+  "DL5A": "DELHI",
+  "DL5B": "DELHI",
+  "DL5C": "DELHI",
+  "DL5D": "DELHI",
+  "DL5E": "DELHI",
+  "DL5F": "DELHI",
+  "DL5G": "DELHI",
+  "DL5H": "DELHI",
+  "DL5I": "DELHI",
+  "DL5J": "DELHI",
+  "DL5K": "DELHI",
+  "DL5L": "DELHI",
+  "DL5M": "DELHI",
+  "DL5N": "DELHI",
+  "DL5O": "DELHI",
+  "DL5P": "DELHI",
+  "DL5Q": "DELHI",
+  "DL5R": "DELHI",
+  "DL5S": "DELHI",
+  "DL5T": "DELHI",
+  "DL5U": "DELHI",
+  "DL5V": "DELHI",
+  "DL5W": "DELHI",
+  "DL5X": "DELHI",
+  "DL5Y": "DELHI",
+  "DL5Z": "DELHI",
+  "DL6A": "DELHI",
+  "DL6B": "DELHI",
+  "DL6C": "DELHI",
+  "DL6D": "DELHI",
+  "DL6E": "DELHI",
+  "DL6F": "DELHI",
+  "DL6G": "DELHI",
+  "DL6H": "DELHI",
+  "DL6I": "DELHI",
+  "DL6J": "DELHI",
+  "DL6K": "DELHI",
+  "DL6L": "DELHI",
+  "DL6M": "DELHI",
+  "DL6N": "DELHI",
+  "DL6O": "DELHI",
+  "DL6P": "DELHI",
+  "DL6Q": "DELHI",
+  "DL6R": "DELHI",
+  "DL6S": "DELHI",
+  "DL6T": "DELHI",
+  "DL6U": "DELHI",
+  "DL6V": "DELHI",
+  "DL6W": "DELHI",
+  "DL6X": "DELHI",
+  "DL6Y": "DELHI",
+  "DL6Z": "DELHI",
+  "DL7A": "DELHI",
+  "DL7B": "DELHI",
+  "DL7C": "DELHI",
+  "DL7D": "DELHI",
+  "DL7E": "DELHI",
+  "DL7F": "DELHI",
+  "DL7G": "DELHI",
+  "DL7H": "DELHI",
+  "DL7I": "DELHI",
+  "DL7J": "DELHI",
+  "DL7K": "DELHI",
+  "DL7L": "DELHI",
+  "DL7M": "DELHI",
+  "DL7N": "DELHI",
+  "DL7O": "DELHI",
+  "DL7P": "DELHI",
+  "DL7Q": "DELHI",
+  "DL7R": "DELHI",
+  "DL7S": "DELHI",
+  "DL7T": "DELHI",
+  "DL7U": "DELHI",
+  "DL7V": "DELHI",
+  "DL7W": "DELHI",
+  "DL7X": "DELHI",
+  "DL7Y": "DELHI",
+  "DL7Z": "DELHI",
+  "DL8A": "DELHI",
+  "DL8B": "DELHI",
+  "DL8C": "DELHI",
+  "DL8D": "DELHI",
+  "DL8E": "DELHI",
+  "DL8F": "DELHI",
+  "DL8G": "DELHI",
+  "DL8H": "DELHI",
+  "DL8I": "DELHI",
+  "DL8J": "DELHI",
+  "DL8K": "DELHI",
+  "DL8L": "DELHI",
+  "DL8M": "DELHI",
+  "DL8N": "DELHI",
+  "DL8O": "DELHI",
+  "DL8P": "DELHI",
+  "DL8Q": "DELHI",
+  "DL8R": "DELHI",
+  "DL8S": "DELHI",
+  "DL8T": "DELHI",
+  "DL8U": "DELHI",
+  "DL8V": "DELHI",
+  "DL8W": "DELHI",
+  "DL8X": "DELHI",
+  "DL8Y": "DELHI",
+  "DL8Z": "DELHI",
+  "DL9A": "DELHI",
+  "DL9B": "DELHI",
+  "DL9C": "DELHI",
+  "DL9D": "DELHI",
+  "DL9E": "DELHI",
+  "DL9F": "DELHI",
+  "DL9G": "DELHI",
+  "DL9H": "DELHI",
+  "DL9I": "DELHI",
+  "DL9J": "DELHI",
+  "DL9K": "DELHI",
+  "DL9L": "DELHI",
+  "DL9M": "DELHI",
+  "DL9N": "DELHI",
+  "DL9O": "DELHI",
+  "DL9P": "DELHI",
+  "DL9Q": "DELHI",
+  "DL9R": "DELHI",
+  "DL9S": "DELHI",
+  "DL9T": "DELHI",
+  "DL9U": "DELHI",
+  "DL9V": "DELHI",
+  "DL9W": "DELHI",
+  "DL9X": "DELHI",
+  "DL9Y": "DELHI",
+  "DL9Z": "DELHI",
+  "DN09": "GJ_GOOD",
+  "GA01": "Goa",
+  "GA02": "Goa",
+  "GA03": "Goa",
+  "GA04": "Goa",
+  "GA05": "Goa",
+  "GA06": "Goa",
+  "GA07": "Goa",
+  "GA08": "Goa",
+  "GA09": "Goa",
+  "GA10": "Goa",
+  "GA11": "Goa",
+  "GA12": "Goa",
+  "GA13": "Goa",
+  "GJ01": "GJ_AHD_BARODA",
+  "GJ02": "GJ_MH_REF",
+  "GJ03": "GJ_BAD1",
+  "GJ04": "GJ_BAD1",
+  "GJ05": "GJ_SURAT",
+  "GJ06": "GJ_AHD_BARODA",
+  "GJ07": "GJ_MH_REF",
+  "GJ08": "GJ_BAD2",
+  "GJ09": "GJ_BAD2",
+  "GJ10": "GJ_BAD2",
+  "GJ11": "GJ_GOOD",
+  "GJ12": "GJ_BAD2",
+  "GJ13": "GJ_BAD2",
+  "GJ14": "GJ_MH_REF",
+  "GJ15": "GJ_BAD1",
+  "GJ16": "GJ_BAD1",
+  "GJ17": "GJ_MH_REF",
+  "GJ18": "GJ_BAD2",
+  "GJ19": "GJ_GOOD",
+  "GJ20": "GJ_MH_REF",
+  "GJ21": "GJ_BAD1",
+  "GJ22": "GJ_MH_REF",
+  "GJ23": "GJ_BAD2",
+  "GJ24": "GJ_MH_REF",
+  "GJ25": "GJ_GOOD",
+  "GJ26": "GJ_BAD1",
+  "GJ27": "GJ_AHD_BARODA",
+  "GJ28": "GJ_GOOD",
+  "GJ29": "GJ_GOOD",
+  "GJ30": "GJ_GOOD",
+  "GJ31": "GJ_BAD1",
+  "GJ32": "GJ_MH_REF",
+  "GJ33": "GJ_MH_REF",
+  "GJ34": "GJ_BAD2",
+  "GJ35": "GJ_BAD1",
+  "GJ36": "GJ_MH_REF",
+  "GJ37": "GJ_MH_REF",
+  "GJ38": "GJ_AHD_BARODA",
+  "GJ39": "GJ_MH_REF",
+  "HP01": "North_Ref",
+  "HP02": "North_Ref",
+  "HP03": "North_Ref",
+  "HP04": "North_Ref",
+  "HP05": "North_Ref",
+  "HP06": "North_Ref",
+  "HP07": "North_Ref",
+  "HP08": "North_Ref",
+  "HP09": "North_Ref",
+  "HP10": "North_Ref",
+  "HP11": "HP_Bad",
+  "HP12": "North_Ref",
+  "HP13": "North_Ref",
+  "HP14": "North_Ref",
+  "HP15": "North_Ref",
+  "HP16": "North_Ref",
+  "HP17": "North_Ref",
+  "HP18": "North_Ref",
+  "HP19": "HP_Bad",
+  "HP20": "HP_Bad",
+  "HP21": "HP_Good",
+  "HP22": "HP_Good",
+  "HP23": "HP_Good",
+  "HP24": "HP_Good",
+  "HP25": "North_Ref",
+  "HP26": "North_Ref",
+  "HP27": "North_Ref",
+  "HP28": "North_Ref",
+  "HP29": "North_Ref",
+  "HP30": "North_Ref",
+  "HP31": "North_Ref",
+  "HP32": "North_Ref",
+  "HP33": "North_Ref",
+  "HP34": "North_Ref",
+  "HP35": "North_Ref",
+  "HP36": "HP_Good",
+  "HP37": "North_Ref",
+  "HP38": "North_Ref",
+  "HP39": "North_Ref",
+  "HP40": "HP_Good",
+  "HP41": "North_Ref",
+  "HP42": "North_Ref",
+  "HP43": "North_Ref",
+  "HP44": "North_Ref",
+  "HP45": "North_Ref",
+  "HP46": "North_Ref",
+  "HP47": "North_Ref",
+  "HP48": "North_Ref",
+  "HP49": "North_Ref",
+  "HP50": "North_Ref",
+  "HP51": "North_Ref",
+  "HP52": "North_Ref",
+  "HP53": "North_Ref",
+  "HP54": "North_Ref",
+  "HP55": "HP_Good",
+  "HP56": "HP_Good",
+  "HP57": "North_Ref",
+  "HP58": "North_Ref",
+  "HP59": "North_Ref",
+  "HP60": "HP_Good",
+  "HP61": "North_Ref",
+  "HP62": "North_Ref",
+  "HP63": "North_Ref",
+  "HP64": "North_Ref",
+  "HP65": "North_Ref",
+  "HP66": "North_Ref",
+  "HP67": "HP_Good",
+  "HP68": "North_Ref",
+  "HP69": "HP_Good",
+  "HP70": "HP_Good",
+  "HP71": "North_Ref",
+  "HP72": "HP_Bad",
+  "HP73": "North_Ref",
+  "HP74": "HP_Good",
+  "HP75": "North_Ref",
+  "HP76": "North_Ref",
+  "HP77": "North_Ref",
+  "HP78": "HP_Bad",
+  "HP79": "North_Ref",
+  "HP80": "HP_Bad",
+  "HP81": "North_Ref",
+  "HP82": "North_Ref",
+  "HP83": "HP_Good",
+  "HP84": "HP_Good",
+  "HP85": "North_Ref",
+  "HP86": "North_Ref",
+  "HP87": "North_Ref",
+  "HP88": "North_Ref",
+  "HP89": "North_Ref",
+  "HP90": "North_Ref",
+  "HP91": "North_Ref",
+  "HP92": "North_Ref",
+  "HP93": "North_Ref",
+  "HP94": "North_Ref",
+  "HP95": "North_Ref",
+  "HP96": "North_Ref",
+  "HP97": "North_Ref",
+  "HP98": "North_Ref",
+  "HP99": "North_Ref",
+  "HR01": "HR_Good",
+  "HR02": "HR_Good",
+  "HR03": "Chd_Tricity",
+  "HR04": "HR_Bad",
+  "HR05": "HR_Bad",
+  "HR06": "HR_Bad",
+  "HR07": "HR_Bad",
+  "HR08": "HR_Bad",
+  "HR09": "HR_Bad",
+  "HR10": "HR_Good",
+  "HR11": "HR_Bad",
+  "HR12": "HR_Good",
+  "HR13": "HR_Bad",
+  "HR14": "HR_Bad",
+  "HR15": "HR_Bad",
+  "HR16": "HR_Good",
+  "HR17": "HR_Bad",
+  "HR18": "North_Ref",
+  "HR19": "HR_Good",
+  "HR20": "HR_Bad",
+  "HR21": "North_Ref",
+  "HR22": "North_Ref",
+  "HR23": "North_Ref",
+  "HR24": "HR_Good",
+  "HR25": "HR_Good",
+  "HR26": "NCR",
+  "HR27": "North_Ref",
+  "HR28": "North_Ref",
+  "HR29": "NCR",
+  "HR30": "HR_Good",
+  "HR31": "North_Ref",
+  "HR32": "North_Ref",
+  "HR33": "HR_Bad",
+  "HR34": "HR_Bad",
+  "HR35": "HR_Bad",
+  "HR36": "North_Ref",
+  "HR37": "HR_Good",
+  "HR38": "NCR",
+  "HR39": "HR_Bad",
+  "HR40": "North_Ref",
+  "HR41": "HR_Good",
+  "HR42": "HR_Good",
+  "HR43": "North_Ref",
+  "HR44": "HR_Bad",
+  "HR45": "HR_Bad",
+  "HR46": "HR_Good",
+  "HR47": "North_Ref",
+  "HR48": "HR_Bad",
+  "HR49": "HR_Good",
+  "HR50": "North_Ref",
+  "HR51": "NCR",
+  "HR52": "North_Ref",
+  "HR53": "HR_Bad",
+  "HR54": "HR_Good",
+  "HR55": "NCR",
+  "HR56": "North_Ref",
+  "HR57": "HR_Good",
+  "HR58": "HR_Good",
+  "HR59": "North_Ref",
+  "HR60": "North_Ref",
+  "HR61": "HR_Good",
+  "HR62": "North_Ref",
+  "HR63": "HR_Bad",
+  "HR64": "HR_Bad",
+  "HR65": "HR_Bad",
+  "HR66": "HR_Bad",
+  "HR67": "HR_Bad",
+  "HR68": "Chd_Tricity",
+  "HR69": "HR_Good",
+  "HR70": "Chd_Tricity",
+  "HR71": "HR_Bad",
+  "HR72": "NCR",
+  "HR73": "HR_Good",
+  "HR74": "North_Ref",
+  "HR75": "HR_Bad",
+  "HR76": "HR_Bad",
+  "HR77": "North_Ref",
+  "HR78": "North_Ref",
+  "HR79": "HR_Bad",
+  "HR80": "North_Ref",
+  "HR81": "HR_Bad",
+  "HR82": "HR_Bad",
+  "HR83": "North_Ref",
+  "HR84": "HR_Good",
+  "HR85": "HR_Good",
+  "HR86": "North_Ref",
+  "HR87": "NCR",
+  "HR88": "North_Ref",
+  "HR89": "HR_Bad",
+  "HR90": "North_Ref",
+  "HR91": "HR_Bad",
+  "HR92": "HR_Bad",
+  "HR93": "HR_Bad",
+  "HR94": "HR_Good",
+  "HR95": "HR_Bad",
+  "HR96": "HR_Good",
+  "HR97": "HR_Bad",
+  "HR98": "NCR",
+  "HR99": "North_Ref",
+  "JH01": "Jharkhand",
+  "JH02": "Jharkhand",
+  "JH03": "JH_BAD",
+  "JH04": "Jharkhand",
+  "JH05": "JH_BAD",
+  "JH06": "Jharkhand",
+  "JH07": "Jharkhand",
+  "JH08": "Jharkhand",
+  "JH09": "Jharkhand",
+  "JH10": "Jharkhand",
+  "JH11": "JH_BAD",
+  "JH12": "JH_BAD",
+  "JH13": "JH_BAD",
+  "JH14": "JH_BAD",
+  "JH15": "Jharkhand",
+  "JH16": "Jharkhand",
+  "JH17": "Jharkhand",
+  "JH18": "Jharkhand",
+  "JH19": "JH_BAD",
+  "JH20": "Jharkhand",
+  "JH21": "Jharkhand",
+  "JH22": "Jharkhand",
+  "JH23": "Jharkhand",
+  "JH24": "Jharkhand",
+  "JK01": "JK_Good",
+  "JK02": "JK_Good",
+  "JK03": "JK_Good",
+  "JK04": "JK_Good",
+  "JK05": "JK_Good",
+  "JK06": "North_Ref",
+  "JK07": "North_Ref",
+  "JK08": "JK_Bad",
+  "JK09": "North_Ref",
+  "JK10": "North_Ref",
+  "JK11": "JK_Bad",
+  "JK12": "North_Ref",
+  "JK13": "JK_Good",
+  "JK14": "JK_Bad",
+  "JK15": "JK_Good",
+  "JK16": "JK_Good",
+  "JK17": "North_Ref",
+  "JK18": "JK_Good",
+  "JK19": "North_Ref",
+  "JK20": "JK_Bad",
+  "JK21": "North_Ref",
+  "JK22": "JK_Good",
+  "KA01": "Bangalore",
+  "KA02": "Bangalore",
+  "KA03": "Bangalore",
+  "KA04": "Bangalore",
+  "KA05": "Bangalore",
+  "KA06": "Rest_of_KA_Bad",
+  "KA07": "South_Ref",
+  "KA08": "South_Ref",
+  "KA09": "Rest_of_KA_Good",
+  "KA10": "Rest_of_KA_Bad",
+  "KA11": "Rest_of_KA_Bad",
+  "KA12": "Rest_of_KA_Bad",
+  "KA13": "South_Ref",
+  "KA14": "Rest_of_KA_Bad",
+  "KA15": "Rest_of_KA_Bad",
+  "KA16": "South_Ref",
+  "KA17": "South_Ref",
+  "KA18": "Rest_of_KA_Bad",
+  "KA19": "Rest_of_KA_Good",
+  "KA20": "South_Ref",
+  "KA21": "Rest_of_KA_Bad",
+  "KA22": "Rest_of_KA_Bad",
+  "KA23": "Rest_of_KA_Bad",
+  "KA24": "Rest_of_KA_Bad",
+  "KA25": "Rest_of_KA_Bad",
+  "KA26": "Rest_of_KA_Bad",
+  "KA27": "South_Ref",
+  "KA28": "South_Ref",
+  "KA29": "South_Ref",
+  "KA30": "South_Ref",
+  "KA31": "South_Ref",
+  "KA32": "South_Ref",
+  "KA33": "South_Ref",
+  "KA34": "South_Ref",
+  "KA35": "Rest_of_KA_Bad",
+  "KA36": "South_Ref",
+  "KA37": "South_Ref",
+  "KA38": "South_Ref",
+  "KA39": "South_Ref",
+  "KA40": "South_Ref",
+  "KA41": "Bangalore",
+  "KA42": "Rest_of_KA_Bad",
+  "KA43": "Bangalore",
+  "KA44": "Rest_of_KA_Bad",
+  "KA45": "Rest_of_KA_Good",
+  "KA46": "South_Ref",
+  "KA47": "South_Ref",
+  "KA48": "South_Ref",
+  "KA49": "Rest_of_KA_Bad",
+  "KA50": "Bangalore",
+  "KA51": "Bangalore",
+  "KA52": "Bangalore",
+  "KA53": "Bangalore",
+  "KA54": "Rest_of_KA_Bad",
+  "KA55": "Rest_of_KA_Good",
+  "KA56": "South_Ref",
+  "KA57": "Bangalore",
+  "KA58": "Bangalore",
+  "KA59": "Bangalore",
+  "KA60": "Bangalore",
+  "KA61": "Bangalore",
+  "KA62": "Rest_of_KA_Bad",
+  "KA63": "Rest_of_KA_Bad",
+  "KA64": "Rest_of_KA_Bad",
+  "KA65": "South_Ref",
+  "KA66": "Rest_of_KA_Bad",
+  "KA67": "South_Ref",
+  "KA68": "South_Ref",
+  "KA69": "Rest_of_KA_Bad",
+  "KA70": "Rest_of_KA_Bad",
+  "KA71": "Rest_of_KA_Bad",
+  "KL01": "South_Ref",
+  "KL02": "Kerala",
+  "KL03": "Kerala",
+  "KL04": "South_Ref",
+  "KL05": "Kerala",
+  "KL06": "South_Ref",
+  "KL07": "Kerala",
+  "KL08": "Kerala",
+  "KL09": "South_Ref",
+  "KL10": "Kerala",
+  "KL11": "Kerala",
+  "KL12": "Kerala",
+  "KL13": "Kerala",
+  "KL14": "Kerala",
+  "KL15": "South_Ref",
+  "KL16": "South_Ref",
+  "KL17": "South_Ref",
+  "KL18": "Kerala",
+  "KL19": "South_Ref",
+  "KL20": "South_Ref",
+  "KL21": "South_Ref",
+  "KL22": "South_Ref",
+  "KL23": "Kerala",
+  "KL24": "Kerala",
+  "KL25": "Kerala",
+  "KL26": "Kerala",
+  "KL27": "Kerala",
+  "KL28": "Kerala",
+  "KL29": "South_Ref",
+  "KL30": "South_Ref",
+  "KL31": "South_Ref",
+  "KL32": "South_Ref",
+  "KL33": "Kerala",
+  "KL34": "Kerala",
+  "KL35": "South_Ref",
+  "KL36": "Kerala",
+  "KL37": "South_Ref",
+  "KL38": "South_Ref",
+  "KL39": "South_Ref",
+  "KL40": "South_Ref",
+  "KL41": "South_Ref",
+  "KL42": "South_Ref",
+  "KL43": "South_Ref",
+  "KL44": "South_Ref",
+  "KL45": "South_Ref",
+  "KL46": "South_Ref",
+  "KL47": "South_Ref",
+  "KL48": "Kerala",
+  "KL49": "South_Ref",
+  "KL50": "South_Ref",
+  "KL51": "South_Ref",
+  "KL52": "South_Ref",
+  "KL53": "Kerala",
+  "KL54": "South_Ref",
+  "KL55": "Kerala",
+  "KL56": "Kerala",
+  "KL57": "Kerala",
+  "KL58": "Kerala",
+  "KL59": "Kerala",
+  "KL60": "South_Ref",
+  "KL61": "Kerala",
+  "KL62": "Kerala",
+  "KL63": "South_Ref",
+  "KL64": "Kerala",
+  "KL65": "Kerala",
+  "KL66": "South_Ref",
+  "KL67": "Kerala",
+  "KL68": "South_Ref",
+  "KL69": "South_Ref",
+  "KL70": "South_Ref",
+  "KL71": "Kerala",
+  "KL72": "Kerala",
+  "KL73": "Kerala",
+  "KL74": "South_Ref",
+  "KL75": "South_Ref",
+  "KL76": "South_Ref",
+  "KL77": "South_Ref",
+  "KL78": "South_Ref",
+  "KL79": "South_Ref",
+  "KL80": "South_Ref",
+  "KL81": "South_Ref",
+  "KL82": "South_Ref",
+  "KL83": "South_Ref",
+  "KL84": "South_Ref",
+  "KL85": "South_Ref",
+  "KL86": "Kerala",
+  "KL99": "Kerala",
+  "LA01": "North_Ref",
+  "LA02": "North_Ref",
+  "LD01": "Kerala",
+  "LD02": "Kerala",
+  "LD03": "Kerala",
+  "LD04": "Kerala",
+  "LD05": "Kerala",
+  "LD06": "Kerala",
+  "LD07": "Kerala",
+  "LD08": "Kerala",
+  "LD09": "Kerala",
+  "MH01": "Mumbai",
+  "MH02": "Mumbai",
+  "MH03": "Mumbai",
+  "MH04": "Mumbai",
+  "MH05": "Mumbai 2",
+  "MH06": "Mumbai 2",
+  "MH07": "ROMG_Good",
+  "MH08": "ROMG_Good",
+  "MH09": "ROMG_Good",
+  "MH10": "ROMG_Good",
+  "MH11": "ROMG_Good",
+  "MH12": "MH_Pune",
+  "MH13": "ROMG_Bad",
+  "MH14": "MH_Pune",
+  "MH15": "ROMG_Good",
+  "MH16": "ROMG_Bad",
+  "MH17": "GJ_MH_REF",
+  "MH18": "GJ_MH_REF",
+  "MH19": "ROMG_Bad",
+  "MH20": "ROMG_Bad",
+  "MH21": "ROMG_Bad",
+  "MH22": "GJ_MH_REF",
+  "MH23": "GJ_MH_REF",
+  "MH24": "GJ_MH_REF",
+  "MH25": "GJ_MH_REF",
+  "MH26": "GJ_MH_REF",
+  "MH27": "ROMG_Bad",
+  "MH28": "GJ_MH_REF",
+  "MH29": "GJ_MH_REF",
+  "MH30": "ROMG_Bad",
+  "MH31": "ROMG_Good",
+  "MH32": "ROMG_Good",
+  "MH33": "ROMG_Good",
+  "MH34": "ROMG_Good",
+  "MH35": "ROMG_Bad",
+  "MH36": "ROMG_Good",
+  "MH37": "GJ_MH_REF",
+  "MH38": "GJ_MH_REF",
+  "MH39": "GJ_MH_REF",
+  "MH40": "ROMG_Good",
+  "MH41": "GJ_MH_REF",
+  "MH42": "ROMG_Good",
+  "MH43": "Mumbai 2",
+  "MH44": "GJ_MH_REF",
+  "MH45": "ROMG_Bad",
+  "MH46": "Mumbai",
+  "MH47": "Mumbai",
+  "MH48": "ROMG_Good",
+  "MH49": "ROMG_Good",
+  "MH50": "ROMG_Good",
+  "MH51": "GJ_MH_REF",
+  "MH52": "GJ_MH_REF",
+  "MH53": "MH_Pune",
+  "MH54": "MH_Pune",
+  "MH55": "Mumbai",
+  "MH56": "Mumbai",
+  "MH57": "GJ_MH_REF",
+  "MH58": "ROMG_Good",
+  "MH59": "ROMG_Bad",
+  "MH60": "ROMG_Good",
+  "MH61": "ROMG_Good",
+  "MH62": "GJ_MH_REF",
+  "ML01": "North_East",
+  "ML02": "North_East",
+  "ML03": "North_East",
+  "ML04": "North_East",
+  "ML05": "North_East",
+  "ML06": "North_East",
+  "ML07": "North_East",
+  "ML08": "North_East",
+  "ML09": "North_East",
+  "ML10": "North_East",
+  "ML11": "North_East",
+  "ML12": "North_East",
+  "ML13": "North_East",
+  "ML14": "North_East",
+  "ML15": "NE_Ref",
+  "ML56": "North_East",
+  "MN01": "NE_Ref",
+  "MN02": "NE_Ref",
+  "MN03": "NE_Ref",
+  "MN04": "NE_Ref",
+  "MN05": "NE_Ref",
+  "MN06": "NE_Ref",
+  "MN07": "NE_Ref",
+  "MN08": "NE_Ref",
+  "MN09": "NE_Ref",
+  "MP01": "MP_Good",
+  "MP02": "MP_Good",
+  "MP03": "MP_Good",
+  "MP04": "MP_Good",
+  "MP05": "All_India_Decline",
+  "MP06": "All_India_Decline",
+  "MP07": "All_India_Decline",
+  "MP08": "MP_Bad",
+  "MP09": "MP_Good",
+  "MP10": "All_India_Decline",
+  "MP11": "All_India_Decline",
+  "MP12": "All_India_Decline",
+  "MP13": "All_India_Decline",
+  "MP14": "MP_Bad",
+  "MP15": "All_India_Decline",
+  "MP16": "MP_Bad",
+  "MP17": "All_India_Decline",
+  "MP18": "All_India_Decline",
+  "MP19": "All_India_Decline",
+  "MP20": "All_India_Decline",
+  "MP21": "All_India_Decline",
+  "MP22": "All_India_Decline",
+  "MP23": "CG_Good",
+  "MP24": "All_India_Decline",
+  "MP25": "All_India_Decline",
+  "MP26": "All_India_Decline",
+  "MP27": "All_India_Decline",
+  "MP28": "All_India_Decline",
+  "MP29": "All_India_Decline",
+  "MP30": "All_India_Decline",
+  "MP31": "All_India_Decline",
+  "MP32": "All_India_Decline",
+  "MP33": "All_India_Decline",
+  "MP34": "All_India_Decline",
+  "MP35": "All_India_Decline",
+  "MP36": "All_India_Decline",
+  "MP37": "All_India_Decline",
+  "MP38": "MP_Bad",
+  "MP39": "MP_Bad",
+  "MP40": "All_India_Decline",
+  "MP41": "All_India_Decline",
+  "MP42": "All_India_Decline",
+  "MP43": "MP_Bad",
+  "MP44": "All_India_Decline",
+  "MP45": "All_India_Decline",
+  "MP46": "All_India_Decline",
+  "MP47": "All_India_Decline",
+  "MP48": "All_India_Decline",
+  "MP49": "All_India_Decline",
+  "MP50": "All_India_Decline",
+  "MP51": "All_India_Decline",
+  "MP52": "All_India_Decline",
+  "MP53": "All_India_Decline",
+  "MP54": "All_India_Decline",
+  "MP55": "All_India_Decline",
+  "MP56": "All_India_Decline",
+  "MP57": "All_India_Decline",
+  "MP58": "All_India_Decline",
+  "MP59": "All_India_Decline",
+  "MP65": "All_India_Decline",
+  "MP66": "All_India_Decline",
+  "MP67": "All_India_Decline",
+  "MP68": "All_India_Decline",
+  "MP69": "All_India_Decline",
+  "MP70": "All_India_Decline",
+  "MP71": "All_India_Decline",
+  "MZ01": "North_East",
+  "MZ02": "North_East",
+  "MZ03": "North_East",
+  "MZ04": "North_East",
+  "MZ05": "North_East",
+  "MZ06": "North_East",
+  "MZ07": "North_East",
+  "MZ08": "North_East",
+  "MZ09": "North_East",
+  "NL01": "NE_Ref",
+  "NL02": "NE_Ref",
+  "NL03": "NE_Ref",
+  "NL04": "NE_Ref",
+  "NL05": "NE_Ref",
+  "NL06": "NE_Ref",
+  "NL07": "NE_Ref",
+  "NL08": "NE_Ref",
+  "NL09": "NE_Ref",
+  "NL10": "NE_Ref",
+  "NL11": "NE_REF",
+  "OD01": "Orissa_Good",
+  "OD02": "Orissa_Good",
+  "OD03": "NE_Ref",
+  "OD04": "NE_Ref",
+  "OD05": "NE_Ref",
+  "OD06": "NE_Ref",
+  "OD07": "NE_Ref",
+  "OD08": "NE_Ref",
+  "OD09": "NE_Ref",
+  "OD10": "NE_Ref",
+  "OD11": "NE_Ref",
+  "OD12": "NE_Ref",
+  "OD13": "NE_Ref",
+  "OD14": "Orissa_Good",
+  "OD15": "NE_Ref",
+  "OD16": "NE_Ref",
+  "OD17": "NE_Ref",
+  "OD18": "NE_Ref",
+  "OD19": "NE_Ref",
+  "OD20": "NE_Ref",
+  "OD21": "NE_Ref",
+  "OD22": "NE_Ref",
+  "OD23": "Orissa_Good",
+  "OD24": "NE_Ref",
+  "OD25": "NE_Ref",
+  "OD26": "NE_Ref",
+  "OD27": "NE_Ref",
+  "OD28": "NE_Ref",
+  "OD29": "NE_Ref",
+  "OD30": "NE_Ref",
+  "OD31": "NE_Ref",
+  "OD32": "NE_Ref",
+  "OD33": "Orissa_Good",
+  "OD34": "NE_Ref",
+  "OD35": "NE_Ref",
+  "OR01": "Orissa_Good",
+  "OR02": "Orissa_Good",
+  "OR03": "NE_Ref",
+  "OR04": "NE_Ref",
+  "OR05": "NE_Ref",
+  "OR06": "NE_Ref",
+  "OR07": "NE_Ref",
+  "OR08": "NE_Ref",
+  "OR09": "NE_Ref",
+  "OR10": "NE_Ref",
+  "OR11": "NE_Ref",
+  "OR12": "NE_Ref",
+  "OR13": "NE_Ref",
+  "OR14": "Orissa_Good",
+  "OR15": "NE_Ref",
+  "OR16": "NE_Ref",
+  "OR17": "NE_Ref",
+  "OR18": "NE_Ref",
+  "OR19": "NE_Ref",
+  "OR20": "NE_Ref",
+  "OR21": "NE_Ref",
+  "OR22": "NE_Ref",
+  "OR23": "Orissa_Good",
+  "OR24": "NE_Ref",
+  "OR25": "NE_Ref",
+  "OR26": "NE_Ref",
+  "OR27": "NE_Ref",
+  "OR28": "NE_Ref",
+  "OR29": "NE_Ref",
+  "OR30": "NE_Ref",
+  "OR31": "NE_Ref",
+  "PB01": "Chd_Tricity",
+  "PB02": "PB_Good",
+  "PB03": "PB_Bad",
+  "PB04": "PB_Good",
+  "PB05": "PB_Bad",
+  "PB06": "PB_Good",
+  "PB07": "PB_Bad",
+  "PB08": "PB_Good",
+  "PB09": "PB_Good",
+  "PB10": "PB_Good",
+  "PB11": "PB_Bad",
+  "PB12": "North_Ref",
+  "PB13": "PB_Bad",
+  "PB14": "PB_Good",
+  "PB15": "PB_Good",
+  "PB16": "North_Ref",
+  "PB17": "PB_Good",
+  "PB18": "PB_Good",
+  "PB19": "PB_Bad",
+  "PB20": "PB_Bad",
+  "PB21": "PB_Bad",
+  "PB22": "PB_Good",
+  "PB23": "PB_Bad",
+  "PB24": "North_Ref",
+  "PB25": "PB_Good",
+  "PB26": "PB_Good",
+  "PB27": "PB_Good",
+  "PB28": "PB_Bad",
+  "PB29": "PB_Good",
+  "PB30": "PB_Bad",
+  "PB31": "PB_Bad",
+  "PB32": "PB_Bad",
+  "PB33": "PB_Good",
+  "PB34": "PB_Bad",
+  "PB35": "PB_Bad",
+  "PB36": "PB_Good",
+  "PB37": "PB_Bad",
+  "PB38": "PB_Good",
+  "PB39": "PB_Bad",
+  "PB40": "North_Ref",
+  "PB41": "PB_Bad",
+  "PB42": "PB_Bad",
+  "PB43": "PB_Bad",
+  "PB44": "North_Ref",
+  "PB45": "PB_Bad",
+  "PB46": "PB_Good",
+  "PB47": "North_Ref",
+  "PB48": "North_Ref",
+  "PB49": "PB_Good",
+  "PB50": "PB_Bad",
+  "PB51": "PB_Bad",
+  "PB52": "PB_Good",
+  "PB53": "PB_Bad",
+  "PB54": "PB_Bad",
+  "PB55": "PB_Good",
+  "PB56": "PB_Good",
+  "PB57": "North_Ref",
+  "PB58": "North_Ref",
+  "PB59": "North_Ref",
+  "PB60": "PB_Bad",
+  "PB61": "PB_Good",
+  "PB62": "PB_Bad",
+  "PB63": "PB_Good",
+  "PB64": "PB_Bad",
+  "PB65": "Chd_Tricity",
+  "PB66": "PB_Good",
+  "PB67": "PB_Good",
+  "PB68": "PB_Bad",
+  "PB69": "North_Ref",
+  "PB70": "Chd_Tricity",
+  "PB71": "North_Ref",
+  "PB72": "PB_Bad",
+  "PB73": "North_Ref",
+  "PB74": "North_Ref",
+  "PB75": "PB_Bad",
+  "PB76": "PB_Good",
+  "PB77": "PB_Bad",
+  "PB78": "PB_Bad",
+  "PB79": "North_Ref",
+  "PB80": "North_Ref",
+  "PB81": "PB_Good",
+  "PB82": "PB_Good",
+  "PB83": "PB_Bad",
+  "PB84": "PB_Bad",
+  "PB85": "PB_Good",
+  "PB86": "PB_Bad",
+  "PB87": "North_Ref",
+  "PB88": "North_Ref",
+  "PB89": "PB_Good",
+  "PB90": "PB_Good",
+  "PB91": "PB_Good",
+  "PB92": "PB_Bad",
+  "PB99": "PB_Good",
+  "PY01": "South_Ref",
+  "PY02": "South_Ref",
+  "PY03": "South_Ref",
+  "PY04": "South_Ref",
+  "PY05": "South_Ref",
+  "RJ01": "RJ_Bad",
+  "RJ02": "North_Ref",
+  "RJ03": "RJ_Bad",
+  "RJ04": "North_Ref",
+  "RJ05": "North_Ref",
+  "RJ06": "North_Ref",
+  "RJ07": "RJ_Bad",
+  "RJ08": "RJ_Bad",
+  "RJ09": "North_Ref",
+  "RJ10": "RJ_Good",
+  "RJ11": "North_Ref",
+  "RJ12": "North_Ref",
+  "RJ13": "RJ_Bad",
+  "RJ14": "RJ_Good",
+  "RJ15": "RJ_Bad",
+  "RJ16": "RJ_Good",
+  "RJ17": "RJ_Bad",
+  "RJ18": "North_Ref",
+  "RJ19": "RJ_Good",
+  "RJ20": "RJ_Good",
+  "RJ21": "North_Ref",
+  "RJ22": "RJ_Bad",
+  "RJ23": "RJ_Bad",
+  "RJ24": "RJ_Good",
+  "RJ25": "North_Ref",
+  "RJ26": "North_Ref",
+  "RJ27": "RJ_Good",
+  "RJ28": "RJ_Bad",
+  "RJ29": "North_Ref",
+  "RJ30": "RJ_Good",
+  "RJ31": "RJ_Bad",
+  "RJ32": "RJ_Good",
+  "RJ33": "North_Ref",
+  "RJ34": "RJ_Good",
+  "RJ35": "RJ_Good",
+  "RJ36": "RJ_Bad",
+  "RJ37": "RJ_Bad",
+  "RJ38": "RJ_Good",
+  "RJ39": "North_Ref",
+  "RJ40": "North_Ref",
+  "RJ41": "RJ_Bad",
+  "RJ42": "RJ_Bad",
+  "RJ43": "RJ_Bad",
+  "RJ44": "RJ_Good",
+  "RJ45": "RJ_Good",
+  "RJ46": "RJ_Good",
+  "RJ47": "RJ_Bad",
+  "RJ48": "RJ_Good",
+  "RJ49": "RJ_Bad",
+  "RJ50": "RJ_Bad",
+  "RJ51": "North_Ref",
+  "RJ52": "RJ_Good",
+  "RJ53": "RJ_Good",
+  "RJ54": "RJ_Bad",
+  "RJ55": "RJ_Bad",
+  "RJ56": "RJ_Bad",
+  "RJ57": "RJ_Bad",
+  "RJ58": "North_Ref",
+  "RJ59": "RJ_Good",
+  "RJ60": "RJ_Good",
+  "SK01": "North_East",
+  "SK02": "North_East",
+  "SK03": "North_East",
+  "SK04": "North_East",
+  "SK05": "North_East",
+  "SK06": "North_East",
+  "SK07": "North_East",
+  "SK08": "North_East",
+  "TG01": "South_Ref",
+  "TG02": "South_Ref",
+  "TG03": "South_Ref",
+  "TG04": "South_Ref",
+  "TG05": "South_Ref",
+  "TG06": "South_Ref",
+  "TG07": "AP TS_GOOD1",
+  "TG08": "AP TS_GOOD1",
+  "TG09": "AP TS_GOOD1",
+  "TG10": "AP TS_GOOD1",
+  "TG11": "AP TS_GOOD1",
+  "TG12": "AP TS_GOOD1",
+  "TG13": "AP TS_GOOD1",
+  "TG14": "AP TS_GOOD1",
+  "TG15": "South_Ref",
+  "TG16": "AP TS_BAD",
+  "TG17": "South_Ref",
+  "TG18": "South_Ref",
+  "TG19": "South_Ref",
+  "TG20": "South_Ref",
+  "TG21": "South_Ref",
+  "TG22": "AP TS_GOOD2",
+  "TG23": "South_Ref",
+  "TG24": "South_Ref",
+  "TG25": "AP TS_GOOD2",
+  "TG26": "AP TS_BAD",
+  "TG27": "South_Ref",
+  "TG28": "South_Ref",
+  "TG29": "South_Ref",
+  "TG30": "AP TS_BAD",
+  "TG31": "South_Ref",
+  "TG32": "South_Ref",
+  "TG33": "South_Ref",
+  "TG34": "South_Ref",
+  "TG35": "South_Ref",
+  "TG36": "AP TS_GOOD2",
+  "TG37": "AP TS_GOOD2",
+  "TG38": "South_Ref",
+  "TN01": "TN_Good",
+  "TN02": "TN_Good",
+  "TN03": "TN_Good",
+  "TN04": "TN_Good",
+  "TN05": "TN_Good",
+  "TN06": "TN_Good",
+  "TN07": "TN_Good",
+  "TN09": "TN_Good",
+  "TN10": "TN_Good",
+  "TN11": "TN_Good",
+  "TN12": "TN_Good",
+  "TN13": "TN_Good",
+  "TN14": "TN_Good",
+  "TN15": "South_Ref",
+  "TN16": "South_Ref",
+  "TN18": "TN_Good",
+  "TN19": "South_Ref",
+  "TN20": "South_Ref",
+  "TN21": "South_Ref",
+  "TN22": "TN_Good",
+  "TN23": "South_Ref",
+  "TN24": "South_Ref",
+  "TN25": "South_Ref",
+  "TN27": "South_Ref",
+  "TN28": "South_Ref",
+  "TN29": "South_Ref",
+  "TN30": "South_Ref",
+  "TN31": "South_Ref",
+  "TN32": "South_Ref",
+  "TN33": "South_Ref",
+  "TN34": "South_Ref",
+  "TN36": "South_Ref",
+  "TN37": "TN_Good",
+  "TN38": "TN_Good",
+  "TN39": "South_Ref",
+  "TN40": "South_Ref",
+  "TN41": "South_Ref",
+  "TN42": "South_Ref",
+  "TN43": "South_Ref",
+  "TN45": "South_Ref",
+  "TN46": "South_Ref",
+  "TN47": "South_Ref",
+  "TN48": "South_Ref",
+  "TN49": "South_Ref",
+  "TN50": "South_Ref",
+  "TN51": "South_Ref",
+  "TN52": "South_Ref",
+  "TN54": "South_Ref",
+  "TN55": "South_Ref",
+  "TN56": "South_Ref",
+  "TN57": "South_Ref",
+  "TN58": "South_Ref",
+  "TN59": "South_Ref",
+  "TN60": "South_Ref",
+  "TN61": "South_Ref",
+  "TN63": "South_Ref",
+  "TN64": "South_Ref",
+  "TN65": "South_Ref",
+  "TN66": "TN_Good",
+  "TN67": "South_Ref",
+  "TN68": "South_Ref",
+  "TN69": "South_Ref",
+  "TN70": "South_Ref",
+  "TN72": "South_Ref",
+  "TN73": "South_Ref",
+  "TN74": "South_Ref",
+  "TN75": "South_Ref",
+  "TN76": "South_Ref",
+  "TN77": "South_Ref",
+  "TN78": "South_Ref",
+  "TN79": "South_Ref",
+  "TN81": "South_Ref",
+  "TN82": "South_Ref",
+  "TN83": "South_Ref",
+  "TN84": "South_Ref",
+  "TN85": "TN_Good",
+  "TN86": "South_Ref",
+  "TN87": "TN_Good",
+  "TN88": "South_Ref",
+  "TN90": "South_Ref",
+  "TN91": "South_Ref",
+  "TN92": "South_Ref",
+  "TN93": "South_Ref",
+  "TN94": "South_Ref",
+  "TN95": "South_Ref",
+  "TN96": "South_Ref",
+  "TN97": "South_Ref",
+  "TN99": "TN_Good",
+  "TR01": "North_East",
+  "TR02": "North_East",
+  "TR03": "North_East",
+  "TR04": "North_East",
+  "TR05": "North_East",
+  "TR06": "North_East",
+  "TR07": "North_East",
+  "TR08": "North_East",
+  "TS01": "South_Ref",
+  "TS02": "South_Ref",
+  "TS03": "South_Ref",
+  "TS04": "South_Ref",
+  "TS05": "South_Ref",
+  "TS06": "South_Ref",
+  "TS07": "AP TS_GOOD1",
+  "TS08": "AP TS_GOOD1",
+  "TS09": "AP TS_GOOD1",
+  "TS10": "AP TS_GOOD1",
+  "TS11": "AP TS_GOOD1",
+  "TS12": "AP TS_GOOD1",
+  "TS13": "AP TS_GOOD1",
+  "TS14": "AP TS_GOOD1",
+  "TS15": "South_Ref",
+  "TS16": "AP TS_BAD",
+  "TS17": "South_Ref",
+  "TS18": "South_Ref",
+  "TS19": "South_Ref",
+  "TS20": "South_Ref",
+  "TS21": "South_Ref",
+  "TS22": "AP TS_GOOD2",
+  "TS23": "South_Ref",
+  "TS24": "South_Ref",
+  "TS25": "AP TS_GOOD2",
+  "TS26": "AP TS_BAD",
+  "TS27": "South_Ref",
+  "TS28": "South_Ref",
+  "TS29": "South_Ref",
+  "TS30": "AP TS_BAD",
+  "TS31": "South_Ref",
+  "TS32": "South_Ref",
+  "TS33": "South_Ref",
+  "TS34": "South_Ref",
+  "TS35": "South_Ref",
+  "TS36": "AP TS_GOOD2",
+  "TS37": "AP TS_GOOD2",
+  "TS38": "South_Ref",
+  "UA01": "UK_Good",
+  "UA02": "UK_Good",
+  "UA03": "UK_Bad",
+  "UA04": "UK_Bad",
+  "UA05": "UK_Good",
+  "UA06": "UP_UK_WB_REF",
+  "UA07": "UK_Good",
+  "UA08": "UK_Bad",
+  "UA09": "UP_UK_WB_REF",
+  "UA10": "UP_UK_WB_REF",
+  "UA11": "UP_UK_WB_REF",
+  "UA12": "UP_UK_WB_REF",
+  "UA13": "UP_UK_WB_REF",
+  "UA18": "UP_UK_WB_REF",
+  "UK01": "UK_Good",
+  "UK02": "UK_Good",
+  "UK03": "UK_Bad",
+  "UK04": "UK_Bad",
+  "UK05": "UK_Good",
+  "UK06": "UP_UK_WB_REF",
+  "UK07": "UK_Good",
+  "UK08": "UK_Bad",
+  "UK09": "UP_UK_WB_REF",
+  "UK10": "UP_UK_WB_REF",
+  "UK11": "UP_UK_WB_REF",
+  "UK12": "UP_UK_WB_REF",
+  "UK13": "UP_UK_WB_REF",
+  "UK14": "UK_Good",
+  "UK15": "UK_Bad",
+  "UK16": "UK_Bad",
+  "UK17": "UK_Bad",
+  "UK18": "UP_UK_WB_REF",
+  "UK19": "UP_UK_WB_REF",
+  "UK20": "UP_UK_WB_REF",
+  "UP01": "UK_Good",
+  "UP02": "UK_Bad",
+  "UP03": "UK_Good",
+  "UP04": "UP_UK_WB_REF",
+  "UP05": "UP_UK_WB_REF",
+  "UP06": "UP_UK_WB_REF",
+  "UP07": "UK_Good",
+  "UP08": "UP_UK_WB_REF",
+  "UP09": "UP_UK_WB_REF",
+  "UP10": "UK_Bad",
+  "UP11": "UP_NEAR_UK",
+  "UP12": "UP_Bad",
+  "UP13": "UP_UK_WB_REF",
+  "UP14": "NCR",
+  "UP15": "UP_Bad",
+  "UP16": "NCR",
+  "UP17": "UP_NEAR_UK",
+  "UP18": "NCR",
+  "UP19": "UP_Bad",
+  "UP20": "UP_NEAR_UK",
+  "UP21": "UP_UK_WB_REF",
+  "UP22": "UP_UK_WB_REF",
+  "UP23": "UP_NEAR_UK",
+  "UP24": "UP_Bad",
+  "UP25": "UP_Bad",
+  "UP26": "UP_UK_WB_REF",
+  "UP27": "UP_Bad",
+  "UP28": "UP_Bad",
+  "UP29": "UP_UK_WB_REF",
+  "UP30": "UP_UK_WB_REF",
+  "UP31": "UP_UK_WB_REF",
+  "UP32": "UP_GOOD1",
+  "UP33": "UP_GOOD1",
+  "UP34": "UP_Bad",
+  "UP35": "UP_Bad",
+  "UP36": "UP_GOOD1",
+  "UP37": "UP_UK_WB_REF",
+  "UP38": "UP_UK_WB_REF",
+  "UP39": "UP_UK_WB_REF",
+  "UP40": "UP_UK_WB_REF",
+  "UP41": "UP_UK_WB_REF",
+  "UP42": "UP_Bad",
+  "UP43": "UP_Bad",
+  "UP44": "UP_UK_WB_REF",
+  "UP45": "UP_Bad",
+  "UP46": "UP_Bad",
+  "UP47": "UP_Bad",
+  "UP48": "UP_UK_WB_REF",
+  "UP49": "UP_UK_WB_REF",
+  "UP50": "UP_Bad",
+  "UP51": "UP_Bad",
+  "UP52": "UP_Bad",
+  "UP53": "UP_Bad",
+  "UP54": "UP_Bad",
+  "UP55": "UP_UK_WB_REF",
+  "UP56": "UP_Bad",
+  "UP57": "UP_UK_WB_REF",
+  "UP58": "UP_Bad",
+  "UP59": "UP_UK_WB_REF",
+  "UP60": "UP_Bad",
+  "UP61": "UP_GOOD1",
+  "UP62": "UP_Bad",
+  "UP63": "UP_Bad",
+  "UP64": "UP_Bad",
+  "UP65": "UP_GOOD1",
+  "UP66": "UP_Bad",
+  "UP67": "UP_Bad",
+  "UP68": "UP_UK_WB_REF",
+  "UP69": "UP_UK_WB_REF",
+  "UP70": "UP_GOOD1",
+  "UP71": "UP_Bad",
+  "UP72": "UP_Bad",
+  "UP73": "UP_UK_WB_REF",
+  "UP74": "UP_Bad",
+  "UP75": "UP_UK_WB_REF",
+  "UP76": "UP_UK_WB_REF",
+  "UP77": "UP_UK_WB_REF",
+  "UP78": "UP_Bad",
+  "UP79": "UP_UK_WB_REF",
+  "UP80": "UP_Bad",
+  "UP81": "UP_UK_WB_REF",
+  "UP82": "UP_UK_WB_REF",
+  "UP83": "UP_UK_WB_REF",
+  "UP84": "UP_UK_WB_REF",
+  "UP85": "UP_UK_WB_REF",
+  "UP86": "UP_UK_WB_REF",
+  "UP87": "UP_UK_WB_REF",
+  "UP90": "UP_UK_WB_REF",
+  "UP91": "UP_UK_WB_REF",
+  "UP92": "UP_UK_WB_REF",
+  "UP93": "UP_Bad",
+  "UP94": "UP_Bad",
+  "UP95": "UP_UK_WB_REF",
+  "UP96": "UP_Bad",
+  "WB01": "WB_Kolkata",
+  "WB02": "WB_Kolkata",
+  "WB03": "WB_Kolkata",
+  "WB04": "WB_Kolkata",
+  "WB05": "WB_Kolkata",
+  "WB06": "WB_Kolkata",
+  "WB07": "WB_Kolkata",
+  "WB08": "WB_Kolkata",
+  "WB09": "WB_Kolkata",
+  "WB10": "WB_Kolkata",
+  "WB11": "WB_Good",
+  "WB12": "WB_Good",
+  "WB13": "WB_Bad",
+  "WB14": "WB_Bad",
+  "WB15": "WB_Good",
+  "WB16": "WB_Good",
+  "WB17": "WB_Good",
+  "WB18": "WB_Good",
+  "WB19": "WB_Good",
+  "WB20": "WB_Good",
+  "WB21": "WB_Good",
+  "WB22": "WB_Good",
+  "WB23": "WB_Good",
+  "WB24": "WB_Good",
+  "WB25": "WB_Good",
+  "WB26": "WB_Good",
+  "WB27": "WB_Good",
+  "WB28": "WB_Good",
+  "WB29": "UP_UK_WB_REF",
+  "WB30": "UP_UK_WB_REF",
+  "WB31": "UP_UK_WB_REF",
+  "WB32": "UP_UK_WB_REF",
+  "WB33": "WB_Bad",
+  "WB34": "WB_Bad",
+  "WB35": "UP_UK_WB_REF",
+  "WB36": "WB_Bad",
+  "WB37": "WB_Bad",
+  "WB38": "WB_Bad",
+  "WB39": "WB_Good",
+  "WB40": "WB_Good",
+  "WB41": "UP_UK_WB_REF",
+  "WB42": "UP_UK_WB_REF",
+  "WB43": "WB_Bad",
+  "WB44": "WB_Bad",
+  "WB45": "WB_Bad",
+  "WB46": "WB_Bad",
+  "WB47": "WB_Good",
+  "WB48": "WB_Good",
+  "WB49": "UP_UK_WB_REF",
+  "WB50": "UP_UK_WB_REF",
+  "WB51": "WB_Bad",
+  "WB52": "WB_Bad",
+  "WB53": "UP_UK_WB_REF",
+  "WB54": "UP_UK_WB_REF",
+  "WB55": "WB_Bad",
+  "WB56": "WB_Bad",
+  "WB57": "WB_Bad",
+  "WB58": "WB_Bad",
+  "WB59": "UP_UK_WB_REF",
+  "WB60": "UP_UK_WB_REF",
+  "WB61": "WB_Bad",
+  "WB62": "WB_Bad",
+  "WB63": "WB_Good",
+  "WB64": "WB_Good",
+  "WB65": "UP_UK_WB_REF",
+  "WB66": "UP_UK_WB_REF",
+  "WB67": "WB_Bad",
+  "WB68": "WB_Bad",
+  "WB69": "WB_Bad",
+  "WB70": "WB_Bad",
+  "WB71": "UP_UK_WB_REF",
+  "WB72": "UP_UK_WB_REF",
+  "WB73": "WB_Bad",
+  "WB74": "WB_Bad",
+  "WB75": "UP_UK_WB_REF",
+  "WB76": "WB_Good",
+  "WB77": "WB_Good",
+  "WB78": "WB_Good",
+  "WB79": "WB_Good",
+  "WB80": "UP_UK_WB_REF",
+  "WB81": "WB_Good",
+  "WB82": "WB_Good",
+  "WB83": "UP_UK_WB_REF",
+  "WB84": "UP_UK_WB_REF",
+  "WB85": "WB_Good",
+  "WB86": "WB_Good",
+  "WB87": "WB_Good",
+  "WB88": "WB_Good",
+  "WB89": "WB_Good",
+  "WB90": "WB_Good",
+  "WB91": "WB_Bad",
+  "WB92": "WB_Bad",
+  "WB93": "WB_Bad",
+  "WB94": "WB_Bad",
+  "WB95": "WB_Good",
+  "WB96": "WB_Good",
+  "WB97": "UP_UK_WB_REF",
+  "WB98": "UP_UK_WB_REF",
+  "WB99": "WB_Good"
+ },
+ "grid": {
+  "All_India_Decline": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol",
+    "age": "All",
+    "pct": 0
+   }
+  ],
+  "Andaman": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 2.5
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "<10",
+    "pct": 20
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 46
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 49
+   },
+   {
+    "segment": "Petrol",
+    "age": "All",
+    "pct": 51
+   }
+  ],
+  "AP TS_BAD": [
+   {
+    "segment": "CNG 1000-1500",
+    "age": "<10",
+    "pct": 10
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": ">10",
+    "pct": 10
+   },
+   {
+    "segment": "CNG<1000",
+    "age": ">10",
+    "pct": 10
+   },
+   {
+    "segment": "CNG<1000",
+    "age": "<10",
+    "pct": 0
+   },
+   {
+    "segment": "CNG>1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel 1000-1500",
+    "age": ">10",
+    "pct": 10
+   },
+   {
+    "segment": "Diesel<1000",
+    "age": ">10",
+    "pct": 10
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "<10",
+    "pct": 5
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 32
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 35
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 15
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "<10",
+    "pct": 30
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": ">10",
+    "pct": 37.5
+   }
+  ],
+  "AP TS_Good1": [
+   {
+    "segment": "CNG 1000-1500",
+    "age": "<10",
+    "pct": 33
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": ">10",
+    "pct": 30
+   },
+   {
+    "segment": "CNG<1000",
+    "age": ">10",
+    "pct": 37
+   },
+   {
+    "segment": "CNG<1000",
+    "age": "<10",
+    "pct": 10
+   },
+   {
+    "segment": "CNG>1500",
+    "age": "All",
+    "pct": 30
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "<10",
+    "pct": 13.5
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 27.5
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 41
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 38
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 41
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 39
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 27.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 51.5
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 48
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 50
+   }
+  ],
+  "AP TS_Good2": [
+   {
+    "segment": "CNG>1500",
+    "age": "<10",
+    "pct": 0
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": "<10",
+    "pct": 10
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": ">10",
+    "pct": 37.5
+   },
+   {
+    "segment": "CNG<1000",
+    "age": "<10",
+    "pct": 20
+   },
+   {
+    "segment": "CNG<1000",
+    "age": ">10",
+    "pct": 20
+   },
+   {
+    "segment": "CNG>1500",
+    "age": ">10",
+    "pct": 37.5
+   },
+   {
+    "segment": "Diesel<1000",
+    "age": "<10",
+    "pct": 28
+   },
+   {
+    "segment": "Diesel 1000-1500",
+    "age": "<10",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 25
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 35.5
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 10
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 30
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 35
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 14
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 24.5
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "All",
+    "pct": 26.5
+   }
+  ],
+  "Assam_Good": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 35
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 32.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 7.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 20
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 42
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 35
+   }
+  ],
+  "Bangalore": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 15
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 17
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 20
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 34
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 35
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 42.5
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 37.5
+   }
+  ],
+  "Bihar_Bad": [
+   {
+    "segment": "CNG>1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "<10",
+    "pct": 25
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 51.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 44.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 52
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "<10",
+    "pct": 47.5
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": ">10",
+    "pct": 52
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": "<10",
+    "pct": 0
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": ">10",
+    "pct": 20
+   },
+   {
+    "segment": "CNG<1000",
+    "age": "<10",
+    "pct": 17.5
+   },
+   {
+    "segment": "CNG<1000",
+    "age": ">10",
+    "pct": 17.5
+   }
+  ],
+  "Bihar_Good": [
+   {
+    "segment": "CNG<1000",
+    "age": "<10",
+    "pct": 10
+   },
+   {
+    "segment": "CNG<1000",
+    "age": ">10",
+    "pct": 47.5
+   },
+   {
+    "segment": "CNG>1000",
+    "age": "<10",
+    "pct": 47.5
+   },
+   {
+    "segment": "CNG>1000",
+    "age": ">10",
+    "pct": 42.5
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "<10",
+    "pct": 29.5
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 37.5
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 42.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 42
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 44.5
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 50
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 50
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "All",
+    "pct": 55
+   }
+  ],
+  "CG_Good": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 25
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 28
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 30
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 30
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 30
+   }
+  ],
+  "Chd_Tricity": [
+   {
+    "segment": "CNG<1000",
+    "age": ">10",
+    "pct": 0
+   },
+   {
+    "segment": "CNG<1000",
+    "age": "<10",
+    "pct": 28
+   },
+   {
+    "segment": "CNG>1000",
+    "age": "All",
+    "pct": 29
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "<10",
+    "pct": 15
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 10
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 30
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 25
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 43.5
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 41
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 35
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 25
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 50
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 38.5
+   }
+  ],
+  "Delhi": [
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 32
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 29.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 14.5
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 31
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 10
+   },
+   {
+    "segment": "CNG >1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": ">10",
+    "pct": 0
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": "<10",
+    "pct": 2.5
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 10
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 50
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 51
+   },
+   {
+    "segment": "CNG<1000",
+    "age": "<10",
+    "pct": 0
+   },
+   {
+    "segment": "CNG<1000",
+    "age": ">10",
+    "pct": 2.5
+   }
+  ],
+  "GJ_Ahd_Baroda": [
+   {
+    "segment": "CNG 1000-1500",
+    "age": "<10",
+    "pct": 33.5
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": ">10",
+    "pct": 37.5
+   },
+   {
+    "segment": "CNG<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "CNG>1500",
+    "age": "<10",
+    "pct": 44.5
+   },
+   {
+    "segment": "CNG>1500",
+    "age": ">10",
+    "pct": 50
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 39
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 45
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 43
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "All",
+    "pct": 52
+   },
+   {
+    "segment": "CNG<1000",
+    "age": "<10",
+    "pct": 20
+   },
+   {
+    "segment": "CNG<1000",
+    "age": ">10",
+    "pct": 35.5
+   }
+  ],
+  "GJ_Bad1": [
+   {
+    "segment": "CNG 1000-1500",
+    "age": "All",
+    "pct": 25
+   },
+   {
+    "segment": "CNG<1000",
+    "age": "<10",
+    "pct": 26
+   },
+   {
+    "segment": "CNG<1000",
+    "age": ">10",
+    "pct": 10
+   },
+   {
+    "segment": "CNG>1500",
+    "age": "All",
+    "pct": 30
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "<10",
+    "pct": 15
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 34
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 39
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 33.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 28.5
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "<10",
+    "pct": 51
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": ">10",
+    "pct": 47.5
+   }
+  ],
+  "GJ_Bad2": [
+   {
+    "segment": "CNG 1000-1500",
+    "age": "<10",
+    "pct": 23
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": ">10",
+    "pct": 20.5
+   },
+   {
+    "segment": "CNG<1000",
+    "age": "<10",
+    "pct": 30
+   },
+   {
+    "segment": "CNG<1000",
+    "age": ">10",
+    "pct": 32.5
+   },
+   {
+    "segment": "CNG>1500",
+    "age": "<10",
+    "pct": 30
+   },
+   {
+    "segment": "CNG>1500",
+    "age": ">10",
+    "pct": 35
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "<10",
+    "pct": 14
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 34
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 42.5
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 42.5
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 39
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 34.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 33.5
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 51
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 48
+   }
+  ],
+  "GJ_Good": [
+   {
+    "segment": "CNG 1000-1500",
+    "age": "<10",
+    "pct": 28.5
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": ">10",
+    "pct": 42.5
+   },
+   {
+    "segment": "CNG<1000",
+    "age": "<10",
+    "pct": 17.5
+   },
+   {
+    "segment": "CNG<1000",
+    "age": ">10",
+    "pct": 35
+   },
+   {
+    "segment": "CNG>1500",
+    "age": "All",
+    "pct": 44.5
+   },
+   {
+    "segment": "Diesel 1000-1500",
+    "age": "<10",
+    "pct": 15
+   },
+   {
+    "segment": "Diesel<1000",
+    "age": "<10",
+    "pct": 15
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 36.5
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 45
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 46
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 52
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 46
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 20
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "All",
+    "pct": 52
+   }
+  ],
+  "GJ_MH_Ref": [
+   {
+    "segment": "CNG<1000",
+    "age": "<10",
+    "pct": 2.5
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": "<10",
+    "pct": 2.5
+   },
+   {
+    "segment": "CNG>1500",
+    "age": "All",
+    "pct": 2.5
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": ">10",
+    "pct": 28
+   },
+   {
+    "segment": "CNG<1000",
+    "age": ">10",
+    "pct": 28
+   },
+   {
+    "segment": "Diesel 1000-1500",
+    "age": "<10",
+    "pct": 5
+   },
+   {
+    "segment": "Diesel 1000-1500",
+    "age": ">10",
+    "pct": 5
+   },
+   {
+    "segment": "Diesel<1000",
+    "age": ">10",
+    "pct": 2.5
+   },
+   {
+    "segment": "Diesel<1000",
+    "age": "<10",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 10
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 20
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 10
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "<10",
+    "pct": 26
+   },
+   {
+    "segment": "RI",
+    "age": ">10",
+    "pct": 27.5
+   }
+  ],
+  "GJ_Surat": [
+   {
+    "segment": "CNG 1000-1500",
+    "age": "<10",
+    "pct": 33.5
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": ">10",
+    "pct": 40
+   },
+   {
+    "segment": "CNG<1000",
+    "age": "All",
+    "pct": 28
+   },
+   {
+    "segment": "CNG>1500",
+    "age": "All",
+    "pct": 44.5
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 39
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 45
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 46
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "All",
+    "pct": 52
+   }
+  ],
+  "Goa": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 2.5
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "<10",
+    "pct": 14
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 49
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 50.5
+   },
+   {
+    "segment": "Petrol",
+    "age": "All",
+    "pct": 50.5
+   }
+  ],
+  "HP_Bad": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 2.5
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 2.5
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 2.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 2.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 2.5
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 2.5
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 2.5
+   }
+  ],
+  "HP_Good": [
+   {
+    "segment": "Diesel<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 40
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 20
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 31
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "All",
+    "pct": 43.5
+   },
+   {
+    "segment": "Diesel 1000-1500",
+    "age": ">10",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel 1000-1500",
+    "age": "<10",
+    "pct": 2.5
+   }
+  ],
+  "HR_Bad": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 17
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 17
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "All",
+    "pct": 5
+   }
+  ],
+  "HR_Good": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "All",
+    "pct": 25
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 19
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 10
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 26
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 30
+   }
+  ],
+  "JH_Bad": [
+   {
+    "segment": "CNG>1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": "<10",
+    "pct": 20
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": ">10",
+    "pct": 20
+   },
+   {
+    "segment": "CNG<1000",
+    "age": "<10",
+    "pct": 20
+   },
+   {
+    "segment": "CNG<1000",
+    "age": ">10",
+    "pct": 20
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 20
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 34.5
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 44
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 40
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 46
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 40
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 50
+   }
+  ],
+  "Jharkhand": [
+   {
+    "segment": "CNG>1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": "<10",
+    "pct": 10
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": ">10",
+    "pct": 10
+   },
+   {
+    "segment": "CNG<1000",
+    "age": "<10",
+    "pct": 10
+   },
+   {
+    "segment": "CNG<1000",
+    "age": ">10",
+    "pct": 10
+   },
+   {
+    "segment": "Diesel 1000-1500",
+    "age": "<10",
+    "pct": 15
+   },
+   {
+    "segment": "Diesel<1000",
+    "age": "<10",
+    "pct": 10
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 34.5
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 7.5
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "All",
+    "pct": 47
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 40
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 44.5
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "All",
+    "pct": 40
+   }
+  ],
+  "JK_Bad": [
+   {
+    "segment": "CNG<1000",
+    "age": "All",
+    "pct": 10
+   },
+   {
+    "segment": "CNG>1000",
+    "age": "<10",
+    "pct": 30
+   },
+   {
+    "segment": "CNG>1000",
+    "age": ">10",
+    "pct": 40
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "<10",
+    "pct": 10
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 34
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 20
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 7.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 10
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "<10",
+    "pct": 20
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": ">10",
+    "pct": 40.5
+   }
+  ],
+  "JK_Good": [
+   {
+    "segment": "CNG<1000",
+    "age": "All",
+    "pct": 2.5
+   },
+   {
+    "segment": "CNG>1000",
+    "age": "All",
+    "pct": 48.5
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "<10",
+    "pct": 47
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 47
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 50.5
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 49
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 45.5
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "All",
+    "pct": 51
+   }
+  ],
+  "Kerala": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 18
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 21
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 10
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "All",
+    "pct": 21
+   }
+  ],
+  "MH_Pune": [
+   {
+    "segment": "CNG 1000-1500",
+    "age": "<10",
+    "pct": 35
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": ">10",
+    "pct": 5
+   },
+   {
+    "segment": "CNG<1000",
+    "age": "All",
+    "pct": 5
+   },
+   {
+    "segment": "CNG>1500",
+    "age": "<10",
+    "pct": 5
+   },
+   {
+    "segment": "CNG>1500",
+    "age": ">10",
+    "pct": 5
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 27
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 42.5
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 38
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 30
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 34.5
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 52.5
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 42.5
+   }
+  ],
+  "MP_Bad": [
+   {
+    "segment": "Diesel",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   }
+  ],
+  "MP_Good": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 20
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "<10",
+    "pct": 5
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": ">10",
+    "pct": 25
+   }
+  ],
+  "Mumbai": [
+   {
+    "segment": "CNG<1000",
+    "age": "<10",
+    "pct": 41
+   },
+   {
+    "segment": "CNG<1000",
+    "age": ">10",
+    "pct": 30
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": "<10",
+    "pct": 42.5
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": ">10",
+    "pct": 30.5
+   },
+   {
+    "segment": "CNG>1500",
+    "age": "<10",
+    "pct": 42.5
+   },
+   {
+    "segment": "CNG>1500",
+    "age": ">10",
+    "pct": 55
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 32
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 54
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 50
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "All",
+    "pct": 53.5
+   }
+  ],
+  "Mumbai2": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 20
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "<10",
+    "pct": 21
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 31
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 45.5
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 47.5
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 48.5
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 54
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 47.5
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 41
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 53.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 40
+   }
+  ],
+  "NCR": [
+   {
+    "segment": "CNG>1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": "<10",
+    "pct": 16
+   },
+   {
+    "segment": "CNG<1000",
+    "age": ">10",
+    "pct": 7.5
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": ">10",
+    "pct": 0
+   },
+   {
+    "segment": "CNG<1000",
+    "age": "<10",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 10
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 38
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 40
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 32
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 23.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 18.5
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "All",
+    "pct": 51
+   }
+  ],
+  "NE_Ref": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 22
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 21.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 20
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 19
+   }
+  ],
+  "North_East": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 26
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 27
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 31
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 31
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 40
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 50
+   }
+  ],
+  "North_Ref": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 20
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 30
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 20
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "All",
+    "pct": 36
+   }
+  ],
+  "Orissa_Good": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 10
+   },
+   {
+    "segment": "Diesel 1000-1500",
+    "age": "<10",
+    "pct": 2.5
+   },
+   {
+    "segment": "Diesel<1000",
+    "age": "<10",
+    "pct": 10
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 27.5
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 40
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 37.5
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 24
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 34
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 10
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 34
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 50
+   }
+  ],
+  "PB_Bad": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 15
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "<10",
+    "pct": 31.5
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 35
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 51.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 46
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "<10",
+    "pct": 37.5
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": ">10",
+    "pct": 54.5
+   }
+  ],
+  "PB_Good": [
+   {
+    "segment": "CNG<1000",
+    "age": "All",
+    "pct": 28
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": "<10",
+    "pct": 20
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": ">10",
+    "pct": 40
+   },
+   {
+    "segment": "CNG>1500",
+    "age": "All",
+    "pct": 20
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "<10",
+    "pct": 35
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 37.5
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 50
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 51.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 52.5
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 53.5
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 53.5
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 55
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 53.5
+   }
+  ],
+  "Rest_of_KA_Bad": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 2.5
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 15
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 26
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 30
+   }
+  ],
+  "Rest_of_KA_Good": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "All",
+    "pct": 15
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 25
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "All",
+    "pct": 41
+   }
+  ],
+  "RJ_Bad": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "<10",
+    "pct": 25
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": ">10",
+    "pct": 12.5
+   }
+  ],
+  "RJ_Good": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 24
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 12
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 5
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "All",
+    "pct": 25
+   }
+  ],
+  "ROMG_Bad": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 15
+   },
+   {
+    "segment": "Diesel 1000-1500",
+    "age": "<10",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel 1000-1500",
+    "age": ">10",
+    "pct": 7.5
+   },
+   {
+    "segment": "Diesel<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 43
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 28
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 35.5
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 47.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 28
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 35.5
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 51
+   }
+  ],
+  "ROMG_Good": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 15
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 45
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 43
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 43
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 32.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 28.5
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 43
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 45
+   },
+   {
+    "segment": "Diesel<1000",
+    "age": "<10",
+    "pct": 15
+   },
+   {
+    "segment": "Diesel 1000-1500",
+    "age": "<10",
+    "pct": 7.5
+   }
+  ],
+  "South_Ref": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol",
+    "age": "All",
+    "pct": 0
+   }
+  ],
+  "TN_Good": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 5
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 15
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 32.5
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 25.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 17
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "All",
+    "pct": 35
+   }
+  ],
+  "UK_Bad": [
+   {
+    "segment": "CNG<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "CNG>1000",
+    "age": "All",
+    "pct": 40
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "<10",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": ">10",
+    "pct": 28
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 38
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 44.5
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 37
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 20
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 50
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 48
+   }
+  ],
+  "UK_Good": [
+   {
+    "segment": "CNG<1000",
+    "age": "All",
+    "pct": 40.5
+   },
+   {
+    "segment": "CNG>1000",
+    "age": "All",
+    "pct": 43
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 28
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 15
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 32.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 33.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 31
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "All",
+    "pct": 48
+   }
+  ],
+  "UP_Bad": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 30
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 29.5
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 29.5
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 32.5
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 31
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 22.5
+   }
+  ],
+  "UP_Good1": [
+   {
+    "segment": "CNG<1000",
+    "age": ">10",
+    "pct": 0
+   },
+   {
+    "segment": "CNG>1000",
+    "age": "All",
+    "pct": 31.5
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 17.5
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 38
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 38
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 25
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 44
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 44
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 50
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 44
+   },
+   {
+    "segment": "CNG<1000",
+    "age": "<10",
+    "pct": 10
+   }
+  ],
+  "UP_Near_UK": [
+   {
+    "segment": "CNG<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "CNG>1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 25
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 35
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 38
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 28
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 18
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "All",
+    "pct": 40
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": "<10",
+    "pct": 10
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": ">10",
+    "pct": 10
+   }
+  ],
+  "UP_UK_WB_REF": [
+   {
+    "segment": "CNG",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "All",
+    "pct": 10
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 15
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 15
+   }
+  ],
+  "WB_Bad": [
+   {
+    "segment": "CNG<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "CNG<1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 44
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 43
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "All",
+    "pct": 43
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": "All",
+    "pct": 15
+   }
+  ],
+  "WB_Good": [
+   {
+    "segment": "CNG<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "CNG<1500",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel<1000",
+    "age": "All",
+    "pct": 0
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "All",
+    "pct": 47
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "<10",
+    "pct": 0
+   },
+   {
+    "segment": "Petrol>1000",
+    "age": "All",
+    "pct": 40
+   },
+   {
+    "segment": "CNG 1000-1500",
+    "age": "All",
+    "pct": 15
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": ">10",
+    "pct": 15
+   },
+   {
+    "segment": "Diesel 1000-1500",
+    "age": "<10",
+    "pct": 10
+   }
+  ],
+  "WB_Kolkata": [
+   {
+    "segment": "CNG>1500",
+    "age": "All",
+    "pct": 5
+   },
+   {
+    "segment": "Diesel<1000-1500",
+    "age": "All",
+    "pct": 25
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": "<10",
+    "pct": 50
+   },
+   {
+    "segment": "Diesel>1500",
+    "age": ">10",
+    "pct": 45.5
+   },
+   {
+    "segment": "Petrol<1000",
+    "age": "All",
+    "pct": 46
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": "<10",
+    "pct": 50
+   },
+   {
+    "segment": "Petrol 1000-1500",
+    "age": ">10",
+    "pct": 50
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": "<10",
+    "pct": 55
+   },
+   {
+    "segment": "Petrol>1500",
+    "age": ">10",
+    "pct": 55
+   },
+   {
+    "segment": "CNG <1500",
+    "age": "All",
+    "pct": 15
+   },
+   {
+    "segment": "Diesel<1000",
+    "age": ">10",
+    "pct": 15
+   }
+  ]
+ }
+}

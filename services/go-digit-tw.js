@@ -26,7 +26,7 @@ function segmentOf(params) {
   const hay = `${norm(params.make)} ${norm(params.model)}`;
   const fuel = norm(params.fuelType);
   if (/ELECTRIC|\bEV\b|BATTERY/.test(fuel) ||
-      /ACTIVA|JUPITER|FASCINO|ACCESS|\bDIO\b|NTORQ|MAESTRO|PLEASURE|VESPA|SCOOT|DESTINI|XOOM|\bRAY\b|BURGMAN|AVIATOR|CHETAK|IQUBE|\bZEST\b|GRAZIA|RITMO|FASCINO/.test(hay)) {
+      /ACTIVA|JUPITER|FASCINO|ACCESS|\bDIO\b|NTORQ|MAESTRO|PLEASURE|VESPA|SCOOT|DESTINI|XOOM|\bRAY\b|BURGMAN|AVIATOR|CHETAK|IQUBE|\bZEST\b|GRAZIA|RITMO|WEGO|GUSTO|\bDURO\b|RODEO|\bDUET\b|SWISH|AEROX|\bVIDA\b|ATHER|AMPERE|\bOLA\b|\bLETS\b|ALPHA|CYGNUS/.test(hay)) {
     return 'SC/EV';
   }
   const cc = Number(params.cc) || 0;

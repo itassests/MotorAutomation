@@ -1228,7 +1228,17 @@ function extractPolicyParams(policy) {
     get('VehicalCategory_Updated') || get('VehicalCategoryname') || get('VehicalCategoryName') || '').toString().trim();
   const make = get('VEHICAL MAKE') || get('MAKE') || get('Make') || '';
   const model = get('VEHICAL MODEL') || get('MODEL') || get('Model') || '';
-  const fuelType = get('FUEL TYPE') || get('FuelType') || '';
+  let fuelType = get('FUEL TYPE') || get('FuelType') || get('FUELTYPE') ||
+    get('VEHICAL_FUELTYPE') || get('VEHICAL FUELTYPE') || get('VEHICAL_FUEL_TYPE') || '';
+  // Data-quality guard: a model carrying an UNAMBIGUOUS PETROL engine badge
+  // (VTVT/VVT-i/MPI/Kappa/i-VTEC/Dualjet — none of which exist on a diesel) but a
+  // source fuel of Diesel/CNG is a mis-tag → treat as Petrol. (USER GJ4/33884
+  // Hyundai "Verna-VTVT SX 1.6" tagged DIESEL → took HDFC SATP NCR Diesel 40
+  // instead of Petrol 60; a diesel Verna is "CRDi", and 1599cc is the 1.6 VTVT.)
+  if (/\bVTVT\b|\bVVT-?I\b|\bMPI\b|KAPPA|\bI-?VTEC\b|DUALJET/i.test(String(model)) &&
+      /^(DIESEL|CNG|LPG|BI[\s-]?FUEL)$/i.test(String(fuelType).trim())) {
+    fuelType = 'Petrol';
+  }
   const rtoCode = get('Code') || get('RTO') || get('RTO CODE') || '';
   // RTO fallback from the tracker number: operator trackers encode the RTO
   // as the 3rd slash-segment (e.g. "MT/DIRSW/MH36/1785/FY26-27/1" → "MH36").
@@ -1274,7 +1284,19 @@ function extractPolicyParams(policy) {
   const tpTenure = _years(get('TP POLICY START DATE') || get('TP_POLICY_START_DATE') || get('TP START DATE'),
                           get('TP POLICY END DATE') || get('TP_POLICY_END_DATE') || get('TP END DATE'));
   const bundledTag = (odTenure && tpTenure) ? `${odTenure}+${tpTenure}` : null;
-  const vehicleSubModel = get('VEHICAL SUBMODAL') || '';
+  const vehicleSubModel = get('VEHICAL SUBMODAL') || get('Vehicle_Sub_Model') || get('VEHICLE SUB MODEL') || get('VEHICAL_SUB_MODEL') || '';
+  // Blank source fuel — infer from the model / sub-model badge. The Prarambh feed often
+  // ships FUELTYPE/VEHICAL_FUELTYPE empty but carries the fuel in the sub-model text
+  // (e.g. Wagon R "1.0 LXI CNG-Hatch Back" → CNG). Needed for fuel-keyed grids (Liberty
+  // Pvt-Car, SBI SATP, …) that drop to no-rule without a fuel. USER GJ10/2283 Wagon R → CNG.
+  if (!String(fuelType || '').trim()) {
+    const _badge = `${model || ''} ${vehicleSubModel || ''}`.toUpperCase();
+    if (/\bCNG\b/.test(_badge)) fuelType = 'CNG';
+    else if (/\bLPG\b/.test(_badge)) fuelType = 'LPG';
+    else if (/ELECTRIC|\bEV\b|BATTERY/.test(_badge)) fuelType = 'Electric';
+    else if (/\bDIESEL\b|\bCRDI\b|\bDDIS\b|\bTDI\b|DICOR|QUADRAJET|MULTIJET|\bTDCI\b|\bMJD\b/.test(_badge)) fuelType = 'Diesel';
+    else if (/\bPETROL\b|\bVTVT\b|\bVVT\b|\bMPI\b|KAPPA|\bVTEC\b|DUALJET/.test(_badge)) fuelType = 'Petrol';
+  }
   const vehicleRegNo = (get('VEHICLE REGISTRATION NO') || get('VEHICLE REG NO') || get('VEHICLE NO') || get('REGISTRATION NO') || get('REG NO') || get('REGN NO') || get('VEHICLE REGISTRATION NUMBER') || '').toString().trim();
 
   // Seating capacity
@@ -1437,6 +1459,75 @@ function extractPolicyParams(policy) {
   if ((mappedVehicleType === 'MISC' || mappedVehicleType === 'GCV' || mappedVehicleType === 'PCV') &&
       /^\s*PVT\.?\s*CAR\s*$/i.test(String(get('VEHICAL_TYPE_Id') || '')) &&
       /MARUTI|SUZUKI|HYUNDAI|HONDA|TOYOTA|\bKIA\b|RENAULT|NISSAN|DATSUN|VOLKSWAGEN|\bVW\b|SKODA|\bFORD\b|\bMG\b|FIAT|CHEVROLET|\bAUDI\b|\bBMW\b|MERCEDES|VOLVO|JAGUAR|LAND\s*ROVER|LEXUS|\bMINI\b|CITROEN|\bBYD\b|POLESTAR/i.test(String(make || ''))) {
+    mappedVehicleType = 'CAR';
+  }
+  // Data-quality guard (reverse): a COMMERCIAL-goods vehicle mis-typed as CAR. The
+  // source typed an Ashok Leyland Dost (a 2.8T goods LCV) as VEHICAL_TYPE_Id
+  // "Pvt.Car" → it took the ICICI Pvt-Car Package rate (30) instead of the SCV rate
+  // (SURAT SCV >=2.45T Old = 43 = operator). Gate on a COMMERCIAL-ONLY make (never a
+  // passenger-car maker) so genuine Tata/Mahindra cars stay CAR. A bus (seating>10)
+  // → PCV, else goods → GCV. USER-confirmed (GJ7/35520 Dost 30→43).
+  if (mappedVehicleType === 'CAR' &&
+      /ASHOK\s*LEYLAND|BHARAT\s*BENZ|BHARATBENZ|SML\s*ISUZU|\bAMW\b|ASIA\s*MOTOR\s*WORKS/i.test(String(make || ''))) {
+    mappedVehicleType = Number(seatingCapacity) > 10 ? 'PCV' : 'GCV';
+  }
+  // Data-quality guard: a PURE agricultural-tractor make (Kubota / John Deere / Sonalika
+  // etc. — these builders make NO passenger cars) typed as "Pvt Car"/GCV is a mis-typed
+  // farm tractor. The source typed a KUBOTA MU4501 (45-HP, 1-seat) as CAR → it took the
+  // SBI Pvt-Car max-tier 30 instead of the Agricultural-Tractor 57. Re-type → MISC so the
+  // SBI agri-tractor handler picks the New/Non-New Agri rate. Mahindra/Eicher/Force are
+  // EXCLUDED (they also make cars/SUVs). USER-confirmed (MH25/1498 Kubota 30→57).
+  if ((mappedVehicleType === 'CAR' || mappedVehicleType === 'GCV') &&
+      /KUBOTA|JOHN\s*DEERE|\bDEERE\b|SONALIKA|SWARAJ|FARMTRAC|POWERTRAC|MASSEY|\bSOLIS\b|\bPREET\b|INDO\s*FARM|\bVST\b|SAME\s*DEUTZ|NEW\s*HOLLAND|ESCORTS?/i.test(String(make || ''))) {
+    mappedVehicleType = 'MISC';
+  }
+  // Same commercial-only makes mis-typed as MISC "Tractor": Ashok Leyland / Bharat
+  // Benz / SML Isuzu / AMW make NO agricultural tractors, so an AL tagged
+  // "MISC - D - Tractor" is a mis-typed goods LCV (Bada Dost — a ~2.9T SCV) — it took
+  // the SBI Agri-Tractor rate (43) instead of the GCV-4W 2.5-3.5T rate (Punjab
+  // TATA&AL age1-5 Above-25L = 46 = operator). Scoped to the "Tractor" category so
+  // genuine MISC-D-Others (transit mixers etc.) stay MISC. Bus (seating>10) → PCV,
+  // else goods → GCV. USER-confirmed (PJ3/5591 Bada Dost 43→46).
+  if (mappedVehicleType === 'MISC' &&
+      /TRACTOR/i.test(vehicalCategoryRaw) &&
+      /ASHOK\s*L[AE]YLAND|BHARAT\s*BENZ|BHARATBENZ|SML\s*ISUZU|\bAMW\b|ASIA\s*MOTOR\s*WORKS/i.test(String(make || ''))) {
+    mappedVehicleType = Number(seatingCapacity) > 10 ? 'PCV' : 'GCV';
+  }
+  // Data-quality guard: a CAR whose MODEL / SUB-MODEL carries an UNAMBIGUOUS
+  // goods-pickup name ("Maxi Truck", "Pik-Up / Pick Up", "Maxx Pik-Up") is a
+  // mis-typed goods LCV — the source types some Mahindra/Tata pickups as
+  // VehicalCategory "Car" (Mahindra Bolero sub-model "Maxi Truck Plus" → took the
+  // HDFC Pvt-Car Robinhood 19.5 instead of the Ahmedabad GCV 2.5-3.5T Bolero 60).
+  // "Camper" is deliberately EXCLUDED — the Bolero Camper has passenger 5-seater
+  // "Saloon/Gold ZX" trims that would be false-caught. Genuine SUVs never carry a
+  // "Maxi Truck"/"Pick Up" token, so they stay CAR. → GCV.
+  // USER-confirmed (GJ7/35525 "BOLERO / MAXI TRUCK PLUS").
+  if (mappedVehicleType === 'CAR') {
+    const _gm = `${model || ''} ${vehicleSubModel || ''}`.toUpperCase();
+    const _mk = String(make || '').toUpperCase();
+    const pickupToken = /MAXI\s*TRUCK|MAXITRUCK|PIK[\s-]?UP|PICK[\s-]?UP|MAXX\s*PIK|MAXX\s*PICK|CITY\s*PIK/.test(_gm);
+    // Goods mini-trucks (SCV) mis-typed as "Car" — MAKE-AWARE with word-boundaries
+    // to avoid passenger false-catches: \bACE\b must not hit "HiAce"/"Acenta", and
+    // gating make=TATA avoids Jaguar "F-Pace". Tata Ace/Intra/Yodha/407 and Maruti
+    // Super Carry are unambiguously goods carriers. (USER GJ7/35538 Tata Ace-Mega XL
+    // → HDFC Pvt-Car Robinhood 27.5 instead of the ROG GCV 0-2.5T 65.)
+    const goodsModel =
+      (/TATA/.test(_mk) && /\bACE\b|\bINTRA\b|\bYODHA\b|\b407\b/.test(_gm)) ||
+      (/MARUTI|SUZUKI/.test(_mk) && /SUPER\s*CARRY/.test(_gm));
+    if (pickupToken || goodsModel) mappedVehicleType = 'GCV';
+  }
+  // Data-quality guard (reverse): a PASSENGER CAR mis-typed "Commercial-Goods Carrying".
+  // The source typed a Maruti Wagon R 1.0 Vxi (998cc petrol, 5-seat) as VehicalCategory
+  // "GCV - 4W 20-40Tn" → it took a heavy-truck 16% instead of the Pvt-Car 30%. A real
+  // 3.5T+ goods truck never has a ≤1600cc engine + 4-6 seats. Gate on a PURE passenger-car
+  // make (no goods vehicles) + small engine + passenger seating + NOT a goods model, so
+  // genuine small commercials (Ace/Eeco/Super-Carry, 2-seat) stay GCV. → CAR.
+  // USER-confirmed (MH41/13 Wagon R 16→30).
+  if (mappedVehicleType === 'GCV' &&
+      /MARUTI|SUZUKI|HYUNDAI|HONDA|TOYOTA|\bKIA\b|RENAULT|NISSAN|DATSUN|VOLKSWAGEN|\bVW\b|SKODA|\bFORD\b|\bMG\b|FIAT|CHEVROLET|\bAUDI\b|\bBMW\b|MERCEDES|VOLVO|JAGUAR|LAND\s*ROVER|LEXUS|CITROEN|\bBYD\b/i.test(String(make || '')) &&
+      Number(seatingCapacity) >= 4 && Number(seatingCapacity) <= 6 &&
+      Number(cc) > 0 && Number(cc) <= 1600 &&
+      !/SUPER\s*CARRY|\bEECO\b|\bOMNI\b|\bCARRY\b|CARGO|\bDOST\b|\bACE\b|PICK[\s-]?UP|MAXI|MAGIC|SUPRO|JEETO|INTRA|YODHA|\b407\b/i.test(`${model || ''} ${vehicleSubModel || ''}`.toUpperCase())) {
     mappedVehicleType = 'CAR';
   }
   // Data-quality guard: an explicit "MOTORCYCLE" make on a commercial (GCV/PCV) type
@@ -2547,14 +2638,17 @@ function filterRulesByPolicy(rules, params, _trace) {
               : (params.hasNilDep === true ||
                  /NIL\s*DEP|ZERO\s*DEP/i.test(`${params.addonText || ''} ${vehicleCategory}`));
           } else if (_isMumbai) {
-            // Shriram MUMBAI taxi 45 (With NIL DEP) / 52 (Without): the operator's
-            // nil-dep split tracks the ACTUAL zero-dep ADD-ON premium, not PR
-            // zero_dep (which is YES for both here). Addon_Premium>0 → nil-dep →
-            // 45; =0 → 52. USER MH20/6745 (MH-05, addon 9525→45) vs MH14/6849
-            // (MH-02, addon 0→52, both zero_dep=YES).
+            // Shriram MUMBAI taxi 45 (With NIL DEP) / 52 (Without). The
+            // authoritative nil-dep signal is TRN_PrarambhMotorDetails.Depreciation
+            // (1 = Nil-Dep → 45, 2 = No → 52), surfaced as params._depreciation.
+            // Fall back to the zero-dep ADD-ON premium only when it's absent.
+            // (USER MH14/7349 Depreciation=1 → 45; the add-on premium read 0 and
+            // wrongly gave 52.)
             remWithNilDep = /WITH\s+NIL\s*DEP/.test(rem) && !/WITHOUT\s+NIL\s*DEP/.test(rem);
             remWithoutNilDep = /WITHOUT\s+NIL\s*DEP/.test(rem);
-            polHasNilDep = (Number(params.addonPremium) || 0) > 0;
+            polHasNilDep = (params._depreciation === 1) ? true
+              : (params._depreciation === 2) ? false
+              : (Number(params.addonPremium) || 0) > 0;
           } else {
             remWithNilDep = /WITH\s+NIL\s*DEP/.test(rem) && !/WITHOUT\s+NIL\s*DEP/.test(rem);
             remWithoutNilDep = /WITHOUT\s+NIL\s*DEP/.test(rem);

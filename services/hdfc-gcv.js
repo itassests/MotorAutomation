@@ -70,6 +70,9 @@ function interpret(text, base, ctx) {
   // "47.5% in Bolero, 50% in Others"
   m = low.match(/([\d.]+)% in bolero,\s*([\d.]+)% in others/);
   if (m) return isBolero ? +m[1] / 100 : +m[2] / 100;
+  // "Bolero 50%, Others 52.5% [(5% less BDE in New)]" (make-first, no "in")
+  m = low.match(/bolero ([\d.]+)%,\s*others ([\d.]+)%/);
+  if (m) return isBolero ? +m[1] / 100 : +m[2] / 100;
   // "60% in Tata and 55% Otherwise"
   m = low.match(/([\d.]+)% in tata and ([\d.]+)% otherwise/);
   if (m) return isTata ? +m[1] / 100 : +m[2] / 100;
@@ -143,23 +146,43 @@ function gcvRtoMap() {
   return GCV_RTO;
 }
 
+// RTO → specific-city token (mumbai/pune/nagpur/nashik/good/ahemedabad/bad/kolkata/…),
+// from the GCV grid's "RTO" sheet col "RTOs". The grouped location above collapses
+// Mumbai+Pune+Goa into one string, but the 2.5-3.5T band files Mumbai and
+// Good/Pune/Goa as SEPARATE rows — so findRow needs the exact city to disambiguate.
+let GCV_CITY = null;
+function gcvCityMap() {
+  if (!GCV_CITY) { try { GCV_CITY = require(require('path').join(__dirname, '..', 'config', 'hdfc_gcv_rtocity.json')); } catch (_) { GCV_CITY = {}; } }
+  return GCV_CITY;
+}
+
 function gridLoc(region, rtoState, rtoCode) {
   const r = String(region || '').toUpperCase();
   const code = String(rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const city = code && gcvCityMap()[code] || null; // specific-city token for band-split disambiguation
   // Authoritative registration-RTO → (state, loc) wins over the region-name
   // heuristics below (which depend on the often-wrong resolved/booked region).
   const fromCode = code && gcvRtoMap()[code];
-  if (fromCode && fromCode.state && fromCode.loc) return { state: fromCode.state, loc: fromCode.loc };
+  if (fromCode && fromCode.state && fromCode.loc) return { state: fromCode.state, loc: fromCode.loc, city };
   // Gujarat: Sheet1 enumerates the Ahmedabad + Bad RTOs explicitly; any GJ RTO
   // NOT listed is the residual "Others, DD, DN" group — NOT "Bad" (the
   // TW-derived rto_mapping wrongly tags some unlisted GJ RTOs like GJ14 as "ROG
   // Bad locations"). Default unlisted GJ codes to Others, overriding region-name.
-  if (code.startsWith('GJ')) return { state: 'Gujarat', loc: 'Others, DD, DN' };
+  if (code.startsWith('GJ')) return { state: 'Gujarat', loc: 'Others, DD, DN', city };
   // Daman (DD*) & Dadra-Nagar-Haveli (DN*) are explicitly the Gujarat "Others,
   // DD, DN" location group — they have no GCV-RTO-map entry and their resolved
   // region (booked "Vapi Valsad" etc.) doesn't hit the loc heuristics, so map
   // them directly. USER GJ10/1637 (DN09 Bolero 2.5-3.5T SATP → base 0.55 +7.5% = 0.625).
-  if (code.startsWith('DD') || code.startsWith('DN')) return { state: 'Gujarat', loc: 'Others, DD, DN' };
+  if (code.startsWith('DD') || code.startsWith('DN')) return { state: 'Gujarat', loc: 'Others, DD, DN', city };
+  // North-East: the registration RTO is authoritative over a misleading booked
+  // region (e.g. an NL01 truck booked in Mumbai must NOT take the Maharashtra
+  // rate). Nagaland/Manipur/Arunachal have no own grid rows → the Assam NE
+  // grouping; Meghalaya/Mizoram/Tripura keep their own rows. (USER: MH36/2153
+  // NL01 Blazo was wrongly rated Maharashtra-Mumbai 20-25T 25%.)
+  const NE = { NL: 'Assam', MN: 'Assam', AR: 'Assam', AS: 'Assam',
+               ML: 'Meghalaya', MZ: 'Mizoram', TR: 'Tripura' };
+  const nePref = code.slice(0, 2);
+  if (NE[nePref]) return { state: NE[nePref], loc: 'All', city };
   let loc = null;
   // Specific city groups FIRST — note "BAD" must use a word boundary, else it
   // false-matches "ahmedaBAD"/"ahemedaBAD".
@@ -179,12 +202,20 @@ function gridLoc(region, rtoState, rtoCode) {
     else if (/MAHA|PUNE|MUMBAI|NAGPUR|NASHIK/.test(r) || code.startsWith('MH')) state = 'Maharashtra';
     else if (/NCR|DELHI/.test(r)) state = 'Delhi';
   }
-  return { state, loc };
+  return { state, loc, city };
 }
 
-function findRow(state, loc, band) {
+function findRow(state, loc, band, city) {
   const rows = grid().filter(r => r.state === state && r.band === band);
   if (!rows.length) return null;
+  // Specific-city match FIRST: a band may file the same location-group as
+  // separate rows (2.5-3.5T splits "Mumbai" from "Good, Pune, Goa"), so the
+  // grouped loc alone is ambiguous — the RTO's exact city disambiguates.
+  if (city) {
+    const tok = String(city).toLowerCase().replace(/[^a-z]/g, '');
+    const byCity = rows.find(r => String(r.loc).toLowerCase().split(',').some(p => p.replace(/[^a-z]/g, '') === tok));
+    if (byCity) return byCity;
+  }
   return rows.find(r => r.loc === loc)
       || rows.find(r => /^all/i.test(r.loc))
       || rows.find(r => /others/i.test(r.loc))
@@ -205,9 +236,9 @@ function resolveGcvRate(params, resolvedRegion, rtoState, isSatp) {
   if (/E-?RIK|E-?RICK/.test(cat)) return null;
   const band = bandFromCat(params.vehicleCategory, make + ' ' + model + ' ' + (params.vehicleSubModel || ''));
   if (!band) return undefined;
-  const { state, loc } = gridLoc(resolvedRegion, rtoState, params.rtoCode);
+  const { state, loc, city } = gridLoc(resolvedRegion, rtoState, params.rtoCode);
   if (!state) return undefined;
-  const row = findRow(state, loc, band);
+  const row = findRow(state, loc, band, city);
   if (!row) return undefined;
   // HDFC's "Tata" premium in the GCV cells applies to LIGHT Tata (Ace/SCV/pickup,
   // ≤3.5T). HEAVY Tata trucks (LPT/LPK, >7.5T) take the "others" rate instead, so

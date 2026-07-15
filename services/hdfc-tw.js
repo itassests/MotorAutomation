@@ -32,6 +32,15 @@ function findRow(state, loc, scooter, pt) {
   if (!rows.length) return null;
   return rows.find(r => r.loc && loc && r.loc.toUpperCase() === loc.toUpperCase())
       || rows.find(r => !r.loc || /^all$/i.test(r.loc))
+      // Unmapped RTO (loc is a booked-city that matched nothing): default to the
+      // clean "Rest of <state>" / "ROG location" row, NOT rows[0] — the first row is
+      // usually the metro (Bangalore 0.50), which over-credits rural RTOs that
+      // belong in "Rest of Karnataka" 0.20. EXCLUDE "Bad locations"/"Decline" rows:
+      // those enumerate SPECIFIC declined RTOs (via the RTO master), so an unmapped
+      // RTO that isn't on that list takes the normal rest-of rate, not the 0/decline.
+      // (USER BG3/5366 KA25 Belagavi scooter 50→20; GJ05/GJ18 unmapped bikes → "ROG
+      // location" 45, not "ROG Bad locations" 0.)
+      || rows.find(r => /rest of|^ro[a-z]\b|others|excluding/i.test(String(r.loc || '')) && !/bad|declin/i.test(String(r.loc || '')))
       || rows[0];
 }
 
@@ -99,7 +108,18 @@ function resolveTwSaodRate(params, resolvedRegion) {
   let rows = saodGrid().filter(r => r.state === state && segMatch(r));
   if (loc) {
     const byLoc = rows.filter(r => r.loc && r.loc.toUpperCase() === String(loc).toUpperCase());
-    if (byLoc.length) rows = byLoc; else rows = rows.filter(r => !r.loc || /^all$/i.test(r.loc)).length ? rows.filter(r => !r.loc || /^all$/i.test(r.loc)) : rows;
+    if (byLoc.length) rows = byLoc;
+    else {
+      // loc didn't match a SAOD row (the SAOD grid uses different location groups
+      // than the Comp/TP "Bad locations" master — e.g. an MH "Bad locations" RTO
+      // has no SAOD row). Prefer the "ROM"/"Rest of <state>" catch-all over the
+      // first-row default (which is an arbitrary metro like Nagpur). Skip
+      // Bad/Decline rows. (USER MH41/19 MH30 "Bad locations" Honda Shine SAOD:
+      // Nagpur 35 → ROM 30.)
+      const rest = rows.filter(r => /^rom\b|rest of|^ro[a-z]\b|others/i.test(String(r.loc || '')) && !/bad|declin/i.test(String(r.loc || '')));
+      const allR = rows.filter(r => !r.loc || /^all$/i.test(r.loc));
+      rows = rest.length ? rest : (allR.length ? allR : rows);
+    }
   }
   if (!rows.length) return undefined;
   // "exc X" applies only when make != X; drop rows excluded for this make.
@@ -119,4 +139,13 @@ function resolveTwSaodRate(params, resolvedRegion) {
   return n > 1 ? n / 100 : n;
 }
 
-module.exports = { resolveTwRate, resolveTwSaodRate, isScooter };
+// The authoritative TW (State,)Location for a policy's RTO — only when the RTO
+// is explicitly in the TW RTO master (returns null for fallback-resolved RTOs so
+// the caller keeps the existing region label). Used to correct the display region.
+function twLoc(params) {
+  const code = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const fromCode = code && rtoMap()[code];
+  return (fromCode && fromCode.loc) ? fromCode.loc : null;
+}
+
+module.exports = { resolveTwRate, resolveTwSaodRate, isScooter, twLoc };
