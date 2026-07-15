@@ -4192,12 +4192,11 @@
         const misTab = document.querySelector('.tab[data-tab="mis"]');
         if (misTab && misTab.style.display !== 'none') {
           window._landedDefault = true;
-          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-          document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-          misTab.classList.add('active');
-          const mp = document.getElementById('panel-mis');
-          if (mp) mp.classList.add('active');
-          if (typeof misInit === 'function') misInit();
+          // Defer to the next tick and trigger via the tab's own click handler, so
+          // the landing runs AFTER the login flow settles (overlay hidden, chrome
+          // rendered). Calling misInit() synchronously here — mid-login, while the
+          // login overlay is still up — left the dashboard blank until a refresh.
+          setTimeout(() => { misTab.click(); }, 0);
           return;
         }
       }
