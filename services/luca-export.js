@@ -278,16 +278,33 @@ async function buildLucaBuffer(ids) {
   const rq = pool.request();
   rq.timeout = 600000;
   const ph = idList.map((id, i) => { rq.input('c' + i, id); return '@c' + i; });
+  // Keep only the LATEST generation of each rate cell. Insurers leave older
+  // cards open (Royal has BOTH "CV Grid__1st May" and "CV Grid__14th June"
+  // effective today), so exporting every effective card mixes May+June rates
+  // and duplicates rows. Ranking each identity (insurer + all rate dimensions)
+  // by effective_from DESC and keeping rn=1 means the newest card wins where it
+  // restates a cell, while a cell only an older card has (e.g. Royal's May-only
+  // STP grid) survives — i.e. "June if available, else May". Mirrors the engine's
+  // per-cover "latest card ≤ date, else earliest" rule (services/rate-lookup.js).
   const result = await rq.query(`
-    SELECT rr.insurer, rr.product, rr.sheet_name, rr.region, rr.segment, rr.make,
-           rr.model, rr.sub_type, rr.fuel_type, rr.cc_band_min, rr.cc_band_max,
-           rr.age_band_min, rr.age_band_max, rr.weight_band_min, rr.weight_band_max,
-           rr.rate_type, rr.rate_value,
-           rr.remarks, rr.state, rc.effective_from
-    FROM rate_rules rr
-    JOIN rate_cards rc ON rc.id = rr.rate_card_id
-    WHERE rr.rate_card_id IN (${ph.join(',')})
-      AND rr.rate_value IS NOT NULL`);
+    WITH picked AS (
+      SELECT rr.insurer, rr.product, rr.sheet_name, rr.region, rr.segment, rr.make,
+             rr.model, rr.sub_type, rr.fuel_type, rr.cc_band_min, rr.cc_band_max,
+             rr.age_band_min, rr.age_band_max, rr.weight_band_min, rr.weight_band_max,
+             rr.rate_type, rr.rate_value,
+             rr.remarks, rr.state, rc.effective_from,
+             ROW_NUMBER() OVER (
+               PARTITION BY rr.insurer, rr.product, rr.sheet_name, rr.region, rr.segment,
+                            rr.make, rr.model, rr.sub_type, rr.fuel_type,
+                            rr.cc_band_min, rr.cc_band_max, rr.age_band_min, rr.age_band_max,
+                            rr.weight_band_min, rr.weight_band_max, rr.rate_type, rr.state
+               ORDER BY rc.effective_from DESC, rr.id DESC) AS rn
+      FROM rate_rules rr
+      JOIN rate_cards rc ON rc.id = rr.rate_card_id
+      WHERE rr.rate_card_id IN (${ph.join(',')})
+        AND rr.rate_value IS NOT NULL
+    )
+    SELECT * FROM picked WHERE rn = 1`);
 
   // Active company margins, loaded once — same source the payout engine uses.
   const marginRules = await loadMarginRules(pool);
