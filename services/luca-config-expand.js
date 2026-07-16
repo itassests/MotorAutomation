@@ -432,23 +432,27 @@ function isSuppressed(r) {
 /**
  * Expand every supported config-driven insurer.
  * @param {Map<string,Date|string>} effByInsurer  slug → the insurer's active
- *        card effective_from, so the exported rows carry the right generation.
+ *        card effective_from. Built from the CARDS THE CALLER ASKED FOR, so it
+ *        doubles as the insurer filter: an insurer absent from the map was not
+ *        requested and must NOT be expanded. Without this, /export/luca?insurer=zuno
+ *        returned Zuno PLUS every config insurer (IndusInd/Tata/Go Digit/…).
  * @returns {object[]} pseudo rate_rules rows.
  */
 function expandConfigRules(effByInsurer) {
   const eff = (slug) => (effByInsurer && effByInsurer.get(slug)) || null;
+  // No map at all (direct/test call) → expand everything; otherwise honour it.
+  const want = (slug) => !effByInsurer ? true : effByInsurer.has(slug);
   const ind = eff('indusind');
   const tat = eff('tata_aig');
   return [
-    ...indusindCar(ind),
-    ...indusindTw(ind),
-    ...indusindCv(ind),
-    ...tataCar(tat),
-    ...tataCv(tat),
-    ...goDigitCar(eff('go_digit')),
+    ...(want('indusind') ? [...indusindCar(ind), ...indusindTw(ind), ...indusindCv(ind)] : []),
+    ...(want('tata_aig') ? [...tataCar(tat), ...tataCv(tat)] : []),
+    ...(want('go_digit') ? goDigitCar(eff('go_digit')) : []),
     // Per-insurer plugin expanders (services/luca-expand/*.js)
     ...PLUGINS.flatMap((p) => {
-      try { return p.expand(eff(String(p.insurer || '').toLowerCase())) || []; }
+      const slug = String(p.insurer || '').toLowerCase();
+      if (!want(slug)) return [];
+      try { return p.expand(eff(slug)) || []; }
       catch (e) { console.warn('[luca-expand] ' + p.insurer + ' failed: ' + e.message); return []; }
     }),
   ];
