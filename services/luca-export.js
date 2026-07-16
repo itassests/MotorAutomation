@@ -149,9 +149,19 @@ function lucaNcb(rateType) {
   return '';
 }
 
+// Render a band (used for vehicle_cc and vehicle_age). Many bands are legitimately
+// OPEN-ENDED — "Motorcycle upto 155cc" has no lower bound, "Above 2500 CC" / "6+
+// years" no upper. The old `${min}-${max}` printed those as a dangling "-155" or
+// "2501-", which reads to an agent as a missing value rather than an open end.
+//   both ends → "181-350"
+//   no lower  → "0-155"      (i.e. upto 155)
+//   no upper  → "2501+"      (i.e. 2501 and above — works for cc AND age, where a
+//                             numeric sentinel like 9999 would be nonsense)
 function band(min, max) {
   if (min == null && max == null) return '';
-  return `${min == null ? '' : min}-${max == null ? '' : max}`;
+  if (min == null) return `0-${max}`;
+  if (max == null) return `${min}+`;
+  return `${min}-${max}`;
 }
 
 // ---- Canonical Luca state slug resolver -------------------------------------
