@@ -245,6 +245,54 @@ function expandMake(s) {
   return out.replace(/\s{2,}/g, ' ').trim();
 }
 
+// Luca keeps make (manufacturer) and model as SEPARATE fields, but some grids
+// put the MODEL in the make column: Bajaj files make = model = "Thar", ICICI
+// files make = "Omni" with an empty model. Map the model back to its maker so
+// vehicle_make is a real manufacturer and vehicle_model carries the model.
+// Only well-known models are listed — an unmapped value is left untouched
+// rather than risk asserting the wrong manufacturer to an agent.
+const MODEL_TO_MAKE = {
+  // Maruti Suzuki
+  'OMNI': 'Maruti Suzuki', 'CIAZ': 'Maruti Suzuki', 'IGNIS': 'Maruti Suzuki',
+  'JIMNY': 'Maruti Suzuki', 'GRAND VITARA': 'Maruti Suzuki',
+  // Hyundai
+  'CRETA': 'Hyundai', 'VENUE': 'Hyundai', 'ALCAZAR': 'Hyundai',
+  // Tata
+  'NEXON': 'Tata', 'HARRIER': 'Tata', 'SAFARI': 'Tata',
+  // Mahindra — "Max Pick Up"/"Max 2"/"Max 3" are the Maxx/Maxximo 2.5-3.5T GCV pickups
+  'THAR': 'Mahindra', 'XUV700': 'Mahindra', 'SCORPIO N': 'Mahindra',
+  'MAX PICK UP': 'Mahindra', 'MAX 2': 'Mahindra', 'MAX 3': 'Mahindra',
+  // Kia
+  'SELTOS': 'Kia', 'SONET': 'Kia', 'CARENS': 'Kia', 'CARNIVAL': 'Kia',
+  // Skoda
+  'KUSHAQ': 'Skoda', 'KODIAQ': 'Skoda',
+  // Volkswagen
+  'TAIGUN': 'Volkswagen', 'TIGUAN': 'Volkswagen',
+  // Toyota — Urban Cruiser Hyryder / Innova Hycross
+  'HYRYDER': 'Toyota', 'HYCROSS': 'Toyota',
+};
+// Sanitize vehicle_model. Some grids park a SEGMENT classifier in the model
+// column — "HE/UHE" / "Other than HE/UHE" (High-End / Ultra-High-End car tiers)
+// are not models and mean nothing to an agent. A genuine multi-model list
+// ("Ace, Super Ace, Yodha…") is left intact.
+function lucaModel(m) {
+  const s = String(m == null ? '' : m).trim();
+  if (!s) return '';
+  const u = s.toUpperCase().replace(/\s+/g, ' ');
+  if (/^(OTHER\s+THAN\s+)?(HE|UHE)(\s*\/\s*(HE|UHE))?$/.test(u)) return '';   // HE/UHE tier, not a model
+  if (/^(MODEL|MAKE|SEGMENT|ALL|OTHERS?)$/.test(u)) return '';                 // header/placeholder leak
+  return s;
+}
+
+/** Split a rate_rules row into a real {make, model} pair for Luca. */
+function lucaMakeModel(r) {
+  const make = lucaMake(r.make);
+  const model = lucaModel(r.model);
+  const maker = MODEL_TO_MAKE[make.toUpperCase()];
+  if (maker) return { make: maker, model: model || make };   // model sat in the make column
+  return { make, model };
+}
+
 function lucaMake(m) {
   const s = String(m == null ? '' : m).trim();
   if (!s) return '';
@@ -342,6 +390,7 @@ async function buildLucaBuffer(ids) {
     const vt = ex.inferVehicleType(r.sheet_name, r.product, r.segment, r.sub_type);
     const cover = ex.inferProduct(r.rate_type, r.sheet_name, r.sub_type, r.segment); // Comp / TP / SAOD
     const isTp = cover === 'TP';
+    const mm = lucaMakeModel(r);   // make = manufacturer, model = model (kept separate)
     // OUTGOING = grid rate − margin, floored at 0 (never expose the grid rate).
     const gridP = pct(r.rate_value);
     const marginP = marginPctForRule(r, canonVt(vt), marginRules, marginCache);
@@ -377,8 +426,8 @@ async function buildLucaBuffer(ids) {
       isTp ? '' : rateP,                                      // irdai_commission_percentage (the outgoing OD rate)
       '', '', '', '',                                         // slab, slab_on, is_slab_on_first_tenure, flat_commission
       '',                                                     // excluded_vehicles
-      lucaMake(r.make),                                       // vehicle_make
-      String(r.model || ''),                                  // vehicle_model
+      mm.make,                                                // vehicle_make (manufacturer)
+      mm.model,                                               // vehicle_model
       band(r.cc_band_min, r.cc_band_max),                     // vehicle_cc
       band(r.age_band_min, r.age_band_max),                   // vehicle_age
       lucaFuel(r.fuel_type),                                  // fuel_type
@@ -402,4 +451,4 @@ async function buildLucaBuffer(ids) {
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', compression: true });
 }
 
-module.exports = { buildLucaBuffer, LUCA_HEADERS, lucaProduct, lucaState, lucaFuel, lucaMake, lucaBusinessType };
+module.exports = { buildLucaBuffer, LUCA_HEADERS, lucaProduct, lucaState, lucaFuel, lucaMake, lucaMakeModel, lucaBusinessType };
