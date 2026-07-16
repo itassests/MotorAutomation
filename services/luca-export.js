@@ -3,12 +3,63 @@
  * 35-column "Luca" layout. Only the commission RATE is exported (placed in
  * tp_commission_percentage / irdai_commission_percentage); income and margin
  * are deliberately NOT included.
+ *
+ * OUTGOING = grid rate − margin (db/schema.sql: "outgoing = rate − margin").
+ * This file is handed to AGENTS, so it must never leak the insurer's grid
+ * (incoming) rate. The margin is resolved with the SAME matcher the payout
+ * engine uses (routes/bulk.js matchMarginForPolicy over active margin_rules),
+ * falling back to the engine's per-product synthetic default. Agent-specific
+ * overrides (special_rate_rules / global uplifts) are deliberately NOT applied
+ * — this is the STANDARD card; a POS with a special rate gets more than this.
  */
 'use strict';
 
 const XLSX = require('xlsx');
 const { getPool } = require('../db/connection');
 const ex = require('./excel-export');
+const { loadMarginRules, matchMarginForPolicy } = require('../routes/bulk');
+
+// inferVehicleType emits 'Pvt car' | 'TW' | 'GCV' | 'PCV' | 'MIS' → canonical.
+function canonVt(vt) {
+  const v = String(vt || '').toUpperCase().replace(/\s+/g, ' ');
+  if (v === 'PVT CAR' || v === 'PVT.CAR' || v === '4W' || v === 'CAR') return 'CAR';
+  if (v === 'MIS' || v === 'MISC') return 'MISC';
+  if (v === '2W' || v === 'TW') return 'TW';
+  return v;   // GCV / PCV
+}
+// Per-product default — mirrors the engine's synthetic default margin
+// (routes/bulk.js: Pvt Car 6%, CV 5%, TW 5%).
+function defaultMarginPct(canon) {
+  if (canon === 'CAR') return 6;
+  if (canon === 'GCV' || canon === 'PCV' || canon === 'MISC') return 5;
+  if (canon === 'TW') return 5;
+  return 0;
+}
+/** Margin % for a rate_rules row, mirroring the engine's precedence.
+ *  Memoised on the dimensions the matcher actually reads — ~215k rules collapse
+ *  to a few thousand distinct keys, which turns an O(rules × margin_rules) scan
+ *  (hundreds of millions of compares) into something that finishes in seconds. */
+function marginPctForRule(r, canon, marginRules, cache) {
+  const ton = r.weight_band_min == null ? undefined : Number(r.weight_band_min);
+  const key = [r.insurer, canon, r.region, r.state, r.fuel_type, r.make, ton]
+    .map(v => String(v == null ? '' : v).toLowerCase()).join('|');
+  if (cache && cache.has(key)) return cache.get(key);
+  const params = {
+    _insurer_slug: r.insurer,
+    vehicleType: canon,
+    resolvedRegion: r.region || '',
+    _stateName: r.state || '',
+    fuelType: r.fuel_type || '',
+    make: r.make || '',
+    tonnage: ton,
+    tonnageMin: ton,
+  };
+  const matched = matchMarginForPolicy(params, null, marginRules);
+  const mp = matched ? Number(matched.margin_pct) : null;
+  const val = (mp > 0) ? mp : defaultMarginPct(canon);   // real margin wins; else default
+  if (cache) cache.set(key, val);
+  return val;
+}
 
 const LUCA_HEADERS = [
   'id', 'name', 'insurers', 'year', 'month', 'products', 'coverage_type', 'ncb',
@@ -238,6 +289,10 @@ async function buildLucaBuffer(ids) {
     WHERE rr.rate_card_id IN (${ph.join(',')})
       AND rr.rate_value IS NOT NULL`);
 
+  // Active company margins, loaded once — same source the payout engine uses.
+  const marginRules = await loadMarginRules(pool);
+  const marginCache = new Map();
+
   const rows = [LUCA_HEADERS.slice()];
   let id = 1;
   for (const r of result.recordset) {
@@ -245,7 +300,10 @@ async function buildLucaBuffer(ids) {
     const vt = ex.inferVehicleType(r.sheet_name, r.product, r.segment, r.sub_type);
     const cover = ex.inferProduct(r.rate_type, r.sheet_name, r.sub_type, r.segment); // Comp / TP / SAOD
     const isTp = cover === 'TP';
-    const rateP = pct(r.rate_value);
+    // OUTGOING = grid rate − margin, floored at 0 (never expose the grid rate).
+    const gridP = pct(r.rate_value);
+    const marginP = marginPctForRule(r, canonVt(vt), marginRules, marginCache);
+    const rateP = gridP === '' ? '' : Math.max(0, +(gridP - marginP).toFixed(3));
     // Luca coverage_type taxonomy: comprehensive | own_damage | third_party | hybrid.
     // hybrid = a bundled long-term COMPREHENSIVE package where the OD and TP
     // tenures differ (1+3, 1+5, 5+5, 3+3, bundled, long-term). Plain annual 1+1
