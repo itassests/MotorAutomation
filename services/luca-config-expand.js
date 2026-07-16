@@ -394,10 +394,39 @@ const SUPPRESS = [
   { insurer: 'go_digit', test: (r) => /PVT\s*CAR/i.test(String(r.sheet_name || '')) },
   { insurer: 'go_digit', test: (r) => /^2W\s*GRID/i.test(String(r.sheet_name || '').trim()) },
 ];
+// ---- Plugin expanders -------------------------------------------------------
+// Each config-driven insurer can live in its own file under services/luca-expand/
+// so they can be added independently. Contract:
+//   module.exports = {
+//     insurer: '<slug>',                       // rate_cards.insurer slug
+//     suppress: [ (row) => bool, ... ],        // optional: DB rows the resolver REPLACES
+//     expand:   (effFrom) => [ ...rows ],      // rows shaped like rate_rules
+//   };
+// Use the `row()` shape below (require this module's ROW_FIELDS doc) — rate_value
+// is the GRID rate as a FRACTION; the export subtracts the margin.
+const fs = require('fs');
+const path = require('path');
+function loadPlugins() {
+  const dir = path.join(__dirname, 'luca-expand');
+  let files = [];
+  try { files = fs.readdirSync(dir).filter(f => f.endsWith('.js')); } catch (_) { return []; }
+  const out = [];
+  for (const f of files) {
+    try {
+      const p = require(path.join(dir, f));
+      if (p && typeof p.expand === 'function') out.push(p);
+    } catch (e) { console.warn('[luca-expand] skipped ' + f + ': ' + e.message); }
+  }
+  return out;
+}
+const PLUGINS = loadPlugins();
+
 /** True when a DB rate_rules row is superseded by a config resolver. */
 function isSuppressed(r) {
   const ins = String(r.insurer || '').toLowerCase();
-  return SUPPRESS.some(s => s.insurer === ins && s.test(r));
+  if (SUPPRESS.some(s => s.insurer === ins && s.test(r))) return true;
+  return PLUGINS.some(p => String(p.insurer || '').toLowerCase() === ins
+    && (p.suppress || []).some(t => { try { return t(r); } catch (_) { return false; } }));
 }
 
 /**
@@ -417,6 +446,11 @@ function expandConfigRules(effByInsurer) {
     ...tataCar(tat),
     ...tataCv(tat),
     ...goDigitCar(eff('go_digit')),
+    // Per-insurer plugin expanders (services/luca-expand/*.js)
+    ...PLUGINS.flatMap((p) => {
+      try { return p.expand(eff(String(p.insurer || '').toLowerCase())) || []; }
+      catch (e) { console.warn('[luca-expand] ' + p.insurer + ' failed: ' + e.message); return []; }
+    }),
   ];
 }
 
