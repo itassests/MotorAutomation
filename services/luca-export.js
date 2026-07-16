@@ -377,6 +377,14 @@ async function buildLucaBuffer(ids) {
       JOIN rate_cards rc ON rc.id = rr.rate_card_id
       WHERE rr.rate_card_id IN (${ph.join(',')})
         AND rr.rate_value IS NOT NULL
+        -- CD1 is the DISCOUNT column on Digit/wide-matrix grids, NOT a commission
+        -- (services/rate-lookup.js pickPrimaryRateRule drops it, so the engine
+        -- never pays it). It was leaking into the file as commission — Go Digit
+        -- "HCV GRID" COMP_CD1 cells held 99, exported as a 99% agent rate.
+        -- FLEXI rows are likewise not a payable commission. Mirror the engine.
+        AND rr.rate_type IS NOT NULL AND rr.rate_type <> ''
+        AND rr.rate_type NOT LIKE '%CD1%'
+        AND rr.rate_type NOT LIKE 'FLEXI%'
     )
     SELECT * FROM picked WHERE rn = 1`);
 
