@@ -468,7 +468,11 @@ async function buildLucaBuffer(ids) {
       mm.make,                                                // vehicle_make (manufacturer)
       mm.model,                                               // vehicle_model
       band(r.cc_band_min, r.cc_band_max),                     // vehicle_cc
-      band(r.age_band_min, r.age_band_max),                   // vehicle_age
+      // vehicle_age — blank for HYBRID (USER): a hybrid row is a bundled
+      // long-term package (1+3 / 1+5 / 5+5), which by definition is written on a
+      // BRAND-NEW vehicle, so an age band on it is meaningless to Luca. Blank =
+      // "all ages". Non-hybrid covers keep their band.
+      coverageType === 'hybrid' ? '' : band(r.age_band_min, r.age_band_max),   // vehicle_age
       lucaFuel(r.fuel_type),                                  // fuel_type
       lucaBusinessType(r.segment, r.sub_type, r.rate_type),   // business_type
       '',                                                     // zones
