@@ -223,10 +223,35 @@ function lucaState(state, region) {
 // age bands mis-mapped into make ("0 yr", "10+ yrs", "4-5 ys", "1+ yr") and
 // stray numbers/rates ("0.7", "0.8"). Luca vehicle_make wants a SPECIFIC make
 // or blank (= all makes) — so blank out all of the above, keep real makes.
+// Insurer grids abbreviate makes ("AL" = Ashok Leyland, "M&M" = Mahindra &
+// Mahindra). Agents read this file, so spell them out. Token-anchored (\b) so
+// ALTO / ALL / RENAULT are untouched; SML skips the lookahead when the grid
+// already says "SML ISUZU" (avoids "SML Isuzu ISUZU").
+const MAKE_EXPANSIONS = [
+  [/\bA\.?L\.?\b/gi, 'Ashok Leyland'],
+  [/\bM\s*&\s*M\b/gi, 'Mahindra & Mahindra'],
+  [/\bSML\b(?!\s*ISUZU)/gi, 'SML Isuzu'],
+  [/\bRE\b/gi, 'Royal Enfield'],
+  [/\bHMSI\b/gi, 'Honda Motorcycle & Scooter India'],
+  [/\bHMC\b/gi, 'Hyundai Motor Company'],
+  [/\bMSIL\b/gi, 'Maruti Suzuki'],
+  [/\bTML\b/gi, 'Tata Motors'],
+  [/\bBAL\b/gi, 'Bajaj Auto'],
+  [/\bVECV\b/gi, 'VE Commercial Vehicles'],
+];
+function expandMake(s) {
+  let out = s;
+  for (const [re, full] of MAKE_EXPANSIONS) out = out.replace(re, full);
+  return out.replace(/\s{2,}/g, ' ').trim();
+}
+
 function lucaMake(m) {
   const s = String(m == null ? '' : m).trim();
   if (!s) return '';
   const u = s.toUpperCase();
+  // Column-header / placeholder leaks — not a make, and meaningless to an agent.
+  if (/^(MAKE|MAKES|SEGMENT|MODEL|OTHER,?\s*MAKES?)$/.test(u)) return '';
+  if (s.replace(/[^A-Za-z]/g, '').length <= 1) return '';            // single-letter leak ("D")
   if (/[%:_+<>]/.test(s)) return '';                                 // rate/remark/cluster/region-combo/spec leak (real makes use spaces)
   if (/^\d+(\.\d+)?$/.test(s)) return '';                            // pure number / rate
   if (/\b(YR|YRS|YEAR|YEARS|YS)\b/.test(u) || /^\d+\s*[-]/.test(s)) return ''; // age band
@@ -236,7 +261,7 @@ function lucaMake(m) {
   if (/GCV|PCV|LCV|HCV|MCV|GCCV|PCCV|\bMISC\b|SEATER|SEAT|TONNE|\bTON\b|GVW|LAKH|\bLAC\b|UPTO|DUMPER|TIPPER|BACKHOE|EXCAVATOR|LOADER|CRANE|HARVESTER|TAXI|\bBUS\b|TANKER|DRILLING|\bRIG\b|MOBILEPLANT|RICKSHAW|E-?LOADER/.test(u)) return '';
   if (/\d\s*T\b/.test(u) || /^[A-Z]{2}\s?\d/.test(u)) return '';     // tonnage ("40T") / RTO-region code ("TN1", "HP 21")
   if (resolveStateSlug(s)) return '';                               // the value IS a region / city / state name
-  return s;                                                          // real make
+  return expandMake(s);                                              // real make — abbreviations spelled out
 }
 
 // Canonical Luca fuel_type: ELECTRICITY | DIESEL | INTERNAL_LPG_CNG | PETROL.
