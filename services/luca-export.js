@@ -18,7 +18,7 @@ const XLSX = require('xlsx');
 const { getPool } = require('../db/connection');
 const ex = require('./excel-export');
 const { loadMarginRules, matchMarginForPolicy } = require('../routes/bulk');
-const { expandConfigRules } = require('./luca-config-expand');
+const { expandConfigRules, isSuppressed } = require('./luca-config-expand');
 
 // inferVehicleType emits 'Pvt car' | 'TW' | 'GCV' | 'PCV' | 'MIS' → canonical.
 function canonVt(vt) {
@@ -399,10 +399,14 @@ async function buildLucaBuffer(ids) {
     for (const e of effRs.recordset) effByInsurer.set(e.insurer, e.eff);
   }
   const configRows = expandConfigRules(effByInsurer);
+  // Drop DB rows the resolvers REPLACE (e.g. Tata's never-ingested Private Car
+  // sheet and mis-ingested CV sheet) — otherwise the file would carry rates the
+  // engine never pays alongside the correct config-expanded ones.
+  const dbRows = result.recordset.filter(r => !isSuppressed(r));
 
   const rows = [LUCA_HEADERS.slice()];
   let id = 1;
-  for (const r of result.recordset.concat(configRows)) {
+  for (const r of dbRows.concat(configRows)) {
     const insurer = lucaInsurer(r.insurer || '');
     const vt = ex.inferVehicleType(r.sheet_name, r.product, r.segment, r.sub_type);
     const cover = ex.inferProduct(r.rate_type, r.sheet_name, r.sub_type, r.segment); // Comp / TP / SAOD

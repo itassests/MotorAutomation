@@ -21,6 +21,14 @@
 const IND_CAR = require('../config/indusind_car.json');
 const IND_TW  = require('../config/indusind_tw.json');
 const IND_CV  = require('../config/indusind_cv.json');
+const TATA_CAR = require('../config/tata_car_jun26.json');
+const TATA_CV  = require('../config/tata_cv_jun26.json');
+
+const norm = (s) => String(s == null ? '' : s).trim().toUpperCase();
+const CONCRETE_FUELS = ['DIESEL', 'CNG', 'ELECTRIC', 'PETROL'];
+// rate_type suffix so lucaNcb() reports TRUE/FALSE for the row.
+const ncbTag = (yes) => (yes ? ' NCB:GT0' : ' NCB:0');
+const SECTION_RT = { PACKAGE: 'COMP', SAOD: 'SAOD', SATP: 'SATP' };
 
 /** Shape a pseudo rate_rules row (only the fields buildLucaBuffer reads). */
 function row(o) {
@@ -182,6 +190,179 @@ function indusindCv(eff) {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// TATA AIG — Private Car (config/tata_car_jun26.json, services/tata-car.js)
+//   biz × section × fuel × rto × ncb → rate (stored as a PERCENT).
+//   The resolver picks by SPECIFICITY (fuel: exact 2 > "Other Than Diesel" 1 >
+//   All 0; ncb: exact 2 > All 0; rto: exact 4 > All 0), so we cannot dump raw
+//   config rows — we resolve the winner per concrete scope exactly as it does,
+//   then collapse: emit the pan-India ("All" RTO) row once and only add an RTO
+//   row where its rate actually differs.
+// ---------------------------------------------------------------------------
+function pickTataCar(biz, section, fc, ncbYes, rto) {
+  let best = null, bestScore = -1;
+  for (const g of (TATA_CAR.grid || [])) {
+    if (norm(g.biz) !== norm(biz) || norm(g.section) !== norm(section)) continue;
+    const gf = norm(g.fuel); let fs;
+    if (gf === 'ALL') fs = 0;
+    else if (gf === 'DIESEL' && fc === 'DIESEL') fs = 2;
+    else if (gf === 'CNG' && fc === 'CNG') fs = 2;
+    else if (gf === 'ELECTRIC' && fc === 'ELECTRIC') fs = 2;
+    else if (gf === 'OTHER THAN DIESEL' && fc !== 'DIESEL') fs = 1;
+    else continue;
+    const gn = norm(g.ncb); let ns;
+    if (gn === 'ALL') ns = 0;
+    else if (gn === 'YES' && ncbYes) ns = 2;
+    else if (gn === 'NO' && !ncbYes) ns = 2;
+    else continue;
+    let rs;
+    if (norm(g.rto) === 'ALL') rs = 0;
+    else if (rto && norm(g.rto) === norm(rto)) rs = 4;
+    else continue;
+    const score = fs + ns + rs;
+    if (score > bestScore) { bestScore = score; best = g; }
+  }
+  return best ? +(best.rate / 100).toFixed(4) : null;   // config stores a percent
+}
+
+function tataCar(eff) {
+  const grid = TATA_CAR.grid || [];
+  const bizes = [...new Set(grid.map(g => g.biz))];
+  const sections = [...new Set(grid.map(g => g.section))];
+  const rtos = [...new Set(grid.map(g => g.rto))].filter(r => norm(r) !== 'ALL');
+  const out = [];
+  for (const biz of bizes) for (const section of sections) {
+    const rt = SECTION_RT[norm(section)] || 'COMP';
+    for (const fc of CONCRETE_FUELS) for (const ncbYes of [true, false]) {
+      const all = pickTataCar(biz, section, fc, ncbYes, null);
+      const base = {
+        insurer: 'tata_aig', product: 'CAR', sheet_name: 'Private Car Jun26',
+        segment: `Private Car ${biz}`, fuel_type: fc,
+        rate_type: rt + ncbTag(ncbYes), effective_from: eff,
+      };
+      if (all != null) out.push(row({ ...base, rate_value: all }));
+      for (const rto of rtos) {
+        const v = pickTataCar(biz, section, fc, ncbYes, rto);
+        if (v == null || v === all) continue;      // covered by the pan-India row
+        out.push(row({ ...base, region: rto, rate_value: v }));
+      }
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// TATA AIG — CV / PCV / GCV / MISC (config/tata_cv_jun26.json, services/tata-cv.js)
+//   rows[{seg, fuel, section, age, rates{region}}]; rates are FRACTIONS.
+//   Same specificity model (fuel + age). Resolve per scope, then collapse the
+//   fuel dimension when it doesn't change the answer (emit blank fuel = all).
+// ---------------------------------------------------------------------------
+function pickTataCv(seg, section, fc, ab, region) {
+  let best = null, bestScore = -1;
+  for (const r of (TATA_CV.rows || [])) {
+    if (r.seg !== seg || r.section !== section) continue;
+    if (r.rates == null || r.rates[region] == null) continue;
+    const rf = norm(r.fuel); let fs;
+    if (rf === 'ALL') fs = 0;
+    else if (rf === 'DIESEL' && fc === 'DIESEL') fs = 2;
+    else if (rf === 'CNG' && fc === 'CNG') fs = 2;
+    else if (rf === 'ELECTRIC' && fc === 'ELECTRIC') fs = 2;
+    else if (rf === 'OTHER THAN DIESEL' && fc !== 'DIESEL') fs = 1;
+    else continue;
+    const ra = norm(r.age); let as;
+    if (ra === 'ALL') as = 0;
+    else if (ra === norm(ab)) as = 2;
+    else continue;
+    const score = fs + as;
+    if (score > bestScore) { bestScore = score; best = r; }
+  }
+  return best ? +Number(best.rates[region]).toFixed(4) : null;
+}
+// Tata CV product family + tonnage band from the segment text.
+function tataCvMeta(seg) {
+  const s = norm(seg);
+  if (/TRACTOR/.test(s)) return { product: 'MISC' };
+  if (/MISC|CRANE|TIPPER|EXCAVAT|JCB|BACKHOE/.test(s)) return { product: 'MISC' };
+  if (/PCV|BUS|TAXI|SCHOOL|AUTO|RICK/.test(s)) return { product: 'PCV' };
+  const m = s.match(/>\s*([\d.]+)\s*<=\s*([\d.]+)/);
+  if (m) return { product: 'GCV', ton: [Number(m[1]), Number(m[2])] };
+  const g = s.match(/>\s*([\d.]+)/);
+  if (g) return { product: 'GCV', ton: [Number(g[1]), null] };
+  const l = s.match(/<=\s*([\d.]+)/);
+  if (l) return { product: 'GCV', ton: [null, Number(l[1])] };
+  return { product: 'GCV' };
+}
+// Age bucket text → [min,max] years.
+function tataAgeBand(ab) {
+  const a = norm(ab);
+  if (/BRAND\s*NEW/.test(a)) return [0, 0];
+  let m = a.match(/>=\s*([\d.]+)\s*<=\s*([\d.]+)/); if (m) return [Number(m[1]), Number(m[2])];
+  m = a.match(/>\s*([\d.]+)\s*<=\s*([\d.]+)/);      if (m) return [Number(m[1]), Number(m[2])];
+  m = a.match(/^>\s*([\d.]+)/);                     if (m) return [Number(m[1]), null];
+  return [null, null];
+}
+
+function tataCv(eff) {
+  const rows = TATA_CV.rows || [];
+  const regions = TATA_CV.regions || [];
+  const segs = [...new Set(rows.map(r => r.seg))];
+  const sections = [...new Set(rows.map(r => r.section))];
+  const ages = [...new Set(rows.map(r => String(r.age)))].filter(a => norm(a) !== 'ALL');
+  const out = [];
+  for (const seg of segs) {
+    const meta = tataCvMeta(seg);
+    for (const section of sections) {
+      const rt = SECTION_RT[norm(section)] || 'COMP';
+      for (const ab of ages) {
+        const [amin, amax] = tataAgeBand(ab);
+        for (const region of regions) {
+          const byFuel = CONCRETE_FUELS.map(fc => pickTataCv(seg, section, fc, ab, region));
+          if (byFuel.every(v => v == null)) continue;
+          const base = {
+            insurer: 'tata_aig', product: meta.product, sheet_name: 'CV Jun26',
+            region, segment: `${seg} ${ab}`, rate_type: rt,
+            weight_band_min: meta.ton ? meta.ton[0] : null,
+            weight_band_max: meta.ton ? meta.ton[1] : null,
+            age_band_min: amin, age_band_max: amax, effective_from: eff,
+          };
+          const uniq = [...new Set(byFuel.map(v => String(v)))];
+          if (uniq.length === 1) {                       // fuel-invariant → one row, all fuels
+            out.push(row({ ...base, rate_value: byFuel[0] }));
+          } else {
+            CONCRETE_FUELS.forEach((fc, i) => {
+              if (byFuel[i] == null) return;
+              out.push(row({ ...base, fuel_type: fc, rate_value: byFuel[i] }));
+            });
+          }
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/** DB rows the resolvers REPLACE — must be dropped from the export or the file
+ *  shows rates the engine never pays. Keyed insurer → predicate(rate_rules row).
+ *  TATA: the June Private Car sheet was NEVER ingested (the "Pvtcar_Extended
+ *  Warranty" tab is not the commission grid) and the June CV sheet was
+ *  MIS-ingested (tonnage in the fuel column) — both are resolved from config
+ *  instead (routes/bulk.js). TATA "TW." rules are genuine and stay. */
+const SUPPRESS = [
+  { insurer: 'tata_aig', test: (r) => /PVTCAR|PVT\s*CAR|EXTENDED\s*WARRANTY/i.test(String(r.sheet_name || '')) },
+  { insurer: 'tata_aig', test: (r) => /^CV$/i.test(String(r.sheet_name || '').trim()) },
+  // "TW." is mis-ingested too: region holds a TONNAGE ("3.5") and rate_type holds
+  // a RATE + body ("45|Moped"). 3,772 rows carry only 9 distinct identities with
+  // CONFLICTING rates (45 vs 40.5) for the same one, so any pick is arbitrary.
+  // Drop it — absent beats handing an agent a coin-flip rate. Re-ingest the Tata
+  // TW sheet (or add a config resolver) to bring it back.
+  { insurer: 'tata_aig', test: (r) => /^TW\.?$/i.test(String(r.sheet_name || '').trim()) },
+];
+/** True when a DB rate_rules row is superseded by a config resolver. */
+function isSuppressed(r) {
+  const ins = String(r.insurer || '').toLowerCase();
+  return SUPPRESS.some(s => s.insurer === ins && s.test(r));
+}
+
 /**
  * Expand every supported config-driven insurer.
  * @param {Map<string,Date|string>} effByInsurer  slug → the insurer's active
@@ -190,12 +371,19 @@ function indusindCv(eff) {
  */
 function expandConfigRules(effByInsurer) {
   const eff = (slug) => (effByInsurer && effByInsurer.get(slug)) || null;
-  const e = eff('indusind');
+  const ind = eff('indusind');
+  const tat = eff('tata_aig');
   return [
-    ...indusindCar(e),
-    ...indusindTw(e),
-    ...indusindCv(e),
+    ...indusindCar(ind),
+    ...indusindTw(ind),
+    ...indusindCv(ind),
+    ...tataCar(tat),
+    ...tataCv(tat),
   ];
 }
 
-module.exports = { expandConfigRules, indusindCar, indusindTw, indusindCv, CV_KEYS };
+module.exports = {
+  expandConfigRules, isSuppressed, SUPPRESS,
+  indusindCar, indusindTw, indusindCv, CV_KEYS,
+  tataCar, tataCv, pickTataCar, pickTataCv,
+};
