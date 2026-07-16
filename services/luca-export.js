@@ -18,6 +18,7 @@ const XLSX = require('xlsx');
 const { getPool } = require('../db/connection');
 const ex = require('./excel-export');
 const { loadMarginRules, matchMarginForPolicy } = require('../routes/bulk');
+const { expandConfigRules } = require('./luca-config-expand');
 
 // inferVehicleType emits 'Pvt car' | 'TW' | 'GCV' | 'PCV' | 'MIS' → canonical.
 function canonVt(vt) {
@@ -383,9 +384,25 @@ async function buildLucaBuffer(ids) {
   const marginRules = await loadMarginRules(pool);
   const marginCache = new Map();
 
+  // Config-driven insurers keep their grids in JSON + a resolver and never write
+  // rate_rules (IndusInd has ZERO), so they'd be missing from an agent's file.
+  // Expand them into rows shaped like rate_rules and run them through the same
+  // pipeline below. Each row carries its insurer's card effective_from so the
+  // year/month columns show the right generation.
+  const effByInsurer = new Map();
+  if (idList.length) {
+    const effRq = pool.request();
+    const eph = idList.map((cid, i) => { effRq.input('e' + i, cid); return '@e' + i; });
+    const effRs = await effRq.query(
+      `SELECT LOWER(insurer) AS insurer, MAX(effective_from) AS eff
+         FROM rate_cards WHERE id IN (${eph.join(',')}) GROUP BY LOWER(insurer)`);
+    for (const e of effRs.recordset) effByInsurer.set(e.insurer, e.eff);
+  }
+  const configRows = expandConfigRules(effByInsurer);
+
   const rows = [LUCA_HEADERS.slice()];
   let id = 1;
-  for (const r of result.recordset) {
+  for (const r of result.recordset.concat(configRows)) {
     const insurer = lucaInsurer(r.insurer || '');
     const vt = ex.inferVehicleType(r.sheet_name, r.product, r.segment, r.sub_type);
     const cover = ex.inferProduct(r.rate_type, r.sheet_name, r.sub_type, r.segment); // Comp / TP / SAOD
