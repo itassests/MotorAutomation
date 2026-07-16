@@ -67,7 +67,8 @@ const LUCA_HEADERS = [
   'commission_on', 'tp_commission_percentage', 'irdai_commission_percentage',
   'slab', 'slab_on', 'is_slab_on_first_tenure', 'flat_commission',
   'excluded_vehicles', 'vehicle_make', 'vehicle_model', 'vehicle_cc',
-  'vehicle_age', 'fuel_type', 'business_type', 'zones', 'included_states',
+  'vehicle_age', 'seating_capacity', 'gross_vehicle_weight',
+  'fuel_type', 'business_type', 'zones', 'included_states',
   'city', 'excluded_cities', 'included_rto', 'excluded_rto', 'sales_channel',
   'rule_type', 'cpa', 'commission_percent_on_total_commission', 'deduction',
   'discount_range', 'REMARK',
@@ -149,25 +150,37 @@ function lucaNcb(rateType) {
   return '';
 }
 
-// vehicle_cc — Luca spec (USER): "Engine capacity range in CC. Format: [min, max].
-// Leave blank for all. if no max value then null, if no min value make 1"
-//   → [1000,null]  = 1000cc and above
-//   → [1,999]      = upto 999cc   (absent min is 1, NOT 0)
-//   → ''           = all
-// The ingested bands express "no bound" three different ways — NULL, a 0 lower
-// bound, and a 99999 upper sentinel — so normalise all of them to the spec:
-// a 0 min becomes 1 (0cc is meaningless), and a sentinel max becomes null.
-const CC_NO_MAX = 99999;
-function ccBand(min, max) {
+// Luca range columns — spec (USER): "Format: [min, max]. Leave blank for all.
+// if no max value then null, if no min value make 1"  →  [1000,null] , [1,999]
+//
+// The ingested bands spell "no bound" several ways and each column has its own
+// sentinel, so normalise per column:
+//   opts.minDefault — value to use when there is no lower bound (1 for cc /
+//                     seating / GVW where 0 is meaningless; 0 for AGE, where a
+//                     0-year-old vehicle is real and means brand-new).
+//   opts.noMax      — an upper sentinel meaning "no upper bound" (cc 99999,
+//                     age 99, GVW 999T). Values at/above it become null.
+//   opts.scale      — multiply into the spec's unit (GVW is stored in TONNES,
+//                     Luca wants KG → scale 1000, so 2.5T → 2500).
+function rangeArr(min, max, opts) {
+  const o = opts || {};
+  const minDefault = o.minDefault == null ? 1 : o.minDefault;
   let lo = (min == null) ? null : Number(min);
   let hi = (max == null) ? null : Number(max);
   if (!Number.isFinite(lo)) lo = null;
   if (!Number.isFinite(hi)) hi = null;
-  if (lo === 0) lo = null;                       // 0 = "no lower bound"
-  if (hi != null && hi >= CC_NO_MAX) hi = null;  // 99999 = "no upper bound"
-  if (lo == null && hi == null) return '';       // unbounded both ways = all
-  return `[${lo == null ? 1 : lo},${hi == null ? 'null' : hi}]`;
+  // A 0 lower bound means "no lower bound" — except where 0 is a real value (age).
+  if (lo === 0 && minDefault !== 0) lo = null;
+  if (hi != null && o.noMax != null && hi >= o.noMax) hi = null;
+  if (lo == null && hi == null) return '';        // unbounded both ways = all
+  const sc = (v) => +(v * (o.scale || 1)).toFixed(0);
+  return `[${lo == null ? minDefault : sc(lo)},${hi == null ? 'null' : sc(hi)}]`;
 }
+const ccBand   = (mn, mx) => rangeArr(mn, mx, { minDefault: 1, noMax: 99999 });
+const ageBand  = (mn, mx) => rangeArr(mn, mx, { minDefault: 0, noMax: 99 });
+const seatBand = (mn, mx) => rangeArr(mn, mx, { minDefault: 1 });
+// GVW: stored in TONNES, Luca wants KG (2.5T -> 2500). 999T = "no upper bound".
+const gvwBand  = (mn, mx) => rangeArr(mn, mx, { minDefault: 1, noMax: 999, scale: 1000 });
 
 // Render a band (used for vehicle_age). Bands are often OPEN-ENDED — "6+ years"
 // has no upper bound — and `${min}-${max}` printed those as a dangling "6-",
@@ -393,13 +406,16 @@ async function buildLucaBuffer(ids) {
       SELECT rr.insurer, rr.product, rr.sheet_name, rr.region, rr.segment, rr.make,
              rr.model, rr.sub_type, rr.fuel_type, rr.cc_band_min, rr.cc_band_max,
              rr.age_band_min, rr.age_band_max, rr.weight_band_min, rr.weight_band_max,
+             rr.seating_capacity_min, rr.seating_capacity_max,
              rr.rate_type, rr.rate_value,
              rr.remarks, rr.state, rc.effective_from,
              ROW_NUMBER() OVER (
                PARTITION BY rr.insurer, rr.product, rr.sheet_name, rr.region, rr.segment,
                             rr.make, rr.model, rr.sub_type, rr.fuel_type,
                             rr.cc_band_min, rr.cc_band_max, rr.age_band_min, rr.age_band_max,
-                            rr.weight_band_min, rr.weight_band_max, rr.rate_type, rr.state
+                            rr.weight_band_min, rr.weight_band_max,
+                            rr.seating_capacity_min, rr.seating_capacity_max,
+                            rr.rate_type, rr.state
                ORDER BY rc.effective_from DESC, rr.id DESC) AS rn
       FROM rate_rules rr
       JOIN rate_cards rc ON rc.id = rr.rate_card_id
@@ -486,11 +502,13 @@ async function buildLucaBuffer(ids) {
       mm.make,                                                // vehicle_make (manufacturer)
       mm.model,                                               // vehicle_model
       ccBand(r.cc_band_min, r.cc_band_max),                   // vehicle_cc — [min,max]
-      // vehicle_age — blank for HYBRID (USER): a hybrid row is a bundled
-      // long-term package (1+3 / 1+5 / 5+5), which by definition is written on a
-      // BRAND-NEW vehicle, so an age band on it is meaningless to Luca. Blank =
-      // "all ages". Non-hybrid covers keep their band.
-      coverageType === 'hybrid' ? '' : band(r.age_band_min, r.age_band_max),   // vehicle_age
+      // vehicle_age — [min,max]; blank for HYBRID (USER): a hybrid row is a
+      // bundled long-term package (1+3 / 1+5 / 5+5), which by definition is
+      // written on a BRAND-NEW vehicle, so an age band on it is meaningless to
+      // Luca. Blank = "all ages". Non-hybrid covers keep their band.
+      coverageType === 'hybrid' ? '' : ageBand(r.age_band_min, r.age_band_max), // vehicle_age
+      seatBand(r.seating_capacity_min, r.seating_capacity_max),                 // seating_capacity
+      gvwBand(r.weight_band_min, r.weight_band_max),                            // gross_vehicle_weight (kg)
       lucaFuel(r.fuel_type),                                  // fuel_type
       lucaBusinessType(r.segment, r.sub_type, r.rate_type),   // business_type
       '',                                                     // zones

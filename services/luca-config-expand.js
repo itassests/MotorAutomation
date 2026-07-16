@@ -47,8 +47,10 @@ function row(o) {
     cc_band_max: o.cc_band_max == null ? null : o.cc_band_max,
     age_band_min: o.age_band_min == null ? null : o.age_band_min,
     age_band_max: o.age_band_max == null ? null : o.age_band_max,
-    weight_band_min: o.weight_band_min == null ? null : o.weight_band_min,
+    weight_band_min: o.weight_band_min == null ? null : o.weight_band_min,   // TONNES (export scales to kg)
     weight_band_max: o.weight_band_max == null ? null : o.weight_band_max,
+    seating_capacity_min: o.seating_capacity_min == null ? null : o.seating_capacity_min,
+    seating_capacity_max: o.seating_capacity_max == null ? null : o.seating_capacity_max,
     rate_type: o.rate_type || null,
     rate_value: o.rate_value,
     remarks: o.remarks || null,
