@@ -149,14 +149,32 @@ function lucaNcb(rateType) {
   return '';
 }
 
-// Render a band (used for vehicle_cc and vehicle_age). Many bands are legitimately
-// OPEN-ENDED — "Motorcycle upto 155cc" has no lower bound, "Above 2500 CC" / "6+
-// years" no upper. The old `${min}-${max}` printed those as a dangling "-155" or
-// "2501-", which reads to an agent as a missing value rather than an open end.
-//   both ends → "181-350"
-//   no lower  → "0-155"      (i.e. upto 155)
-//   no upper  → "2501+"      (i.e. 2501 and above — works for cc AND age, where a
-//                             numeric sentinel like 9999 would be nonsense)
+// vehicle_cc — Luca spec (USER): "Engine capacity range in CC. Format: [min, max].
+// Leave blank for all. if no max value then null, if no min value make 1"
+//   → [1000,null]  = 1000cc and above
+//   → [1,999]      = upto 999cc   (absent min is 1, NOT 0)
+//   → ''           = all
+// The ingested bands express "no bound" three different ways — NULL, a 0 lower
+// bound, and a 99999 upper sentinel — so normalise all of them to the spec:
+// a 0 min becomes 1 (0cc is meaningless), and a sentinel max becomes null.
+const CC_NO_MAX = 99999;
+function ccBand(min, max) {
+  let lo = (min == null) ? null : Number(min);
+  let hi = (max == null) ? null : Number(max);
+  if (!Number.isFinite(lo)) lo = null;
+  if (!Number.isFinite(hi)) hi = null;
+  if (lo === 0) lo = null;                       // 0 = "no lower bound"
+  if (hi != null && hi >= CC_NO_MAX) hi = null;  // 99999 = "no upper bound"
+  if (lo == null && hi == null) return '';       // unbounded both ways = all
+  return `[${lo == null ? 1 : lo},${hi == null ? 'null' : hi}]`;
+}
+
+// Render a band (used for vehicle_age). Bands are often OPEN-ENDED — "6+ years"
+// has no upper bound — and `${min}-${max}` printed those as a dangling "6-",
+// which reads as a missing value rather than an open end.
+//   both ends → "1-5"
+//   no lower  → "0-5"   (upto 5)
+//   no upper  → "6+"    (6 and above; a numeric sentinel like 9999 years is nonsense)
 function band(min, max) {
   if (min == null && max == null) return '';
   if (min == null) return `0-${max}`;
@@ -467,7 +485,7 @@ async function buildLucaBuffer(ids) {
       '',                                                     // excluded_vehicles
       mm.make,                                                // vehicle_make (manufacturer)
       mm.model,                                               // vehicle_model
-      band(r.cc_band_min, r.cc_band_max),                     // vehicle_cc
+      ccBand(r.cc_band_min, r.cc_band_max),                   // vehicle_cc — [min,max]
       // vehicle_age — blank for HYBRID (USER): a hybrid row is a bundled
       // long-term package (1+3 / 1+5 / 5+5), which by definition is written on a
       // BRAND-NEW vehicle, so an age band on it is meaningless to Luca. Blank =
