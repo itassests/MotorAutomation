@@ -23,6 +23,7 @@ const IND_TW  = require('../config/indusind_tw.json');
 const IND_CV  = require('../config/indusind_cv.json');
 const TATA_CAR = require('../config/tata_car_jun26.json');
 const TATA_CV  = require('../config/tata_cv_jun26.json');
+const GD_CAR   = require('../config/go_digit_car_jun26.json');
 
 const norm = (s) => String(s == null ? '' : s).trim().toUpperCase();
 const CONCRETE_FUELS = ['DIESEL', 'CNG', 'ELECTRIC', 'PETROL'];
@@ -341,6 +342,32 @@ function tataCv(eff) {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// GO DIGIT — Private Car Comp/SAOD (config/go_digit_car_jun26.json,
+// services/go-digit-car.js). grid: cluster → {saodNonNcb, saodNcb, compNonNcb,
+// compNcb, hev}; rates are PERCENTS. The resolver checks HEV FIRST (a strong
+// hybrid takes the hev rate regardless of cover/NCB), then SAOD vs Comp × NCB.
+// SATP is handled by a separate config (go_digit_car_tp_jun26) — not expanded
+// here yet, so Go Digit Pvt Car SATP stays absent for now.
+// ---------------------------------------------------------------------------
+function goDigitCar(eff) {
+  const grid = GD_CAR.grid || {};
+  const out = [];
+  for (const cluster of Object.keys(grid)) {
+    const g = grid[cluster] || {};
+    const base = { insurer: 'go_digit', product: 'CAR', sheet_name: 'Pvt Car Comp+SAOD Jun26',
+                   region: cluster, segment: 'Private Car', effective_from: eff };
+    // HEV wins over cover/NCB in the resolver, so it's its own row.
+    if (has(g.hev)) out.push(row({ ...base, segment: 'Private Car Strong Hybrid HEV',
+                                   fuel_type: 'HYBRID', rate_type: 'COMP', rate_value: g.hev / 100 }));
+    if (has(g.saodNcb))    out.push(row({ ...base, rate_type: 'SAOD' + ncbTag(true),  rate_value: g.saodNcb / 100 }));
+    if (has(g.saodNonNcb)) out.push(row({ ...base, rate_type: 'SAOD' + ncbTag(false), rate_value: g.saodNonNcb / 100 }));
+    if (has(g.compNcb))    out.push(row({ ...base, rate_type: 'COMP' + ncbTag(true),  rate_value: g.compNcb / 100 }));
+    if (has(g.compNonNcb)) out.push(row({ ...base, rate_type: 'COMP' + ncbTag(false), rate_value: g.compNonNcb / 100 }));
+  }
+  return out;
+}
+
 /** DB rows the resolvers REPLACE — must be dropped from the export or the file
  *  shows rates the engine never pays. Keyed insurer → predicate(rate_rules row).
  *  TATA: the June Private Car sheet was NEVER ingested (the "Pvtcar_Extended
@@ -389,6 +416,7 @@ function expandConfigRules(effByInsurer) {
     ...indusindCv(ind),
     ...tataCar(tat),
     ...tataCv(tat),
+    ...goDigitCar(eff('go_digit')),
   ];
 }
 
@@ -396,4 +424,5 @@ module.exports = {
   expandConfigRules, isSuppressed, SUPPRESS,
   indusindCar, indusindTw, indusindCv, CV_KEYS,
   tataCar, tataCv, pickTataCar, pickTataCv,
+  goDigitCar,
 };
