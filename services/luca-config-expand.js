@@ -356,6 +356,16 @@ const SUPPRESS = [
   // Drop it — absent beats handing an agent a coin-flip rate. Re-ingest the Tata
   // TW sheet (or add a config resolver) to bring it back.
   { insurer: 'tata_aig', test: (r) => /^TW\.?$/i.test(String(r.sheet_name || '').trim()) },
+  // GO DIGIT — same story (routes/bulk.js): the June re-ingestion MIS-READ the
+  // two-table Pvt Car sheet and loaded the LEFT make-block, "so every make
+  // collapsed to one wrong rate" (the operator pays the RIGHT summary block),
+  // and the 2W ingestion "stored wrong rate_rules values". Both are resolved
+  // config-driven at calc time, so the DB rows are rates nobody pays.
+  // TODO: expand go_digit_car_jun26 / _car_tp / _tw / _tw_bundle into rows —
+  // until then Pvt Car + 2W are ABSENT rather than wrong. CV/HCV rows are kept
+  // (their sheets ingested cleanly and have no bulk.js override).
+  { insurer: 'go_digit', test: (r) => /PVT\s*CAR/i.test(String(r.sheet_name || '')) },
+  { insurer: 'go_digit', test: (r) => /^2W\s*GRID/i.test(String(r.sheet_name || '').trim()) },
 ];
 /** True when a DB rate_rules row is superseded by a config resolver. */
 function isSuppressed(r) {
