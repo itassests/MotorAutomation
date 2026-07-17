@@ -51,17 +51,24 @@ const DECLARES = `
                            ELSE DATEADD(MONTH, -1, DATEFROMPARTS(YEAR(@today), MONTH(@today), 2)) END;`;
 
 // Shared column list + joins for the two attribution paths (offline / online).
+// PERF: #base is materialised for EVERY policy in the subtree (~42.5k rows for a
+// company-wide root) and every column here is written to tempdb — twice, once per
+// attribution branch. Measured: the joins cost 3.8s but the SELECT INTO cost 20s,
+// so ROW WIDTH, not the joins, was the dashboard's bottleneck. Columns needed only
+// by the capped case list (customer / policy_no / reg_no / created_dt / channel /
+// status) are therefore NOT carried here — result set 5 re-joins them for its
+// 1000 rows. Keep this list narrow: anything added here is paid 42.5k times.
 const baseCols = (scope) => `
       m.Id AS _id, m.TrackerNo,
-      CAST(m.CREATED_DATE AS date) AS cdate, m.CREATED_DATE AS created_dt,
+      CAST(m.CREATED_DATE AS date) AS cdate,
       m.NatureOfSale, m.LogStatusId, mis.POLICY_STATUS_ID AS policy_status_id,
       CASE WHEN mt.PTrackerno IS NOT NULL THEN 1 ELSE 0 END AS in_txn,
       f1.Name AS vertical, msb.Location AS branch, mssb.Sub_Location AS sub_branch,
       ISNULL(r.IDVpos, r.UPIN_CODE) AS agent_code,
       up.EmployeeCode AS employee_code, up.DisplayName AS employee_name,
-      f3.Name AS vehicle_type, f5.Name AS product_type, fn.Name AS channel, ff.Name AS status,
-      i.CompanyName AS insurer, p.FULLNAME_PROPOSER AS customer, mis.POLICY_NO AS policy_no,
-      md.VEHICLE_REGISTRATION_NO AS reg_no, md.RTO_Code AS rto, md.StateName AS state,
+      f3.Name AS vehicle_type, f5.Name AS product_type,
+      i.CompanyName AS insurer,
+      md.RTO_Code AS rto, md.StateName AS state,
       CASE WHEN ISNULL(md.NCB, 0) > 0 THEN 1 ELSE 0 END AS has_ncb,
       CASE WHEN ISNULL(md.Addon_Premium, 0) > 0 OR ISNULL(md.ADD_ON_PREMIUM, 0) > 0 THEN 1 ELSE 0 END AS has_addon,
       -- Renewal: IsRenewal flag; same/different insurer compares the OCR-captured
@@ -86,7 +93,8 @@ const joinsHead = (scope) => `
     LEFT JOIN (SELECT CurrentTrackerNo, MAX(ISNULL(NULLIF(AnnualPremium, 0), TotalPremium)) AS prem
                FROM Beeinsured_v3_2.dbo.TRN_ReportedFieldsPrarambh WITH (NOLOCK)
                WHERE CurrentTrackerNo IS NOT NULL GROUP BY CurrentTrackerNo) rfp ON rfp.CurrentTrackerNo = m.TrackerNo`}
-    LEFT JOIN TRN_PrarambhProposerDetails p WITH (NOLOCK) ON p.PrarambhMainId = m.Id AND p.ISACTIVE = 1
+    -- (Proposer is NOT joined here — customer is only needed by the capped case
+    --  list, which re-joins it for its own rows. See the baseCols perf note.)
     LEFT JOIN TRN_PrarambhReportedFields r WITH (NOLOCK) ON r.PrarambhMainId = m.Id AND r.ISACTIVE = 1
     LEFT JOIN TRN_PrarambhMotorMISUpdation mis WITH (NOLOCK) ON mis.PrarambhMainId = m.Id AND mis.ISACTIVE = 1
     LEFT JOIN RH_InsurerMast i WITH (NOLOCK) ON i.insid = r.InsurerId`;
@@ -94,8 +102,7 @@ const JOINS_TAIL = `
     LEFT JOIN MST_FieldMasters f1 WITH (NOLOCK) ON f1.MasterId = 4040 AND f1.Value = m.Vertical
     LEFT JOIN MST_FieldMasters f3 WITH (NOLOCK) ON f3.MasterId = 9210 AND f3.Value = md.VEHICAL_TYPE_Id
     LEFT JOIN MST_FieldMasters f5 WITH (NOLOCK) ON f5.MasterId = 9220 AND f5.Value = r.Product_Type_Id
-    LEFT JOIN MST_FieldMasters fn WITH (NOLOCK) ON fn.MasterId = 4030 AND fn.Value = m.NatureOfSale
-    LEFT JOIN MST_FieldMasters ff WITH (NOLOCK) ON ff.MasterId = 8050 AND ff.Value = m.FinalStatus
+    -- (channel/status FieldMasters are NOT joined here — case-list only.)
     LEFT JOIN MST_SalesBranch msb WITH (NOLOCK) ON msb.id = r.SALES_BRANCH_Id
     LEFT JOIN MST_SalesSubBranch mssb WITH (NOLOCK) ON mssb.id = r.SALES_SUB_BRANCH_Id
     LEFT JOIN (SELECT DISTINCT PTrackerno FROM Beeinsured_v3_2.dbo.TRN_MotorTransactionForPrarambh WITH (NOLOCK)
@@ -254,14 +261,25 @@ router.get('/dashboard', async (req, res, next) => {
       SELECT DISTINCT b.vertical, b.branch, b.sub_branch, b.agent_code, b.vehicle_type, b.employee_code, b.employee_name
       FROM #base b;
 
-      -- 5) Case list (capped)
+      -- 5) Case list (capped). customer / policy_no / reg_no / created_dt /
+      --    channel / status are needed ONLY here, so they are NOT carried in
+      --    #base (writing those wide columns for every row was ~16s of tempdb
+      --    for a company-wide root). Re-join them for just these ${LIST_CAP} rows.
       SELECT TOP ${LIST_CAP}
-        b.TrackerNo AS tracker_no, b.created_dt AS created_date, b.channel,
+        b.TrackerNo AS tracker_no, m.CREATED_DATE AS created_date, fn.Name AS channel,
         CASE WHEN b.NatureOfSale IN ${ONLINE_SET} THEN 1 ELSE 0 END AS is_online,
         b.vertical, b.branch, b.sub_branch, b.agent_code, b.employee_code, b.employee_name,
-        b.vehicle_type, b.product_type, b.insurer, b.customer, b.policy_no,
-        b.reg_no, b.rto, b.state, b.premium, b.status
-      FROM #base b WHERE 1=1${DATE_SEL}${cl.full} ORDER BY b.created_dt DESC;
+        b.vehicle_type, b.product_type, b.insurer, p.FULLNAME_PROPOSER AS customer,
+        mis.POLICY_NO AS policy_no, md.VEHICLE_REGISTRATION_NO AS reg_no,
+        b.rto, b.state, b.premium, ff.Name AS status
+      FROM #base b
+      JOIN TRN_PrarambhMain m WITH (NOLOCK) ON m.Id = b._id
+      LEFT JOIN TRN_PrarambhProposerDetails p WITH (NOLOCK) ON p.PrarambhMainId = b._id AND p.ISACTIVE = 1
+      LEFT JOIN TRN_PrarambhMotorMISUpdation mis WITH (NOLOCK) ON mis.PrarambhMainId = b._id AND mis.ISACTIVE = 1
+      LEFT JOIN TRN_PrarambhMotorDetails md WITH (NOLOCK) ON md.PrarambhMainId = b._id AND md.ISACTIVE = 1
+      LEFT JOIN MST_FieldMasters fn WITH (NOLOCK) ON fn.MasterId = 4030 AND fn.Value = m.NatureOfSale
+      LEFT JOIN MST_FieldMasters ff WITH (NOLOCK) ON ff.MasterId = 8050 AND ff.Value = m.FinalStatus
+      WHERE 1=1${DATE_SEL}${cl.full} ORDER BY m.CREATED_DATE DESC;
 
       -- 6) Period buckets (YTD / MTD / FTD) — every status side by side
       SELECT
