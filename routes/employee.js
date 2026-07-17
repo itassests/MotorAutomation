@@ -37,6 +37,20 @@ router.use(attachUser(), (req, res, next) => {
 const ONLINE_SET = '(2,5,6)';     // NatureOfSale values treated as Online
 const LIST_CAP = 1000;
 
+// Cascading-dropdown combos (branch/sub-branch/employee/vehicle/product/insurer)
+// are effectively master data — they change when a branch/employee/insurer is
+// added, not when a policy is booked. But the DISTINCT over the whole subtree
+// costs ~1.8s on a company-wide root and is a large share of the payload, on
+// EVERY load. Cache it.
+//   - Keyed by ROOT (+ scope): it is SUBTREE-SCOPED, so a global cache would leak
+//     one manager's branches/employees into another's dropdowns.
+//   - Deliberately NOT keyed by the other filters: the cascade needs the FULL
+//     unfiltered combo set to stay complete (that's why the query has no WHERE).
+//   - TTL-bounded so a genuinely new branch/employee appears within the window;
+//     ?nocache=1 forces a rebuild.
+const FILTER_TTL_MS = 15 * 60 * 1000;
+const _filterCache = new Map();   // `${root}|${scope}` -> { at, rows }
+
 function rootEmpFor(req) {
   const me = String(req.user.empcode || '').trim();
   if (req.user.role === 'admin') return String(req.query.employee_root || '').trim() || me;
@@ -228,6 +242,11 @@ router.get('/dashboard', async (req, res, next) => {
     const rq = pool.request();
     const cl = buildClauses(rq, root, from, to, q);
     const scope = String(q.scope || 'motor').toLowerCase();
+    // Dropdown combos are master-ish → serve from cache and skip the ~1.8s DISTINCT.
+    const fKey = `${root}|${scope}`;
+    const fHit = _filterCache.get(fKey);
+    const fFresh = !!fHit && String(q.nocache || '') !== '1'
+                && (Date.now() - fHit.at) < FILTER_TTL_MS;
     const batch = `
       ${DECLARES}
       IF OBJECT_ID('tempdb..#base') IS NOT NULL DROP TABLE #base;
@@ -401,7 +420,9 @@ router.get('/dashboard', async (req, res, next) => {
 
       -- 17) Filter combinations — drives cascading dropdowns (branch/sub/employee/
       --     vehicle/product/insurer). One row per distinct combo actually present.
-      SELECT DISTINCT ISNULL(b.branch,'') AS branch, ISNULL(b.sub_branch,'') AS sub_branch,
+      --     On a cache hit this becomes TOP 0 — the recordset SHAPE is kept so the
+      --     recs[] indices below don't shift; the rows come from _filterCache.
+      ${fFresh ? 'SELECT TOP 0' : 'SELECT DISTINCT'} ISNULL(b.branch,'') AS branch, ISNULL(b.sub_branch,'') AS sub_branch,
         ISNULL(b.employee_code,'') AS emp_code, ISNULL(b.employee_name, b.employee_code) AS emp_name,
         ISNULL(b.vehicle_type,'') AS vehicle_type, ISNULL(b.product_type,'') AS product, ISNULL(b.insurer,'') AS insurer
       FROM #base b;
@@ -449,7 +470,13 @@ router.get('/dashboard', async (req, res, next) => {
     const rtoRows = recs[13] || [];
     const evalRows = recs[14] || [];
     const posStat = (recs[15] && recs[15][0]) || {};
-    const filterRows = recs[16] || [];
+    // Dropdown combos: cached rows on a hit, else map the fresh set and cache it.
+    const filterRows = fFresh ? fHit.rows : (recs[16] || []).map(r => ({
+      branch: r.branch || '', sub_branch: r.sub_branch || '', emp_code: r.emp_code || '',
+      emp_name: r.emp_name || r.emp_code || '',
+      vehicle_type: r.vehicle_type || '', product: r.product || '', insurer: r.insurer || '',
+    }));
+    if (!fFresh) _filterCache.set(fKey, { at: Date.now(), rows: filterRows });
     const renew = (recs[17] && recs[17][0]) || {};
     const renewFromRows = recs[18] || [];
     const renewMonthRows = recs[19] || [];
@@ -511,10 +538,7 @@ router.get('/dashboard', async (req, res, next) => {
         by_month: renewMonthRows.map(r => ({ ym: r.ym, renewed: Number(r.renewed_nop) || 0, same: Number(r.same_nop) || 0, diff: Number(r.diff_nop) || 0, new_nop: Number(r.new_nop) || 0 })),
       },
       by_rto: rtoRows.map(r => ({ k: r.k || '—', state: r.state || '—', nop: Number(r.nop) || 0, premium: round(r.premium) })),
-      filter_rows: filterRows.map(r => ({
-        branch: r.branch || '', sub_branch: r.sub_branch || '', emp_code: r.emp_code || '', emp_name: r.emp_name || r.emp_code || '',
-        vehicle_type: r.vehicle_type || '', product: r.product || '', insurer: r.insurer || '',
-      })),
+      filter_rows: filterRows,   // already normalised (and cached) above
       agent_pos: {
         total: Number(posStat.total_pos) || 0,
         producing: Number(posStat.producing_pos) || 0,
