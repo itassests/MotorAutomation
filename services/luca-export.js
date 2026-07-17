@@ -472,6 +472,12 @@ async function buildLucaBuffer(ids) {
     const marginP = marginPctForRule(r, canonVt(vt), marginRules, marginCache);
     const rateP = gridP === '' ? ''
       : Math.max(0, +((gridP > 0 && marginP >= gridP) ? gridP : gridP - marginP).toFixed(3));
+    // USER 2026-07-17: "if TP, OD, IRDA all rates are either ZERO or blank dont
+    // download those records". Each row carries the rate in exactly ONE of
+    // tp_commission_percentage / irdai_commission_percentage, so a blank-or-zero
+    // rateP means every commission column on the row is empty — a declined /
+    // nil-payout cell that tells an agent nothing. Drop the row entirely.
+    if (rateP === '' || Number(rateP) === 0) continue;
     // Luca coverage_type taxonomy: comprehensive | own_damage | third_party | hybrid.
     // hybrid = a bundled long-term COMPREHENSIVE package where the OD and TP
     // tenures differ (1+3, 1+5, 5+5, 3+3, bundled, long-term). Plain annual 1+1
