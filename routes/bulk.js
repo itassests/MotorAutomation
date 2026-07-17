@@ -6535,7 +6535,13 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
   // New India PJ3/5612: income 1345 (~3.3% of 40218) but margin 5% = 2011, so
   // an uncapped savings exceeds income and income−savings goes negative. Capping
   // keeps savings ≤ income and outgoing ≥ 0, consistently.
-  const savings = Math.min(marginPct * premiumBase, income);
+  // USER 2026-07-17: "if margin is greater than income keep income as agent rate".
+  // When our margin cut would meet or exceed the commission earned, we take NO
+  // margin and the AGENT keeps the whole income — instead of the old behaviour
+  // where savings was capped AT income, which left the agent 0 and us keeping it
+  // all (~29k rate cells, e.g. magma grid 2.5% vs a 5% default margin).
+  const rawSavings = marginPct * premiumBase;
+  const savings = (income > 0 && rawSavings >= income) ? 0 : Math.min(rawSavings, income);
   const outgoing = Math.max(0, income - savings);
 
   // Tag for the output row so the UI can flag policies whose calc was
@@ -6782,15 +6788,16 @@ function buildOutputRow(policy, params, rule, rateVal, marginRule, nums, note, s
     // Outgoing % — Rate − effective Margin, floored at 0. Surfaced as a
     // top-level field so the UI and CSV download can read it directly without
     // recomputing. applyOverrides() recomputes when the user edits any axis.
-    // Clamp to 0 (matches the outgoing AMOUNT's Math.max(0, income−savings) at
-    // ~L4877): when the rate is 0 / below the margin (e.g. a declined 0% row or
-    // income=0), outgoing can't be negative — you don't pay the agent a negative
-    // %, so it floors at 0 instead of showing e.g. −5%.
-    outgoing_pct: +Math.max(0,
-      Number(rateVal != null ? rateVal * 100 : 0)
-      - (nums && nums.special ? Number(nums.special.effective_margin_pct || 0)
-                              : (marginRule ? Number(marginRule.margin_pct || 0) : 0))
-    ).toFixed(3),
+    // Mirrors the outgoing AMOUNT rule above (USER 2026-07-17): when the margin
+    // meets/exceeds the rate we take NO margin and the agent keeps the whole rate;
+    // otherwise it's rate − margin. Still floors at 0 so a declined/0% row stays 0
+    // rather than showing e.g. −5%.
+    outgoing_pct: (() => {
+      const _r = Number(rateVal != null ? rateVal * 100 : 0);
+      const _m = (nums && nums.special ? Number(nums.special.effective_margin_pct || 0)
+                                       : (marginRule ? Number(marginRule.margin_pct || 0) : 0));
+      return +Math.max(0, (_r > 0 && _m >= _r) ? _r : _r - _m).toFixed(3);
+    })(),
     income, savings, outgoing,
     // Statement-match fields (null when no statement covers this policy)
     statement_amount:    stmtAmount,

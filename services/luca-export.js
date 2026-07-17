@@ -464,10 +464,14 @@ async function buildLucaBuffer(ids) {
     const cover = ex.inferProduct(r.rate_type, r.sheet_name, r.sub_type, r.segment); // Comp / TP / SAOD
     const isTp = cover === 'TP';
     const mm = lucaMakeModel(r);   // make = manufacturer, model = model (kept separate)
-    // OUTGOING = grid rate − margin, floored at 0 (never expose the grid rate).
+    // OUTGOING = grid rate − margin (never expose the grid rate). USER 2026-07-17:
+    // when the margin meets/exceeds the income we take NO margin and the agent
+    // keeps the whole rate — mirrors routes/bulk.js so the file cannot promise a
+    // rate the engine won't pay. Floors at 0 (a declined/0% grid stays 0).
     const gridP = pct(r.rate_value);
     const marginP = marginPctForRule(r, canonVt(vt), marginRules, marginCache);
-    const rateP = gridP === '' ? '' : Math.max(0, +(gridP - marginP).toFixed(3));
+    const rateP = gridP === '' ? ''
+      : Math.max(0, +((gridP > 0 && marginP >= gridP) ? gridP : gridP - marginP).toFixed(3));
     // Luca coverage_type taxonomy: comprehensive | own_damage | third_party | hybrid.
     // hybrid = a bundled long-term COMPREHENSIVE package where the OD and TP
     // tenures differ (1+3, 1+5, 5+5, 3+3, bundled, long-term). Plain annual 1+1
