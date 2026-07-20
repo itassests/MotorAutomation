@@ -240,7 +240,14 @@ _addState('andaman_and_nicobar', 'andaman and nicobar', 'andaman & nicobar', 'an
 _addState('madhya_pradesh', 'madhya pradesh', 'mp', 'indore', 'bhopal', 'gwalior', 'jabalpur');
 _addState('chhattisgarh', 'chhattisgarh', 'chattisgarh', 'chhatisgarh', 'cg', 'raipur');
 // Full-state-name keys (length ≥ 5) for substring fallback ("MAHARASHTRA OTHERS").
-const _STATE_NAME_KEYS = Object.keys(STATE_MAP).filter((k) => k.length >= 5);
+// Sorted LONGEST-FIRST: several state names contain a shorter one, and the loop
+// returns the first hit. "ANDAMAN" contains "DAMAN", so in insertion order every
+// Andaman region resolved to daman_and_diu ("ANDAMAN & NICOBAR ISLANDS" and
+// "South Andaman" both mapped to Daman & Diu). Longest-first makes the specific
+// name win over the substring.
+const _STATE_NAME_KEYS = Object.keys(STATE_MAP)
+  .filter((k) => k.length >= 5)
+  .sort((a, b) => b.length - a.length);
 
 function resolveStateSlug(raw) {
   if (!raw) return null;
@@ -387,6 +394,58 @@ function lucaBusinessType(seg, sub, rateType) {
  * @param {number|number[]} ids  rate_card id(s) to export.
  * @returns {Promise<Buffer>} xlsx buffer in Luca layout.
  */
+// included_rto — the actual RTO codes a rule covers, comma-separated (USER).
+// rate_rules has no rto column; the codes live in rto_mappings keyed by
+// (insurer, region|cluster). Two gotchas found in the data:
+//   1. Some insurers put the rule's region in rto_mappings.REGION (chola "MUMBAI
+//      THANE") and others in .CLUSTER (sbi rules say "AP - Rest", whose region
+//      column holds the state code "AP") — so index BOTH.
+//   2. Some rules name the state in full ("MAHARASHTRA") where the mapping uses
+//      the 2-letter RTO prefix ("MH") — hence the state-name fallback.
+// Coverage on the live book: region-only 44.9% → +cluster 63.4% → +state ~65%.
+// A rule whose region matches nothing is left BLANK rather than guessed — a wrong
+// RTO list would tell an agent a rate applies where it does not.
+const STATE_TO_RTO_PREFIX = {
+  'ANDHRA PRADESH': 'AP', 'ARUNACHAL PRADESH': 'AR', 'ASSAM': 'AS', 'BIHAR': 'BR',
+  'CHHATTISGARH': 'CG', 'CHATTISGARH': 'CG', 'GOA': 'GA', 'GUJARAT': 'GJ',
+  'HARYANA': 'HR', 'HIMACHAL PRADESH': 'HP', 'JAMMU AND KASHMIR': 'JK', 'JHARKHAND': 'JH',
+  'KARNATAKA': 'KA', 'KERALA': 'KL', 'MADHYA PRADESH': 'MP', 'MAHARASHTRA': 'MH',
+  'MANIPUR': 'MN', 'MEGHALAYA': 'ML', 'MIZORAM': 'MZ', 'NAGALAND': 'NL',
+  'ODISHA': 'OD', 'ORISSA': 'OD', 'PUNJAB': 'PB', 'RAJASTHAN': 'RJ', 'SIKKIM': 'SK',
+  'TAMIL NADU': 'TN', 'TAMILNADU': 'TN', 'TELANGANA': 'TS', 'TRIPURA': 'TR',
+  'UTTAR PRADESH': 'UP', 'UTTARAKHAND': 'UK', 'WEST BENGAL': 'WB', 'DELHI': 'DL',
+  'CHANDIGARH': 'CH', 'PUDUCHERRY': 'PY', 'PONDICHERRY': 'PY',
+};
+const _rkey = (ins, g) => String(ins || '').toLowerCase().trim() + '|'
+  + String(g || '').toUpperCase().replace(/\s+/g, ' ').trim();
+
+/** insurer+region/cluster → sorted, comma-separated RTO codes. */
+async function loadRtoIndex(pool) {
+  const rs = await pool.request().query(
+    'SELECT insurer, region, cluster, rto_code FROM rto_mappings WHERE rto_code IS NOT NULL');
+  const sets = new Map();
+  for (const r of rs.recordset) {
+    const code = String(r.rto_code).toUpperCase().trim();
+    if (!code) continue;
+    for (const g of [r.region, r.cluster]) {
+      if (!g || !String(g).trim()) continue;
+      const k = _rkey(r.insurer, g);
+      if (!sets.has(k)) sets.set(k, new Set());
+      sets.get(k).add(code);
+    }
+  }
+  const out = new Map();
+  for (const [k, s] of sets) out.set(k, [...s].sort().join(','));
+  return out;
+}
+function rtoListFor(idx, insurer, region) {
+  const g = String(region || '').trim();
+  if (!g) return '';
+  return idx.get(_rkey(insurer, g))
+      || idx.get(_rkey(insurer, STATE_TO_RTO_PREFIX[g.toUpperCase().replace(/\s+/g, ' ')] || ' '))
+      || '';
+}
+
 async function buildLucaBuffer(ids) {
   const idList = Array.isArray(ids) ? ids : [ids];
   const pool = await getPool();
@@ -435,6 +494,7 @@ async function buildLucaBuffer(ids) {
   // Active company margins, loaded once — same source the payout engine uses.
   const marginRules = await loadMarginRules(pool);
   const marginCache = new Map();
+  const rtoIdx = await loadRtoIndex(pool);   // included_rto lookup
 
   // Config-driven insurers keep their grids in JSON + a resolver and never write
   // rate_rules (IndusInd has ZERO), so they'd be missing from an agent's file.
@@ -525,7 +585,7 @@ async function buildLucaBuffer(ids) {
       lucaState(r.state, r.region),                           // included_states (canonical state slug)
       '',                                                     // city
       '',                                                     // excluded_cities
-      '',                                                     // included_rto
+      rtoListFor(rtoIdx, r.insurer, region),                  // included_rto (comma-separated)
       '',                                                     // excluded_rto
       'pos',                                                  // sales_channel
       'outgoing',                                             // rule_type
