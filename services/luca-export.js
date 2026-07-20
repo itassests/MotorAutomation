@@ -419,13 +419,30 @@ const STATE_TO_RTO_PREFIX = {
 const _rkey = (ins, g) => String(ins || '').toLowerCase().trim() + '|'
   + String(g || '').toUpperCase().replace(/\s+/g, ' ').trim();
 
+// Normalise an RTO code to ONE uniform shape (USER): "MH-01" — 2-letter state,
+// dash, 2-digit zero-padded district. So KA05 / KA5 / "KA 43" / KA-05 all collapse
+// to KA-05 / KA-43 (4,653 raw variants -> 2,760 unique codes).
+// A trailing series letter is REAL (DL6I = Delhi-6 series I, TN39Z) and is kept as
+// a third part: DL-06-I. Dropped, because they are not an RTO the agent can act on:
+//   - "ALL" (wildcard — the whole cell goes blank, per USER)
+//   - PIN codes / pure numbers ("560098")
+//   - unparseable junk ("APRTOCODENOTEXIST", "BIA", "TN/G", "DL1P to DL18P" ranges)
+// Dropping beats emitting a malformed code that no one can match on.
+function normRto(raw) {
+  const s = String(raw == null ? '' : raw).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!s || s === 'ALL' || /^\d+$/.test(s)) return null;
+  const m = s.match(/^([A-Z]{2})(\d{1,3})([A-Z]{0,2})$/);
+  if (!m) return null;
+  return m[1] + '-' + String(parseInt(m[2], 10)).padStart(2, '0') + (m[3] ? '-' + m[3] : '');
+}
+
 /** insurer+region/cluster → sorted, comma-separated RTO codes. */
 async function loadRtoIndex(pool) {
   const rs = await pool.request().query(
     'SELECT insurer, region, cluster, rto_code FROM rto_mappings WHERE rto_code IS NOT NULL');
   const sets = new Map();
   for (const r of rs.recordset) {
-    const code = String(r.rto_code).toUpperCase().trim();
+    const code = normRto(r.rto_code);   // uniform MH-01 shape; drops ALL / PIN / junk
     if (!code) continue;
     for (const g of [r.region, r.cluster]) {
       if (!g || !String(g).trim()) continue;
