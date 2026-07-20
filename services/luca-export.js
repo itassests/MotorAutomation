@@ -420,10 +420,14 @@ const _rkey = (ins, g) => String(ins || '').toLowerCase().trim() + '|'
   + String(g || '').toUpperCase().replace(/\s+/g, ' ').trim();
 
 // Normalise an RTO code to ONE uniform shape (USER): "MH-01" — 2-letter state,
-// dash, 2-digit zero-padded district. So KA05 / KA5 / "KA 43" / KA-05 all collapse
-// to KA-05 / KA-43 (4,653 raw variants -> 2,760 unique codes).
-// A trailing series letter is REAL (DL6I = Delhi-6 series I, TN39Z) and is kept as
-// a third part: DL-06-I. Dropped, because they are not an RTO the agent can act on:
+// dash, 2-digit zero-padded district. KA05 / KA5 / "KA 43" / KA-05 all collapse to
+// KA-05 / KA-43.
+// The trailing letter is DROPPED. In an Indian registration (DL-6C-AB-1234) the
+// letter after the district is the VEHICLE-CLASS / series code, NOT part of the
+// RTO — "DL6I" is not an RTO, the RTO is DL-06 (USER). Delhi alone has 567 raw
+// variants (DL00, DL01, DL-01, DL02C, DL0C, DL0D, DL0I, DL1, DL001 …) that are
+// really just 92 offices.
+// Dropped entirely, because they are not an RTO the agent can act on:
 //   - "ALL" (wildcard — the whole cell goes blank, per USER)
 //   - PIN codes / pure numbers ("560098")
 //   - unparseable junk ("APRTOCODENOTEXIST", "BIA", "TN/G", "DL1P to DL18P" ranges)
@@ -431,9 +435,9 @@ const _rkey = (ins, g) => String(ins || '').toLowerCase().trim() + '|'
 function normRto(raw) {
   const s = String(raw == null ? '' : raw).toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (!s || s === 'ALL' || /^\d+$/.test(s)) return null;
-  const m = s.match(/^([A-Z]{2})(\d{1,3})([A-Z]{0,2})$/);
+  const m = s.match(/^([A-Z]{2})(\d{1,3})[A-Z]{0,2}$/);   // trailing class letter ignored
   if (!m) return null;
-  return m[1] + '-' + String(parseInt(m[2], 10)).padStart(2, '0') + (m[3] ? '-' + m[3] : '');
+  return m[1] + '-' + String(parseInt(m[2], 10)).padStart(2, '0');
 }
 
 /** insurer+region/cluster → sorted, comma-separated RTO codes. */
