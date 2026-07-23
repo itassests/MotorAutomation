@@ -266,6 +266,31 @@ function lucaState(state, region) {
   return resolveStateSlug(state) || resolveStateSlug(region) || '';
 }
 
+// city — the sub-state locality that distinguishes a rule (USER: "city is not
+// populating due to this it looks duplicate records"). A rule's region is often a
+// CITY / cluster (MAHOBA, ERNAKULAM/KOCHI, "Kanpur,Varanasi", "HARYANA (Excluding
+// Gurgaon and Faridabad)") — 1,376 of 2,872 distinct regions. included_states only
+// carries the STATE, so two rules for different cities in the same state rendered
+// identically. Put the city/cluster region here; blank it when the region is a
+// bare STATE (included_states already has that) or a state code / "ALL".
+const _BARE_STATE = new Set(['MAHARASHTRA', 'GUJARAT', 'KARNATAKA', 'KERALA', 'TAMILNADU',
+  'TELANGANA', 'ANDHRAPRADESH', 'DELHI', 'PUNJAB', 'HARYANA', 'RAJASTHAN', 'WESTBENGAL',
+  'BIHAR', 'MADHYAPRADESH', 'UTTARPRADESH', 'UTTARAKHAND', 'ODISHA', 'ORISSA', 'ASSAM',
+  'GOA', 'CHHATTISGARH', 'CHATTISGARH', 'JHARKHAND', 'HIMACHALPRADESH', 'JAMMUANDKASHMIR',
+  'CHANDIGARH', 'PONDICHERRY', 'PUDUCHERRY', 'DAMANDDIU', 'DADRAANDNAGARHAVELI',
+  'ANDAMANANDNICOBAR', 'SIKKIM', 'TRIPURA', 'MEGHALAYA', 'MANIPUR', 'MIZORAM', 'NAGALAND',
+  'ARUNACHALPRADESH', 'LAKSHADWEEP']);
+function lucaCity(region) {
+  const raw = String(region || '').trim();
+  if (!raw) return '';
+  const bare = raw.toUpperCase().replace(/[^A-Z]/g, '');       // 2-letter state code?
+  if (/^[A-Z]{2}$/.test(bare) && STATE_MAP[_sk(bare)]) return '';
+  const n = bare.replace(/^RESTOF/, '').replace(/(OTHERS?|REGION|ZONE|KEYCITIES?|CITY|CITIES)$/, '');
+  if (!n || n === 'ALL' || n === 'PANINDIA' || n === 'ALLINDIA' || n === 'INDIA'
+      || _BARE_STATE.has(n)) return '';                         // region IS a state / pan-India / wildcard
+  return raw;                                                    // real city / cluster
+}
+
 // Sanitize the vehicle_make column. rr.make is polluted in several grids with
 // non-make values: category descriptors ("All", "All Electric Make", "All
 // excluding Volvo and Scania", "Excluding Eicher", "All Other Make/Models"),
@@ -538,6 +563,7 @@ async function buildLucaBuffer(ids) {
   const dbRows = result.recordset.filter(r => !isSuppressed(r));
 
   const rows = [LUCA_HEADERS.slice()];
+  const _emitted = new Set();   // output-level dedupe (see the push below)
   let id = 1;
   for (const r of dbRows.concat(configRows)) {
     const insurer = lucaInsurer(r.insurer || '');
@@ -576,8 +602,8 @@ async function buildLucaBuffer(ids) {
     const d = r.effective_from ? new Date(r.effective_from) : null;
     const region = String(r.region || r.state || '').trim();
 
-    rows.push([
-      id++,                                                   // id
+    const rowArr = [
+      0,                                                      // id — assigned below after the dedupe check
       (insurer + vt + (cover === 'Comp' ? 'PACKAGE' : cover.toUpperCase())).toUpperCase().replace(/[^A-Z0-9]/g, ''), // name
       insurer,                                                // insurers
       d ? d.getFullYear() : '',                               // year
@@ -604,7 +630,7 @@ async function buildLucaBuffer(ids) {
       lucaBusinessType(r.segment, r.sub_type, r.rate_type),   // business_type
       '',                                                     // zones
       lucaState(r.state, r.region),                           // included_states (canonical state slug)
-      '',                                                     // city
+      lucaCity(region),                                       // city (sub-state locality)
       '',                                                     // excluded_cities
       rtoListFor(rtoIdx, r.insurer, region),                  // included_rto (comma-separated)
       '',                                                     // excluded_rto
@@ -612,7 +638,18 @@ async function buildLucaBuffer(ids) {
       'outgoing',                                             // rule_type
       '', '', '', '',                                         // cpa, commission_percent_on_total_commission, deduction, discount_range
       String(r.remarks || '').slice(0, 250),                 // REMARK
-    ]);
+    ];
+    // Output-level dedupe (USER: "it looks duplicate records"). Different source
+    // rate_rules can render to a byte-identical Luca row — e.g. two rows that
+    // differ only in a column Luca doesn't carry (sub_type). Identical on every
+    // agent-visible column = indistinguishable, so emit it once. Key on the whole
+    // row EXCEPT the id (index 0) and the REMARK (last col — free text, not a
+    // rate dimension, so it shouldn't create a phantom "distinct" row).
+    const sig = rowArr.slice(1, rowArr.length - 1).join('');
+    if (_emitted.has(sig)) continue;
+    _emitted.add(sig);
+    rowArr[0] = id++;
+    rows.push(rowArr);
   }
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
