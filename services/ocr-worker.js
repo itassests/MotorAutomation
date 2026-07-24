@@ -31,6 +31,11 @@ const ENABLED = String(process.env.OCR_WORKER_ENABLED || '0') === '1';
 const TICK_MS = parseInt(process.env.OCR_WORKER_TICK_MS || '8000', 10);
 const FOLDERS_PER_TICK = parseInt(process.env.OCR_FOLDERS_PER_TICK || '1', 10);
 const PDFS_PER_TICK = parseInt(process.env.OCR_PDFS_PER_TICK || '3', 10);
+// How many PDFs to OCR concurrently per tick. Each OCR round-trip to the engine
+// takes ~40s, so serial processing (=1) is the throughput bottleneck. The claim
+// query is READPAST-safe, so N workers never grab the same row. Tune via
+// OCR_CONCURRENCY; keep modest so the shared OCR engine isn't overwhelmed.
+const CONCURRENCY = Math.max(1, parseInt(process.env.OCR_CONCURRENCY || '5', 10));
 const MAX_RETRY = parseInt(process.env.OCR_MAX_RETRY || '3', 10);
 const DROP_DIR = process.env.OCR_ZIP_DROP_DIR
   || path.join(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'), 'ocr_dropzone');
@@ -220,15 +225,21 @@ async function lookupPolicyNo(live, mainId, trackerNo) {
   return r.recordset[0] ? String(r.recordset[0].POLICY_NO).trim() : null;
 }
 
-/** Phase 2 — process up to N queued PDFs. */
-async function processPdfs(app, live) {
-  for (let i = 0; i < PDFS_PER_TICK; i++) {
-    const claim = await app.request().query(`
-      UPDATE TOP (1) p SET p.status = 4
-      OUTPUT INSERTED.id, INSERTED.upload_id, INSERTED.pdf_path, INSERTED.tracker_no, INSERTED.prarambh_main_id, INSERTED.retry
-      FROM dbo.ocr_bulk_pdf p WITH (READPAST, ROWLOCK, UPDLOCK) WHERE p.status = 1`);
-    if (claim.recordset.length === 0) break;
-    const row = claim.recordset[0];
+/** Claim a single queued PDF, flipping it to status=4 (processing). READPAST +
+ *  ROWLOCK make this safe for concurrent workers — each claims a distinct row.
+ *  Returns the claimed row, or null when the queue is empty. */
+async function claimOnePdf(app) {
+  const claim = await app.request().query(`
+    UPDATE TOP (1) p SET p.status = 4
+    OUTPUT INSERTED.id, INSERTED.upload_id, INSERTED.pdf_path, INSERTED.tracker_no, INSERTED.prarambh_main_id, INSERTED.retry
+    FROM dbo.ocr_bulk_pdf p WITH (READPAST, ROWLOCK, UPDLOCK) WHERE p.status = 1`);
+  return claim.recordset.length ? claim.recordset[0] : null;
+}
+
+/** OCR one claimed PDF end-to-end and finalize it (status=2 + policy on success,
+ *  retry or status=3 on failure). Self-contained so a wave can run in parallel. */
+async function handlePdf(app, live, row) {
+  {
     const meta = await app.request().input('id', sql.Int, row.upload_id)
       .query('SELECT emp_code, transaction_id, folder_key FROM dbo.ocr_bulk_meta WHERE upload_id = @id');
     const md = meta.recordset[0] || {};
@@ -292,6 +303,19 @@ async function processPdfs(app, live) {
   }
 }
 
+/** Phase 2 — claim a wave of up to CONCURRENCY queued PDFs and OCR them in
+ *  parallel. Settling runs after each wave (in tick), so folders roll to "done"
+ *  incrementally rather than all at the very end. */
+async function processPdfs(app, live) {
+  const wave = [];
+  for (let i = 0; i < CONCURRENCY; i++) {
+    const row = await claimOnePdf(app);
+    if (!row) break;
+    wave.push(row);
+  }
+  if (wave.length) await Promise.all(wave.map((r) => handlePdf(app, live, r)));
+}
+
 /** Phase 3 — flip folders whose PDFs are all settled to Done (Isactive=2). */
 async function settleFolders(app, live) {
   const r = await app.request().query(`
@@ -334,7 +358,7 @@ async function startWorker() {
     await app.request().query('UPDATE dbo.ocr_bulk_pdf SET status = 1 WHERE status = 4');   // reclaim stale
   } catch (err) { console.warn('[ocr-worker] startup reclaim skipped:', err.message); }
   setInterval(tick, TICK_MS);
-  console.log(`[ocr-worker] started (tick ${TICK_MS}ms, ${FOLDERS_PER_TICK} folder(s)/${PDFS_PER_TICK} PDF(s) per tick)`);
+  console.log(`[ocr-worker] started (tick ${TICK_MS}ms, ${FOLDERS_PER_TICK} folder(s)/tick, ${CONCURRENCY} PDF(s) in parallel per wave)`);
 }
 
 module.exports = { startWorker, tick, locateFolderPdfs };
