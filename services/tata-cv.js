@@ -96,6 +96,36 @@ function classifySeg(params) {
   return null;
 }
 
+// TATA CV "Incremental Rule" (sheet "Incremental Rule" of the June CV grid):
+// the final payout = base rate + an INCREMENT (additive percentage points) keyed
+// by Vehicle Class × the policy's IDV slab. The resolver historically returned
+// only the base, running ~3pt low vs the operator on ~200 CV rows (e.g. Pune GCV
+// base 40 + IDV 656100 [LCV 500-750k = +3] = 43). Applied here so the grid's own
+// increment sheet is honoured. Slab caps (₹) → increment points, per class.
+const CV_INCREMENT = {
+  PCV:   [[50000, 0], [150000, 1], [300000, 2], [500000, 2.5], [750000, 3], [1000000, 4], [Infinity, 4]],
+  LCV:   [[50000, 0], [150000, 1], [300000, 2], [500000, 2.5], [750000, 3], [1000000, 4], [Infinity, 4]],
+  BUS:   [[50000, 0], [150000, 2], [300000, 3], [500000, 4], [750000, 4.5], [1000000, 4.5], [Infinity, 5]],
+  MNHCV: [[50000, 0], [150000, 0.5], [300000, 1.5], [500000, 2.5], [750000, 3], [1000000, 3], [Infinity, 3]],
+};
+// Map the classifySeg() label → increment vehicle class. LCV = goods ≤ 7.5T,
+// MNHCV = goods > 7.5T; PCV bus → BUS; other passenger → PCV. Misc/Tractor/
+// Harvester/Trailer aren't in the increment sheet → no increment.
+const MNHCV_SEG = new Set(['GCV > 7.5 <= 12', 'GCV > 12 <= 20', 'GCV > 20 <= 35', 'GCV > 35 <= 45', 'GCV > 45']);
+function incrementClass(seg) {
+  if (/^GCV/.test(seg)) return MNHCV_SEG.has(seg) ? 'MNHCV' : 'LCV';
+  if (/^PCV Bus/.test(seg)) return 'BUS';
+  if (/^PCV/.test(seg)) return 'PCV';
+  return null;
+}
+function incrementPoints(seg, idv) {
+  const cls = incrementClass(seg);
+  const v = Number(idv);
+  if (!cls || !(v > 0)) return 0;
+  for (const [cap, pts] of CV_INCREMENT[cls]) if (v <= cap) return pts;
+  return 0;
+}
+
 function fuelCat(f) {
   const u = norm(f);
   if (/DIESEL/.test(u)) return 'DIESEL';
@@ -147,7 +177,10 @@ function resolveTataCvRate(params) {
     const score = fscore + ascore;
     if (score > bestScore) { bestScore = score; best = row; bestKey = rk; }
   }
-  return best ? +Number(best.rates[bestKey]).toFixed(4) : null;
+  if (!best) return null;
+  const base = Number(best.rates[bestKey]);
+  const inc = incrementPoints(seg, params.idv) / 100;   // points → fraction
+  return +(base + inc).toFixed(4);
 }
 
 module.exports = { resolveTataCvRate, cvRegion, classifySeg };
