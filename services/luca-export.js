@@ -111,7 +111,7 @@ function lucaProduct(vt, seg, sub, sheet, wMin, wMax) {
   }
   if (V === 'MISC' || V === 'MIS') {
     if (/AUTO|E-?RICK|RICKSHAW|\b3\s*W/.test(hay)) return 'auto';
-    return 'gcv';
+    return 'misc';   // Ambulance / MISC-D / Motor Trade / CPA etc. are Misc, NOT gcv
   }
   return V.toLowerCase();
 }
@@ -511,7 +511,7 @@ async function buildLucaBuffer(ids) {
       SELECT rr.insurer, rr.product, rr.sheet_name, rr.region, rr.segment, rr.make,
              rr.model, rr.sub_type, rr.fuel_type, rr.cc_band_min, rr.cc_band_max,
              rr.age_band_min, rr.age_band_max, rr.weight_band_min, rr.weight_band_max,
-             rr.seating_capacity_min, rr.seating_capacity_max,
+             rr.seating_capacity_min, rr.seating_capacity_max, rr.volume_tier,
              rr.rate_type, rr.rate_value,
              rr.remarks, rr.state, rc.effective_from,
              ROW_NUMBER() OVER (
@@ -519,7 +519,7 @@ async function buildLucaBuffer(ids) {
                             rr.make, rr.model, rr.sub_type, rr.fuel_type,
                             rr.cc_band_min, rr.cc_band_max, rr.age_band_min, rr.age_band_max,
                             rr.weight_band_min, rr.weight_band_max,
-                            rr.seating_capacity_min, rr.seating_capacity_max,
+                            rr.seating_capacity_min, rr.seating_capacity_max, rr.volume_tier,
                             rr.rate_type, rr.state
                ORDER BY rc.effective_from DESC, rr.id DESC) AS rn
       FROM rate_rules rr
@@ -637,7 +637,14 @@ async function buildLucaBuffer(ids) {
       'pos',                                                  // sales_channel
       'outgoing',                                             // rule_type
       '', '', '', '',                                         // cpa, commission_percent_on_total_commission, deduction, discount_range
-      String(r.remarks || '').slice(0, 250),                 // REMARK
+      // Comment: carry every rate dimension Luca has NO dedicated column for —
+      // segment / sub_type / volume_tier (e.g. Ambulance vs MISC-D vs Motor Trade;
+      // SBI/Bajaj volume slabs). Without them, rows sharing every visible column but
+      // differing only by one of these look like unexplained duplicates
+      // (USER 2026-07-29). Original remark appended last.
+      ([[r.segment, r.sub_type].map(x => String(x || '').trim()).filter(Boolean).join(' ').trim(),
+        r.volume_tier ? 'slab:' + String(r.volume_tier).trim() : '',
+        String(r.remarks || '').trim()].filter(Boolean).join(' | ')).slice(0, 250),  // REMARK / comment
     ];
     // Output-level dedupe (USER: "it looks duplicate records"). Different source
     // rate_rules can render to a byte-identical Luca row — e.g. two rows that
