@@ -391,23 +391,36 @@ function lucaMakeModel(r) {
   return { make, model };
 }
 
-function lucaMake(m) {
-  const s = String(m == null ? '' : m).trim();
-  if (!s) return '';
+// Is a single token a real make (not a header, keyword, number, spec, region…)?
+function _isRealMakeToken(s) {
   const u = s.toUpperCase();
-  // Column-header / placeholder leaks — not a make, and meaningless to an agent.
-  if (/^(MAKE|MAKES|SEGMENT|MODEL|OTHER,?\s*MAKES?)$/.test(u)) return '';
-  if (s.replace(/[^A-Za-z]/g, '').length <= 1) return '';            // single-letter leak ("D")
-  if (/[%:_+<>]/.test(s)) return '';                                 // rate/remark/cluster/region-combo/spec leak (real makes use spaces)
-  if (/^\d+(\.\d+)?$/.test(s)) return '';                            // pure number / rate
-  if (/\b(YR|YRS|YEAR|YEARS|YS)\b/.test(u) || /^\d+\s*[-]/.test(s)) return ''; // age band
-  if (/^ALL\b/.test(u) || /^NON[\s-]/.test(u) || /^OTHERS?$/.test(u)) return ''; // "All ..." / "Non Tata" / "Other(s)"
-  if (/EXCLUD|EXCEPT|OTHER\s+MAKE|OTHER\s+MODEL|OTHER\s+THAN|\bREF\b/.test(u)) return ''; // exclusion / region-ref
-  // segment / vehicle-type / spec words (no \b so glued forms like "BackhoeLoader" are caught)
-  if (/GCV|PCV|LCV|HCV|MCV|GCCV|PCCV|\bMISC\b|SEATER|SEAT|TONNE|\bTON\b|GVW|LAKH|\bLAC\b|UPTO|DUMPER|TIPPER|BACKHOE|EXCAVATOR|LOADER|CRANE|HARVESTER|TAXI|\bBUS\b|TANKER|DRILLING|\bRIG\b|MOBILEPLANT|RICKSHAW|E-?LOADER/.test(u)) return '';
-  if (/\d\s*T\b/.test(u) || /^[A-Z]{2}\s?\d/.test(u)) return '';     // tonnage ("40T") / RTO-region code ("TN1", "HP 21")
-  if (resolveStateSlug(s)) return '';                               // the value IS a region / city / state name
-  return expandMake(s);                                              // real make — abbreviations spelled out
+  if (/^(MAKE|MAKES|SEGMENT|MODEL|MODELS|ONLY|FOR|INCL|INCLUDE|INCLUDES|INCLUDING|WITH|WITHOUT|DOABLE|AND|OR|THE|OTHERS?|OTHER\s*MAKES?)$/.test(u)) return false; // annotation words
+  if (s.replace(/[^A-Za-z]/g, '').length <= 1) return false;         // single-letter leak ("D")
+  if (/[%:_+<>]/.test(s)) return false;                              // rate/remark/spec leak
+  if (/^\d+(\.\d+)?$/.test(s)) return false;                         // pure number / rate
+  if (/\b(YR|YRS|YEAR|YEARS|YS)\b/.test(u) || /^\d+\s*[-]/.test(s)) return false; // age band
+  if (/^ALL\b/.test(u) || /^NON[\s-]/.test(u)) return false;         // "All ..." / "Non Tata"
+  if (/EXCLUD|EXCEPT|OTHER\s+MAKE|OTHER\s+MODEL|OTHER\s+THAN|\bREF\b/.test(u)) return false;
+  if (/GCV|PCV|LCV|HCV|MCV|GCCV|PCCV|\bMISC\b|SEATER|SEAT|TONNE|\bTON\b|GVW|LAKH|\bLAC\b|UPTO|DUMPER|TIPPER|BACKHOE|EXCAVATOR|LOADER|CRANE|HARVESTER|TAXI|\bBUS\b|TANKER|DRILLING|\bRIG\b|MOBILEPLANT|RICKSHAW|E-?LOADER/.test(u)) return false;
+  if (/\d\s*T\b/.test(u) || /^[A-Z]{2}\s?\d/.test(u)) return false;  // tonnage / RTO-region code
+  if (resolveStateSlug(s)) return false;                            // the value IS a region / city / state
+  return true;
+}
+// vehicle_make: only real make name(s). Strips parenthetical notes, splits multi-
+// make lists ("Tata, Ashok Leyland & Eicher"), drops annotation words ("For",
+// "Only", "including", …) that leaked from the grid, expands abbreviations, dedupes.
+function lucaMake(m) {
+  const raw = String(m == null ? '' : m).trim();
+  if (!raw) return '';
+  const stripped = raw.replace(/\([^)]*\)/g, ' ');                  // drop "(including …)" notes
+  const out = []; const seen = new Set();
+  for (const part of stripped.split(/\s*(?:,|&|\/|\band\b)\s*/i)) {
+    const s = part.trim();
+    if (!s || !_isRealMakeToken(s)) continue;
+    const exp = expandMake(s); const key = exp.toUpperCase();
+    if (exp && !seen.has(key)) { seen.add(key); out.push(exp); }
+  }
+  return out.join(', ');
 }
 
 // Canonical Luca fuel_type: ELECTRICITY | DIESEL | INTERNAL_LPG_CNG | PETROL.
