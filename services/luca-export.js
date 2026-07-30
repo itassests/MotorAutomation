@@ -283,6 +283,14 @@ const _BARE_STATE = new Set(['MAHARASHTRA', 'GUJARAT', 'KARNATAKA', 'KERALA', 'T
 function lucaCity(region) {
   const raw = String(region || '').trim();
   if (!raw) return '';
+  const U = raw.toUpperCase();
+  // Reject segment / cover / spec text that leaks from the region column into
+  // "city" (e.g. Bajaj "GCV4 12 To 20T 0 To 1 year (Low CD2 RTOs @ 10% CD2)").
+  // A real city/locality is plain alphabetic — no digits, no rate/spec symbols,
+  // and no vehicle-type / cover / tonnage / age keywords.
+  if (/\d/.test(raw)) return '';                                // GCV4, 12 To 20T, 6+ Years, @10%, CD2
+  if (/[@%()\[\]{}<>+\/]/.test(raw)) return '';                 // rate / spec / cluster-combo symbols
+  if (/GCV|PCV|LCV|HCV|GCCV|PCCV|\bMISC\b|SEATER|TONNE|\bTON\b|\bGVW\b|\bCD1\b|\bCD2\b|\bRTOS?\b|YEAR|\bYRS?\b|BUNDL|PACKAGE|LIABILITY|\bSATP\b|\bSAOD\b|\bCOMP\b|EXCLUD|EXCEPT|MENTION/.test(U)) return '';
   const bare = raw.toUpperCase().replace(/[^A-Z]/g, '');       // 2-letter state code?
   if (/^[A-Z]{2}$/.test(bare) && STATE_MAP[_sk(bare)]) return '';
   const n = bare.replace(/^RESTOF/, '').replace(/(OTHERS?|REGION|ZONE|KEYCITIES?|CITY|CITIES)$/, '');
