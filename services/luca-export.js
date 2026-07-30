@@ -74,6 +74,22 @@ const LUCA_HEADERS = [
   'discount_range', 'REMARK',
 ];
 
+// Column order in the OUTPUT file (Luca import schema, USER 2026-07-29). Rows are
+// BUILT in LUCA_HEADERS order; remap to this before writing so the build code stays
+// simple. gross_vehicle_weight + seating_capacity move to the end; REMARK (comment)
+// kept as the trailing column.
+const OUTPUT_ORDER = [
+  'id', 'name', 'insurers', 'year', 'month', 'products', 'coverage_type', 'ncb',
+  'commission_on', 'tp_commission_percentage', 'irdai_commission_percentage',
+  'slab', 'slab_on', 'is_slab_on_first_tenure', 'flat_commission', 'excluded_vehicles',
+  'vehicle_make', 'vehicle_model', 'vehicle_cc', 'vehicle_age', 'fuel_type',
+  'business_type', 'zones', 'included_states', 'city', 'excluded_cities',
+  'included_rto', 'excluded_rto', 'sales_channel', 'rule_type', 'cpa',
+  'commission_percent_on_total_commission', 'deduction', 'discount_range',
+  'gross_vehicle_weight', 'seating_capacity', 'REMARK',
+];
+const _OUT_IDX = OUTPUT_ORDER.map((h) => LUCA_HEADERS.indexOf(h));
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // Map an internal rule to the granular Luca product taxonomy:
@@ -697,7 +713,9 @@ async function buildLucaBuffer(ids) {
     rows.push(rowArr);
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(rows);
+  // Reorder every row (header included) from build order to the Luca output order.
+  const outRows = rows.map((row) => _OUT_IDX.map((i) => row[i]));
+  const ws = XLSX.utils.aoa_to_sheet(outRows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', compression: true });
