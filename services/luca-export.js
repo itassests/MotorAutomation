@@ -500,6 +500,35 @@ function rtoListFor(idx, insurer, region) {
       || '';
 }
 
+// RTO-code → city/district name, so the "city" column shows the ACTUAL cities in a
+// region cluster (e.g. Liberty "GUJARAT - 1 A" → Ahmedabad, Gandhinagar) instead of
+// the opaque cluster label. Keyed in normRto shape ("GJ-01"). Primary source:
+// bajaj_rto_district (clean district names); supplemented by tata_rto_cluster where
+// its value is a plausible city (skip state/region/ROW* labels).
+const RTO_CITY = (() => {
+  const map = {};
+  const add = (raw, city) => { const k = normRto(raw); const c = String(city || '').trim(); if (k && c && !map[k]) map[k] = c; };
+  try { const bd = require('../config/bajaj_rto_district.json'); for (const k in bd) add(k, typeof bd[k] === 'string' ? bd[k] : (bd[k] && (bd[k].district || bd[k].city))); } catch (_) { /* optional */ }
+  try {
+    const tc = require('../config/tata_rto_cluster.json');
+    for (const k in tc) {
+      const v = tc[k]; const city = v && (v.car || v.cv || v.tw);
+      if (city && !/^RO[A-Z]{2}$|^ROW|^REST\b|PRADESH|\bBENGAL\b|\bNADU\b|ODISHA|^GUJARAT$|^MAHARASHTRA$|^KERALA$|^KARNATAKA$|^BIHAR$|^GOA$|^ASSAM$/i.test(city)) add(k, city);
+    }
+  } catch (_) { /* optional */ }
+  return map;
+})();
+// Map a comma-separated normRto list ("GJ-01, GJ-18") → deduped city names.
+function citiesFromRtoList(rtoStr) {
+  if (!rtoStr) return '';
+  const seen = new Set(); const out = [];
+  for (const code of String(rtoStr).split(',')) {
+    const c = RTO_CITY[code.trim()];
+    if (c && !seen.has(c.toUpperCase())) { seen.add(c.toUpperCase()); out.push(c); }
+  }
+  return out.join(', ');
+}
+
 async function buildLucaBuffer(ids) {
   const idList = Array.isArray(ids) ? ids : [ids];
   const pool = await getPool();
@@ -609,6 +638,7 @@ async function buildLucaBuffer(ids) {
                        : 'third_party';
     const d = r.effective_from ? new Date(r.effective_from) : null;
     const region = String(r.region || r.state || '').trim();
+    const rtoList = rtoListFor(rtoIdx, r.insurer, region);   // shared by city + included_rto
 
     const rowArr = [
       0,                                                      // id — assigned below after the dedupe check
@@ -638,9 +668,9 @@ async function buildLucaBuffer(ids) {
       lucaBusinessType(r.segment, r.sub_type, r.rate_type),   // business_type
       '',                                                     // zones
       lucaState(r.state, r.region),                           // included_states (canonical state slug)
-      lucaCity(region),                                       // city (sub-state locality)
+      citiesFromRtoList(rtoList) || lucaCity(region),         // city — cities in the cluster (RTO→city), else clean locality
       '',                                                     // excluded_cities
-      rtoListFor(rtoIdx, r.insurer, region),                  // included_rto (comma-separated)
+      rtoList,                                                // included_rto (comma-separated)
       '',                                                     // excluded_rto
       'pos',                                                  // sales_channel
       'outgoing',                                             // rule_type
