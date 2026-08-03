@@ -472,6 +472,28 @@ router.post('/upload', async (req, res, next) => {
       response.parse_profiles = { error: e.message };
     }
 
+    // 7. Rule counts by vehicle type (product) and cover — a post-upload summary
+    //    so the operator immediately sees WHAT was ingested (e.g. GCV 656, PCV 210).
+    try {
+      const cnt = await pool.request().input('cid', sql.Int, rateCardId).query(`
+        SELECT ISNULL(NULLIF(product, ''), '(unset)') AS product,
+               ISNULL(NULLIF(rate_type, ''), '(none)') AS cover,
+               COUNT(*) AS n
+        FROM rate_rules WHERE rate_card_id = @cid
+        GROUP BY ISNULL(NULLIF(product, ''), '(unset)'), ISNULL(NULLIF(rate_type, ''), '(none)')`);
+      const byProduct = {};
+      for (const row of cnt.recordset) {
+        const p = (byProduct[row.product] = byProduct[row.product] || { total: 0, covers: {} });
+        p.total += row.n; p.covers[row.cover] = (p.covers[row.cover] || 0) + row.n;
+      }
+      response.rule_counts = {
+        total: Object.values(byProduct).reduce((a, p) => a + p.total, 0),
+        by_product: Object.entries(byProduct)
+          .sort((a, b) => b[1].total - a[1].total)
+          .map(([product, v]) => ({ product, total: v.total, covers: v.covers })),
+      };
+    } catch (e) { response.rule_counts = { error: e.message }; }
+
     // Validate the just-ingested card so a bad parse (0 rules / scratch sheet /
     // scrambled columns / mostly-zero) is flagged at the door, not weeks later.
     try { response.validation = await validateCard(pool, rateCardId); }

@@ -7331,6 +7331,28 @@
               statsHTML += `<div style="grid-column:1/-1; margin-top:12px; padding:8px 16px; background:#e8f5e9; border-left:4px solid #2e7d32; border-radius:4px; font-size:13px; color:#2e7d32;">✅ Validation passed — ${v.total.toLocaleString()} rules across ${v.distinct_regions} regions, no anomalies.</div>`;
             }
           }
+          // Rule counts by vehicle type (product) × cover — what actually got ingested.
+          const rc = data.rule_counts;
+          if (rc && !rc.error && (rc.by_product || []).length) {
+            statsHTML += `<div style="grid-column:1/-1; margin-top:12px; padding:12px 16px; background:#f4f8ff; border-left:4px solid #1565c0; border-radius:4px; font-size:13px;">
+              <strong>Rules by vehicle type &amp; product</strong> — ${rc.total.toLocaleString()} total
+              <table style="margin-top:8px; border-collapse:collapse; font-size:12px;">
+                <thead><tr><th style="text-align:left; padding:3px 12px 3px 0;">Product / Vehicle type</th><th style="text-align:right; padding:3px 12px;">Rules</th><th style="text-align:left; padding:3px 0;">By cover</th></tr></thead>
+                <tbody>${rc.by_product.map(p => `<tr>
+                  <td style="padding:3px 12px 3px 0;"><span class="badge badge-blue">${escapeHtml(p.product)}</span></td>
+                  <td style="text-align:right; padding:3px 12px; font-weight:600;">${p.total.toLocaleString()}</td>
+                  <td style="padding:3px 0; color:#555;">${Object.entries(p.covers).map(([c, n]) => `${escapeHtml(c)}&nbsp;${n}`).join(' · ')}</td>
+                </tr>`).join('')}</tbody>
+              </table></div>`;
+          }
+          // Dynamic parse-profile summary — flag sheets needing review.
+          const pp = data.parse_profiles;
+          if (pp && !pp.error && (pp.needs_review || []).length) {
+            statsHTML += `<div style="grid-column:1/-1; margin-top:12px; padding:10px 16px; background:#fff3e0; border-left:4px solid #ff9800; border-radius:4px; font-size:13px;">
+              <strong>⚠️ ${pp.needs_review.length} sheet(s) need parse review</strong>
+              — ${pp.needs_review.map(escapeHtml).join(', ')}.
+              <span style="color:#666;">Open the <b>Parse Review</b> tab to correct the mapping and re-parse.</span></div>`;
+          }
           document.getElementById('uploadStats').innerHTML = statsHTML;
           const dlBtn = document.getElementById('downloadMasterBtn');
           dlBtn.style.display = 'inline-block';

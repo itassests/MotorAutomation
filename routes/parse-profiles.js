@@ -94,6 +94,30 @@ router.get('/', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// ── rule counts for a card, by vehicle type (product) × cover ──────────────────
+router.get('/card/:cardId(\\d+)/counts', async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const r = await pool.request().input('cid', sql.Int, Number(req.params.cardId)).query(`
+      SELECT ISNULL(NULLIF(product, ''), '(unset)') AS product,
+             ISNULL(NULLIF(rate_type, ''), '(none)') AS cover,
+             COUNT(*) AS n
+      FROM rate_rules WHERE rate_card_id = @cid
+      GROUP BY ISNULL(NULLIF(product, ''), '(unset)'), ISNULL(NULLIF(rate_type, ''), '(none)')`);
+    const byProduct = {};
+    for (const row of r.recordset) {
+      const p = (byProduct[row.product] = byProduct[row.product] || { total: 0, covers: {} });
+      p.total += row.n; p.covers[row.cover] = (p.covers[row.cover] || 0) + row.n;
+    }
+    res.json({
+      success: true, card_id: Number(req.params.cardId),
+      total: Object.values(byProduct).reduce((a, p) => a + p.total, 0),
+      by_product: Object.entries(byProduct).sort((a, b) => b[1].total - a[1].total)
+        .map(([product, v]) => ({ product, total: v.total, covers: v.covers })),
+    });
+  } catch (e) { next(e); }
+});
+
 // ── all profiles for a card ────────────────────────────────────────────────────
 router.get('/card/:cardId(\\d+)', async (req, res, next) => {
   try {
