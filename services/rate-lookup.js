@@ -333,7 +333,7 @@ async function lookupRates(pool, params) {
   // the optional effective-date generation filter below (policy-start-date rate
   // selection). The join is cheap (rate_cards is tiny) and adds no filtering on
   // its own, so existing callers are unaffected.
-  let query = `SELECT ${topClause}rr.*, rc.effective_from AS _eff_from FROM rate_rules rr` +
+  let query = `SELECT ${topClause}rr.*, rc.effective_from AS _eff_from, rc.effective_to AS _eff_to FROM rate_rules rr` +
               ` LEFT JOIN rate_cards rc ON rr.rate_card_id = rc.id`;
   if (conditions.length > 0) {
     query += ` WHERE ${conditions.join(' AND ')}`;
@@ -394,7 +394,14 @@ async function lookupRates(pool, params) {
       for (const r of dated) { const t = coverClass(r); (groups[t] = groups[t] || []).push(r); }
       for (const t in groups) {
         const grp = groups[t];
-        const cands = grp.filter((r) => iso(r._eff_from) <= eff);
+        // Honor the card's active window: a card whose effective_to has passed the
+        // policy date is no longer effective. Used for bounded mid-cycle deal cards
+        // (e.g. Chola's 20-31 Jul HCV exclusive) that must revert to the standing
+        // grid after their window. effective_to is the first day the card is NO
+        // LONGER active (exclusive), so a card stays a candidate while eff_to > eff.
+        // Verified safe: no existing active card is "newest-effective AND expired",
+        // so normal superseded cards (their successor already wins) are unaffected.
+        const cands = grp.filter((r) => iso(r._eff_from) <= eff && (r._eff_to == null || iso(r._eff_to) > eff));
         let target = '';
         if (cands.length) { for (const r of cands) { const v = iso(r._eff_from); if (v > target) target = v; } }   // latest ≤ start
         else { target = iso(grp[0]._eff_from); for (const r of grp) { const v = iso(r._eff_from); if (v < target) target = v; } }   // earliest fallback
