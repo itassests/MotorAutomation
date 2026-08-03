@@ -164,10 +164,11 @@ router.post('/upload', async (req, res, next) => {
       .input('insurer', sql.NVarChar, insurer)
       .input('file_name', sql.NVarChar, fileName)
       .input('effective_from', sql.Date, new Date(effective_from))
+      .input('source_path', sql.NVarChar, filePath)
       .query(
-        `INSERT INTO rate_cards (insurer, file_name, effective_from)
+        `INSERT INTO rate_cards (insurer, file_name, effective_from, source_path)
          OUTPUT INSERTED.id
-         VALUES (@insurer, @file_name, @effective_from)`
+         VALUES (@insurer, @file_name, @effective_from, @source_path)`
       );
     const rateCardId = cardResult.recordset[0].id;
 
@@ -438,6 +439,38 @@ router.post('/upload', async (req, res, next) => {
       rules_count: rateRules.length,
       rto_count: rtoCount,
     };
+
+    // 6. Dynamic parse profiles (self-describing ingestion). For EVERY upload we
+    //    detect a layout per sheet (flat | matrix unpivot), score its health, and
+    //    persist a reproducible, human-reviewable parse profile. Low-confidence /
+    //    low-coverage sheets are flagged `needs_review` so a drifted layout is
+    //    surfaced instead of silently mis-parsed. When there is no hand config (or
+    //    the config parse produced nothing), the dynamic engine BECOMES the parser
+    //    for the high-confidence sheets — so unknown/reshuffled grids still ingest.
+    try {
+      const pp = require('../services/parse-profile');
+      const generated = pp.generateProfiles(filePath, { insurer });
+      await pp.persistProfiles(pool, rateCardId, filePath, generated, { insurer });
+      if (insurerConfig.auto_generated || rateRules.length === 0) {
+        const dynCount = await pp.insertAutoRules(pool, filePath, rateCardId, insurer, generated);
+        if (dynCount > 0) {
+          response.dynamic_rules_count = dynCount;
+          response.rules_count = dynCount;
+        }
+      }
+      response.parse_profiles = {
+        total: generated.length,
+        auto: generated.filter((g) => g.status === 'auto').length,
+        needs_review: generated.filter((g) => g.status === 'needs_review').map((g) => g.sheet_name),
+        sheets: generated.map((g) => ({
+          sheet: g.sheet_name, layout: g.profile.layout, confidence: g.profile.confidence,
+          coverage: g.health.coverage, rules: g.health.rulesOut, status: g.status,
+        })),
+      };
+    } catch (e) {
+      console.warn('[upload] parse-profile step skipped:', e.message);
+      response.parse_profiles = { error: e.message };
+    }
 
     // Validate the just-ingested card so a bad parse (0 rules / scratch sheet /
     // scrambled columns / mostly-zero) is flagged at the door, not weeks later.

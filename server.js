@@ -82,6 +82,7 @@ app.use('/api/recon', reconRoutes);
 app.use('/api/ocr-bulk', ocrBulkRoutes);
 app.use('/api/policy-push', require('./routes/policy-push'));
 app.use('/api/rate-admin', require('./routes/rate-admin'));
+app.use('/api/parse-profiles', require('./routes/parse-profiles'));
 app.use('/api/rate-changes', require('./routes/rate-changes'));
 app.use('/api/renewal-notice', renewalNoticeRoutes);
 app.use('/api/agent', require('./routes/agent'));

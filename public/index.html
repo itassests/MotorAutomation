@@ -407,6 +407,7 @@
     <div class="tab"        data-tab="calculate"         title="Calculate Payout"   ><span class="tab-icon">&#128290;</span><span class="tab-label">Calculate Payout</span></div>
     <div class="tab"        data-tab="policy"            title="Policy Lookup"      ><span class="tab-icon">&#128270;</span><span class="tab-label">Policy Lookup</span></div>
     <div class="tab"        data-tab="cards"             title="Manage Rate Cards"  ><span class="tab-icon">&#128221;</span><span class="tab-label">Manage Rate Cards</span></div>
+    <div class="tab"        data-tab="parse-review"      title="Parse Review"       ><span class="tab-icon">&#128300;</span><span class="tab-label">Parse Review</span></div>
     <div class="tab"        data-tab="final"             title="Upload Final Rates" ><span class="tab-icon">&#128190;</span><span class="tab-label">Upload Final Rates</span></div>
     <div class="tab"        data-tab="utr"               title="UTR / Bank Transfer"><span class="tab-icon">&#127974;</span><span class="tab-label">UTR / Bank Transfer</span></div>
     <div class="tab"        data-tab="margin-exceptions" title="Margin Exceptions"  ><span class="tab-icon">&#9888;</span><span class="tab-label">Margin Exceptions</span></div>
@@ -1133,6 +1134,65 @@
           <button class="btn btn-outline btn-sm" id="downloadLucaBtn" onclick="downloadLucaData()" title="All insurers' outgoing rates in Luca format (no income / margin)">Download Luca Data</button>
         </div>
         <div id="rateCardsList"></div>
+      </div>
+    </div>
+
+    <!-- ============ PARSE REVIEW PANEL ============ -->
+    <div class="panel" id="panel-parse-review">
+      <div class="card">
+        <h2><span class="icon">&#128300;</span> Parse Review</h2>
+        <p style="color:#666; font-size:13px; margin-top:-8px; margin-bottom:14px;">
+          Every uploaded grid is parsed by a dynamically-detected layout (flat or tiled cross-tab). Sheets the
+          engine isn't confident about are flagged <b>needs review</b> here — correct the column&rarr;role mapping
+          and re-parse, no code change. A format change surfaces as a low-coverage flag instead of silent mispricing.
+        </p>
+        <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
+          <label style="font-size:13px;">Show:
+            <select id="prvStatus" onchange="parseReviewLoad()" style="padding:5px 8px;">
+              <option value="needs_review">Needs review</option>
+              <option value="auto">Auto (high confidence)</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="rejected">Rejected</option>
+              <option value="">All</option>
+            </select>
+          </label>
+          <input id="prvInsurer" placeholder="filter insurer (slug)" style="padding:5px 8px; font-size:13px;"
+                 onkeydown="if(event.key==='Enter')parseReviewLoad()">
+          <button class="btn btn-outline btn-sm" onclick="parseReviewLoad()">Refresh</button>
+          <span id="prvCount" style="color:#666; font-size:12px;"></span>
+        </div>
+        <div class="table-wrap" style="max-height:420px; overflow:auto;">
+          <table id="prvTable" class="tbl">
+            <thead><tr>
+              <th>Card</th><th>Insurer</th><th>Sheet</th><th>Layout</th>
+              <th>Conf</th><th>Coverage</th><th>Rules</th><th>Status</th><th></th>
+            </tr></thead>
+            <tbody id="prvBody"><tr><td colspan="9" style="color:#888; padding:14px;">Loading…</td></tr></tbody>
+          </table>
+        </div>
+
+        <!-- editor -->
+        <div id="prvEditor" style="display:none; margin-top:18px; border-top:2px solid #eee; padding-top:14px;">
+          <h3 style="margin:0 0 6px;">Mapping editor — <span id="prvEdTitle"></span></h3>
+          <div id="prvEdMeta" style="font-size:12px; color:#555; margin-bottom:10px;"></div>
+          <div id="prvEdError" style="color:#c62828; font-size:13px; margin-bottom:8px;"></div>
+
+          <div id="prvEdControls" style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;"></div>
+
+          <div style="font-size:12px; color:#666; margin-bottom:4px;">Sheet preview (detected header row highlighted):</div>
+          <div class="table-wrap" style="max-height:300px; overflow:auto; border:1px solid #eee;">
+            <table id="prvPreview" class="tbl" style="font-size:11px;"></table>
+          </div>
+
+          <div style="display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="parseReviewApply()">Re-parse with this mapping</button>
+            <button class="btn btn-success btn-sm" onclick="parseReviewConfirm()" style="background:#2e7d32;color:#fff;">Confirm &amp; keep</button>
+            <button class="btn btn-outline btn-sm" onclick="parseReviewReject()">Reject</button>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('prvEditor').style.display='none'">Close</button>
+            <span id="prvEdResult" style="font-size:12px; color:#2e7d32;"></span>
+          </div>
+          <div id="prvSample" style="margin-top:10px;"></div>
+        </div>
       </div>
     </div>
 
@@ -4257,6 +4317,7 @@
         tab.classList.add('active');
         document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
         if (tab.dataset.tab === 'admin') adminLoad();
+        if (tab.dataset.tab === 'parse-review') parseReviewLoad();
         if (tab.dataset.tab === 'rate-changes' && !window._rcInited) { window._rcInited = true; rcInitTab(); }
         if (tab.dataset.tab === 'upload' && typeof loadEnablers === 'function') loadEnablers();
         if (tab.dataset.tab === 'upload' && typeof loadFleets === 'function') loadFleets();
@@ -14964,6 +15025,205 @@
       loadPrList();
       loadCycles();
     })();
+
+    // ═══════════════ PARSE REVIEW (dynamic parse-profile review) ═══════════════
+    let _prvProfile = null, _prvMeta = null, _prvPreview = null;
+    const PRV_ROLES = ['rate','rate_od','rate_tp','region','cover','segment','fuel','ncb','biz','make','cc','tonnage','seating','age'];
+
+    async function parseReviewLoad() {
+      const status = document.getElementById('prvStatus').value;
+      const insurer = document.getElementById('prvInsurer').value.trim();
+      const qs = new URLSearchParams();
+      if (status) qs.set('status', status);
+      if (insurer) qs.set('insurer', insurer);
+      const body = document.getElementById('prvBody');
+      body.innerHTML = '<tr><td colspan="9" style="color:#888;padding:14px;">Loading…</td></tr>';
+      try {
+        const r = await fetch('/api/parse-profiles?' + qs.toString());
+        const j = await r.json();
+        if (!j.success) throw new Error(j.error || 'load failed');
+        const rows = j.profiles || [];
+        document.getElementById('prvCount').textContent = rows.length + ' sheet(s)';
+        if (!rows.length) { body.innerHTML = '<tr><td colspan="9" style="color:#888;padding:14px;">Nothing here.</td></tr>'; return; }
+        body.innerHTML = rows.map(p => {
+          const cov = p.coverage == null ? '—' : (Math.round(p.coverage * 100) + '%');
+          const conf = p.confidence == null ? '—' : p.confidence;
+          const badge = { needs_review:'#c62828', auto:'#1565c0', confirmed:'#2e7d32', rejected:'#777' }[p.status] || '#555';
+          return `<tr>
+            <td>${p.rate_card_id}<div style="font-size:10px;color:#999;">${(p.file_name||'').slice(0,22)}</div></td>
+            <td>${p.insurer||''}</td>
+            <td style="max-width:180px;">${(p.sheet_name||'').slice(0,40)}</td>
+            <td>${p.layout||''}</td>
+            <td>${conf}</td>
+            <td>${cov}</td>
+            <td>${p.rules_out ?? '—'}</td>
+            <td><span style="color:${badge};font-weight:600;">${(p.status||'').replace('_',' ')}</span></td>
+            <td><button class="btn btn-outline btn-sm" onclick="parseReviewOpen(${p.id})">Open</button></td>
+          </tr>`;
+        }).join('');
+      } catch (e) {
+        body.innerHTML = `<tr><td colspan="9" style="color:#c62828;padding:14px;">${e.message}</td></tr>`;
+      }
+    }
+
+    async function parseReviewOpen(id) {
+      const ed = document.getElementById('prvEditor');
+      ed.style.display = 'block';
+      document.getElementById('prvEdResult').textContent = '';
+      document.getElementById('prvEdError').textContent = '';
+      document.getElementById('prvSample').innerHTML = '';
+      document.getElementById('prvEdTitle').textContent = 'loading…';
+      try {
+        const r = await fetch('/api/parse-profiles/' + id + '/preview');
+        const j = await r.json();
+        if (!j.success) throw new Error(j.error || 'preview failed');
+        _prvProfile = j.profile; _prvMeta = j.meta; _prvPreview = j.preview || [];
+        document.getElementById('prvEdTitle').textContent =
+          `card ${j.meta.rate_card_id} · ${j.meta.insurer||''} · "${j.meta.sheet_name}"`;
+        const h = j.health || {};
+        document.getElementById('prvEdMeta').innerHTML =
+          `layout <b>${_prvProfile.layout}</b> · confidence ${_prvProfile.confidence ?? '—'} · ` +
+          `coverage ${h.coverage==null?'—':Math.round(h.coverage*100)+'%'} · rules ${h.rulesOut ?? '—'} · ` +
+          `divisor ${_prvProfile.rate_divisor||100}` + (j.source_error ? ` · <span style="color:#c62828;">${j.source_error}</span>` : '');
+        renderPrvControls();
+        renderPrvPreview();
+      } catch (e) {
+        document.getElementById('prvEdError').textContent = e.message;
+      }
+    }
+
+    // Column dropdown: pick which column index maps to a role (flat) — or the key
+    // matrix rows/divisor (matrix). Header labels shown for context.
+    function renderPrvControls() {
+      const box = document.getElementById('prvEdControls');
+      const p = _prvProfile;
+      const headers = (p.headers || []).map((h, i) => `${i}: ${String(h||'').slice(0,16)}`);
+      const colOpts = (sel) => '<option value="">—</option>' +
+        headers.map((lbl, i) => `<option value="${i}" ${sel===i?'selected':''}>${lbl}</option>`).join('');
+      let html = '';
+      const divCtrl = `<label style="font-size:12px;">rate divisor
+        <select id="prvDiv" style="padding:4px;">
+          <option value="100" ${(p.rate_divisor||100)==100?'selected':''}>100 (whole %)</option>
+          <option value="1" ${(p.rate_divisor||100)==1?'selected':''}>1 (fraction)</option>
+        </select></label>`;
+      if (p.layout === 'matrix') {
+        html = `<div style="font-size:12px;color:#555;">Matrix (tiled) layout — rows are unpivoted per region&times;cover cell.</div>
+          <label style="font-size:12px;">region row <input id="prvMRegion" type="number" value="${p.regionRow??''}" style="width:56px;padding:4px;"></label>
+          <label style="font-size:12px;">cover row <input id="prvMCover" type="number" value="${p.coverRow??''}" style="width:56px;padding:4px;"></label>
+          <label style="font-size:12px;">segment col <input id="prvMSeg" type="number" value="${p.segmentCol??''}" style="width:56px;padding:4px;"></label>
+          <label style="font-size:12px;">make col <input id="prvMMake" type="number" value="${p.makeCol??''}" style="width:56px;padding:4px;"></label>
+          ${divCtrl}
+          <button class="btn btn-outline btn-sm" onclick="parseReviewSwitchLayout('flat')">Switch to flat</button>`;
+      } else {
+        const roles = p.roles || {};
+        html = `<label style="font-size:12px;">header row <input id="prvHdr" type="number" value="${p.header_row??0}" style="width:56px;padding:4px;"></label>`;
+        for (const role of PRV_ROLES) {
+          html += `<label style="font-size:12px;">${role}
+            <select data-role="${role}" class="prvRole" style="padding:4px;">${colOpts(roles[role])}</select></label>`;
+        }
+        html += divCtrl + `<button class="btn btn-outline btn-sm" onclick="parseReviewSwitchLayout('matrix')">Switch to matrix</button>`;
+      }
+      box.innerHTML = html;
+    }
+
+    function renderPrvPreview() {
+      const p = _prvProfile;
+      const hdrRow = p.layout === 'matrix' ? p.coverRow : (p.header_row||0);
+      const regionRow = p.layout === 'matrix' ? p.regionRow : -1;
+      const tbl = document.getElementById('prvPreview');
+      tbl.innerHTML = (_prvPreview||[]).map((row, ri) => {
+        const hl = ri === hdrRow ? 'background:#fff3cd;' : (ri === regionRow ? 'background:#d4edda;' : '');
+        const cells = row.map((c, ci) => `<td style="${hl}border:1px solid #eee;padding:2px 4px;max-width:120px;overflow:hidden;">${String(c).slice(0,18)}</td>`).join('');
+        return `<tr><td style="color:#bbb;border:1px solid #eee;padding:2px 4px;">${ri}</td>${cells}</tr>`;
+      }).join('');
+    }
+
+    // Read the edited controls back into a profile object.
+    function collectPrvProfile() {
+      const p = JSON.parse(JSON.stringify(_prvProfile));
+      p.rate_divisor = Number(document.getElementById('prvDiv').value) || 100;
+      if (p.layout === 'matrix') {
+        const gv = id => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
+        p.regionRow = gv('prvMRegion'); p.coverRow = gv('prvMCover');
+        p.segmentCol = gv('prvMSeg'); p.makeCol = gv('prvMMake');
+        // rateCols left as detected unless coverRow changed — recompute is server-side on next generate;
+        // here we keep the stored rateCols (best effort).
+      } else {
+        p.header_row = Number(document.getElementById('prvHdr').value) || 0;
+        const roles = {};
+        document.querySelectorAll('.prvRole').forEach(sel => {
+          if (sel.value !== '') roles[sel.dataset.role] = Number(sel.value);
+        });
+        p.roles = roles;
+      }
+      return p;
+    }
+
+    function parseReviewSwitchLayout(layout) {
+      _prvProfile.layout = layout;
+      if (layout === 'matrix') {
+        _prvProfile.regionRow = _prvProfile.regionRow ?? 0;
+        _prvProfile.coverRow = _prvProfile.coverRow ?? 1;
+        _prvProfile.rateCols = _prvProfile.rateCols || [];
+      }
+      renderPrvControls(); renderPrvPreview();
+    }
+
+    async function parseReviewApply() {
+      const prof = collectPrvProfile();
+      document.getElementById('prvEdResult').textContent = 'parsing…';
+      document.getElementById('prvEdError').textContent = '';
+      try {
+        const r = await fetch('/api/parse-profiles/' + _prvMeta.id, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile: prof }),
+        });
+        const j = await r.json();
+        if (!j.success) throw new Error(j.error || 'reparse failed');
+        _prvProfile = prof;
+        const h = j.health || {};
+        document.getElementById('prvEdResult').textContent =
+          `→ ${j.rulesOut} rules · coverage ${h.coverage==null?'—':Math.round(h.coverage*100)+'%'} · status ${j.status}`;
+        renderPrvSample(j.sample || []);
+        parseReviewLoad();
+      } catch (e) {
+        document.getElementById('prvEdResult').textContent = '';
+        document.getElementById('prvEdError').textContent = e.message;
+      }
+    }
+
+    function renderPrvSample(rows) {
+      if (!rows.length) { document.getElementById('prvSample').innerHTML = ''; return; }
+      const cols = ['region','segment','make','rate_type','rate_value','fuel_type','weight_band_min','weight_band_max'];
+      document.getElementById('prvSample').innerHTML =
+        '<div style="font-size:12px;color:#666;margin:6px 0 3px;">Sample parsed rules:</div>' +
+        '<div class="table-wrap" style="max-height:200px;overflow:auto;"><table class="tbl" style="font-size:11px;"><thead><tr>' +
+        cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>' +
+        rows.map(r => '<tr>' + cols.map(c => `<td>${r[c]==null?'':String(r[c]).slice(0,20)}</td>`).join('') + '</tr>').join('') +
+        '</tbody></table></div>';
+    }
+
+    async function parseReviewConfirm() {
+      if (!_prvMeta) return;
+      try {
+        const r = await fetch('/api/parse-profiles/' + _prvMeta.id + '/confirm', { method: 'POST' });
+        const j = await r.json();
+        if (!j.success) throw new Error(j.error || 'confirm failed');
+        document.getElementById('prvEdResult').textContent = `confirmed · ${j.rulesOut} rules kept`;
+        parseReviewLoad();
+      } catch (e) { document.getElementById('prvEdError').textContent = e.message; }
+    }
+
+    async function parseReviewReject() {
+      if (!_prvMeta) return;
+      try {
+        const r = await fetch('/api/parse-profiles/' + _prvMeta.id + '/reject', { method: 'POST' });
+        const j = await r.json();
+        if (!j.success) throw new Error('reject failed');
+        document.getElementById('prvEditor').style.display = 'none';
+        parseReviewLoad();
+      } catch (e) { document.getElementById('prvEdError').textContent = e.message; }
+    }
   </script>
 
 </body>
