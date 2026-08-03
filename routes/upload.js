@@ -102,7 +102,6 @@ router.post('/upload', async (req, res, next) => {
         }
       }
 
-      const generated = pp.profileSheets(sheets, { insurer });
       const effFrom = effective_from || info.effective.from;
       if (!effFrom) {
         return res.status(400).json({ success: false, error: 'No effective_from supplied and none detected in the email — please provide it.' });
@@ -121,6 +120,12 @@ router.post('/upload', async (req, res, next) => {
         .query('INSERT INTO rate_cards (insurer,file_name,effective_from,effective_to,source_path) OUTPUT INSERTED.id VALUES (@insurer,@fn,@ef,@et,@sp)');
       const cardId = cardRes.recordset[0].id;
 
+      // Classify + route each table: RTO master → rto_mappings, fleet approval →
+      // fleet_overrides, enabler → enabler_overrides; rate/unknown continue to the
+      // dynamic parse-profile path below.
+      const { routeAndIngest } = require('../services/doc-router');
+      const routed = await routeAndIngest(pool, cardId, sheets, { insurer, subject: info.subject, sourceFile: fileName });
+      const generated = pp.profileSheets(routed.rateSheets, { insurer });
       const dynCount = await pp.insertAutoRulesFromGenerated(pool, cardId, insurer, generated, null);
       await pp.persistProfiles(pool, cardId, filePath, generated.map(({ rows, ...g }) => g), { insurer });
 
@@ -134,11 +139,12 @@ router.post('/upload', async (req, res, next) => {
         ruleCounts = { total: Object.values(bp).reduce((a, p) => a + p.total, 0), by_product: Object.entries(bp).sort((a, b) => b[1].total - a[1].total).map(([product, v]) => ({ product, total: v.total, covers: v.covers })) };
       } catch (_) { /* best effort */ }
 
-      const noGrid = generated.every((g) => g.health.rulesOut === 0);
+      const noGrid = dynCount === 0 && routed.counts.rto_map === 0 && routed.counts.fleet === 0 && routed.counts.enabler === 0;
       return res.json({
         success: true, rate_card_id: cardId, source: 'email', format: info.format,
         subject: info.subject, effective_from: effFrom, effective_to: effTo, bounded: !!effTo,
         rules_count: dynCount, tables_found: info.tables.length,
+        routed: routed.counts, classified: routed.classified,
         attachments: info.attachments.map((a) => ({ name: a.filename, kind: a.isSheet ? 'sheet' : a.isPdf ? 'pdf' : a.isImage ? 'image' : 'other', size: a.size })),
         notes: attNotes, no_grid: noGrid,
         parse_profiles: {
@@ -530,15 +536,24 @@ router.post('/upload', async (req, res, next) => {
     //    for the high-confidence sheets — so unknown/reshuffled grids still ingest.
     try {
       const pp = require('../services/parse-profile');
-      const generated = pp.generateProfiles(filePath, { insurer });
-      await pp.persistProfiles(pool, rateCardId, filePath, generated, { insurer });
+      const { routeAndIngest } = require('../services/doc-router');
+      // Classify every sheet: RTO master → rto_mappings, fleet approval →
+      // fleet_overrides, enabler → enabler_overrides. Rate/unknown sheets stay on
+      // the dynamic parse-profile path (rate_rules). Handles workbooks that are
+      // actually RTO masters / fleet lists, not rate grids.
+      const allSheets = pp.readSheets(filePath);
+      const routed = await routeAndIngest(pool, rateCardId, allSheets, { insurer, sourceFile: fileName });
+      const generated = pp.profileSheets(routed.rateSheets, { insurer });
+      await pp.persistProfiles(pool, rateCardId, filePath, generated.map(({ rows, ...g }) => g), { insurer });
       if (insurerConfig.auto_generated || rateRules.length === 0) {
-        const dynCount = await pp.insertAutoRules(pool, filePath, rateCardId, insurer, generated);
+        const dynCount = await pp.insertAutoRulesFromGenerated(pool, rateCardId, insurer, generated, null);
         if (dynCount > 0) {
           response.dynamic_rules_count = dynCount;
           response.rules_count = dynCount;
         }
       }
+      if (routed.counts.rto_map || routed.counts.fleet || routed.counts.enabler) response.routed = routed.counts;
+      response.classified = routed.classified;
       response.parse_profiles = {
         total: generated.length,
         auto: generated.filter((g) => g.status === 'auto').length,

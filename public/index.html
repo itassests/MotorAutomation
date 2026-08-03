@@ -7343,6 +7343,18 @@
               ${(data.notes || []).length ? '<ul style="margin:8px 0 0; padding-left:18px; color:#9e7700;">' + data.notes.map(n => `<li>${escapeHtml(n)}</li>`).join('') + '</ul>' : ''}
             </div>`;
           }
+          // Document router: what each table was recognised as and where it went.
+          const rt = data.routed;
+          if (rt && (rt.rto_map || rt.fleet || rt.enabler)) {
+            const parts = [];
+            if (rt.rto_map) parts.push(`<b>${rt.rto_map.toLocaleString()}</b> RTO mappings → rto_mappings`);
+            if (rt.fleet) parts.push(`<b>${rt.fleet}</b> fleet approval(s) → fleet_overrides`);
+            if (rt.enabler) parts.push(`<b>${rt.enabler}</b> enabler row(s) → enabler_overrides`);
+            if (rt.rate) parts.push(`<b>${rt.rate}</b> rate sheet(s) → rate_rules`);
+            statsHTML += `<div style="grid-column:1/-1; margin-top:12px; padding:12px 16px; background:#f3f0ff; border-left:4px solid #6f42c1; border-radius:4px; font-size:13px;">
+              <strong>🧭 Document router</strong> — recognised and routed:
+              <ul style="margin:6px 0 0; padding-left:18px;">${parts.map(p => `<li>${p}</li>`).join('')}</ul></div>`;
+          }
           // Rule counts by vehicle type (product) × cover — what actually got ingested.
           const rc = data.rule_counts;
           if (rc && !rc.error && (rc.by_product || []).length) {
