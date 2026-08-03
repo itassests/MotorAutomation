@@ -69,6 +69,87 @@ router.post('/upload', async (req, res, next) => {
     if (!insurer) {
       return res.status(400).json({ success: false, error: 'Missing required parameter: insurer' });
     }
+
+    // ── EMAIL (.eml/.msg) branch ────────────────────────────────────────────────
+    // Extract grids from the mail body (inline HTML tables) + spreadsheet
+    // attachments, parse them with the dynamic engine, and land them as a card.
+    // A bounded deal window (e.g. "20th-31st Jul") is an OVERLAY (standing grid
+    // stays open); an unbounded grid supersedes prior open cards by effective date.
+    if (/\.(eml|msg)$/i.test(req.file.originalname) || /\.(eml|msg)$/i.test(req.file.path)) {
+      const pool = await getPool();
+      const filePath = req.file.path;
+      const fileName = req.file.originalname;
+      const { extractEmail } = require('../services/email-extract');
+      const pp = require('../services/parse-profile');
+      const XLSXlib = require('xlsx');
+      const info = await extractEmail(filePath);
+
+      const sheets = [];
+      info.tables.forEach((rows, i) => sheets.push({ name: 'Email Table ' + (i + 1), rows }));
+      const attNotes = [];
+      for (const a of info.attachments) {
+        if (a.isSheet && a.buffer) {
+          try {
+            const wb = XLSXlib.read(a.buffer, { type: 'buffer' });
+            for (const sn of wb.SheetNames) {
+              sheets.push({ name: 'attach:' + a.filename + ':' + sn, rows: XLSXlib.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' }) });
+            }
+          } catch (e) { attNotes.push('attachment "' + a.filename + '" unreadable: ' + e.message); }
+        } else if (a.isPdf) {
+          attNotes.push('PDF attachment "' + a.filename + '" — needs a config parser (not auto-parsed)');
+        } else if (a.isImage && a.size > 4000) {
+          attNotes.push('image attachment "' + a.filename + '" — likely a grid image; route to OCR');
+        }
+      }
+
+      const generated = pp.profileSheets(sheets, { insurer });
+      const effFrom = effective_from || info.effective.from;
+      if (!effFrom) {
+        return res.status(400).json({ success: false, error: 'No effective_from supplied and none detected in the email — please provide it.' });
+      }
+      const effTo = info.effective.bounded ? info.effective.to : null;
+
+      if (!effTo) {
+        await pool.request().input('insurer', sql.NVarChar, insurer).input('ef', sql.Date, new Date(effFrom))
+          .query('UPDATE rate_cards SET effective_to=@ef WHERE insurer=@insurer AND effective_to IS NULL AND effective_from<@ef');
+      }
+      const cardRes = await pool.request()
+        .input('insurer', sql.NVarChar, insurer).input('fn', sql.NVarChar, fileName)
+        .input('ef', sql.Date, new Date(effFrom))
+        .input('et', sql.Date, effTo ? new Date(effTo) : null)
+        .input('sp', sql.NVarChar, filePath)
+        .query('INSERT INTO rate_cards (insurer,file_name,effective_from,effective_to,source_path) OUTPUT INSERTED.id VALUES (@insurer,@fn,@ef,@et,@sp)');
+      const cardId = cardRes.recordset[0].id;
+
+      const dynCount = await pp.insertAutoRulesFromGenerated(pool, cardId, insurer, generated, null);
+      await pp.persistProfiles(pool, cardId, filePath, generated.map(({ rows, ...g }) => g), { insurer });
+
+      let ruleCounts = null;
+      try {
+        const cnt = await pool.request().input('cid', sql.Int, cardId).query(`
+          SELECT ISNULL(NULLIF(product,''),'(unset)') AS product, ISNULL(NULLIF(rate_type,''),'(none)') AS cover, COUNT(*) AS n
+          FROM rate_rules WHERE rate_card_id=@cid GROUP BY ISNULL(NULLIF(product,''),'(unset)'), ISNULL(NULLIF(rate_type,''),'(none)')`);
+        const bp = {};
+        for (const row of cnt.recordset) { const p = (bp[row.product] = bp[row.product] || { total: 0, covers: {} }); p.total += row.n; p.covers[row.cover] = (p.covers[row.cover] || 0) + row.n; }
+        ruleCounts = { total: Object.values(bp).reduce((a, p) => a + p.total, 0), by_product: Object.entries(bp).sort((a, b) => b[1].total - a[1].total).map(([product, v]) => ({ product, total: v.total, covers: v.covers })) };
+      } catch (_) { /* best effort */ }
+
+      const noGrid = generated.every((g) => g.health.rulesOut === 0);
+      return res.json({
+        success: true, rate_card_id: cardId, source: 'email', format: info.format,
+        subject: info.subject, effective_from: effFrom, effective_to: effTo, bounded: !!effTo,
+        rules_count: dynCount, tables_found: info.tables.length,
+        attachments: info.attachments.map((a) => ({ name: a.filename, kind: a.isSheet ? 'sheet' : a.isPdf ? 'pdf' : a.isImage ? 'image' : 'other', size: a.size })),
+        notes: attNotes, no_grid: noGrid,
+        parse_profiles: {
+          total: generated.length, auto: generated.filter((g) => g.status === 'auto').length,
+          needs_review: generated.filter((g) => g.status === 'needs_review').map((g) => g.sheet_name),
+          sheets: generated.map((g) => ({ sheet: g.sheet_name, layout: g.profile.layout, confidence: g.profile.confidence, coverage: g.health.coverage, rules: g.health.rulesOut, status: g.status })),
+        },
+        rule_counts: ruleCounts,
+      });
+    }
+
     if (!effective_from) {
       return res.status(400).json({ success: false, error: 'Missing required parameter: effective_from' });
     }

@@ -22,7 +22,7 @@ const XLSX = require('xlsx');
 const { getPool } = require('../db/connection');
 const { attachUser, requireAdmin } = require('./auth');
 const {
-  loadProfile, reparseProfile, gateStatus, generateProfiles, persistProfiles,
+  loadProfile, reparseProfile, gateStatus, generateProfiles, persistProfiles, readProfileRows,
 } = require('../services/parse-profile');
 const { profileHealth, buildProfile } = require('../services/grid-schema-resolver');
 
@@ -30,13 +30,10 @@ const router = express.Router();
 router.use(attachUser());
 router.use(requireAdmin);
 
-/** Read one sheet's rows from a stored source file. */
-function readSheetRows(sourcePath, sheetName) {
+/** Read one sheet's rows from a stored source file (workbook or email). */
+async function readSheetRows(sourcePath, sheetName) {
   if (!sourcePath || !fs.existsSync(sourcePath)) throw new Error('source file not found: ' + sourcePath);
-  const wb = XLSX.readFile(sourcePath);
-  const ws = wb.Sheets[sheetName];
-  if (!ws) throw new Error('sheet not found: ' + sheetName);
-  return XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  return readProfileRows(sourcePath, sheetName);
 }
 
 // ── (re)generate profiles for an EXISTING card ─────────────────────────────────
@@ -136,7 +133,7 @@ router.get('/:id(\\d+)/preview', async (req, res, next) => {
     if (!row) return res.status(404).json({ success: false, error: 'profile not found' });
     let rows = [], health = null, err = null;
     try {
-      rows = readSheetRows(row.source_path, row.sheet_name);
+      rows = await readSheetRows(row.source_path, row.sheet_name);
       health = profileHealth(rows, row.profile, { insurer: row.insurer, product: row.product });
     } catch (e) { err = e.message; }
     const preview = rows.slice(0, 30).map((r) => (r || []).map((v) => (v == null ? '' : String(v))));

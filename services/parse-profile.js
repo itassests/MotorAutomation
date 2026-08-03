@@ -26,6 +26,32 @@ function readSheets(filePath) {
   }));
 }
 
+/**
+ * Read the rows for ONE profile's sheet from its source file — workbook OR email.
+ * Email sheet names are 'Email Table N' (inline table) or 'attach:<file>:<sheet>'
+ * (spreadsheet attachment); we re-extract them so the review UI / re-parse works
+ * for email-derived profiles just like workbook ones.
+ */
+async function readProfileRows(sourcePath, sheetName) {
+  if (/\.(eml|msg)$/i.test(sourcePath)) {
+    const { extractEmail } = require('./email-extract');
+    const info = await extractEmail(sourcePath);
+    let m = /^Email Table (\d+)$/.exec(sheetName);
+    if (m) return info.tables[Number(m[1]) - 1] || [];
+    m = /^attach:(.+):([^:]+)$/.exec(sheetName);
+    if (m) {
+      const a = (info.attachments || []).find((x) => x.filename === m[1]);
+      if (a && a.buffer) { const wb = XLSX.read(a.buffer, { type: 'buffer' }); return XLSX.utils.sheet_to_json(wb.Sheets[m[2]], { header: 1, defval: '' }); }
+      return [];
+    }
+    return [];
+  }
+  const wb = XLSX.readFile(sourcePath);
+  const ws = wb.Sheets[sheetName];
+  if (!ws) throw new Error('sheet not found: ' + sheetName);
+  return XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+}
+
 /** auto vs needs_review from health + confidence. */
 function gateStatus(profile, health) {
   if ((profile.confidence || 0) < GATE.confidence) return 'needs_review';
@@ -35,15 +61,16 @@ function gateStatus(profile, health) {
 }
 
 /**
- * Build + score a profile for every non-trivial sheet of a workbook.
- * Returns [{ sheet_name, profile, health, status }]. Sheets with < 3 rows or
- * that yield 0 rules AND look like mapping/notes sheets are still recorded
- * (status needs_review) so nothing is silently dropped.
+ * Build + score a profile for a list of already-extracted sheets
+ * ([{ name, rows }]). Shared by workbook uploads AND email (inline-table /
+ * attachment) ingestion. Returns [{ sheet_name, profile, health, status }].
+ * Sheets < 3 rows are skipped; anything that yields 0 rules is still recorded
+ * (needs_review) so nothing is silently dropped.
  */
-function generateProfiles(filePath, opts = {}) {
+function profileSheets(sheets, opts = {}) {
   const { insurer, product } = opts;
   const out = [];
-  for (const { name, rows } of readSheets(filePath)) {
+  for (const { name, rows } of sheets) {
     if (!rows || rows.length < 3) continue;
     let profile, health, status;
     try {
@@ -55,9 +82,14 @@ function generateProfiles(filePath, opts = {}) {
       health = { dataRows: rows.length, rulesOut: 0, coverage: 0, emptyRatePct: 1, confidence: 0 };
       status = 'needs_review';
     }
-    out.push({ sheet_name: name, profile, health, status });
+    out.push({ sheet_name: name, profile, health, status, rows });
   }
   return out;
+}
+
+/** Build + score a profile for every non-trivial sheet of a workbook file. */
+function generateProfiles(filePath, opts = {}) {
+  return profileSheets(readSheets(filePath), opts).map(({ rows, ...g }) => g);
 }
 
 /** Replace all stored profiles for a card with a freshly-generated set. */
@@ -171,10 +203,7 @@ async function reparseProfile(pool, profileRow, opts = {}) {
   const insurer = opts.insurer || profileRow.insurer;
   const product = opts.product || profileRow.product;
   const sheet = profileRow.sheet_name;
-  const wb = XLSX.readFile(path);
-  const ws = wb.Sheets[sheet];
-  if (!ws) throw new Error('sheet not found: ' + sheet);
-  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  const rows = await readProfileRows(path, sheet);
   const profile = opts.profile || profileRow.profile;
   const rules = parseWithProfile(rows, profile, { insurer, product, sheetName: sheet });
   const health = profileHealth(rows, profile, { insurer, product });
@@ -212,7 +241,27 @@ async function insertAutoRules(pool, filePath, cardId, insurer, generated, produ
   return total;
 }
 
+/**
+ * Insert dynamic rules for the AUTO sheets of an already-profiled sheet set
+ * (rows in memory — used by email ingestion where there's no re-readable file
+ * per table). `generated` items must carry `.rows` (profileSheets includes them).
+ */
+async function insertAutoRulesFromGenerated(pool, cardId, insurer, generated, product) {
+  let total = 0;
+  for (const g of generated) {
+    if (g.status !== 'auto' || !g.rows) continue;
+    const rules = parseWithProfile(g.rows, g.profile, { insurer, product, sheetName: g.sheet_name });
+    if (!rules.length) continue;
+    await pool.request().input('cid', sql.Int, cardId).input('sheet', sql.NVarChar, g.sheet_name)
+      .query('DELETE FROM rate_rules WHERE rate_card_id = @cid AND sheet_name = @sheet');
+    await insertRules(pool, cardId, insurer, g.sheet_name, rules.map((r) => ({ ...r, product: r.product || product })));
+    total += rules.length;
+  }
+  return total;
+}
+
 module.exports = {
-  GATE, readSheets, gateStatus, generateProfiles, persistProfiles,
+  GATE, readSheets, readProfileRows, gateStatus, profileSheets, generateProfiles, persistProfiles,
   loadProfiles, loadProfile, insertRules, reparseProfile, insertAutoRules,
+  insertAutoRulesFromGenerated,
 };

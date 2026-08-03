@@ -448,7 +448,7 @@
           <div class="icon">&#128230;</div>
           <p>Drag & drop an Excel file here, or click to browse</p>
           <div class="filename" id="uploadFileName"></div>
-          <input type="file" id="uploadFile" accept=".xlsx,.xls">
+          <input type="file" id="uploadFile" accept=".xlsx,.xls,.xlsb,.csv,.eml,.msg,.pdf">
         </div>
 
         <div class="progress-bar" id="uploadProgress">
@@ -7330,6 +7330,18 @@
             } else {
               statsHTML += `<div style="grid-column:1/-1; margin-top:12px; padding:8px 16px; background:#e8f5e9; border-left:4px solid #2e7d32; border-radius:4px; font-size:13px; color:#2e7d32;">✅ Validation passed — ${v.total.toLocaleString()} rules across ${v.distinct_regions} regions, no anomalies.</div>`;
             }
+          }
+          // Email ingestion summary (.eml/.msg): window, tables, attachments, flags.
+          if (data.source === 'email') {
+            const win = data.bounded
+              ? `<b>bounded overlay</b> ${escapeHtml(data.effective_from)} → ${escapeHtml(data.effective_to)} (standing grid stays open)`
+              : `supersedes from ${escapeHtml(data.effective_from)}`;
+            statsHTML += `<div style="grid-column:1/-1; margin-top:12px; padding:12px 16px; background:#eef7ff; border-left:4px solid #1565c0; border-radius:4px; font-size:13px;">
+              <strong>📧 Email grid (${escapeHtml(data.format)})</strong> — "${escapeHtml(data.subject || '')}"<br>
+              <span style="color:#555;">Effective: ${win}. Inline tables found: ${data.tables_found}.</span>
+              ${data.no_grid ? '<div style="color:#c62828; margin-top:6px;">⚠️ No parseable grid found in the body or attachments — this may be a prose-only note.</div>' : ''}
+              ${(data.notes || []).length ? '<ul style="margin:8px 0 0; padding-left:18px; color:#9e7700;">' + data.notes.map(n => `<li>${escapeHtml(n)}</li>`).join('') + '</ul>' : ''}
+            </div>`;
           }
           // Rule counts by vehicle type (product) × cover — what actually got ingested.
           const rc = data.rule_counts;

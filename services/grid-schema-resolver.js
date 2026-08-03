@@ -172,6 +172,56 @@ function inferProduct(text) {
 const COVER_TOKEN = /^(package|pack|pkg|comp|comprehensive|saod|sod|satp|tp|act|od|liability|bundled|1\s*\+\s*\d)$/i;
 function isCoverToken(v) { return COVER_TOKEN.test(cell(v)); }
 
+/**
+ * Value-repair a flat schema when header-based resolution mis-maps columns —
+ * common in EMAIL tables whose merged/split headers land offset from the data
+ * (e.g. "New PO %" header in col0 but the % values in col3). Reassigns rate /
+ * region / segment purely from the DATA columns' values. Returns a new roles map.
+ */
+function repairRolesByValues(rows, schema) {
+  const { headerRow } = schema;
+  const data = [];
+  for (let r = headerRow + 1; r < rows.length; r++) {
+    const row = rows[r]; if (!row) continue;
+    if (row.map(cell).every((c) => c === '')) continue;
+    data.push(row);
+  }
+  if (data.length < 2) return schema.roles;
+  const nCols = Math.max(...data.map((r) => r.length));
+  const col = (c) => data.map((r) => cell((r || [])[c])).filter((v) => v !== '');
+  const stat = [];
+  for (let c = 0; c < nCols; c++) {
+    const vals = col(c);
+    if (!vals.length) { stat[c] = null; continue; }
+    const nums = vals.filter(isNumericish);
+    const numFrac = nums.length / vals.length;
+    const inBand = nums.filter((v) => { const n = numVal(v); return n >= 0 && n <= 100; }).length / (nums.length || 1);
+    const segFrac = vals.filter((v) => SEGMENT_VOCAB.test(v) || /\d+\s*t\b|upto|gcv|pcv|lcv|hcv|ton/i.test(v)).length / vals.length;
+    const textFrac = vals.filter((v) => !isNumericish(v)).length / vals.length;
+    const distinct = new Set(vals.map((v) => v.toUpperCase())).size;
+    stat[c] = { c, numFrac, inBand, segFrac, textFrac, distinct, n: vals.length };
+  }
+  const roles = { ...schema.roles };
+  // rate: leftmost column that is mostly numeric & in 0..100 band
+  const rateCol = stat.filter(Boolean).find((s) => s.numFrac >= 0.6 && s.inBand >= 0.6);
+  if (rateCol) { roles.rate = rateCol.c; delete roles.rate_od; delete roles.rate_tp; }
+  // segment: text column richest in vehicle/segment vocabulary
+  const textCols = stat.filter((s) => s && s.textFrac >= 0.6);
+  const segCol = textCols.slice().sort((a, b) => b.segFrac - a.segFrac)[0];
+  if (segCol && segCol.segFrac > 0) roles.segment = segCol.c;
+  // region: another text column that is NOT the segment and NOT a constant
+  // product/cover label (e.g. a "CV" column). Prefer the least vehicle-like one.
+  const isProductLabel = (s) => {
+    const vals = col(s.c);
+    return vals.filter((v) => inferProduct(v) || isCoverToken(v)).length / vals.length >= 0.6;
+  };
+  const regCol = textCols
+    .filter((s) => (!segCol || s.c !== segCol.c) && s.distinct >= 2 && !isProductLabel(s))
+    .sort((a, b) => a.segFrac - b.segFrac)[0];
+  if (regCol) roles.region = regCol.c;
+  return roles;
+}
+
 /** Normalise a cover token → COMP | SAOD | TP. */
 function coverToRateType(v) {
   const s = cell(v).toLowerCase();
@@ -462,6 +512,19 @@ function buildProfile(rows, opts = {}) {
     notes: schema.notes,
     rate_divisor: guessRateDivisor(rows, schema),
   };
+  // If the header-based flat schema parses to nothing (mis-mapped columns — the
+  // classic messy-email-table case), repair the roles from the data VALUES.
+  let flatN = parseFlatGrid(rows, schema, opts).length;
+  if (flatN === 0) {
+    const repaired = repairRolesByValues(rows, schema);
+    const repairedN = parseFlatGrid(rows, { roles: repaired, headerRow: schema.headerRow }, opts).length;
+    if (repairedN > 0) {
+      flat.roles = repaired;
+      flat.notes = (flat.notes || []).concat('roles repaired from data values (header mis-aligned)');
+      flat.confidence = Math.max(flat.confidence, 0.6);
+      flatN = repairedN;
+    }
+  }
   const matrix = detectMatrix(rows);
   // Prefer matrix when it's confidently tiled: a flat resolve of a cross-tab
   // either finds no rate column or covers a tiny fraction of rows, so matrix
@@ -469,7 +532,6 @@ function buildProfile(rows, opts = {}) {
   let chosen = flat;
   if (matrix && matrix.rateCols.length >= 2 && matrix.confidence >= flat.confidence - 0.1) {
     // sanity: matrix must actually emit more rules than flat, else keep flat
-    const flatN = parseFlatGrid(rows, schema, opts).length;
     const matN = parseMatrixGrid(rows, matrix, opts).length;
     if (matN > flatN) chosen = matrix;
   }
