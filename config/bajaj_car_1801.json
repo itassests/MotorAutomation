@@ -4,6 +4,7 @@
   "default": 45,
   "dieselNoNcb": 10,
   "hevNoNcb": 10,
+  "hevNcb": 19.5,
   "states": {
     "HARYANA":        { "dieselNoNcb": 10, "petrolNoNcb": 15, "dieselNcb": 25, "petrolNcb": 25 },
     "PUDUCHERRY":     { "dieselNoNcb": 5,  "petrolNoNcb": 5,  "dieselNcb": 5,  "petrolNcb": 5  },

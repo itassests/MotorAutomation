@@ -54,8 +54,13 @@ function resolveBajajCarRate(params) {
   const diesel = /DIESEL/.test(fuel);
   const hev = /ELECTRIC|HYBRID|\bHEV\b|BATTERY/.test(fuel);
 
-  // Universal rule first — Diesel/HEV without NCB = 10, in every state.
-  if (!ncb && (diesel || hev)) return +(GRID.dieselNoNcb / 100).toFixed(4);
+  // HEV (all states, all fuel) — July'26 grid note "For HEV, existing grids to
+  // continue with the following exception: all without-NCB = 10% on OD". So HEV
+  // keeps its own grid (hevNcb=19.5 with NCB), and 10 without NCB. Applied before
+  // the state fuel/NCB grid so HEV-with-NCB no longer falls through to 45.
+  if (hev) return +((ncb ? GRID.hevNcb : GRID.hevNoNcb) / 100).toFixed(4);
+  // Universal rule — Diesel without NCB = 10, in every state.
+  if (!ncb && diesel) return +(GRID.dieselNoNcb / 100).toFixed(4);
 
   let st = gridStateForRto(params.rtoCode);
   if (st) st = (GRID._stateAliases[st] || st);
