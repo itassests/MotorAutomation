@@ -176,14 +176,14 @@ async function reparseProfile(pool, profileRow, opts = {}) {
   if (!ws) throw new Error('sheet not found: ' + sheet);
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
   const profile = opts.profile || profileRow.profile;
-  const rules = parseWithProfile(rows, profile, { insurer, product });
+  const rules = parseWithProfile(rows, profile, { insurer, product, sheetName: sheet });
   const health = profileHealth(rows, profile, { insurer, product });
   // replace this sheet's rules on the card
   await pool.request()
     .input('cid', sql.Int, profileRow.rate_card_id)
     .input('sheet', sql.NVarChar, sheet)
     .query('DELETE FROM rate_rules WHERE rate_card_id = @cid AND sheet_name = @sheet');
-  await insertRules(pool, profileRow.rate_card_id, insurer, sheet, rules.map((r) => ({ ...r, product })));
+  await insertRules(pool, profileRow.rate_card_id, insurer, sheet, rules.map((r) => ({ ...r, product: r.product || product })));
   return { rulesOut: rules.length, health, rules };
 }
 
@@ -201,11 +201,12 @@ async function insertAutoRules(pool, filePath, cardId, insurer, generated, produ
     if (g.status !== 'auto') continue;
     const ws = wb.Sheets[g.sheet_name]; if (!ws) continue;
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-    const rules = parseWithProfile(rows, g.profile, { insurer, product });
+    const rules = parseWithProfile(rows, g.profile, { insurer, product, sheetName: g.sheet_name });
     if (!rules.length) continue;
     await pool.request().input('cid', sql.Int, cardId).input('sheet', sql.NVarChar, g.sheet_name)
       .query('DELETE FROM rate_rules WHERE rate_card_id = @cid AND sheet_name = @sheet');
-    await insertRules(pool, cardId, insurer, g.sheet_name, rules.map((r) => ({ ...r, product })));
+    // keep the per-row inferred product; fall back to the caller's product only when blank
+    await insertRules(pool, cardId, insurer, g.sheet_name, rules.map((r) => ({ ...r, product: r.product || product })));
     total += rules.length;
   }
   return total;

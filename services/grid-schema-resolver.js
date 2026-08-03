@@ -145,6 +145,29 @@ function resolveSchema(rows) {
   return { headerRow, headers, roles, confidence, notes };
 }
 
+/**
+ * Infer the vehicle-type / product (CAR|TW|GCV|PCV|MISC) from a rule's segment /
+ * sub_type / sheet-name text, so dynamically-parsed rules aren't left product-less
+ * (which shows as "(unset)" in the counts). Explicit product tokens win; then
+ * body/keyword heuristics, ordered so passenger (bus/school/taxi) beats goods and
+ * both beat the generic "car / 4W" catch (a "GCV - 4W" row must NOT read as CAR).
+ */
+function inferProduct(text) {
+  const s = String(text || '').toUpperCase();
+  if (!s) return null;
+  // explicit product tokens — allow no word-boundary suffix (e.g. "GCV3W", "PCV3W")
+  // and common insurer abbreviations (Chola: GCCV goods, PCCV passenger, MSV misc).
+  if (/GCCV|GCV/.test(s)) return 'GCV';
+  if (/PCCV|\bPCV\b|PCV\d/.test(s)) return 'PCV';
+  if (/\bMISC\b|MISCELLANEOUS|\bMSV\b/.test(s)) return 'MISC';
+  if (/TRACTOR|\bCRANE\b|DUMPER|TIPPER|EXCAVATOR|FORK.?LIFT|BACKHOE|LOADER|GRADER|HARVEST|COMPACTOR|\bROLLER\b|CONSTRUCTION\s*EQUIP|\bCE\b/.test(s)) return 'MISC';
+  if (/\bBUS\b|SCHOOL|\bSTAFF\b|\bTAXI\b|\bCAB\b|MAXI.?CAB|E.?RICK|AUTO.?RICK|PASSENGER|CONTRACT\s*CARRIAGE/.test(s)) return 'PCV';
+  if (/\bGOODS\b|\bLCV\b|\bHCV\b|\bMCV\b|\bMHCV\b|TRUCK|TANKER|TRAILER|PICK.?UP|\bTEMPO\b|\bDOST\b|CARRIER|MINI.?TRUCK/.test(s)) return 'GCV';
+  if (/\bTW\b|\b2W\b|TWO.?WHEEL|SCOOTER|SCOOTY|MOTOR.?CYCLE|\bMC\b|\bBIKE\b|MOPED/.test(s)) return 'TW';
+  if (/PVT.?CAR|PRIVATE.?CAR|\bCAR\b|\b4W\b|SEDAN|HATCH|\bSUV\b|MOTOR\s*CAR/.test(s)) return 'CAR';
+  return null;
+}
+
 /** Cover token matcher — includes PACK/ACT which the value-vocab omits. */
 const COVER_TOKEN = /^(package|pack|pkg|comp|comprehensive|saod|sod|satp|tp|act|od|liability|bundled|1\s*\+\s*\d)$/i;
 function isCoverToken(v) { return COVER_TOKEN.test(cell(v)); }
@@ -239,7 +262,7 @@ function parseFlatGrid(rows, schema, opts = {}) {
       else if (leg.key === 'TP') { rateType = 'TP'; appliedOn = 'TP'; }
       out.push({
         insurer: opts.insurer,
-        product: opts.product,
+        product: inferProduct([segment, opts.sheetName].join(' ')) || opts.product || null,
         region: region || 'PAN INDIA',
         sub_type: segment || '',
         rate_type: rateType,
@@ -376,6 +399,13 @@ function parseMatrixGrid(rows, layout, opts = {}) {
     leftCols.forEach((c) => { const v = cell(row[c]); if (v !== '') ff[c] = v; });
     const segment = segmentCol != null ? (cell(row[segmentCol]) || ff[segmentCol]) : '';
     const make = makeCol != null && cell(row[makeCol]) ? cell(row[makeCol]) : 'All';
+    // product: try each left dimension column LEFT-TO-RIGHT (a PROD/CLASS col like
+    // "GCCV"/"PCCV"/"MSV" sits leftmost and is the reliable signal), then the
+    // segment, then the sheet name. Left-to-right beats a naive join because a
+    // model-list column ("…Tractor, Supro") would otherwise leak MISC into PCV.
+    let rowProduct = null;
+    for (const c of leftCols) { rowProduct = inferProduct(ff[c]); if (rowProduct) break; }
+    rowProduct = rowProduct || inferProduct(segment) || inferProduct(opts.sheetName) || opts.product || null;
     for (const c of rateCols) {
       if (!isNumericish(row[c])) continue;
       const n = numVal(row[c]);
@@ -383,7 +413,7 @@ function parseMatrixGrid(rows, layout, opts = {}) {
       const rateType = coverToRateType(coverCells[c]) || 'COMP';
       out.push({
         insurer: opts.insurer,
-        product: opts.product,
+        product: rowProduct,
         region: regionOf[c] || 'PAN INDIA',
         segment,
         sub_type: segment,
@@ -500,5 +530,5 @@ module.exports = {
   resolveSchema, parseFlatGrid, HEADER_SYNONYMS,
   buildProfile, schemaFromProfile, parseWithProfile, profileHealth,
   guessRateDivisor, parseBand, normFuel, normBiz, coverToRateType,
-  detectMatrix, parseMatrixGrid, isCoverToken,
+  detectMatrix, parseMatrixGrid, isCoverToken, inferProduct,
 };
