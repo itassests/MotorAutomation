@@ -886,6 +886,8 @@ const _UPLOAD_INSURER_MAP = {
   'UNITED INDIA': 'united_india',
   'KOTAK': 'kotak',
   'NAVI': 'navi',
+  'KIWI': 'kiwi',
+  'KIWI GENERAL': 'kiwi',
   'ACKO': 'acko',
   'FUTURE GENERALI': 'future_generali',
   'FUTURE': 'future_generali',

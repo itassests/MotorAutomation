@@ -1853,6 +1853,7 @@ function resolveInsurerSlug(insurerName) {
     { patterns: ['LIBERTY'], slug: 'liberty_videocon' },
     { patterns: ['MAGMA'], slug: 'magma_hdi' },
     { patterns: ['NAVI'], slug: 'navi' },
+    { patterns: ['KIWI'], slug: 'kiwi' },
     { patterns: ['SHRIRAM'], slug: 'shriram' },
     { patterns: ['ACKO'], slug: 'acko' },
     { patterns: ['ZUNO', 'EDELWEISS'], slug: 'zuno' },

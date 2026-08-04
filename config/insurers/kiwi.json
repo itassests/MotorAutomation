@@ -1,0 +1,13 @@
+{
+  "insurer": "kiwi",
+  "display_name": "Kiwi General Insurance",
+  "file_patterns": ["*Kiwi*", "Kiwi*"],
+
+  "_layout_notes": [
+    "Standalone insurer (own grid). No bespoke parse layout — the dynamic parse-profile engine (services/grid-schema-resolver.js, flat + matrix) and the document router (services/doc-router.js) handle KIWI grids, RTO masters, fleet approvals and enablers.",
+    "Policy INSURERNAME in tmp_PrarambhData: 'Kiwi General Insurance Ltd' → resolveInsurerSlug maps to slug 'kiwi'.",
+    "Empty 'sheets' so parseWorkbook returns nothing and the dynamic path parses the uploaded grid."
+  ],
+
+  "sheets": []
+}
