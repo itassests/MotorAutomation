@@ -31,14 +31,36 @@ try {
   }
 } catch (_) { /* dir missing */ }
 
-// extracted grid data cache (slug__sheetId -> rows)
+// extracted grid data cache (filename -> rows)
 const _dataCache = {};
-function gridData(slug, sheetId) {
-  const k = slug + '__' + sheetId;
-  if (k in _dataCache) return _dataCache[k];
-  try { _dataCache[k] = JSON.parse(fs.readFileSync(path.join(DATA_DIR, k + '.json'), 'utf8')).rows; }
-  catch (_) { _dataCache[k] = null; }
-  return _dataCache[k];
+
+// Effective-date generations: each upload also writes a dated file
+// data/<slug>__<sheetId>__<YYYY-MM-DD>.json. For a policy we pick the NEWEST
+// generation whose effective_from <= the policy's risk-start date (mirrors the
+// rate_rules card selection). Falls back to the oldest generation for policies
+// predating every grid, and to the plain (latest-wins) file if no dated files.
+function pickGenFile(slug, sheetId, effDate) {
+  const prefix = slug + '__' + sheetId + '__';
+  let gens;
+  try {
+    gens = fs.readdirSync(DATA_DIR)
+      .filter((f) => f.startsWith(prefix) && f.endsWith('.json'))
+      .map((f) => ({ f, d: f.slice(prefix.length, -5) }))
+      .filter((g) => /^\d{4}-\d{2}-\d{2}$/.test(g.d))
+      .sort((a, b) => (a.d < b.d ? 1 : -1));  // newest first
+  } catch (_) { return null; }
+  if (!gens.length) return null;
+  const eff = String(effDate || '').slice(0, 10);
+  if (!eff) return gens[0].f;                              // no date -> current (newest)
+  const pick = gens.find((g) => g.d <= eff) || gens[gens.length - 1];  // newest<=eff, else oldest
+  return pick.f;
+}
+function gridData(slug, sheetId, effDate) {
+  const fname = pickGenFile(slug, sheetId, effDate) || (slug + '__' + sheetId + '.json');
+  if (fname in _dataCache) return _dataCache[fname];
+  try { _dataCache[fname] = JSON.parse(fs.readFileSync(path.join(DATA_DIR, fname), 'utf8')).rows; }
+  catch (_) { _dataCache[fname] = null; }
+  return _dataCache[fname];
 }
 
 /**
@@ -93,13 +115,19 @@ function extractFlatGrid(rows, sheet) {
   return out;
 }
 
-/** Persist extracted rows (called at upload so future months self-refresh). */
-function saveGridData(slug, sheetId, rows, sourceFile) {
+/**
+ * Persist extracted rows (called at upload so future months self-refresh).
+ * Writes the plain latest-wins file AND, when an effective_from is supplied, a
+ * dated generation file so backdated policies price on the grid in force then.
+ */
+function saveGridData(slug, sheetId, rows, sourceFile, effDate) {
   try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(path.join(DATA_DIR, slug + '__' + sheetId + '.json'),
-      JSON.stringify({ _source: sourceFile || null, rows }, null, 0));
-    delete _dataCache[slug + '__' + sheetId];
+    const eff = String(effDate || '').slice(0, 10);
+    const payload = JSON.stringify({ _source: sourceFile || null, _effective_from: eff || null, rows }, null, 0);
+    fs.writeFileSync(path.join(DATA_DIR, slug + '__' + sheetId + '.json'), payload);   // latest-wins fallback
+    if (/^\d{4}-\d{2}-\d{2}$/.test(eff)) fs.writeFileSync(path.join(DATA_DIR, slug + '__' + sheetId + '__' + eff + '.json'), payload);
+    for (const k of Object.keys(_dataCache)) if (k.startsWith(slug + '__' + sheetId)) delete _dataCache[k];
   } catch (_) { /* best effort */ }
 }
 
@@ -197,9 +225,10 @@ function resolveFlatGridRate(insurerSlug, params) {
   const spec = SPECS[insurerSlug];
   if (!spec) return null;
   const vt = norm(params.vehicleType);
+  const effDate = params.effective_date || params.effectiveDate || params.riskStartDate || params.policyStartDate || params.effective_from;
   for (const sheet of (spec.sheets || [])) {
     if ((sheet.products || []).length && !sheet.products.some((p) => norm(p) === vt)) continue;
-    const rows = gridData(insurerSlug, sheet.id);
+    const rows = gridData(insurerSlug, sheet.id, effDate);
     if (!rows || !rows.length) continue;
     const region = resolveRegion(sheet, params);
     if (!region) continue;
@@ -228,7 +257,7 @@ function resolveFlatGridRate(insurerSlug, params) {
  * Returns a report [{id, sheet, rows}] so the upload can surface what refreshed.
  * Best-effort — never throws (the normal ingest already succeeded).
  */
-function refreshFromWorkbook(insurerSlug, filePath) {
+function refreshFromWorkbook(insurerSlug, filePath, effDate) {
   const spec = SPECS[insurerSlug];
   if (!spec || !/\.xls/i.test(String(filePath || ''))) return [];
   const report = [];
@@ -242,7 +271,7 @@ function refreshFromWorkbook(insurerSlug, filePath) {
       if (!sn) continue;
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' });
       const grid = extractFlatGrid(rows, sheet);
-      if (grid.length) { saveGridData(insurerSlug, sheet.id, grid, sn); report.push({ id: sheet.id, sheet: sn, rows: grid.length }); }
+      if (grid.length) { saveGridData(insurerSlug, sheet.id, grid, sn, effDate); report.push({ id: sheet.id, sheet: sn, rows: grid.length }); }
     }
   } catch (_) { /* best effort */ }
   return report;

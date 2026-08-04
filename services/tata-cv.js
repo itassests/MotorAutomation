@@ -12,9 +12,17 @@
  * is fixed per region so it's just a per-region rate). config/tata_cv_jun26.json.
  * Returns the rate fraction or null.
  */
-const { rows } = require('../config/tata_cv_jun26.json');
+const ROWS_JUN = require('../config/tata_cv_jun26.json').rows;
+const ROWS_JUL = require('../config/tata_cv_jul26.json').rows;
 const CLUSTER = require('../config/tata_rto_cluster.json');
 const norm = (s) => String(s == null ? '' : s).trim().toUpperCase();
+
+// Pick grid generation by risk-start (effective) date: July'26 grid on/after
+// 1-Jul-2026 (and when no date), June before. Mirrors tata-car.js gridFor.
+function rowsFor(params) {
+  const d = String(params.effective_date || params.effectiveDate || params.riskStartDate || params.policyStartDate || '').slice(0, 10);
+  return (!d || d >= '2026-07-01') ? ROWS_JUL : ROWS_JUN;
+}
 
 function cvRegion(params) {
   const code = norm(params.rtoCode).replace(/[^A-Z0-9]/g, '');
@@ -151,7 +159,7 @@ function resolveTataCvRate(params) {
   const ab = ageBand(params.vehicleAge);
   const nregion = norm(region);
   let best = null, bestScore = -1, bestKey = null;
-  for (const row of rows) {
+  for (const row of rowsFor(params)) {
     if (norm(row.seg) !== norm(seg)) continue;
     // Region keys in config are inconsistently cased (city clusters UPPERCASE
     // "PUNE", state clusters Title-case) while cvRegion returns the cluster's

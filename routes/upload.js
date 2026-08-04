@@ -624,7 +624,7 @@ router.post('/upload', async (req, res, next) => {
     // grid data the resolver uses; no code change per month.
     try {
       const { refreshFromWorkbook } = require('../services/flat-grid');
-      const fg = refreshFromWorkbook(insurer, filePath);
+      const fg = refreshFromWorkbook(insurer, filePath, effective_from);
       if (fg.length) response.flat_grids = fg;
     } catch (_) { /* best effort */ }
 
