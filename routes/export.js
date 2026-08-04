@@ -133,7 +133,13 @@ router.get('/luca', async (req, res, next) => {
     if (ids.length === 0) {
       return res.status(404).json({ success: false, error: 'No active rate cards to export' });
     }
-    const buffer = await buildLucaBuffer(ids);
+    // Product scope: the Luca file covers Pvt Car / TW / GCV only (USER 2026-08-04,
+    // PCV & MISC ignored). Override with ?products=CAR,TW,GCV,PCV,MISC (or =ALL).
+    const prodParam = String(req.query.products || '').trim();
+    const products = prodParam
+      ? (/^all$/i.test(prodParam) ? null : prodParam.split(',').map(s => s.trim().toUpperCase()).filter(Boolean))
+      : ['CAR', 'TW', 'GCV'];
+    const buffer = await buildLucaBuffer(ids, products ? { products } : undefined);
     const stem = ['luca', insurer || 'all'].filter(Boolean).join('_');
     sendXlsx(res, buffer, `${stem}_${todayStamp()}.xlsx`);
   } catch (err) { next(err); }

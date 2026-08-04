@@ -582,7 +582,12 @@ function citiesFromRtoList(rtoStr) {
   return out.join(', ');
 }
 
-async function buildLucaBuffer(ids) {
+async function buildLucaBuffer(ids, opts) {
+  // Restrict to specific canonical vehicle types when requested (USER 2026-08-04:
+  // Luca file = Pvt Car / TW / GCV only, ignore PCV & MISC). null = no filter.
+  const allowTypes = (opts && Array.isArray(opts.products) && opts.products.length)
+    ? new Set(opts.products.map((p) => String(p).toUpperCase().trim()))
+    : null;
   const idList = Array.isArray(ids) ? ids : [ids];
   const pool = await getPool();
   const rq = pool.request();
@@ -666,6 +671,10 @@ async function buildLucaBuffer(ids) {
   for (const r of dbRows.concat(configRows)) {
     const insurer = lucaInsurer(r.insurer || '');
     const vt = ex.inferVehicleType(r.sheet_name, r.product, r.segment, r.sub_type);
+    // Product scope (USER): the Luca file covers Pvt Car / TW / GCV only — skip
+    // PCV and MISC. canonVt folds inferVehicleType's forms (Pvt car/4W→CAR,
+    // 2W→TW, MIS→MISC) so the allowlist matches on the CAR/TW/GCV/PCV/MISC family.
+    if (allowTypes && !allowTypes.has(canonVt(vt))) continue;
     const cover = ex.inferProduct(r.rate_type, r.sheet_name, r.sub_type, r.segment); // Comp / TP / SAOD
     const isTp = cover === 'TP';
     const mm = lucaMakeModel(r);   // make = manufacturer, model = model (kept separate)
