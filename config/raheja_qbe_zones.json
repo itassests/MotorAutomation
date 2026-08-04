@@ -1,0 +1,10 @@
+{
+  "_note": "Raheja QBE zone → state bifurcation (from the July'26 grid email). The zonal grid (region = North/Centre/West/South/East) is expanded to state-level rules so policies resolve the same way as the state-wise June grid. State names match the June card's exact strings; Mumbai included under West (MH sub-region).",
+  "zones": {
+    "North":  ["Jammu & Kashmir", "Himachal Pradesh", "Uttarakhand", "Punjab", "Chandigarh", "Haryana", "Delhi", "Uttar Pradesh", "Chhattisgarh"],
+    "Centre": ["Rajasthan", "Madhya Pradesh"],
+    "East":   ["West Bengal", "Bihar", "Odisha", "Jharkhand"],
+    "West":   ["Maharashtra", "Mumbai", "Gujarat", "Goa", "Daman & Diu", "Dadra & Nagar Haveli"],
+    "South":  ["Andhra Pradesh", "Telangana", "Tamil Nadu", "Karnataka", "Puducherry"]
+  }
+}

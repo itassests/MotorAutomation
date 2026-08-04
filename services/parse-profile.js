@@ -10,9 +10,41 @@
  * silently producing null-heavy junk. A stored profile can be re-parsed anytime.
  */
 const fs = require('fs');
+const path = require('path');
 const sql = require('mssql');
 const XLSX = require('xlsx');
 const { buildProfile, profileHealth, parseWithProfile } = require('./grid-schema-resolver');
+
+// Optional per-insurer zone→state map (config/<insurer>_zones.json). When present,
+// a rule whose region is a ZONE (e.g. Raheja "North") is expanded to one rule per
+// member state, so a zonal grid resolves like a state-wise one. Cached per insurer.
+const _zoneCache = {};
+function loadZoneMap(insurer) {
+  if (!insurer) return null;
+  if (insurer in _zoneCache) return _zoneCache[insurer];
+  let map = null;
+  try {
+    const f = path.join(__dirname, '..', 'config', insurer + '_zones.json');
+    const cfg = JSON.parse(fs.readFileSync(f, 'utf8'));
+    const zones = cfg.zones || cfg;
+    map = {};
+    for (const z in zones) map[z.toUpperCase().trim()] = zones[z];
+  } catch (_) { map = null; }
+  _zoneCache[insurer] = map;
+  return map;
+}
+/** Expand zone-region rules → per-state rules (pass-through when region isn't a zone). */
+function expandZones(rules, insurer) {
+  const map = loadZoneMap(insurer);
+  if (!map) return rules;
+  const out = [];
+  for (const r of rules) {
+    const states = map[String(r.region || '').toUpperCase().trim()];
+    if (states && states.length) for (const st of states) out.push({ ...r, region: st, _zone: r.region });
+    else out.push(r);
+  }
+  return out;
+}
 
 // Gate thresholds — below either, the sheet is flagged for human review.
 const GATE = { confidence: 0.6, coverage: 0.5 };
@@ -234,7 +266,7 @@ async function reparseProfile(pool, profileRow, opts = {}) {
     .input('cid', sql.Int, profileRow.rate_card_id)
     .input('sheet', sql.NVarChar, sheet)
     .query('DELETE FROM rate_rules WHERE rate_card_id = @cid AND sheet_name = @sheet');
-  await insertRules(pool, profileRow.rate_card_id, insurer, sheet, rules.map((r) => ({ ...r, product: r.product || product })));
+  await insertRules(pool, profileRow.rate_card_id, insurer, sheet, expandZones(rules.map((r) => ({ ...r, product: r.product || product })), insurer));
   return { rulesOut: rules.length, health, rules };
 }
 
@@ -257,7 +289,7 @@ async function insertAutoRules(pool, filePath, cardId, insurer, generated, produ
     await pool.request().input('cid', sql.Int, cardId).input('sheet', sql.NVarChar, g.sheet_name)
       .query('DELETE FROM rate_rules WHERE rate_card_id = @cid AND sheet_name = @sheet');
     // keep the per-row inferred product; fall back to the caller's product only when blank
-    await insertRules(pool, cardId, insurer, g.sheet_name, rules.map((r) => ({ ...r, product: r.product || product })));
+    await insertRules(pool, cardId, insurer, g.sheet_name, expandZones(rules.map((r) => ({ ...r, product: r.product || product })), insurer));
     total += rules.length;
   }
   return total;
@@ -276,7 +308,7 @@ async function insertAutoRulesFromGenerated(pool, cardId, insurer, generated, pr
     if (!rules.length) continue;
     await pool.request().input('cid', sql.Int, cardId).input('sheet', sql.NVarChar, g.sheet_name)
       .query('DELETE FROM rate_rules WHERE rate_card_id = @cid AND sheet_name = @sheet');
-    await insertRules(pool, cardId, insurer, g.sheet_name, rules.map((r) => ({ ...r, product: r.product || product })));
+    await insertRules(pool, cardId, insurer, g.sheet_name, expandZones(rules.map((r) => ({ ...r, product: r.product || product })), insurer));
     total += rules.length;
   }
   return total;
