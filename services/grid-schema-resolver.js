@@ -524,20 +524,62 @@ function parseRateCell(s) {
   else if (od != null) legs.push({ rate_type: 'COMP', pct: od, applied_on: 'OD' });
   if (saod != null) legs.push({ rate_type: 'SAOD', pct: saod });
   if (tp != null) legs.push({ rate_type: 'TP', pct: tp });
-  if (!legs.length) { const n = t.match(/(\d+(?:\.\d+)?)\s*%/); if (n) legs.push({ rate_type: '', pct: +n[1], remarks: t.length > 8 ? t : undefined }); }
+  if (!legs.length) {
+    const pctM = t.match(/(\d+(?:\.\d+)?)\s*%/);           // "45%" inside a longer cell
+    if (pctM) legs.push({ rate_type: '', pct: +pctM[1], remarks: t.length > 8 ? t : undefined });
+    else if (/^\d+(\.\d+)?$/.test(t)) legs.push({ rate_type: '', pct: +t });   // a bare number cell ("0.35")
+  }
   return legs;
 }
 
-/** If a row is a region-grid header (has Segment + Type + ≥2 region labels), describe it. */
+/** Header role of a LEFT dimension column (tonnage/age/segment/volume/cc/seating). */
+function leftDimRole(header) {
+  const h = cell(header).toLowerCase();
+  if (!h) return null;
+  if (/tonnage|\bgvw\b|\bgcw\b|gross\s*weight|\bton\b|\bmt\b/.test(h)) return 'tonnage';
+  if (/^age$|vehicle\s*age|age\s*(group|band)|age\b/.test(h)) return 'age';
+  if (/discount\s*band|disc\.?\s*band|\bslab\b|volume|idv\s*band/.test(h)) return 'volume';
+  if (/^segment$|sub[\s_-]*type|body\s*type|^type$|^class$|^sub\s*class$|^product$|^category$|vehicle\s*type|^variant$/.test(h)) return 'segment';
+  if (/\bcc\b|cubic|engine\s*cap/.test(h)) return 'cc';
+  if (/seat/.test(h)) return 'seating';
+  if (/^make$|manufact|^model$/.test(h)) return 'segment';
+  return null;
+}
+
+/** A cell that looks like a REGION label (a place/zone), not a number/cover/fuel/dim/rate/note. */
+function isRegionLabelCell(v) {
+  const s = cell(v);
+  if (!s || isNumericish(s)) return false;
+  if (s.length > 26) return false;                     // a note/sentence, not a label
+  if (isCoverToken(s)) return false;
+  if (/^(petrol|diesel|ev|electric|cng|lpg|non[\s-]*diesel|bifuel|hybrid|hev|comp|saod|satp|tp|od|new|old|remarks?|grid|bac|nil|na)$/i.test(s)) return false;
+  if (/\bcc\b|cubic|below\s*\d|above\s*\d|\d\s*to\s*\d/i.test(s)) return false;
+  if (/\d\s*%/.test(s) || parseRateCell(s).length) return false;   // a rate cell, not a region
+  if (leftDimRole(s)) return false;   // it's a dimension header, not a region
+  return true;
+}
+
+/**
+ * A region-grid header: some LEFT dimension columns (tonnage/age/segment/…) then a
+ * contiguous block of ≥3 REGION labels across the top. Generalises the earlier
+ * Segment/Type form to any dims-left / regions-across-top grid (Royal GCV: Tonnage
+ * Band | Age | <cities>; Raheja: Segment | Type | <zones>).
+ */
 function regionHeaderOf(row) {
   const cells = (row || []).map(cell);
-  const segIdx = cells.findIndex((c) => /^\s*segment\s*$/i.test(c));
-  const typeIdx = cells.findIndex((c) => /^\s*type\s*$/i.test(c));
-  if (segIdx < 0 || typeIdx < 0 || typeIdx <= segIdx) return null;
+  const leftCols = [];
+  let firstRegionCol = -1;
+  for (let c = 0; c < cells.length; c++) {
+    if (cells[c] === '') continue;
+    const role = leftDimRole(cells[c]);
+    if (firstRegionCol < 0 && role) leftCols.push({ col: c, role, header: cells[c] });
+    else if (isRegionLabelCell(cells[c])) { if (firstRegionCol < 0) firstRegionCol = c; }
+  }
+  if (!leftCols.length || firstRegionCol < 0) return null;
   const regionCols = [];
-  for (let c = typeIdx + 1; c < cells.length; c++) if (cells[c] !== '') regionCols.push({ col: c, name: cells[c] });
-  if (regionCols.length < 2) return null;
-  return { segIdx, typeIdx, regionCols };
+  for (let c = firstRegionCol; c < cells.length; c++) if (isRegionLabelCell(cells[c])) regionCols.push({ col: c, name: cells[c] });
+  if (regionCols.length < 3) return null;
+  return { leftCols, regionCols };
 }
 
 function detectRegionGrid(rows) {
@@ -547,44 +589,49 @@ function detectRegionGrid(rows) {
   return { layout: 'region', confidence: 0.8, notes: headers > 1 ? ['multiple stacked sub-grids'] : [] };
 }
 
-/** Unpivot a region grid → one rule per (data row × zone × rate leg). */
+/** Unpivot a region grid → one rule per (data row × region × rate leg). */
 function parseRegionGrid(rows, layout, opts = {}) {
   const out = [];
-  let cur = null, segFF = '';
+  let cur = null; const ff = {};   // ff: role → forward-filled left value (merged cells)
   for (let r = 0; r < rows.length; r++) {
     const row = rows[r]; if (!row) continue;
     const hdr = regionHeaderOf(row);
-    if (hdr) { cur = hdr; segFF = ''; continue; }
+    if (hdr) { cur = hdr; for (const k in ff) delete ff[k]; continue; }
     if (!cur) continue;
     let cells = row.map(cell);
     while (cells.length && cells[cells.length - 1] === '') cells.pop();
     const N = cur.regionCols.length;
     if (cells.length < N) continue;                 // not a full data row
-    const rates = cells.slice(cells.length - N);    // right-aligned zone cells
+    const rates = cells.slice(cells.length - N);    // right-aligned region cells
     const keys = cells.slice(0, cells.length - N);
-    if (rates.every((c) => c === '')) continue;
-    let segment = segFF, type = '';
-    if (keys.length >= 2) { segment = keys[0] || segFF; type = keys[keys.length - 1]; segFF = segment; }
-    else if (keys.length === 1) { type = keys[0]; }
-    else continue;
-    if (!type) continue;
-    const ton = parseTonnage(type);
-    const product = inferProduct([segment, type, opts.sheetName].join(' ')) || 'GCV';
+    if (!rates.some((c) => parseRateCell(c).length)) continue;   // no parseable rate → not a data row
+    // map left keys → dimension roles, RIGHT-aligned (merged left cells shift rows)
+    const nLeft = cur.leftCols.length; const vals = {}; const ordered = [];
+    for (let i = 0; i < nLeft; i++) {
+      const lc = cur.leftCols[nLeft - 1 - i];
+      const k = keys[keys.length - 1 - i];
+      const v = (k != null && k !== '') ? k : (ff[lc.role + i] || '');
+      ff[lc.role + i] = v; vals[lc.role] = vals[lc.role] || v; ordered.unshift(v);
+    }
+    const segStr = ordered.filter(Boolean).join(' ');
+    if (!segStr) continue;
+    const ton = vals.tonnage ? parseTonnage(vals.tonnage) : parseTonnage(segStr);
+    const ccB = vals.cc ? parseBand(vals.cc) : { min: null, max: null };
+    const volumeTier = vals.volume || undefined;
+    const product = inferProduct([segStr, opts.sheetName].join(' ')) || opts.product || 'GCV';
     for (let i = 0; i < N; i++) {
       const region = cur.regionCols[i].name;
       for (const leg of parseRateCell(rates[i])) {
-        if (leg.declined) {
-          out.push({ insurer: opts.insurer, product, region, segment: type, sub_type: segment, make: 'All', rate_type: 'COMP', rate_value: 0, is_declined: true, weight_band_min: ton.min, weight_band_max: ton.max, _srcRow: r });
-          continue;
-        }
+        const base = {
+          insurer: opts.insurer, product, region, segment: segStr, sub_type: vals.segment || '', make: 'All',
+          weight_band_min: ton.min, weight_band_max: ton.max, cc_band_min: ccB.min, cc_band_max: ccB.max,
+          volume_tier: volumeTier, _srcRow: r,
+        };
+        if (leg.declined) { out.push({ ...base, rate_type: 'COMP', rate_value: 0, is_declined: true }); continue; }
         const rt = leg.rate_type || opts.defaultCover || 'COMP';
-        out.push({
-          insurer: opts.insurer, product, region, segment: type, sub_type: segment, make: 'All',
-          rate_type: rt, applied_on: leg.applied_on || (rt === 'TP' ? 'TP' : 'NET'),
-          rate_value: +(leg.pct / 100).toFixed(6),
-          weight_band_min: ton.min, weight_band_max: ton.max,
-          remarks: leg.remarks, _srcRow: r,
-        });
+        // Cells are either whole-percent ("50%" → 50) or already fractions ("0.35").
+        const val = leg.pct > 1 ? leg.pct / 100 : leg.pct;
+        out.push({ ...base, rate_type: rt, applied_on: leg.applied_on || (rt === 'TP' ? 'TP' : 'NET'), rate_value: +val.toFixed(6), remarks: leg.remarks });
       }
     }
   }
