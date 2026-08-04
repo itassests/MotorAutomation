@@ -6771,14 +6771,9 @@
             sel.innerHTML += `<option value="${ins.insurer}">${ins.display_name || ins.insurer}</option>`;
           });
         });
-        // Mirror into the Manage Rate Cards → export filter dropdown.
-        const expSel = document.getElementById('exportInsurerFilter');
-        if (expSel) {
-          expSel.innerHTML = '<option value="">All insurers</option>'
-            + configInsurers.map(ins =>
-                `<option value="${ins.insurer}">${ins.display_name || ins.insurer}</option>`
-              ).join('');
-        }
+        // (The export/Luca insurer picker is populated from the actual rate cards
+        // in populateExportInsurerFilter() — every insurer with a card, not just
+        // config-driven ones — so a single-insurer download works for any of them.)
       } catch (e) { console.error('Failed to load config insurers:', e); }
 
       // Load ALL insurers from master list for Upload dropdown
@@ -9517,9 +9512,23 @@
         const res = await fetch(API + '/upload/rate-cards');
         const data = await res.json();
         _allRateCards = data.rate_cards || [];
+        populateExportInsurerFilter();
         renderRateCardsList();
       } catch (e) { showToast('Failed to load rate cards', 'error'); }
       loadCoverageMatrix();
+    }
+
+    // Fill the export/Luca insurer picker from EVERY insurer that has a rate card
+    // (not just config-driven ones), so a single-insurer Luca download works for
+    // any of them. Preserves the current selection across refreshes.
+    function populateExportInsurerFilter() {
+      const sel = document.getElementById('exportInsurerFilter');
+      if (!sel) return;
+      const cur = sel.value;
+      const insurers = [...new Set((_allRateCards || []).map(c => c.insurer).filter(Boolean))].sort();
+      sel.innerHTML = '<option value="">All insurers</option>'
+        + insurers.map(i => `<option value="${i}">${_insurerLabel(i)}</option>`).join('');
+      if (insurers.includes(cur)) sel.value = cur;
     }
 
     // Pretty insurer label from a slug (sbi_general → "Sbi General").
