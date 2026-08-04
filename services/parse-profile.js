@@ -86,9 +86,14 @@ async function readProfileRows(sourcePath, sheetName) {
 
 /** auto vs needs_review from health + confidence. */
 function gateStatus(profile, health) {
-  if ((profile.confidence || 0) < GATE.confidence) return 'needs_review';
-  if ((health.coverage || 0) < GATE.coverage) return 'needs_review';
   if ((health.rulesOut || 0) === 0) return 'needs_review';
+  if ((profile.confidence || 0) < GATE.confidence) return 'needs_review';
+  // Coverage (rows-with-rule / data-rows) is a meaningful gate for FLAT grids.
+  // For unpivot layouts (matrix / wide / region) one data row yields many rules
+  // and title/header/blank rows dilute the ratio, so coverage under-reads — for
+  // those, a confident parse that emits rules is enough.
+  const unpivot = profile.layout === 'matrix' || profile.layout === 'wide' || profile.layout === 'region';
+  if (!unpivot && (health.coverage || 0) < GATE.coverage) return 'needs_review';
   return 'auto';
 }
 
