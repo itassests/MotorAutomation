@@ -1,0 +1,16 @@
+{
+  "_note": "Universal Sompo email grid uses state ABBREVIATIONS (CG, AS, MH…); this expands each to the exact region label the Sompo card resolves policies to (from card 573). Codes that already match (GJ/DD, J&K/LA, DL-NCR) map to themselves for case-normalisation. Applied via parse-profile expandZones.",
+  "zones": {
+    "CG": ["CHHATTISGARH"], "AS": ["ASSAM"], "JH": ["JHARKHAND"], "WB": ["WEST BENGAL"],
+    "ODIS": ["ODISHA"], "BR": ["BIHAR"], "7S": ["SIKKIM"], "MH": ["MAHARASHTRA"],
+    "GJ/DD": ["GJ/DD"], "GJ": ["GUJARAT"], "GOA": ["GOA"], "MP": ["MADHYA PRADESH"],
+    "MP1": ["Ujjain, Indore, Bhopal"], "MP 2": ["Rest of MP"], "MP2": ["Rest of MP"],
+    "UP1": ["UP-1"], "UP2": ["UP-2"], "UP3": ["UP-3"],
+    "RJ": ["RAJASTHAN"], "RJ1": ["RJ-1"], "RJ2": ["RJ-2"], "RJ3": ["RJ-3"],
+    "HR": ["HARYANA"], "DL-NCR": ["DL-NCR"], "DL": ["DELHI"], "NCR": ["NCR"],
+    "UK": ["UTTARAKHAND"], "PB": ["PUNJAB"], "CH": ["CHANDIGARH"], "HP": ["HIMACHAL PRADESH"],
+    "J&K/LA": ["J&K/LA"], "TN": ["TAMIL NADU"], "PONDI": ["PUDUCHERRY"],
+    "KA": ["KARNATAKA"], "KA1": ["Bangalore, Mysore, Mangalore"], "KA 2": ["Rest of KA"], "KA2": ["Rest of KA"],
+    "KL": ["KERALA"], "AP": ["ANDHRA PRADESH"], "TS": ["TELANGANA"]
+  }
+}

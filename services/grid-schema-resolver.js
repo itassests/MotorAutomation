@@ -165,6 +165,7 @@ function inferProduct(text) {
   if (/\bGOODS\b|\bLCV\b|\bHCV\b|\bMCV\b|\bMHCV\b|TRUCK|TANKER|TRAILER|PICK.?UP|\bTEMPO\b|\bDOST\b|CARRIER|MINI.?TRUCK/.test(s)) return 'GCV';
   if (/\bTW\b|\b2W\b|TWO.?WHEEL|SCOOTER|SCOOTY|MOTOR.?CYCLE|\bMC\b|\bBIKE\b|MOPED/.test(s)) return 'TW';
   if (/PVT.?CAR|PRIVATE.?CAR|\bCAR\b|\b4W\b|SEDAN|HATCH|\bSUV\b|MOTOR\s*CAR/.test(s)) return 'CAR';
+  if (/\bCV\b|commercial\s*veh/.test(s)) return 'GCV';   // "CV Grid" = commercial (goods)
   return null;
 }
 
@@ -563,32 +564,40 @@ function isRegionLabelCell(v) {
   return true;
 }
 
+/** True if a cell below a header is a RATE (numeric, decline, or combined-rate). */
+function isRateData(v) {
+  return isNumericish(v) || isDeclineMarker(v) || parseRateCell(v).length > 0;
+}
+
 /**
- * A region-grid header: some LEFT dimension columns (tonnage/age/segment/…) then a
- * contiguous block of ≥3 REGION labels across the top. Generalises the earlier
- * Segment/Type form to any dims-left / regions-across-top grid (Royal GCV: Tonnage
- * Band | Age | <cities>; Raheja: Segment | Type | <zones>).
+ * A region-grid header at row r: a block of ≥3 REGION labels across the top whose
+ * DATA (the row below) is rate-like, and ≥1 LEFT dimension column before them. The
+ * data check makes this robust to mislabelled left headers ("State"/"Class of Veh"
+ * over a New/Old/GVW dimension) — a column is a region only if it holds rates.
+ * Generalises Royal (Tonnage|Age|<cities>) and Raheja (Segment|Type|<zones>).
  */
-function regionHeaderOf(row) {
-  const cells = (row || []).map(cell);
-  const leftCols = [];
-  let firstRegionCol = -1;
+function regionHeaderOf(rows, r) {
+  const row = rows[r]; if (!row) return null;
+  const cells = row.map(cell);
+  const below = (rows[r + 1] || []).map(cell);
+  const regionCols = []; let firstRegionCol = -1;
   for (let c = 0; c < cells.length; c++) {
-    if (cells[c] === '') continue;
-    const role = leftDimRole(cells[c]);
-    if (firstRegionCol < 0 && role) leftCols.push({ col: c, role, header: cells[c] });
-    else if (isRegionLabelCell(cells[c])) { if (firstRegionCol < 0) firstRegionCol = c; }
+    if (isRegionLabelCell(cells[c]) && (below[c] === undefined || isRateData(below[c]) || below[c] === '')) {
+      // confirm with the data 1-2 rows down (header may sit above a sub-header)
+      const d = isRateData(below[c]) ? true : isRateData((rows[r + 2] || [])[c]);
+      if (d) { regionCols.push({ col: c, name: cells[c] }); if (firstRegionCol < 0) firstRegionCol = c; }
+    }
   }
-  if (!leftCols.length || firstRegionCol < 0) return null;
-  const regionCols = [];
-  for (let c = firstRegionCol; c < cells.length; c++) if (isRegionLabelCell(cells[c])) regionCols.push({ col: c, name: cells[c] });
-  if (regionCols.length < 3) return null;
+  if (regionCols.length < 3 || firstRegionCol < 1) return null;   // need ≥1 left dim col
+  const leftCols = [];
+  for (let c = 0; c < firstRegionCol; c++) if (cells[c] !== '') leftCols.push({ col: c, role: leftDimRole(cells[c]) || 'segment', header: cells[c] });
+  if (!leftCols.length) return null;
   return { leftCols, regionCols };
 }
 
 function detectRegionGrid(rows) {
   let headers = 0;
-  for (let r = 0; r < rows.length; r++) if (regionHeaderOf(rows[r])) headers++;
+  for (let r = 0; r < rows.length; r++) if (regionHeaderOf(rows, r)) headers++;
   if (!headers) return null;
   return { layout: 'region', confidence: 0.8, notes: headers > 1 ? ['multiple stacked sub-grids'] : [] };
 }
@@ -599,8 +608,13 @@ function parseRegionGrid(rows, layout, opts = {}) {
   let cur = null; const ff = {};   // ff: role → forward-filled left value (merged cells)
   for (let r = 0; r < rows.length; r++) {
     const row = rows[r]; if (!row) continue;
-    const hdr = regionHeaderOf(row);
-    if (hdr) { cur = hdr; for (const k in ff) delete ff[k]; continue; }
+    const hdr = regionHeaderOf(rows, r);
+    if (hdr) {
+      // capture the title rows above the header (e.g. "CV Grid", "PVT CAR",
+      // "Tractor") — the product usually lives there, not in the segment.
+      hdr.title = rows.slice(Math.max(0, r - 3), r).flat().map(cell).filter(Boolean).join(' ');
+      cur = hdr; for (const k in ff) delete ff[k]; continue;
+    }
     if (!cur) continue;
     let cells = row.map(cell);
     while (cells.length && cells[cells.length - 1] === '') cells.pop();
@@ -622,7 +636,7 @@ function parseRegionGrid(rows, layout, opts = {}) {
     const ton = vals.tonnage ? parseTonnage(vals.tonnage) : parseTonnage(segStr);
     const ccB = vals.cc ? parseBand(vals.cc) : { min: null, max: null };
     const volumeTier = vals.volume || undefined;
-    const product = inferProduct([segStr, opts.sheetName].join(' ')) || opts.product || 'GCV';
+    const product = inferProduct([cur.title || '', segStr, opts.sheetName].join(' ')) || opts.product || 'GCV';
     for (let i = 0; i < N; i++) {
       const region = cur.regionCols[i].name;
       for (const leg of parseRateCell(rates[i])) {
