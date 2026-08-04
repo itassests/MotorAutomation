@@ -104,7 +104,7 @@ function classifyTable(rows, opts = {}) {
   if (rtoCodeCol >= 0 && regionCol >= 0 && rateCol < 0) {
     // Multi-product RTO master: separate region columns per product (Royal's
     // "TPULR for Private Car / VGC / 3W VPCV / 2W"). Emit one mapping per product.
-    const PH = [[/private\s*car|pvt\s*car|for\s*private/i, 'CAR'], [/\bvgc\b|goods|\bgcv\b/i, 'GCV'], [/3\s*w|vpcv/i, 'PCV'], [/\btaxi\b/i, 'PCV'], [/\b2\s*w\b|two\s*wheel/i, 'TW']];
+    const PH = [[/private\s*car|pvt\s*car|for\s*private/i, 'CAR'], [/\bvgc\b|goods|\bgcv\b/i, 'GCV'], [/\btaxi\b/i, 'TAXI'], [/3\s*w|vpcv/i, 'PCV'], [/\b2\s*w\b|two\s*wheel/i, 'TW']];
     const productRegions = {};
     headers.forEach((h, i) => {
       if (/tpulr|tp[\s_]*ulr|payout|region|cluster|division/i.test(h)) {
