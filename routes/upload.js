@@ -106,7 +106,14 @@ router.post('/upload', async (req, res, next) => {
       if (!effFrom) {
         return res.status(400).json({ success: false, error: 'No effective_from supplied and none detected in the email — please provide it.' });
       }
-      const effTo = info.effective.bounded ? info.effective.to : null;
+      // Only a genuine bounded deal window (internally valid: to > from) makes an
+      // overlay card. A stray "month of June 2026" that mis-parses to a backward
+      // window must NOT bound the card (else it never supersedes the prior month).
+      const emailWin = info.effective;
+      const effTo = (emailWin.bounded && emailWin.from && emailWin.to && emailWin.to > emailWin.from) ? emailWin.to : null;
+
+      // De-dup identical tables — reply threads quote the same grid twice.
+      { const seen = new Set(); for (let i = sheets.length - 1; i >= 0; i--) { const k = JSON.stringify(sheets[i].rows); if (seen.has(k)) sheets.splice(i, 1); else seen.add(k); } }
 
       // Emails often bundle PRIOR months' grids for comparison (Raheja ships
       // July + June + May + Apr). Keep only the table(s) whose labelled month

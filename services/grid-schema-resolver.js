@@ -559,6 +559,7 @@ function isRegionLabelCell(v) {
   if (isCoverToken(s)) return false;
   if (/^(petrol|diesel|ev|electric|cng|lpg|non[\s-]*diesel|bifuel|hybrid|hev|comp|saod|satp|tp|od|new|old|remarks?|grid|bac|nil|na)$/i.test(s)) return false;
   if (/\bcc\b|cubic|below\s*\d|above\s*\d|\d\s*to\s*\d/i.test(s)) return false;
+  if (/^\d+\s*[-–—]\s*\d+/.test(s)) return false;   // "65-69" = a numeric band, not a region
   if (/\d\s*%/.test(s) || parseRateCell(s).length) return false;   // a rate cell, not a region
   if (leftDimRole(s)) return false;   // it's a dimension header, not a region
   return true;
