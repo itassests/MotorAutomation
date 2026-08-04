@@ -102,9 +102,19 @@ function classifyTable(rows, opts = {}) {
       note: 'enabler (IMD/COA/approved payout tokens)' };
   }
   if (rtoCodeCol >= 0 && regionCol >= 0 && rateCol < 0) {
+    // Multi-product RTO master: separate region columns per product (Royal's
+    // "TPULR for Private Car / VGC / 3W VPCV / 2W"). Emit one mapping per product.
+    const PH = [[/private\s*car|pvt\s*car|for\s*private/i, 'CAR'], [/\bvgc\b|goods|\bgcv\b/i, 'GCV'], [/3\s*w|vpcv/i, 'PCV'], [/\btaxi\b/i, 'PCV'], [/\b2\s*w\b|two\s*wheel/i, 'TW']];
+    const productRegions = {};
+    headers.forEach((h, i) => {
+      if (/tpulr|tp[\s_]*ulr|payout|region|cluster|division/i.test(h)) {
+        for (const [re, pr] of PH) { if (re.test(h) && productRegions[pr] == null) { productRegions[pr] = i; break; } }
+      }
+    });
     return { type: 'rto_map', headerRow, confidence: 0.85,
-      cols: { rto_code: rtoCodeCol, region: regionCol, cluster: find(/actuarial|cluster|group|zone/), product: find(/product\s*categ|^product$|veh.*type/) },
-      note: 'RTO master (rto code → region, no rate)' };
+      cols: { rto_code: rtoCodeCol, region: regionCol, cluster: find(/actuarial|cluster|group|zone/), product: find(/product\s*categ|^product$|veh.*type/),
+        productRegions: Object.keys(productRegions).length >= 2 ? productRegions : null },
+      note: Object.keys(productRegions).length >= 2 ? 'multi-product RTO master (per-product region columns)' : 'RTO master (rto code → region, no rate)' };
   }
   if (rateCol >= 0) {
     return { type: 'rate', headerRow, confidence: 0.6, cols: { rate: rateCol, region: regionCol, rto: rtoCodeCol }, note: 'rate grid' };
@@ -123,20 +133,29 @@ function normProductCat(v) {
   return s ? s.replace(/\s+/g, '_') : null;
 }
 
-/** RTO master rows → rto_mappings records. Explodes comma-lists; per-row product. */
+/** RTO master rows → rto_mappings records. Explodes comma-lists; per-row product;
+ *  or per-PRODUCT region columns for a multi-product master. */
 function toRtoMappings(rows, cls, opts = {}) {
-  const { rto_code, region, cluster, product } = cls.cols;
+  const { rto_code, region, cluster, product, productRegions } = cls.cols;
   const out = [];
   for (let r = cls.headerRow + 1; r < rows.length; r++) {
     const row = rows[r]; if (!row) continue;
     const codeRaw = cell(row[rto_code]);
+    if (!codeRaw) continue;
+    const codes = codeRaw.split(/[,/]/).map((s) => s.trim()).filter(Boolean).map((c) => c.toUpperCase().replace(/[\s-]/g, ''));
+    if (productRegions) {                              // one mapping per product column
+      for (const pr in productRegions) {
+        const reg = cell(row[productRegions[pr]]);
+        if (!reg) continue;
+        for (const code of codes) out.push({ insurer: opts.insurer, product: pr, rto_code: code, region: reg, cluster: null });
+      }
+      continue;
+    }
     const reg = cell(row[region]);
-    if (!codeRaw || !reg) continue;
+    if (!reg) continue;
     const clust = cluster != null && cluster >= 0 ? cell(row[cluster]) : null;
     const prod = product != null && product >= 0 ? normProductCat(row[product]) : (opts.product || null);
-    for (const code of codeRaw.split(/[,/]/).map((s) => s.trim()).filter(Boolean)) {
-      out.push({ insurer: opts.insurer, product: prod, rto_code: code.toUpperCase().replace(/[\s-]/g, ''), region: reg, cluster: clust || null });
-    }
+    for (const code of codes) out.push({ insurer: opts.insurer, product: prod, rto_code: code, region: reg, cluster: clust || null });
   }
   return out;
 }
