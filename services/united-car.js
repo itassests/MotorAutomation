@@ -117,27 +117,39 @@ function resolveUnitedCarRate(params) {
 // MH/WB/JK trucks, and 56.5 is the majority. The mis-ingested flat ~56.5 base already
 // matches that majority, so a full grid net-regressed (fixed 21 / broke 23). Left as
 // preferred-RTO-only; the ~22 GCV paying 50/15/0 are operator-timing noise.
-const GCV_PREF = require('../config/united_gcv_pref.json');
-const GCV_BANDS = GCV_PREF.bands.map(b => ({ maxTonnes: b.maxTonnes, rate: b.rate, set: new Set(b.rtos.map(norm)) }));
+// Sub-Annexure preferred-RTO override, effective-date aware: on/after 1-Jul-2026
+// the July'26 Sub Annexure 3 lists (config/united_gcv_pref_jul26.json) apply — the
+// GVW<=2000 band dropped (now flat 57.5% base), RTO lists refreshed; before, the
+// April Sub Annexure 2 (config/united_gcv_pref.json). Bands: minTonnes<weight<=maxTonnes.
+const _mkBands = (cfg) => cfg.bands.map(b => ({ minTonnes: b.minTonnes == null ? 0 : b.minTonnes, maxTonnes: b.maxTonnes, rate: b.rate, set: new Set(b.rtos.map(norm)) }));
+const GCV_BANDS_JUN = _mkBands(require('../config/united_gcv_pref.json'));
+const GCV_BANDS_JUL = _mkBands(require('../config/united_gcv_pref_jul26.json'));
+function effOnOrAfterJul(params) {
+  const d = String(params.effective_date || params.effectiveDate || params.riskStartDate || params.policyStartDate || '').slice(0, 10);
+  return !d || d >= '2026-07-01';
+}
 function resolveUnitedGcvRate(params) {
   if (String(params.vehicleType || '').toUpperCase() !== 'GCV') return null;
   const t = Number(params.tonnage);
   if (!Number.isFinite(t) || t <= 0) return null;
+  const bands = effOnOrAfterJul(params) ? GCV_BANDS_JUL : GCV_BANDS_JUN;
   const variants = rtoVariants(params.rtoCode);
-  for (const b of GCV_BANDS) {
-    if (t <= b.maxTonnes) {
-      if (variants.some(v => b.set.has(v))) return b.rate;
-      return null; // correct band, RTO not preferred → leave to engine
+  for (const b of bands) {
+    if (t > b.minTonnes && t <= b.maxTonnes) {
+      return variants.some(v => b.set.has(v)) ? b.rate : null; // RTO not preferred → leave to engine base
     }
   }
-  return null; // above 7.5T → not covered by Sub Annexure-2
+  return null; // weight outside any preferred band → leave to engine base
 }
 
 // ---- PCV 3-Wheeler override ----
-// United's "Three Wheeled (Passenger Carrying)" commission (all bands incl. EV):
-// Madhya Pradesh 25%, Other than above States 40%. 3W autos (Atul/Bajaj-RE/TVS-King/
-// Piaggio/e-rickshaw) in non-MP states should take 40% but the broad scorer lands on
-// the MP 25% row. Scoped to 3W passenger autos; returns null otherwise (no regression).
+// United's "Three Wheeled (Passenger Carrying)" commission (all bands incl. EV).
+// Pre-July: Madhya Pradesh 25%, other 40%. July'26 adds a 60% tier for WB/MH/GJ/DL/
+// Uttarakhand/PB/Goa/J&K. 3W autos (Atul/Bajaj-RE/TVS-King/Piaggio/e-rickshaw) in
+// non-MP states should take the state rate but the broad scorer lands on the MP 25%
+// row. Scoped to 3W passenger autos; returns null otherwise (no regression).
+// State by RTO prefix: Goa registers as GA, Uttarakhand UK, J&K JK.
+const PCV3W_60_STATES = new Set(['WB', 'MH', 'GJ', 'DL', 'UK', 'PB', 'GA', 'JK']);
 function resolveUnitedPcvRate(params) {
   if (String(params.vehicleType || '').toUpperCase() !== 'PCV') return null;
   const hay = `${params.vehicleCategory || ''} ${params.model || ''} ${params.make || ''}`.toUpperCase();
@@ -146,7 +158,9 @@ function resolveUnitedPcvRate(params) {
       /ATUL|PIAGGIO|\bRE\b|TVS\s*KING|BAJAJ|MAHINDRA\s*ALFA|TREO/.test(hay));
   if (!is3W) return null;
   const st = norm(params.rtoCode).slice(0, 2);
-  return st === 'MP' ? 0.25 : 0.40;
+  if (st === 'MP') return 0.25;
+  if (effOnOrAfterJul(params) && PCV3W_60_STATES.has(st)) return 0.60;  // July'26 60% tier
+  return 0.40;
 }
 
 module.exports = { resolveUnitedCarRate, resolveUnitedGcvRate, resolveUnitedPcvRate, isPreferredRto };

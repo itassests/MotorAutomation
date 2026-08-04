@@ -30,26 +30,31 @@ const { PDFParse } = require('pdf-parse');
 
 // Two Wheeler — by CC band.  Each entry: low-rate states + "other states".
 //   Source: page 4 "Two Wheelers Electric and Non-Electric"
+// July'26: added Puducherry to every low-rate state list; base rates unchanged.
+const TW_LOW = ['Tamil Nadu', 'Puducherry', 'Kerala', 'Karnataka', 'Madhya Pradesh', 'Assam'];
 const TW_RATES = [
   {
     cc_min: 0, cc_max: 150, fuel: 'Non-Electric', cc_label: 'Upto 150 CC',
-    low_states: ['Tamil Nadu', 'Kerala', 'Karnataka', 'Madhya Pradesh', 'Assam'],
-    low_rate: 0.05, other_rate: 0.275,
+    low_states: TW_LOW, low_rate: 0.05, other_rate: 0.275,
   },
   {
     cc_min: 150, cc_max: 350, fuel: 'Non-Electric', cc_label: '150-350 CC',
-    low_states: ['Tamil Nadu', 'Kerala', 'Karnataka', 'Madhya Pradesh', 'Assam'],
-    low_rate: 0.05, other_rate: 0.225,
+    low_states: TW_LOW, low_rate: 0.05, other_rate: 0.225,
   },
   {
     cc_min: 350, cc_max: null, fuel: 'Non-Electric', cc_label: 'Above 350 CC',
-    low_states: ['Tamil Nadu', 'Kerala', 'Karnataka', 'Madhya Pradesh', 'Assam'],
-    low_rate: 0.05, other_rate: 0.175,
+    low_states: TW_LOW, low_rate: 0.05, other_rate: 0.175,
   },
   {
     cc_min: 0, cc_max: null, fuel: 'Electric', cc_label: 'Electric Vehicles',
-    low_states: ['Tamil Nadu', 'Kerala', 'Karnataka', 'Madhya Pradesh', 'Assam'],
-    low_rate: 0.05, other_rate: 0.225,
+    low_states: TW_LOW, low_rate: 0.05, other_rate: 0.225,
+  },
+  // July'26 NEW — Two Wheeler Long Term Package (5+5), all bands incl Electric.
+  // Distinct rate_type (COMP_5+5) so it only matches a 5+5 long-term policy and
+  // never hijacks an annual TW (whose per-CC-band rows are more specific anyway).
+  {
+    cc_min: 0, cc_max: null, fuel: 'All', cc_label: 'Long Term Package (5+5)',
+    rate_type: 'COMP_5+5', low_states: TW_LOW, low_rate: 0.05, other_rate: 0.175,
   },
 ];
 const TW_SAOD_RATE = 0.20;   // All states, all bands incl Electric
@@ -60,36 +65,44 @@ const PCV_RATES = [
   // emit a sister rule with fuel_type=Electric.
   { class: '2W PCV', band_label: 'All CC Bands',          fuel: 'Petrol',   rate: 0.10, applies_to: 'all' },
   { class: '2W PCV', band_label: 'Electric Vehicles',     fuel: 'Electric', rate: 0.10, applies_to: 'all' },
-  // Three-Wheeled PCV
+  // Three-Wheeled PCV. July'26 adds a 60% tier for 8 states (was MP 25% / other 40%).
   {
     class: '3W PCV', band_label: 'All Bands (incl Electric)',
-    low_states: ['Madhya Pradesh'], low_rate: 0.25, other_rate: 0.40,
+    tiers: [
+      { states: ['Madhya Pradesh'], rate: 0.25, label: 'MP' },
+      { states: ['West Bengal', 'Maharashtra', 'Gujarat', 'Delhi', 'Uttarakhand', 'Punjab', 'Goa', 'Jammu & Kashmir'], rate: 0.60, label: '60% states' },
+    ],
+    other_rate: 0.40,
   },
-  // 4W PCV > 6 passengers — by PCC band
+  // 4W PCV > 6 passengers — by PCC band. July'26: "other" 20→30, low 10→7.5 (≤10,10-20),
+  // 20-30 low 7.5→5; +Puducherry to low lists.
   {
     class: '4W PCV > 6', band_label: 'PCC <=10 (All Fuel)',     seat_min: 0,  seat_max: 10,
-    low_states: ['Haryana', 'Rajasthan'], low_rate: 0.10, other_rate: 0.20,
+    low_states: ['Haryana', 'Rajasthan'], low_rate: 0.075, other_rate: 0.30,
   },
   {
     class: '4W PCV > 6', band_label: '10<PCC<=20 (All Fuel)',   seat_min: 11, seat_max: 20,
-    low_states: ['Tamil Nadu', 'Karnataka'], low_rate: 0.10, other_rate: 0.20,
+    low_states: ['Tamil Nadu', 'Puducherry', 'Karnataka'], low_rate: 0.075, other_rate: 0.30,
   },
   {
     class: '4W PCV > 6', band_label: '20<PCC<=30 (Except EV)',  seat_min: 21, seat_max: 30,
-    low_states: ['Tamil Nadu', 'Madhya Pradesh', 'Uttar Pradesh'],
-    low_rate: 0.075, other_rate: 0.10,
+    low_states: ['Tamil Nadu', 'Puducherry', 'Madhya Pradesh', 'Uttar Pradesh'],
+    low_rate: 0.05, other_rate: 0.10,
   },
-  // PCC 30-60 (Except EV) — flat 5% all states (no state split per PDF)
-  { class: '4W PCV > 6', band_label: '30<PCC<=40 (Except EV)',  seat_min: 31, seat_max: 40, rate: 0.05, applies_to: 'all' },
-  { class: '4W PCV > 6', band_label: '40<PCC<=50 (Except EV)',  seat_min: 41, seat_max: 50, rate: 0.05, applies_to: 'all' },
-  { class: '4W PCV > 6', band_label: '50<PCC<=60 (Except EV)',  seat_min: 51, seat_max: 60, rate: 0.05, applies_to: 'all' },
-  { class: '4W PCV > 6', band_label: 'PCC>60 (Except EV)',      seat_min: 61, seat_max: null, rate: 0.05, applies_to: 'all' },
+  // PCC>30 (Except EV) — July'26: OD 10%, TP 0% (was flat 5%). Asymmetric leg.
+  { class: '4W PCV > 6', band_label: '30<PCC<=40 (Except EV)',  seat_min: 31, seat_max: 40, applies_to: 'all', od_rate: 0.10, tp_rate: 0 },
+  { class: '4W PCV > 6', band_label: '40<PCC<=50 (Except EV)',  seat_min: 41, seat_max: 50, applies_to: 'all', od_rate: 0.10, tp_rate: 0 },
+  { class: '4W PCV > 6', band_label: '50<PCC<=60 (Except EV)',  seat_min: 51, seat_max: 60, applies_to: 'all', od_rate: 0.10, tp_rate: 0 },
+  { class: '4W PCV > 6', band_label: 'PCC>60 (Except EV)',      seat_min: 61, seat_max: null, applies_to: 'all', od_rate: 0.10, tp_rate: 0 },
   { class: '4W PCV > 6', band_label: 'PCC>20 (Electric)',       seat_min: 21, seat_max: null, fuel: 'Electric', rate: 0.10, applies_to: 'all' },
-  // Taxis (page 5) — 15% in Haryana / Karnataka / Rajasthan / Tamil Nadu /
-  // Uttar Pradesh / Madhya Pradesh; 25% in all other states.
-  { class: 'Taxi', band_label: 'All CC Bands (incl Electric)',
+  // Taxis — Package: 15% in HR/KA/RJ/TN/UP/MP, 25% other (unchanged July'26).
+  { class: 'Taxi', band_label: 'All CC Bands (incl Electric) - Package',
     low_states: ['Haryana', 'Karnataka', 'Rajasthan', 'Tamil Nadu', 'Uttar Pradesh', 'Madhya Pradesh'],
     low_rate: 0.15, other_rate: 0.25 },
+  // Taxis — SATP (July'26 NEW, was NA): 15% in HR/KA/RJ/TN/Puducherry/UP/MP, 30% other.
+  { class: 'Taxi', band_label: 'All CC Bands (incl Electric) - SATP', rate_type: 'SATP',
+    low_states: ['Haryana', 'Karnataka', 'Rajasthan', 'Tamil Nadu', 'Puducherry', 'Uttar Pradesh', 'Madhya Pradesh'],
+    low_rate: 0.15, other_rate: 0.30 },
   // "Educational Institution and Staff Buses" — PDF lists a single 62.5% row
   // covering both bus types. Split into two independent categories so
   // VehicleCategory shows "School Bus" / "Staff Bus" explicitly.
@@ -99,46 +112,51 @@ const PCV_RATES = [
 
 // GCV — Gross Vehicle Weight bands (page 5-6)
 // "Excluded states" group below is the low-rate group for that row.
+// July'26 changes: GVW≤2000 now flat 57.5% (UP-20% low removed); 2000-3500 "other"
+// 50→56.5% (Haryana/Rajasthan drop to "other"); 7500-10000 now 3-way (TN/Puducherry
+// 5, Rajasthan 15, other 17.5→22.5); +Puducherry to the 12000+ low lists. The MP/TN/UP
+// "except Sub-Annexure-3 RTOs" carve-out for 2000-3500 & 3500-7500 is applied by the
+// resolveUnitedGcvRate preferred-RTO override (config/united_gcv_pref.json).
 const GCV_RATES = [
-  {
-    band_label: 'GVW <= 2000',        weight_min: 0,    weight_max: 2.0,
-    low_states: ['Uttar Pradesh'], low_rate: 0.20, other_rate: 0.575,
-  },
+  { band_label: 'GVW <= 2000',        weight_min: 0,    weight_max: 2.0, rate: 0.575, applies_to: 'all' },
   {
     band_label: '2000 < GVW <= 3500', weight_min: 2.0,  weight_max: 3.5,
-    low_states: ['Haryana', 'Madhya Pradesh', 'Rajasthan', 'Tamil Nadu', 'Uttar Pradesh'],
-    low_rate: 0.15, other_rate: 0.50,
+    low_states: ['Madhya Pradesh', 'Tamil Nadu', 'Uttar Pradesh'],
+    low_rate: 0.15, other_rate: 0.565,
   },
   {
     band_label: '3500 < GVW <= 7500', weight_min: 3.5,  weight_max: 7.5,
-    low_states: ['Haryana', 'Madhya Pradesh', 'Rajasthan', 'Tamil Nadu', 'Uttar Pradesh'],
+    low_states: ['Haryana', 'Madhya Pradesh', 'Rajasthan', 'Tamil Nadu', 'Puducherry', 'Uttar Pradesh'],
     low_rate: 0.10, other_rate: 0.275,
   },
   {
     band_label: '7500 < GVW <= 10000', weight_min: 7.5,  weight_max: 10.0,
-    low_states: ['Madhya Pradesh', 'Rajasthan', 'Tamil Nadu'],
-    low_rate: 0.10, other_rate: 0.175,
+    tiers: [
+      { states: ['Tamil Nadu', 'Puducherry'], rate: 0.05, label: 'TN/Puducherry' },
+      { states: ['Rajasthan'], rate: 0.15, label: 'Rajasthan' },
+    ],
+    other_rate: 0.225,
   },
   { band_label: '10000 < GVW <= 12000', weight_min: 10.0, weight_max: 12.0, rate: 0.025, applies_to: 'all' },
   {
     band_label: '12000 < GVW <= 20000', weight_min: 12.0, weight_max: 20.0,
-    low_states: ['Haryana', 'Madhya Pradesh', 'Rajasthan', 'Tamil Nadu', 'Uttar Pradesh', 'Karnataka', 'Kerala'],
+    low_states: ['Haryana', 'Madhya Pradesh', 'Rajasthan', 'Tamil Nadu', 'Puducherry', 'Uttar Pradesh', 'Karnataka', 'Kerala'],
     low_rate: 0.05, other_rate: 0.15,
   },
   {
     band_label: '20000 < GVW <= 25000', weight_min: 20.0, weight_max: 25.0,
-    low_states: ['Haryana', 'Madhya Pradesh', 'Rajasthan', 'Tamil Nadu', 'Uttar Pradesh', 'Karnataka', 'Kerala'],
+    low_states: ['Haryana', 'Madhya Pradesh', 'Rajasthan', 'Tamil Nadu', 'Puducherry', 'Uttar Pradesh', 'Karnataka', 'Kerala'],
     low_rate: 0.05, other_rate: 0.15,
   },
   {
     band_label: '25000 < GVW <= 32000', weight_min: 25.0, weight_max: 32.0,
-    low_states: ['Haryana', 'Madhya Pradesh', 'Rajasthan', 'Tamil Nadu', 'Uttar Pradesh', 'Karnataka', 'Kerala'],
+    low_states: ['Haryana', 'Madhya Pradesh', 'Rajasthan', 'Tamil Nadu', 'Puducherry', 'Uttar Pradesh', 'Karnataka', 'Kerala'],
     low_rate: 0.025, other_rate: 0.125,
   },
   { band_label: '32000 < GVW <= 40000', weight_min: 32.0, weight_max: 40.0, rate: 0.05, applies_to: 'all' },
   {
     band_label: 'GVW > 40000', weight_min: 40.0, weight_max: null,
-    low_states: ['Haryana', 'Madhya Pradesh', 'Rajasthan', 'Tamil Nadu', 'Uttar Pradesh', 'Karnataka', 'Kerala'],
+    low_states: ['Haryana', 'Madhya Pradesh', 'Rajasthan', 'Tamil Nadu', 'Puducherry', 'Uttar Pradesh', 'Karnataka', 'Kerala'],
     low_rate: 0, other_rate: 0.05,
   },
   // E-Cart — 50% all states, fuel=Electric. Distinct segment so the export
@@ -277,6 +295,46 @@ function otherStates(exclude) {
   const ex = new Set((exclude || []).map(s => s.toLowerCase()));
   return ALL_INDIA_STATES.filter(s => !ex.has(s.toLowerCase()));
 }
+
+// Normalize any rate row into {states, rate, od_rate?, tp_rate?, label} buckets
+// covering all of India. Supports three shapes:
+//   applies_to:'all'                         -> single all-states bucket
+//   tiers:[{states, rate | od_rate/tp_rate}] -> N named tiers + `other_rate` catch-all
+//   low_states/low_rate + other_rate         -> legacy 2-way (low group + others)
+function rateBuckets(r) {
+  if (r.applies_to === 'all') {
+    return [{ states: ALL_INDIA_STATES, rate: r.rate, od_rate: r.od_rate, tp_rate: r.tp_rate, label: 'all states' }];
+  }
+  if (Array.isArray(r.tiers)) {
+    const named = [];
+    const buckets = r.tiers.map((t) => {
+      named.push(...t.states);
+      return { states: t.states, rate: t.rate, od_rate: t.od_rate, tp_rate: t.tp_rate, label: t.label || 'tier' };
+    });
+    const other = otherStates(named);
+    if (other.length) buckets.push({ states: other, rate: r.other_rate, od_rate: r.other_od_rate, tp_rate: r.other_tp_rate, label: 'other-states' });
+    return buckets;
+  }
+  return [
+    { states: r.low_states || [], rate: r.low_rate, label: 'low-rate state' },
+    { states: otherStates(r.low_states || []), rate: r.other_rate, label: 'other-states' },
+  ];
+}
+
+// Push a bucket honouring: asymmetric OD/TP (od_rate/tp_rate — e.g. PCC>30 OD10/TP0),
+// SAOD (OD-only), SATP (TP-only), else COMP (same rate to OD & TP).
+function pushLeg(rules, base, bucket, rateType) {
+  if (bucket.od_rate != null || bucket.tp_rate != null) {
+    rules.push({ ...base, applied_on: 'OD', rate_value: bucket.od_rate == null ? 0 : bucket.od_rate });
+    rules.push({ ...base, applied_on: 'TP', rate_value: bucket.tp_rate == null ? 0 : bucket.tp_rate });
+  } else if (rateType === 'SAOD') {
+    rules.push({ ...base, applied_on: 'OD', rate_value: bucket.rate });
+  } else if (rateType === 'SATP') {
+    rules.push({ ...base, applied_on: 'TP', rate_value: bucket.rate });
+  } else {
+    pushComp(rules, base, bucket.rate);
+  }
+}
 function fuelsFor(fuel) {
   if (!fuel || fuel === 'All') return [null];        // null = any fuel
   if (fuel === 'Non-Electric') return NON_ELECTRIC_FUELS;
@@ -296,42 +354,25 @@ function emitTwoWheeler(meta) {
   const rules = [];
   for (const r of TW_RATES) {
     const fuels = fuelsFor(r.fuel);
-    // One rule per (state × fuel) in the low-rate group
-    for (const state of r.low_states) {
-      for (const fuel of fuels) {
-        pushComp(rules, {
-          product: 'TW',
-          sheet_name: meta.sheetName,
-          segment: 'TW',
-          state: state, region: state,
-          make: 'All',
-          cc_band_min: r.cc_min,
-          cc_band_max: r.cc_max,
-          fuel_type: fuel,
-          rate_type: 'COMP',
-          is_declined: false,
-          remarks: `${r.cc_label} | Low-rate state${fuel ? ' (' + fuel + ')' : ''} | rate applies to OD & TP`,
-          rate_text: `TW ${r.cc_label} | ${state}${fuel ? ' ' + fuel : ''} | ${(r.low_rate*100).toFixed(2)}%`,
-        }, r.low_rate);
-      }
-    }
-    // Catch-all "Other states" — fan out into one rule per remaining state × fuel
-    for (const state of otherStates(r.low_states)) {
-      for (const fuel of fuels) {
-        pushComp(rules, {
-          product: 'TW',
-          sheet_name: meta.sheetName,
-          segment: 'TW',
-          state: state, region: state,
-          make: 'All',
-          cc_band_min: r.cc_min,
-          cc_band_max: r.cc_max,
-          fuel_type: fuel,
-          rate_type: 'COMP',
-          is_declined: false,
-          remarks: `${r.cc_label} | ${state}${fuel ? ' (' + fuel + ')' : ''} (other-states bucket) | rate applies to OD & TP`,
-          rate_text: `TW ${r.cc_label} | ${state}${fuel ? ' ' + fuel : ''} | ${(r.other_rate*100).toFixed(2)}%`,
-        }, r.other_rate);
+    const rateType = r.rate_type || 'COMP';
+    for (const b of rateBuckets(r)) {
+      for (const state of b.states) {
+        for (const fuel of fuels) {
+          pushLeg(rules, {
+            product: 'TW',
+            sheet_name: meta.sheetName,
+            segment: r.segment || 'TW',
+            state: state, region: state,
+            make: 'All',
+            cc_band_min: r.cc_min,
+            cc_band_max: r.cc_max,
+            fuel_type: fuel,
+            rate_type: rateType,
+            is_declined: false,
+            remarks: `${r.cc_label} | ${state}${fuel ? ' (' + fuel + ')' : ''} (${b.label}) | rate applies to OD & TP`,
+            rate_text: `TW ${r.cc_label} | ${state}${fuel ? ' ' + fuel : ''} | ${((b.rate != null ? b.rate : (b.od_rate || 0)) * 100).toFixed(2)}%`,
+          }, b, rateType);
+        }
       }
     }
   }
@@ -357,6 +398,7 @@ function emitPCV(meta) {
 
     for (const fuel of fuelList) {
       const fuelTag = isExceptEV ? ` (${fuel})` : '';
+      const rateType = r.rate_type || 'COMP';
       const baseRule = {
         product: 'PCV',
         sheet_name: meta.sheetName,
@@ -365,33 +407,16 @@ function emitPCV(meta) {
         seating_capacity_min: r.seat_min ?? null,
         seating_capacity_max: r.seat_max ?? null,
         fuel_type: fuel,
-        rate_type: 'COMP',
+        rate_type: rateType,
         is_declined: false,
         rate_text: `PCV ${r.class} | ${r.band_label}${fuelTag}`,
       };
-      if (r.applies_to === 'all') {
-        // Fan out "all states" rows into one rule per state too, so the
-        // grid shows the rate against each state explicitly.
-        for (const state of ALL_INDIA_STATES) {
-          pushComp(rules, {
+      for (const b of rateBuckets(r)) {
+        for (const state of b.states) {
+          pushLeg(rules, {
             ...baseRule, state: state, region: state,
-            remarks: `${r.band_label}${fuelTag} | ${state} | rate applies to OD & TP`,
-          }, r.rate);
-        }
-      } else {
-        // One rule per low-rate state
-        for (const state of r.low_states) {
-          pushComp(rules, {
-            ...baseRule, state: state, region: state,
-            remarks: `${r.band_label}${fuelTag} | ${state} (low-rate state) | rate applies to OD & TP`,
-          }, r.low_rate);
-        }
-        // Fan "Others" bucket out into one rule per remaining state
-        for (const state of otherStates(r.low_states)) {
-          pushComp(rules, {
-            ...baseRule, state: state, region: state,
-            remarks: `${r.band_label}${fuelTag} | ${state} (other-states bucket) | rate applies to OD & TP`,
-          }, r.other_rate);
+            remarks: `${r.band_label}${fuelTag} | ${state} (${b.label}) | rate applies to OD & TP`,
+          }, b, rateType);
         }
       }
     }
@@ -414,27 +439,12 @@ function emitGCV(meta) {
       is_declined: false,
       rate_text: `GCV ${r.band_label}`,
     };
-    if (r.applies_to === 'all') {
-      for (const state of ALL_INDIA_STATES) {
-        pushComp(rules, {
+    for (const b of rateBuckets(r)) {
+      for (const state of b.states) {
+        pushLeg(rules, {
           ...baseRule, state: state, region: state,
-          remarks: `${r.band_label} | ${state} | rate applies to OD & TP`,
-        }, r.rate);
-      }
-    } else {
-      // One rule per low-rate / excluded state
-      for (const state of r.low_states) {
-        pushComp(rules, {
-          ...baseRule, state: state, region: state,
-          remarks: `${r.band_label} | ${state} (excluded — Sub-Annexure 2 RTOs override) | rate applies to OD & TP`,
-        }, r.low_rate);
-      }
-      // Fan "Others" out per remaining state
-      for (const state of otherStates(r.low_states)) {
-        pushComp(rules, {
-          ...baseRule, state: state, region: state,
-          remarks: `${r.band_label} | ${state} (other-states bucket) | rate applies to OD & TP`,
-        }, r.other_rate);
+          remarks: `${r.band_label} | ${state} (${b.label}) | rate applies to OD & TP`,
+        }, b, 'COMP');
       }
     }
   }
