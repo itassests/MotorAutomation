@@ -261,7 +261,8 @@ function parseBand(v) {
   const s = cell(v).toLowerCase().replace(/,/g, '');
   if (!s) return { min: null, max: null };
   let m;
-  if ((m = s.match(/(-?\d+(?:\.\d+)?)\s*(?:-|to|–|—)\s*(-?\d+(?:\.\d+)?)/))) return { min: +m[1], max: +m[2] };
+  // "0_1000CC" / "1000-2000" / "1000 to 2000" — underscore is a common band sep.
+  if ((m = s.match(/(-?\d+(?:\.\d+)?)\s*(?:-|to|–|—|_)\s*(-?\d+(?:\.\d+)?)/))) return { min: +m[1], max: +m[2] };
   if ((m = s.match(/(?:upto|up\s*to|<=|below|less\s*than|<)\s*(-?\d+(?:\.\d+)?)/))) return { min: null, max: +m[1] };
   if ((m = s.match(/(?:above|more\s*than|greater|>=|>)\s*(-?\d+(?:\.\d+)?)/)) ) return { min: +m[1], max: null };
   if ((m = s.match(/(-?\d+(?:\.\d+)?)\s*\+/))) return { min: +m[1], max: null };
@@ -478,6 +479,130 @@ function parseMatrixGrid(rows, layout, opts = {}) {
   return out;
 }
 
+// ── Wide / pivot layout (row-key × multi-level column headers) ───────────────
+// A very common shape: a REGION/cluster key down the left, and many rate columns
+// grouped under a 2-row header (e.g. fuel-group over CC-band, or zone over NCB).
+// Neither flat (one rate col) nor region-tiled matrix (region across the top)
+// captures it, so we unpivot the columns: one rule per (row × rate-column),
+// deriving the column's dimensions (fuel / cc / cover / segment) from its headers.
+
+/** Classify a column-header token → { role, value }. role ∈ cc|fuel|cover|segment. */
+function classifyColToken(s) {
+  const t = cell(s);
+  if (!t) return null;
+  if (/\d+\s*[_-]?\s*\d*\s*cc|\bcc\b|cubic|engine/i.test(t) || /^\d+\s*[_-]\s*\d+/.test(t)) return { role: 'cc', value: t };
+  if (isCoverToken(t) || /comp|saod|satp|package|\bpack\b|\bod\b|\btp\b|bundled/i.test(t)) return { role: 'cover', value: t };
+  if (/petrol|diesel|\bev\b|electric|\bcng\b|\blpg\b|hybrid|\bhev\b|\bp\s*\+|\bd\s*\+|bifuel/i.test(t)) return { role: 'fuel', value: t };
+  return { role: 'segment', value: t };
+}
+
+/**
+ * Detect a wide layout. Returns { layout:'wide', keyCol, headerRows:[..], dataStart,
+ * rateCols, colDims:{col→{cc,fuel,cover,segment}}, rate_divisor, confidence } or null.
+ */
+function detectWide(rows) {
+  const limit = Math.min(20, rows.length);
+  // data start: first row with a text key in some left column AND ≥3 numeric cells
+  let dataStart = -1, keyCol = -1;
+  for (let r = 0; r < limit; r++) {
+    const row = (rows[r] || []).map(cell);
+    const nums = row.filter(isNumericish).length;
+    if (nums < 3) continue;
+    // leftmost non-numeric text cell = key
+    const k = row.findIndex((c) => c !== '' && !isNumericish(c));
+    if (k < 0) continue;
+    dataStart = r; keyCol = k; break;
+  }
+  if (dataStart < 1 || keyCol < 0) return null;
+
+  // rate columns: columns right of keyCol that are mostly numeric (0..100) in data
+  const nCols = Math.max(...rows.slice(dataStart, dataStart + 40).map((r) => (r || []).length));
+  const rateCols = [];
+  for (let c = keyCol + 1; c < nCols; c++) {
+    const vals = [];
+    for (let r = dataStart; r < Math.min(rows.length, dataStart + 60); r++) { const v = cell((rows[r] || [])[c]); if (v !== '') vals.push(v); }
+    if (!vals.length) continue;
+    const nums = vals.filter(isNumericish);
+    if (nums.length / vals.length >= 0.7 && nums.filter((v) => numVal(v) >= 0 && numVal(v) <= 100).length / nums.length >= 0.8) rateCols.push(c);
+  }
+  if (rateCols.length < 3) return null;   // < 3 rate cols → let flat/matrix handle it
+
+  // header rows: the (up to 2) rows above dataStart that carry column labels
+  const headerRowIdx = [];
+  for (let r = dataStart - 1; r >= 0 && headerRowIdx.length < 2; r--) {
+    const row = (rows[r] || []).map(cell);
+    if (rateCols.some((c) => row[c] !== '')) headerRowIdx.unshift(r);
+    else if (headerRowIdx.length) break;   // stop at first gap above the header block
+  }
+  if (!headerRowIdx.length) return null;
+
+  // forward-fill each header row rightward (merged group cells) and classify tokens
+  const ffRow = (ri) => { const row = (rows[ri] || []).map(cell); let cur = ''; const out = []; for (let c = 0; c < nCols; c++) { if (row[c] !== '') cur = row[c]; out[c] = cur; } return out; };
+  const filled = headerRowIdx.map(ffRow);
+  const colDims = {};
+  let dimensional = 0;   // cols whose header carries a real cc/fuel/cover DIMENSION
+  for (const c of rateCols) {
+    const dims = {};
+    for (const fr of filled) { const cl = classifyColToken(fr[c]); if (cl && !dims[cl.role]) dims[cl.role] = cl.value; }
+    if (dims.cc || dims.fuel || dims.cover) dimensional++;
+    colDims[c] = dims;
+  }
+  // Only a WIDE (unpivot) grid if most rate columns are dimensioned by cc/fuel/
+  // cover headers. Otherwise the numeric columns are rate legs/components (e.g.
+  // "New PO / Agency / Additional") or unrelated numerics — leave it to flat.
+  if (dimensional < Math.max(2, Math.ceil(rateCols.length * 0.5))) return null;
+  const rate_divisor = guessRateDivisorAt(rows, dataStart - 1, rateCols);
+  const confidence = +(Math.min(1, 0.4 + 0.3 * Math.min(1, rateCols.length / 4) + 0.3 * (dimensional / rateCols.length)).toFixed(2));
+  return { layout: 'wide', keyCol, headerRows: headerRowIdx, dataStart, rateCols, colDims, rate_divisor, confidence, notes: [] };
+}
+
+/** Expand a fuel-group header ("P+ EV", "D+ CNG") → distinct fuels. [''] = any. */
+function expandFuels(s) {
+  const t = String(s || '').toUpperCase();
+  const out = new Set();
+  if (/\bP\b|PETROL/.test(t)) out.add('PETROL');
+  if (/\bD\b|DIESEL/.test(t)) out.add('DIESEL');
+  if (/\bEV\b|ELECTRIC/.test(t)) out.add('ELECTRIC');
+  if (/\bCNG\b/.test(t)) out.add('CNG');
+  if (/\bLPG\b/.test(t)) out.add('LPG');
+  if (/HYBRID|\bHEV\b/.test(t)) out.add('HYBRID');
+  return out.size ? [...out] : [''];
+}
+
+/** Unpivot a wide layout → one rule per (data row × rate column × fuel-in-group). */
+function parseWideGrid(rows, layout, opts = {}) {
+  const { keyCol, dataStart, rateCols, colDims } = layout;
+  const div = layout.rate_divisor || 100;
+  const out = [];
+  for (let r = dataStart; r < rows.length; r++) {
+    const row = rows[r]; if (!row) continue;
+    const region = cell(row[keyCol]);
+    if (!region || isNumericish(region)) continue;
+    for (const c of rateCols) {
+      if (!isNumericish(row[c])) continue;
+      const n = numVal(row[c]); if (!Number.isFinite(n) || n <= 0) continue;
+      const d = colDims[c] || {};
+      const cc = d.cc ? parseBand(d.cc) : { min: null, max: null };
+      const rateType = coverToRateType(d.cover || '') || 'COMP';
+      const seg = d.segment || '';
+      // CC band ≥ ~350 ⇒ car territory (bikes are < 350cc); else infer from tokens.
+      const product = inferProduct([seg, d.fuel, opts.sheetName].join(' ')) || ((cc.max || cc.min || 0) >= 350 ? 'CAR' : null) || opts.product || null;
+      // A grouped fuel header ("P+ EV") applies to EACH fuel in the group.
+      for (const fuel of expandFuels(d.fuel || '')) {
+        out.push({
+          insurer: opts.insurer, product,
+          region, segment: seg, sub_type: seg,
+          make: 'All', fuel_type: fuel,
+          cc_band_min: cc.min, cc_band_max: cc.max,
+          rate_type: rateType, applied_on: rateType === 'TP' ? 'TP' : 'NET',
+          rate_value: +(n / div).toFixed(6), _srcRow: r, _rateCol: c,
+        });
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * Guess whether rate cells are whole-percent (45 → divisor 100) or already
  * fractions (0.45 → divisor 1). Samples the resolved rate column(s).
@@ -525,15 +650,18 @@ function buildProfile(rows, opts = {}) {
       flatN = repairedN;
     }
   }
+  let chosen = flat, chosenN = flatN;
+  // Wide / pivot: row-key × multi-level column headers (many rate cols per row).
+  const wide = detectWide(rows);
+  if (wide) {
+    const wideN = parseWideGrid(rows, wide, opts).length;
+    if (wideN > chosenN) { chosen = wide; chosenN = wideN; }
+  }
   const matrix = detectMatrix(rows);
-  // Prefer matrix when it's confidently tiled: a flat resolve of a cross-tab
-  // either finds no rate column or covers a tiny fraction of rows, so matrix
-  // wins whenever it detected ≥2 rate columns and isn't clearly weaker.
-  let chosen = flat;
+  // Region-tiled cross-tab: region across the top, cover sub-row.
   if (matrix && matrix.rateCols.length >= 2 && matrix.confidence >= flat.confidence - 0.1) {
-    // sanity: matrix must actually emit more rules than flat, else keep flat
     const matN = parseMatrixGrid(rows, matrix, opts).length;
-    if (matN > flatN) chosen = matrix;
+    if (matN > chosenN) { chosen = matrix; chosenN = matN; }
   }
   chosen.sheet_name = opts.sheet_name || null;
   return chosen;
@@ -547,6 +675,7 @@ function schemaFromProfile(profile) {
 /** Parse a sheet using a (possibly human-corrected) persisted profile. */
 function parseWithProfile(rows, profile, opts = {}) {
   if (profile.layout === 'matrix') return parseMatrixGrid(rows, profile, opts);
+  if (profile.layout === 'wide') return parseWideGrid(rows, profile, opts);
   return parseFlatGrid(rows, schemaFromProfile(profile), {
     ...opts,
     rateDivisor: profile.rate_divisor || 100,
@@ -565,8 +694,10 @@ function parseWithProfile(rows, profile, opts = {}) {
 function profileHealth(rows, profile, opts = {}) {
   const rules = parseWithProfile(rows, profile, opts);
   const rulesOut = rules.length;
-  // header boundary: flat = header_row; matrix = coverRow (data starts below it)
-  const headerR = profile.layout === 'matrix' ? profile.coverRow : (profile.header_row || 0);
+  // header boundary: flat = header_row; matrix = coverRow; wide = dataStart-1
+  const headerR = profile.layout === 'matrix' ? profile.coverRow
+    : profile.layout === 'wide' ? (profile.dataStart || 1) - 1
+    : (profile.header_row || 0);
   let dataRows = 0;
   for (let r = headerR + 1; r < rows.length; r++) {
     const row = rows[r]; if (!row) continue;
@@ -592,5 +723,5 @@ module.exports = {
   resolveSchema, parseFlatGrid, HEADER_SYNONYMS,
   buildProfile, schemaFromProfile, parseWithProfile, profileHealth,
   guessRateDivisor, parseBand, normFuel, normBiz, coverToRateType,
-  detectMatrix, parseMatrixGrid, isCoverToken, inferProduct,
+  detectMatrix, parseMatrixGrid, detectWide, parseWideGrid, isCoverToken, inferProduct,
 };
