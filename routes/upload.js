@@ -108,6 +108,23 @@ router.post('/upload', async (req, res, next) => {
       }
       const effTo = info.effective.bounded ? info.effective.to : null;
 
+      // Emails often bundle PRIOR months' grids for comparison (Raheja ships
+      // July + June + May + Apr). Keep only the table(s) whose labelled month
+      // matches the effective month, so we don't ingest conflicting old rates.
+      const MON = { jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12' };
+      const monthOf = (rows) => {
+        for (const row of (rows || []).slice(0, 4)) for (const c of row) {
+          const m = String(c == null ? '' : c).match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*['\s\-/]{0,3}(\d{2,4})\b/i);
+          if (m) { let y = m[2]; if (y.length === 2) y = '20' + y; return y + '-' + MON[m[1].slice(0, 3).toLowerCase()]; }
+        }
+        return null;
+      };
+      const effMonth = String(effFrom).slice(0, 7);
+      const tblMonth = sheets.map((s) => (/^Email Table/.test(s.name) ? monthOf(s.rows) : undefined));
+      if (tblMonth.some((m) => m === effMonth)) {
+        for (let i = sheets.length - 1; i >= 0; i--) if (tblMonth[i] && tblMonth[i] !== effMonth) sheets.splice(i, 1);
+      }
+
       if (!effTo) {
         await pool.request().input('insurer', sql.NVarChar, insurer).input('ef', sql.Date, new Date(effFrom))
           .query('UPDATE rate_cards SET effective_to=@ef WHERE insurer=@insurer AND effective_to IS NULL AND effective_from<@ef');

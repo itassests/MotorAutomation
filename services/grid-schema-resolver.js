@@ -491,15 +491,104 @@ function isDeclineMarker(v) {
   return /^(block(ed)?|decline[d]?|\bd\b|\bna\b|\bn\/?a\b|nil|not\s*allowed|no\s*business|closed|\bx\b|-{1,2})$/i.test(cell(v));
 }
 
-/** Parse a tonnage band from a segment string ("GCV 12T - 20T", "<=2.5 T", "> 40T"). */
+/** Parse a tonnage band from a segment string ("GCV 12T-20T", "0 to 2.5 GVW", "> 40T"). */
 function parseTonnage(s) {
   const t = cell(s).toLowerCase();
   let m;
+  if ((m = t.match(/([\d.]+)\s*(?:to|-|–|—)\s*([\d.]+)\s*(?:gvw|t|ton|mt)\b/))) return { min: +m[1], max: +m[2] };
   if ((m = t.match(/([\d.]+)\s*t(?:on)?s?\s*[-–—to]+\s*([\d.]+)\s*t/))) return { min: +m[1], max: +m[2] };
-  if ((m = t.match(/(?:<=?|upto|up\s*to|below)\s*([\d.]+)\s*t/))) return { min: null, max: +m[1] };
-  if ((m = t.match(/(?:>=?|above|more\s*than|over)\s*([\d.]+)\s*t/))) return { min: +m[1], max: null };
+  if ((m = t.match(/(?:<=?|upto|up\s*to|below)\s*([\d.]+)\s*(?:t|gvw)/))) return { min: null, max: +m[1] };
+  if ((m = t.match(/(?:>=?|above|more\s*than|over)\s*([\d.]+)\s*(?:t|gvw)/))) return { min: +m[1], max: null };
   if ((m = t.match(/([\d.]+)\s*t\s*[-–—]\s*([\d.]+)/))) return { min: +m[1], max: +m[2] };
   return { min: null, max: null };
+}
+
+// ── Region-grid layout (zones across the top, combined Comp/TP cells) ─────────
+// Broker CV grids often lay out: Segment | Type | North | Centre | West | ... with
+// each cell a COMBINED string "Comp-50% & TP-45%" (or "NA"). The Segment cell is
+// frequently row-spanned (merged), so sub-rows drop a column and shift left — so
+// we RIGHT-ALIGN the region cells. Handles multiple stacked sub-grids in one sheet.
+
+/** Parse a combined rate cell → legs [{rate_type, pct, applied_on?, remarks?}] or declined. */
+function parseRateCell(s) {
+  const t = cell(s);
+  if (!t) return [];
+  if (isDeclineMarker(t)) return [{ declined: true }];
+  const legs = [];
+  const grab = (re) => { const m = t.match(re); return m ? +m[1] : null; };
+  const comp = grab(/(?:comp|pkg|package)\s*[-:=]?\s*(\d+(?:\.\d+)?)\s*%?/i);
+  const od = grab(/\bod\s*[-:=]?\s*(\d+(?:\.\d+)?)\s*%?/i);
+  const saod = grab(/\bsaod\s*[-:=]?\s*(\d+(?:\.\d+)?)\s*%?/i);
+  const tp = grab(/\b(?:tp|satp)\s*[-:=]?\s*(\d+(?:\.\d+)?)\s*%?/i);
+  if (comp != null) legs.push({ rate_type: 'COMP', pct: comp });
+  else if (od != null) legs.push({ rate_type: 'COMP', pct: od, applied_on: 'OD' });
+  if (saod != null) legs.push({ rate_type: 'SAOD', pct: saod });
+  if (tp != null) legs.push({ rate_type: 'TP', pct: tp });
+  if (!legs.length) { const n = t.match(/(\d+(?:\.\d+)?)\s*%/); if (n) legs.push({ rate_type: '', pct: +n[1], remarks: t.length > 8 ? t : undefined }); }
+  return legs;
+}
+
+/** If a row is a region-grid header (has Segment + Type + ≥2 region labels), describe it. */
+function regionHeaderOf(row) {
+  const cells = (row || []).map(cell);
+  const segIdx = cells.findIndex((c) => /^\s*segment\s*$/i.test(c));
+  const typeIdx = cells.findIndex((c) => /^\s*type\s*$/i.test(c));
+  if (segIdx < 0 || typeIdx < 0 || typeIdx <= segIdx) return null;
+  const regionCols = [];
+  for (let c = typeIdx + 1; c < cells.length; c++) if (cells[c] !== '') regionCols.push({ col: c, name: cells[c] });
+  if (regionCols.length < 2) return null;
+  return { segIdx, typeIdx, regionCols };
+}
+
+function detectRegionGrid(rows) {
+  let headers = 0;
+  for (let r = 0; r < rows.length; r++) if (regionHeaderOf(rows[r])) headers++;
+  if (!headers) return null;
+  return { layout: 'region', confidence: 0.8, notes: headers > 1 ? ['multiple stacked sub-grids'] : [] };
+}
+
+/** Unpivot a region grid → one rule per (data row × zone × rate leg). */
+function parseRegionGrid(rows, layout, opts = {}) {
+  const out = [];
+  let cur = null, segFF = '';
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r]; if (!row) continue;
+    const hdr = regionHeaderOf(row);
+    if (hdr) { cur = hdr; segFF = ''; continue; }
+    if (!cur) continue;
+    let cells = row.map(cell);
+    while (cells.length && cells[cells.length - 1] === '') cells.pop();
+    const N = cur.regionCols.length;
+    if (cells.length < N) continue;                 // not a full data row
+    const rates = cells.slice(cells.length - N);    // right-aligned zone cells
+    const keys = cells.slice(0, cells.length - N);
+    if (rates.every((c) => c === '')) continue;
+    let segment = segFF, type = '';
+    if (keys.length >= 2) { segment = keys[0] || segFF; type = keys[keys.length - 1]; segFF = segment; }
+    else if (keys.length === 1) { type = keys[0]; }
+    else continue;
+    if (!type) continue;
+    const ton = parseTonnage(type);
+    const product = inferProduct([segment, type, opts.sheetName].join(' ')) || 'GCV';
+    for (let i = 0; i < N; i++) {
+      const region = cur.regionCols[i].name;
+      for (const leg of parseRateCell(rates[i])) {
+        if (leg.declined) {
+          out.push({ insurer: opts.insurer, product, region, segment: type, sub_type: segment, make: 'All', rate_type: 'COMP', rate_value: 0, is_declined: true, weight_band_min: ton.min, weight_band_max: ton.max, _srcRow: r });
+          continue;
+        }
+        const rt = leg.rate_type || opts.defaultCover || 'COMP';
+        out.push({
+          insurer: opts.insurer, product, region, segment: type, sub_type: segment, make: 'All',
+          rate_type: rt, applied_on: leg.applied_on || (rt === 'TP' ? 'TP' : 'NET'),
+          rate_value: +(leg.pct / 100).toFixed(6),
+          weight_band_min: ton.min, weight_band_max: ton.max,
+          remarks: leg.remarks, _srcRow: r,
+        });
+      }
+    }
+  }
+  return out;
 }
 
 /**
@@ -701,6 +790,12 @@ function buildProfile(rows, opts = {}) {
     }
   }
   let chosen = flat, chosenN = flatN;
+  // Region grid: zones across the top with combined "Comp-X & TP-Y" cells.
+  const region = detectRegionGrid(rows);
+  if (region) {
+    const regionN = parseRegionGrid(rows, region, opts).length;
+    if (regionN > chosenN) { chosen = region; chosenN = regionN; }
+  }
   // Wide / pivot: row-key × multi-level column headers (many rate cols per row).
   const wide = detectWide(rows);
   if (wide) {
@@ -726,6 +821,7 @@ function schemaFromProfile(profile) {
 function parseWithProfile(rows, profile, opts = {}) {
   if (profile.layout === 'matrix') return parseMatrixGrid(rows, profile, opts);
   if (profile.layout === 'wide') return parseWideGrid(rows, profile, opts);
+  if (profile.layout === 'region') return parseRegionGrid(rows, profile, opts);
   return parseFlatGrid(rows, schemaFromProfile(profile), {
     ...opts,
     rateDivisor: profile.rate_divisor || 100,
@@ -747,6 +843,7 @@ function profileHealth(rows, profile, opts = {}) {
   // header boundary: flat = header_row; matrix = coverRow; wide = dataStart-1
   const headerR = profile.layout === 'matrix' ? profile.coverRow
     : profile.layout === 'wide' ? (profile.dataStart || 1) - 1
+    : profile.layout === 'region' ? 0
     : (profile.header_row || 0);
   let dataRows = 0;
   for (let r = headerR + 1; r < rows.length; r++) {
@@ -773,5 +870,6 @@ module.exports = {
   resolveSchema, parseFlatGrid, HEADER_SYNONYMS,
   buildProfile, schemaFromProfile, parseWithProfile, profileHealth,
   guessRateDivisor, parseBand, normFuel, normBiz, coverToRateType,
-  detectMatrix, parseMatrixGrid, detectWide, parseWideGrid, isCoverToken, inferProduct,
+  detectMatrix, parseMatrixGrid, detectWide, parseWideGrid,
+  detectRegionGrid, parseRegionGrid, parseRateCell, isCoverToken, inferProduct,
 };
