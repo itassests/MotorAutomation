@@ -681,7 +681,11 @@ async function buildLucaBuffer(ids) {
       isTp ? 'TP' : 'OD',                                     // commission_on
       isTp ? rateP : '',                                      // tp_commission_percentage
       isTp ? '' : rateP,                                      // irdai_commission_percentage (the outgoing OD rate)
-      '', '', '', '',                                         // slab, slab_on, is_slab_on_first_tenure, flat_commission
+      // slab — the premium/volume band (e.g. "Below 1L", "Upto 2L", "<50K"). Was
+      // blank + carried only in the REMARK ("slab:X"), which collapsed premium-tiered
+      // rules into look-alike rows (same visible params, different rate). Populate the
+      // structured column so each band is distinct (USER 2026-08). slab_on/tenure/flat blank.
+      r.volume_tier ? String(r.volume_tier).trim() : '', '', '', '',
       '',                                                     // excluded_vehicles
       mm.make,                                                // vehicle_make (manufacturer)
       mm.model,                                               // vehicle_model
@@ -709,8 +713,9 @@ async function buildLucaBuffer(ids) {
       // SBI/Bajaj volume slabs). Without them, rows sharing every visible column but
       // differing only by one of these look like unexplained duplicates
       // (USER 2026-07-29). Original remark appended last.
+      // volume_tier now lives in the structured `slab` column (above), so it's no
+      // longer duplicated here; REMARK keeps segment/sub_type + the original remark.
       ([[r.segment, r.sub_type].map(x => String(x || '').trim()).filter(Boolean).join(' ').trim(),
-        r.volume_tier ? 'slab:' + String(r.volume_tier).trim() : '',
         String(r.remarks || '').trim()].filter(Boolean).join(' | ')).slice(0, 250),  // REMARK / comment
     ];
     // Output-level dedupe (USER: "it looks duplicate records"). Different source
