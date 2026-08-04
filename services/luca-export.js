@@ -699,7 +699,12 @@ async function buildLucaBuffer(ids) {
                        : 'third_party';
     const d = r.effective_from ? new Date(r.effective_from) : null;
     const region = String(r.region || r.state || '').trim();
-    const rtoList = rtoListFor(rtoIdx, r.insurer, region);   // shared by city + included_rto
+    let rtoList = rtoListFor(rtoIdx, r.insurer, region);     // shared by city + included_rto
+    // Some insurers (Kotak GCV) file per-RTO with the RTO CODE itself AS the region
+    // ("AP16", "BR39"). The cluster lookup then finds nothing and the row shows only
+    // the state, so AP16 and AP25 (different rates) collapse to look-alikes. If the
+    // region is itself a valid RTO code, use it directly as the included_rto.
+    if (!rtoList) { const c = normRto(region); if (c) rtoList = c; }
 
     const rowArr = [
       0,                                                      // id — assigned below after the dedupe check
