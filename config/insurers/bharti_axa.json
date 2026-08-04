@@ -1,0 +1,49 @@
+{
+  "insurer": "bharti_axa",
+  "display_name": "Bharti Axa",
+  "auto_generated": true,
+  "sheets": [
+    {
+      "name": "Sheet1",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 3,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 0,
+            "name": "X-DKIM-Verification: dkim domain=bajajgeneral.com"
+          },
+          {
+            "col": 1,
+            "name": "verify=0"
+          },
+          {
+            "col": 2,
+            "name": "BodyHash=0"
+          },
+          {
+            "col": 3,
+            "name": "TestMode=-1"
+          },
+          {
+            "col": 4,
+            "name": "SAligned=1"
+          },
+          {
+            "col": 5,
+            "name": "RAligned=1"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    }
+  ]
+}

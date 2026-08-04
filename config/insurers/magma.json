@@ -1,0 +1,309 @@
+{
+  "insurer": "magma",
+  "display_name": "Magma",
+  "auto_generated": true,
+  "sheets": [
+    {
+      "name": "Note",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 1,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 0,
+            "name": "Note:-"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    },
+    {
+      "name": ">2 Lacs",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 2,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 0,
+            "name": "Biz Mix 3"
+          },
+          {
+            "col": 1,
+            "name": "TP GCV 3W"
+          },
+          {
+            "col": 2,
+            "name": "TP GCV <=2.5 T"
+          },
+          {
+            "col": 3,
+            "name": "TP GCV 2.5 T - 2.8T"
+          },
+          {
+            "col": 4,
+            "name": "TP GCV 2.8 T - 3.5T"
+          },
+          {
+            "col": 5,
+            "name": "TP GCV 3.5T - 7.5T"
+          },
+          {
+            "col": 6,
+            "name": "TP GCV 7.5T - 12T"
+          },
+          {
+            "col": 7,
+            "name": "TP GCV 12T - 20T"
+          },
+          {
+            "col": 8,
+            "name": "TP GCV 12T - 20T"
+          },
+          {
+            "col": 9,
+            "name": "TP GCV 20T - 40T"
+          },
+          {
+            "col": 10,
+            "name": "TP GCV 20T - 40T"
+          },
+          {
+            "col": 11,
+            "name": "TP GCV > 40T"
+          },
+          {
+            "col": 12,
+            "name": "TP_PVT-CAR"
+          },
+          {
+            "col": 13,
+            "name": "TP_PVT-CAR"
+          },
+          {
+            "col": 14,
+            "name": "TP_PVT-CAR"
+          },
+          {
+            "col": 15,
+            "name": "TP_PVT-CAR"
+          },
+          {
+            "col": 16,
+            "name": "TP_PVT-CAR"
+          },
+          {
+            "col": 17,
+            "name": "TP_PVT-CAR"
+          },
+          {
+            "col": 18,
+            "name": "TP_Taxi"
+          },
+          {
+            "col": 19,
+            "name": "TP-2W"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    },
+    {
+      "name": "<=2 Lacs",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 2,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 0,
+            "name": "Biz Mix 3"
+          },
+          {
+            "col": 1,
+            "name": "TP GCV 3W"
+          },
+          {
+            "col": 2,
+            "name": "TP GCV <=2.5 T"
+          },
+          {
+            "col": 3,
+            "name": "TP GCV 2.5 T - 2.8T"
+          },
+          {
+            "col": 4,
+            "name": "TP GCV 2.8 T - 3.5T"
+          },
+          {
+            "col": 5,
+            "name": "TP GCV 3.5T - 7.5T"
+          },
+          {
+            "col": 6,
+            "name": "TP GCV 7.5T - 12T"
+          },
+          {
+            "col": 7,
+            "name": "TP GCV 12T - 20T"
+          },
+          {
+            "col": 8,
+            "name": "TP GCV 12T - 20T"
+          },
+          {
+            "col": 9,
+            "name": "TP GCV 20T - 40T"
+          },
+          {
+            "col": 10,
+            "name": "TP GCV 20T - 40T"
+          },
+          {
+            "col": 11,
+            "name": "TP GCV > 40T"
+          },
+          {
+            "col": 12,
+            "name": "TP_PVT-CAR"
+          },
+          {
+            "col": 13,
+            "name": "TP_PVT-CAR"
+          },
+          {
+            "col": 14,
+            "name": "TP_PVT-CAR"
+          },
+          {
+            "col": 15,
+            "name": "TP_PVT-CAR"
+          },
+          {
+            "col": 16,
+            "name": "TP_PVT-CAR"
+          },
+          {
+            "col": 17,
+            "name": "TP_PVT-CAR"
+          },
+          {
+            "col": 18,
+            "name": "TP_Taxi"
+          },
+          {
+            "col": 19,
+            "name": "TP-2W"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    },
+    {
+      "name": "RTO Vs Cluster.",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 1,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 0,
+            "name": "RevisedRTOCode"
+          },
+          {
+            "col": 1,
+            "name": "Product Category"
+          },
+          {
+            "col": 2,
+            "name": "V REG REGION"
+          },
+          {
+            "col": 3,
+            "name": "RTO STATE"
+          },
+          {
+            "col": 4,
+            "name": "UW Cluster (26-27)"
+          },
+          {
+            "col": 5,
+            "name": "Actuarial Cluster (26-27)"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    },
+    {
+      "name": "RTO Vs Cluster",
+      "layout": "flat_table",
+      "config": {
+        "product": "AUTO",
+        "data_start_row": 1,
+        "column_map": {},
+        "rate_columns": [],
+        "decline_markers": [
+          "D",
+          "NA",
+          "Declined"
+        ],
+        "_detected_headers": [
+          {
+            "col": 0,
+            "name": "RTO Code"
+          },
+          {
+            "col": 1,
+            "name": "Product Category"
+          },
+          {
+            "col": 2,
+            "name": "LOCATION DESC"
+          },
+          {
+            "col": 3,
+            "name": "UW Cluster (25-26)"
+          },
+          {
+            "col": 4,
+            "name": "Actuarial Cluster (25-26)"
+          },
+          {
+            "col": 5,
+            "name": "Cluster State (25-26)"
+          }
+        ],
+        "_note": "Auto-generated config — review and adjust column_map and rate_columns for accurate parsing"
+      }
+    }
+  ]
+}
