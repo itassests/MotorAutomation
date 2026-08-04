@@ -493,8 +493,17 @@ const STATE_TO_RTO_PREFIX = {
   'UTTAR PRADESH': 'UP', 'UTTARAKHAND': 'UK', 'WEST BENGAL': 'WB', 'DELHI': 'DL',
   'CHANDIGARH': 'CH', 'PUDUCHERRY': 'PY', 'PONDICHERRY': 'PY',
 };
-const _rkey = (ins, g) => String(ins || '').toLowerCase().trim() + '|'
-  + String(g || '').toUpperCase().replace(/\s+/g, ' ').trim();
+// magma & magma_hdi are the same underwriter with the SAME cluster labels, but
+// their rto_mappings DIVERGE — small "rest-of-state" clusters (CG5, MH7, GJ5, TL4…)
+// are filed only under `magma`, while most rate_rules are `magma_hdi` → blank
+// included_rto and clusters collapse. Canonicalize the two slugs so their mappings
+// merge. Verified state-consistent (CG5→CG, GJ5→GJ, TL4→TS/TG) — no cross-contamination.
+const RTO_INSURER_ALIAS = { magma_hdi: 'magma' };
+const _rkey = (ins, g) => {
+  let s = String(ins || '').toLowerCase().trim();
+  s = RTO_INSURER_ALIAS[s] || s;
+  return s + '|' + String(g || '').toUpperCase().replace(/\s+/g, ' ').trim();
+};
 
 // Normalise an RTO code to ONE uniform shape (USER): "MH-01" — 2-letter state,
 // dash, 2-digit zero-padded district. KA05 / KA5 / "KA 43" / KA-05 all collapse to
