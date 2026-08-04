@@ -425,7 +425,11 @@ function guessRateDivisorAt(rows, headerRow, cols) {
     for (const c of cols) if (isNumericish(row[c])) nums.push(numVal(row[c]));
   }
   if (!nums.length) return 100;
-  const frac = nums.filter((n) => n > 0 && n <= 1).length / nums.length;
+  // Decide on NON-ZERO values only — a grid full of 0s (declined cells) would
+  // otherwise dilute the ≤1 fraction and mis-pick 100 for a fraction grid.
+  const nz = nums.filter((n) => n !== 0);
+  if (!nz.length) return 1;
+  const frac = nz.filter((n) => n <= 1).length / nz.length;
   return frac > 0.7 ? 1 : 100;
 }
 
@@ -803,7 +807,9 @@ function guessRateDivisor(rows, schema) {
     for (const c of rateCols) if (isNumericish(row[c])) nums.push(numVal(row[c]));
   }
   if (!nums.length) return 100;
-  const frac = nums.filter((n) => n > 0 && n <= 1).length / nums.length;
+  const nz = nums.filter((n) => n !== 0);
+  if (!nz.length) return 1;
+  const frac = nz.filter((n) => n <= 1).length / nz.length;
   return frac > 0.7 ? 1 : 100;   // mostly ≤1 → already fractions
 }
 

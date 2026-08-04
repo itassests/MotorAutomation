@@ -70,8 +70,8 @@ function classifyTable(rows, opts = {}) {
   // MAPPING" = the city-cluster grids key on, e.g. "Vapi"), THEN region/cluster/
   // zone, and only fall back to raw city/state when nothing better exists.
   let regionCol = find(/grid[\s_]*mapping|po[\s_]*grid/);
-  if (regionCol < 0) regionCol = find(/region|cluster|\bzone\b|rto[\s_]*group/);
-  if (regionCol < 0) regionCol = find(/rto[\s_]*city|rto[\s_]*state|geography/);
+  if (regionCol < 0) regionCol = find(/region|cluster|\bzone\b|rto[\s_]*group|division|tp[\s_]*ulr|location/);
+  if (regionCol < 0) regionCol = find(/rto[\s_]*city|rto[\s_]*state|geography|state|\bcity\b/);
   // a rate column: header hints OR a column mostly numeric in 0..100
   let rateCol = find(/\bpo\s*%|payout|\brate\b|approved\s*pay|net\s*po|imd\b|commission/);
   if (rateCol < 0) {
