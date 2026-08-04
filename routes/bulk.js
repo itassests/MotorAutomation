@@ -5906,6 +5906,24 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // ---- Zuno Pvt-Car Comp business-type gate (July'26) ----
+  // July split the comp-with-NCB line into "Package Comp (Rollover/Renewal)" 30%
+  // (6 listed regions, 28% ≤5L IDV) and a NEW Pan-India "Package With NCB" 38%.
+  // USER ruling: gate by business type — only Rollover/Renewal business takes the
+  // 30% regional rows; every other comp (incl. rollover-in) takes 38% Pan India.
+  // New vehicles keep their own "Pvt new car business" 1+3 line (handled earlier).
+  // We prune the Rollover/Renewal rows for non-rollover/renewal existing cars, but
+  // only when the 38% With-NCB row is actually in the pool (else no-op, no regression).
+  if (insurerSlug === 'zuno' && String(params.vehicleType || '').toUpperCase() === 'CAR') {
+    const _isRollRenew = /RENEW|ROLL/.test(String(params.subBusinessType || params.businessType || '').toUpperCase());
+    const _isNewVeh = (Number(params.vehicleAge) || 0) === 0 ||
+      String(params.vehicleRegNo || '').trim().toUpperCase() === 'NEW';
+    if (!_isRollRenew && !_isNewVeh) {
+      const pruned = rules.filter(r => String(r.sub_type || '') !== 'Rollover/Renewal');
+      if (pruned.some(r => String(r.sub_type || '') === 'With NCB')) rules = pruned;
+    }
+  }
+
   // ---- Zuno Pvt-Car SAOD routing ----
   // Zuno keeps its only CAR-SAOD rates OUTSIDE the regional grids: "All doable
   // RTO'S" SAOD 24% (NCB 1-99) and the Pan-India "NCB = 0 → 15%" floor. A

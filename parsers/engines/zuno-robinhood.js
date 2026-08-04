@@ -180,7 +180,14 @@ function pushComp(rules, base, rate) {
 //                rate cell was empty in the source, so we emit 0%)
 const PRODUCT_LINES = {
   'Pvt Car Package Comp (Rollover/Renewal)':
-    { product: 'CAR', segment: 'Pvt Car', rate_type: 'COMP', emit: 'comp' },
+    { product: 'CAR', segment: 'Pvt Car', rate_type: 'COMP', emit: 'comp', sub_type: 'Rollover/Renewal' },
+  // July'26: NEW headline comp-with-NCB rate, Pan India 38%. Applies to comp
+  // business that is NOT rollover/renewal (bulk.js gates by business type; the
+  // region-specific 30% Rollover/Renewal rows win by specificity for those).
+  'Pvt Car Package With NCB':
+    { product: 'CAR', segment: 'Pvt Car', rate_type: 'COMP', emit: 'comp', sub_type: 'With NCB' },
+  'PVT car Pakage With NCB':   // operator's July'26 spelling (typo "Pakage")
+    { product: 'CAR', segment: 'Pvt Car', rate_type: 'COMP', emit: 'comp', sub_type: 'With NCB' },
   'Pvt Car SAOD':
     { product: 'CAR', segment: 'Pvt Car', rate_type: 'SAOD', emit: 'saod' },
   // "High End" → segment carries the marker so the export's inferHEV() tags
@@ -195,6 +202,8 @@ const PRODUCT_LINES = {
   'TW NEW':
     { product: 'TW',  segment: 'TW', rate_type: 'COMP_1+5', emit: 'new_tw' },
   'TW TP':
+    { product: 'TW',  segment: 'TW', rate_type: 'SATP', emit: 'satp_tw' },
+  'TW TP Only':   // July'26 rename of "TW TP"
     { product: 'TW',  segment: 'TW', rate_type: 'SATP', emit: 'satp_tw' },
   'Pvt Car TP Only':
     { product: 'CAR', segment: 'Pvt Car', rate_type: 'SATP', emit: 'satp' },
@@ -229,6 +238,9 @@ function emitSection1Row(rules, meta, productLine, regionLabel, rate) {
   // Pan India / "All doable RTO" rows: emit a single rule with no state.
   const isPan = /pan\s*india/i.test(regionLabel) ||
                 /all\s*doable\s*RTO/i.test(regionLabel);
+  // Normalize a "Pan India" region to the pooled candidate label so the
+  // bulk candidate-region list ('Pan India (doable RTOs)') actually reaches it.
+  const panRegion = /pan\s*india/i.test(regionLabel) ? 'Pan India (doable RTOs)' : regionLabel;
   // High End → per-city fanout (each city + its parent state, surfaced
   // in the City and State columns). Other product lines → per-state fanout.
   const isHighEnd = productLine === 'High End';
@@ -252,7 +264,8 @@ function emitSection1Row(rules, meta, productLine, regionLabel, rate) {
         segment: cfg.segment,
         make: make,
         state: state || undefined,
-        region: city || state || regionLabel,  // city wins; falls back to state, then raw label
+        region: city || state || (isPan ? panRegion : regionLabel),  // city > state > (pooled Pan India | raw label)
+        sub_type: cfg.sub_type || null,
         rate_type: cfg.rate_type,
         vehicle_age_min: cfg.vehicle_age_min ?? null,
         vehicle_age_max: cfg.vehicle_age_max ?? null,
