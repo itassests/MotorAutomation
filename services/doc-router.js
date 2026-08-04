@@ -103,7 +103,7 @@ function classifyTable(rows, opts = {}) {
   }
   if (rtoCodeCol >= 0 && regionCol >= 0 && rateCol < 0) {
     return { type: 'rto_map', headerRow, confidence: 0.85,
-      cols: { rto_code: rtoCodeCol, region: regionCol, cluster: find(/cluster|group|zone/) },
+      cols: { rto_code: rtoCodeCol, region: regionCol, cluster: find(/actuarial|cluster|group|zone/), product: find(/product\s*categ|^product$|veh.*type/) },
       note: 'RTO master (rto code → region, no rate)' };
   }
   if (rateCol >= 0) {
@@ -112,9 +112,20 @@ function classifyTable(rows, opts = {}) {
   return { type: 'unknown', headerRow, cols: {}, confidence: 0.2, note: 'no rate/rto/fleet/enabler signal' };
 }
 
-/** RTO master rows → rto_mappings records. Explodes comma-lists of codes. */
+// Normalise a product-category cell → CAR|TW|GCV|PCV|MISC (best effort).
+function normProductCat(v) {
+  const s = String(v || '').toUpperCase();
+  if (/PVT|PRIVATE|\bCAR\b|4\s*W/.test(s)) return 'CAR';
+  if (/\bTW\b|TWO\s*WHEEL|2\s*W/.test(s)) return 'TW';
+  if (/GCV|GOODS/.test(s)) return 'GCV';
+  if (/PCV|PASSENGER/.test(s)) return 'PCV';
+  if (/MISC/.test(s)) return 'MISC';
+  return s ? s.replace(/\s+/g, '_') : null;
+}
+
+/** RTO master rows → rto_mappings records. Explodes comma-lists; per-row product. */
 function toRtoMappings(rows, cls, opts = {}) {
-  const { rto_code, region, cluster } = cls.cols;
+  const { rto_code, region, cluster, product } = cls.cols;
   const out = [];
   for (let r = cls.headerRow + 1; r < rows.length; r++) {
     const row = rows[r]; if (!row) continue;
@@ -122,8 +133,9 @@ function toRtoMappings(rows, cls, opts = {}) {
     const reg = cell(row[region]);
     if (!codeRaw || !reg) continue;
     const clust = cluster != null && cluster >= 0 ? cell(row[cluster]) : null;
+    const prod = product != null && product >= 0 ? normProductCat(row[product]) : (opts.product || null);
     for (const code of codeRaw.split(/[,/]/).map((s) => s.trim()).filter(Boolean)) {
-      out.push({ insurer: opts.insurer, product: opts.product || null, rto_code: code.toUpperCase().replace(/\s+/g, ''), region: reg, cluster: clust || null });
+      out.push({ insurer: opts.insurer, product: prod, rto_code: code.toUpperCase().replace(/[\s-]/g, ''), region: reg, cluster: clust || null });
     }
   }
   return out;
@@ -189,21 +201,32 @@ async function routeAndIngest(pool, cardId, sheets, opts = {}) {
 
     if (cls.type === 'rto_map') {
       const maps = toRtoMappings(rows, cls, { insurer });
-      if (maps.length >= 50) { // authoritative full master → replace this insurer's mappings
-        await pool.request().input('ins', sql.NVarChar, insurer).query('DELETE FROM rto_mappings WHERE insurer=@ins');
-      }
-      for (let i = 0; i < maps.length; i += 500) {
-        const tx = new sql.Transaction(pool); await tx.begin();
-        try {
-          for (const m of maps.slice(i, i + 500)) {
-            await new sql.Request(tx)
-              .input('cid', sql.Int, cardId).input('ins', sql.NVarChar, m.insurer)
-              .input('prod', sql.NVarChar, m.product).input('code', sql.NVarChar, m.rto_code)
-              .input('reg', sql.NVarChar, m.region).input('clu', sql.NVarChar, m.cluster)
-              .query('INSERT INTO rto_mappings (rate_card_id,insurer,product,rto_code,region,cluster) VALUES (@cid,@ins,@prod,@code,@reg,@clu)');
+      if (maps.length >= 50) {
+        // Authoritative master → replace, but SCOPED to the products in this sheet
+        // (Magma ships separate GCV and Pvt Car RTO sheets; a blanket insurer-wide
+        // delete would let the second sheet wipe the first).
+        const prods = [...new Set(maps.map((m) => m.product))];
+        if (prods.length === 1 && prods[0] == null) {
+          await pool.request().input('ins', sql.NVarChar, insurer).query('DELETE FROM rto_mappings WHERE insurer=@ins AND product IS NULL');
+        } else {
+          for (const pr of prods) {
+            const rq = pool.request().input('ins', sql.NVarChar, insurer);
+            if (pr == null) await rq.query('DELETE FROM rto_mappings WHERE insurer=@ins AND product IS NULL');
+            else await rq.input('pr', sql.NVarChar, pr).query('DELETE FROM rto_mappings WHERE insurer=@ins AND product=@pr');
           }
-          await tx.commit();
-        } catch (e) { await tx.rollback(); throw e; }
+        }
+      }
+      const tr = (v, n) => (v == null ? null : (String(v).length > n ? String(v).slice(0, n) : String(v)));
+      for (let i = 0; i < maps.length; i += 5000) {
+        const table = new sql.Table('rto_mappings');
+        table.columns.add('rate_card_id', sql.Int, { nullable: true });
+        table.columns.add('insurer', sql.VarChar(100), { nullable: true });
+        table.columns.add('product', sql.VarChar(100), { nullable: true });
+        table.columns.add('rto_code', sql.VarChar(20), { nullable: true });
+        table.columns.add('region', sql.VarChar(200), { nullable: true });
+        table.columns.add('cluster', sql.VarChar(200), { nullable: true });
+        for (const m of maps.slice(i, i + 5000)) table.rows.add(cardId, tr(m.insurer, 100), tr(m.product, 100), tr(m.rto_code, 20), tr(m.region, 200), tr(m.cluster, 200));
+        await pool.request().bulk(table);
       }
       counts.rto_map += maps.length;
     } else if (cls.type === 'fleet') {

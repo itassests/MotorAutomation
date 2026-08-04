@@ -486,14 +486,43 @@ function parseMatrixGrid(rows, layout, opts = {}) {
 // captures it, so we unpivot the columns: one rule per (row × rate-column),
 // deriving the column's dimensions (fuel / cc / cover / segment) from its headers.
 
-/** Classify a column-header token → { role, value }. role ∈ cc|fuel|cover|segment. */
-function classifyColToken(s) {
-  const t = cell(s);
-  if (!t) return null;
-  if (/\d+\s*[_-]?\s*\d*\s*cc|\bcc\b|cubic|engine/i.test(t) || /^\d+\s*[_-]\s*\d+/.test(t)) return { role: 'cc', value: t };
-  if (isCoverToken(t) || /comp|saod|satp|package|\bpack\b|\bod\b|\btp\b|bundled/i.test(t)) return { role: 'cover', value: t };
-  if (/petrol|diesel|\bev\b|electric|\bcng\b|\blpg\b|hybrid|\bhev\b|\bp\s*\+|\bd\s*\+|bifuel/i.test(t)) return { role: 'fuel', value: t };
-  return { role: 'segment', value: t };
+/** A declined/blocked rate cell ("Block", "Decline", "D", "NA", "X", "Nil"). */
+function isDeclineMarker(v) {
+  return /^(block(ed)?|decline[d]?|\bd\b|\bna\b|\bn\/?a\b|nil|not\s*allowed|no\s*business|closed|\bx\b|-{1,2})$/i.test(cell(v));
+}
+
+/** Parse a tonnage band from a segment string ("GCV 12T - 20T", "<=2.5 T", "> 40T"). */
+function parseTonnage(s) {
+  const t = cell(s).toLowerCase();
+  let m;
+  if ((m = t.match(/([\d.]+)\s*t(?:on)?s?\s*[-–—to]+\s*([\d.]+)\s*t/))) return { min: +m[1], max: +m[2] };
+  if ((m = t.match(/(?:<=?|upto|up\s*to|below)\s*([\d.]+)\s*t/))) return { min: null, max: +m[1] };
+  if ((m = t.match(/(?:>=?|above|more\s*than|over)\s*([\d.]+)\s*t/))) return { min: +m[1], max: null };
+  if ((m = t.match(/([\d.]+)\s*t\s*[-–—]\s*([\d.]+)/))) return { min: +m[1], max: +m[2] };
+  return { min: null, max: null };
+}
+
+/**
+ * Extract ALL dimensions a column-header cell carries → { cover, cc, fuel, segment,
+ * tonnage:{min,max} }. A single header can hold several (e.g. "TP GCV <=2.5 T" =
+ * cover TP + segment "GCV <=2.5 T" + tonnage ≤2.5). Multi-role, unlike a 1:1 map.
+ */
+function extractColDims(s) {
+  const t = cell(s); const dims = {};
+  if (!t) return dims;
+  const cov = t.match(/\b(comprehensive|comp|saod|satp|tp|act|package|pack|od|bundled)\b/i);
+  if (cov) dims.cover = cov[1];
+  const cc = t.match(/(\d+\s*[_-]\s*\d+\s*cc|<=?\s*\d+\s*cc|>\s*\d+\s*cc|\d+\s*cc)/i);
+  if (cc) dims.cc = cc[1];
+  const fu = t.match(/petrol|diesel|\bev\b|electric|\bcng\b|\blpg\b|hybrid|\bhev\b|\bp\s*\+\s*ev|\bd\s*\+\s*cng|bifuel/i);
+  if (fu) dims.fuel = fu[0];
+  // segment = the header with cover/tier words stripped, when it names a vehicle
+  if (/gcv|pcv|\bcar\b|\btw\b|2w|3w|4w|goods|passenger|truck|\bbus\b|tractor|misc|\d\s*t\b|ton/i.test(t)) {
+    dims.segment = t.replace(/\b(tp|comp|comprehensive|saod|satp|act|od|pack|gwp|biz\s*mix)\b/ig, '').replace(/\s+/g, ' ').trim();
+    const ton = parseTonnage(t);
+    if (ton.min != null || ton.max != null) dims.tonnage = ton;
+  }
+  return dims;
 }
 
 /**
@@ -515,7 +544,9 @@ function detectWide(rows) {
   }
   if (dataStart < 1 || keyCol < 0) return null;
 
-  // rate columns: columns right of keyCol that are mostly numeric (0..100) in data
+  // rate columns: columns right of keyCol whose cells are mostly a rate (numeric
+  // 0..100) OR a decline marker ("Block"/"NA"). Decline cells are VALID grid data
+  // (the cluster is declined for that segment), so they must not disqualify a col.
   const nCols = Math.max(...rows.slice(dataStart, dataStart + 40).map((r) => (r || []).length));
   const rateCols = [];
   for (let c = keyCol + 1; c < nCols; c++) {
@@ -523,7 +554,10 @@ function detectWide(rows) {
     for (let r = dataStart; r < Math.min(rows.length, dataStart + 60); r++) { const v = cell((rows[r] || [])[c]); if (v !== '') vals.push(v); }
     if (!vals.length) continue;
     const nums = vals.filter(isNumericish);
-    if (nums.length / vals.length >= 0.7 && nums.filter((v) => numVal(v) >= 0 && numVal(v) <= 100).length / nums.length >= 0.8) rateCols.push(c);
+    const declines = vals.filter(isDeclineMarker);
+    const rateLike = (nums.length + declines.length) / vals.length;
+    const inBand = nums.length ? nums.filter((v) => numVal(v) >= 0 && numVal(v) <= 100).length / nums.length : 1;
+    if (rateLike >= 0.7 && nums.length >= 1 && inBand >= 0.8) rateCols.push(c);
   }
   if (rateCols.length < 3) return null;   // < 3 rate cols → let flat/matrix handle it
 
@@ -540,11 +574,11 @@ function detectWide(rows) {
   const ffRow = (ri) => { const row = (rows[ri] || []).map(cell); let cur = ''; const out = []; for (let c = 0; c < nCols; c++) { if (row[c] !== '') cur = row[c]; out[c] = cur; } return out; };
   const filled = headerRowIdx.map(ffRow);
   const colDims = {};
-  let dimensional = 0;   // cols whose header carries a real cc/fuel/cover DIMENSION
+  let dimensional = 0;   // cols whose header carries a real cc/fuel/cover/segment DIMENSION
   for (const c of rateCols) {
     const dims = {};
-    for (const fr of filled) { const cl = classifyColToken(fr[c]); if (cl && !dims[cl.role]) dims[cl.role] = cl.value; }
-    if (dims.cc || dims.fuel || dims.cover) dimensional++;
+    for (const fr of filled) { const d = extractColDims(fr[c]); for (const k in d) if (dims[k] == null) dims[k] = d[k]; }
+    if (dims.cc || dims.fuel || dims.cover || dims.segment) dimensional++;
     colDims[c] = dims;
   }
   // Only a WIDE (unpivot) grid if most rate columns are dimensioned by cc/fuel/
@@ -569,33 +603,49 @@ function expandFuels(s) {
   return out.size ? [...out] : [''];
 }
 
+/** Volume tier from a sheet name (">2 Lacs" → Above2L, "<=2 Lacs" → Upto2L). */
+function volumeTierFromSheet(name) {
+  const s = String(name || '').toLowerCase();
+  let m = s.match(/(>=?|above|<=?|upto|below)\s*([\d.]+)\s*(lac|lakh|l\b|cr|k)/);
+  if (!m) return '';
+  const gt = /^(>|above|>=)/.test(m[1]);
+  return (gt ? 'Above' : 'Upto') + m[2] + (m[3][0].toUpperCase());
+}
+
 /** Unpivot a wide layout → one rule per (data row × rate column × fuel-in-group). */
 function parseWideGrid(rows, layout, opts = {}) {
   const { keyCol, dataStart, rateCols, colDims } = layout;
   const div = layout.rate_divisor || 100;
+  const volumeTier = opts.volumeTier || volumeTierFromSheet(opts.sheetName) || '';
   const out = [];
   for (let r = dataStart; r < rows.length; r++) {
     const row = rows[r]; if (!row) continue;
     const region = cell(row[keyCol]);
     if (!region || isNumericish(region)) continue;
     for (const c of rateCols) {
-      if (!isNumericish(row[c])) continue;
-      const n = numVal(row[c]); if (!Number.isFinite(n) || n <= 0) continue;
+      const raw = row[c];
+      const declined = isDeclineMarker(raw);
+      if (!isNumericish(raw) && !declined) continue;
+      const n = declined ? 0 : numVal(raw);
+      if (!declined && (!Number.isFinite(n) || n <= 0)) continue;
       const d = colDims[c] || {};
       const cc = d.cc ? parseBand(d.cc) : { min: null, max: null };
-      const rateType = coverToRateType(d.cover || '') || 'COMP';
+      const ton = d.tonnage || { min: null, max: null };
+      const rateType = coverToRateType(d.cover || '') || (opts.defaultCover || 'COMP');
       const seg = d.segment || '';
-      // CC band ≥ ~350 ⇒ car territory (bikes are < 350cc); else infer from tokens.
       const product = inferProduct([seg, d.fuel, opts.sheetName].join(' ')) || ((cc.max || cc.min || 0) >= 350 ? 'CAR' : null) || opts.product || null;
-      // A grouped fuel header ("P+ EV") applies to EACH fuel in the group.
       for (const fuel of expandFuels(d.fuel || '')) {
         out.push({
           insurer: opts.insurer, product,
           region, segment: seg, sub_type: seg,
           make: 'All', fuel_type: fuel,
           cc_band_min: cc.min, cc_band_max: cc.max,
+          weight_band_min: ton.min, weight_band_max: ton.max,
+          volume_tier: volumeTier || undefined,
           rate_type: rateType, applied_on: rateType === 'TP' ? 'TP' : 'NET',
-          rate_value: +(n / div).toFixed(6), _srcRow: r, _rateCol: c,
+          rate_value: declined ? 0 : +(n / div).toFixed(6),
+          is_declined: declined || undefined,
+          _srcRow: r, _rateCol: c,
         });
       }
     }

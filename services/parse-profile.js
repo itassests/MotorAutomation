@@ -164,6 +164,7 @@ function bindRule(reqt, cardId, insurer, sheetName, rule) {
     .input('rate_type', sql.NVarChar, rule.rate_type || null)
     .input('rate_value', sql.Decimal(10, 4), rule.rate_value ?? null)
     .input('is_declined', sql.Bit, rule.is_declined ? 1 : 0)
+    .input('volume_tier', sql.NVarChar, rule.volume_tier || null)
     .input('remarks', sql.NVarChar, rule.remarks || null);
 }
 
@@ -171,23 +172,44 @@ const INSERT_SQL = `INSERT INTO rate_rules
   (rate_card_id, insurer, product, sheet_name, region, segment, make, sub_type, applied_on,
    fuel_type, cc_band_min, cc_band_max, weight_band_min, weight_band_max,
    vehicle_age_min, vehicle_age_max, seating_capacity_min, seating_capacity_max,
-   rate_type, rate_value, is_declined, remarks)
+   rate_type, rate_value, is_declined, volume_tier, remarks)
   VALUES
   (@rate_card_id, @insurer, @product, @sheet_name, @region, @segment, @make, @sub_type, @applied_on,
    @fuel_type, @cc_band_min, @cc_band_max, @weight_band_min, @weight_band_max,
    @vehicle_age_min, @vehicle_age_max, @seating_capacity_min, @seating_capacity_max,
-   @rate_type, @rate_value, @is_declined, @remarks)`;
+   @rate_type, @rate_value, @is_declined, @volume_tier, @remarks)`;
 
-/** Insert dynamic rule objects into rate_rules (transactional, batched). */
+const _num = (v) => { if (v === null || v === undefined || v === '') return null; const n = typeof v === 'number' ? v : Number(v); return Number.isFinite(n) ? n : null; };
+const _int = (v) => { const n = _num(v); return n === null ? null : Math.round(n); };
+const _trunc = (v, n) => (v == null ? null : (String(v).length > n ? String(v).slice(0, n) : String(v)));
+
+/** Insert dynamic rule objects into rate_rules via TDS bulk load (fast over WAN). */
 async function insertRules(pool, cardId, insurer, sheetName, rules) {
-  for (let i = 0; i < rules.length; i += 500) {
-    const batch = rules.slice(i, i + 500);
-    const tx = new sql.Transaction(pool);
-    await tx.begin();
-    try {
-      for (const rule of batch) await bindRule(new sql.Request(tx), cardId, insurer, sheetName, rule).query(INSERT_SQL);
-      await tx.commit();
-    } catch (e) { await tx.rollback(); throw e; }
+  for (let i = 0; i < rules.length; i += 5000) {
+    const slice = rules.slice(i, i + 5000);
+    const table = new sql.Table('rate_rules');
+    const cols = [
+      ['rate_card_id', sql.Int], ['insurer', sql.VarChar(100)], ['product', sql.VarChar(100)],
+      ['sheet_name', sql.VarChar(200)], ['region', sql.VarChar(200)], ['segment', sql.VarChar(300)],
+      ['make', sql.VarChar(200)], ['sub_type', sql.VarChar(100)], ['applied_on', sql.VarChar(10)],
+      ['fuel_type', sql.VarChar(50)], ['cc_band_min', sql.Int], ['cc_band_max', sql.Int],
+      ['weight_band_min', sql.Decimal(10, 2)], ['weight_band_max', sql.Decimal(10, 2)],
+      ['vehicle_age_min', sql.Int], ['vehicle_age_max', sql.Int],
+      ['seating_capacity_min', sql.Int], ['seating_capacity_max', sql.Int],
+      ['rate_type', sql.VarChar(50)], ['rate_value', sql.Decimal(10, 4)], ['is_declined', sql.Bit],
+      ['volume_tier', sql.VarChar(100)], ['remarks', sql.VarChar(500)],
+    ];
+    for (const [name, type] of cols) table.columns.add(name, type, { nullable: true });
+    for (const r of slice) {
+      table.rows.add(
+        cardId, _trunc(r.insurer || insurer, 100), _trunc(r.product, 100), _trunc(r.sheet_name || sheetName, 200),
+        _trunc(r.region, 200), _trunc(r.segment, 300), _trunc(r.make, 200), _trunc(r.sub_type, 100), _trunc(r.applied_on, 10),
+        _trunc(r.fuel_type, 50), _int(r.cc_band_min), _int(r.cc_band_max), _num(r.weight_band_min), _num(r.weight_band_max),
+        _int(r.vehicle_age_min), _int(r.vehicle_age_max), _int(r.seating_capacity_min), _int(r.seating_capacity_max),
+        _trunc(r.rate_type, 50), _num(r.rate_value), r.is_declined ? 1 : 0, _trunc(r.volume_tier, 100), _trunc(r.remarks, 500),
+      );
+    }
+    await pool.request().bulk(table);
   }
   return rules.length;
 }
