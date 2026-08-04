@@ -26,7 +26,7 @@ const HEADER_SYNONYMS = {
   rate:    [/approval\s*grid/i, /payout/i, /\bpo\b/i, /commission/i, /brokerage/i, /\brate\b/i, /\bgrid\b/i, /\bimd\b/i, /net\s*po/i],
   region:  [/^\s*rto\s*$/i, /region/i, /\bzone\b/i, /\bcity\b/i, /\bstate\b/i, /location/i, /cluster/i, /geography/i, /circle/i],
   cover:   [/section\s*text/i, /^\s*section\s*$/i, /\bcover\b/i, /policy\s*type/i, /coverage/i],
-  segment: [/^\s*segment\s*$/i, /sub[\s_-]*type/i, /body\s*type/i, /vehicle\s*type/i, /\bveh\b/i],
+  segment: [/^\s*segment\s*$/i, /sub[\s_-]*type/i, /body\s*type/i, /vehicle\s*type/i, /\bveh\b/i, /^\s*products?\s*$/i, /class\s*of\s*veh/i],
   fuel:    [/fuel/i],
   ncb:     [/\bncb\b/i, /no\s*claim/i],
   biz:     [/business\s*type/i, /\bbiz\b/i, /new.*renew|renew.*new/i, /nb\s*\/?\s*renewal/i],
