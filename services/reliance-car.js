@@ -83,8 +83,10 @@ function resolveRelianceCarRate(params, resolvedRegion) {
   const tp = Number(params.tpPremium) || 0;
   if (od < 1) return null;                       // SATP (TP-only) — not in this grid
   const fuel = String(params.fuelType || '').toUpperCase();
-  const mk   = String(params.make || '').toUpperCase();
-  const dieselEv = /DIESEL|ELECTRIC|\bEV\b|BATTERY/.test(fuel) || /\bEV\b|ELECTRIC/.test(mk);
+  // July'26 grid regrouped fuels: Comprehensive is "Petrol+Bifuel+EV" vs "Diesel".
+  // EV/Electric now prices with PETROL (dieselCom serves DIESEL only), not the old
+  // Diesel/EV bundle. So only Diesel routes to the diesel column.
+  const diesel = /DIESEL/.test(fuel);
   if (tp < 1) {                                  // SAOD (OD-only)
     // High-End SAOD (region 12.5-22.5%) vs Non-High-End (30%), per the "PVT car Segment"
     // sheet (MAKE+MODEL → VEHICLE_SEGMENT = HIGH END). USER-confirmed: High-End SAOD is
@@ -96,8 +98,8 @@ function resolveRelianceCarRate(params, resolvedRegion) {
       : { rate: G.nonHighEndSaod / 100, label: `Reliance PvtCar ${g} SAOD (non-high-end)` };
   }
   // Comprehensive (OD + TP)
-  const r = dieselEv ? G.dieselEvCom : G.petrolCom;
-  return { rate: r / 100, label: `Reliance PvtCar ${g} COMP ${dieselEv ? 'Diesel/EV' : 'Petrol/CNG/LPG'}` };
+  const r = diesel ? (G.dieselCom ?? G.dieselEvCom) : G.petrolCom;
+  return { rate: r / 100, label: `Reliance PvtCar ${g} COMP ${diesel ? 'Diesel' : 'Petrol/CNG/LPG/EV'}` };
 }
 
 module.exports = { resolveRelianceCarRate, regionGroup };
