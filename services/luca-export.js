@@ -198,6 +198,21 @@ const seatBand = (mn, mx) => rangeArr(mn, mx, { minDefault: 1 });
 // GVW: stored in TONNES, Luca wants KG (2.5T -> 2500). 999T = "no upper bound".
 const gvwBand  = (mn, mx) => rangeArr(mn, mx, { minDefault: 1, noMax: 999, scale: 1000 });
 
+// Some insurers encode the age band ONLY in the segment text (e.g. Magma TP rows
+// "GCV 12T-20T Age<5" / "Age>=5" ship with both age columns NULL), so the structured
+// vehicle_age comes out blank and age-banded rows collapse into look-alikes. Parse a
+// [min,max] band from the segment as a last resort. "Age<5"→[0,4], "Age>=5"→[5,null].
+function ageBandFromSegment(seg) {
+  const s = String(seg || '');
+  let m;
+  if ((m = /age\s*<\s*(\d+)/i.exec(s)))  return [0, +m[1] - 1];
+  if ((m = /age\s*<=\s*(\d+)/i.exec(s))) return [0, +m[1]];
+  if ((m = /age\s*>=\s*(\d+)/i.exec(s))) return [+m[1], null];
+  if ((m = /age\s*>\s*(\d+)/i.exec(s)))  return [+m[1] + 1, null];
+  if ((m = /\bage\s*(\d+)\s*[-–]\s*(\d+)/i.exec(s))) return [+m[1], +m[2]];
+  return null;
+}
+
 // Render a band (used for vehicle_age). Bands are often OPEN-ENDED — "6+ years"
 // has no upper bound — and `${min}-${max}` printed those as a dangling "6-",
 // which reads as a missing value rather than an open end.
@@ -576,14 +591,22 @@ async function buildLucaBuffer(ids) {
     WITH picked AS (
       SELECT rr.insurer, rr.product, rr.sheet_name, rr.region, rr.segment, rr.make,
              rr.model, rr.sub_type, rr.fuel_type, rr.cc_band_min, rr.cc_band_max,
-             rr.age_band_min, rr.age_band_max, rr.weight_band_min, rr.weight_band_max,
+             -- age lives in EITHER age_band_* OR vehicle_age_* depending on the
+             -- ingestion path (e.g. Magma writes vehicle_age_*, leaving age_band_*
+             -- NULL). Reading only age_band_* left vehicle_age blank, collapsing
+             -- age-banded rows into look-alikes (same params, diff rate). COALESCE both.
+             COALESCE(rr.age_band_min, rr.vehicle_age_min) AS age_band_min,
+             COALESCE(rr.age_band_max, rr.vehicle_age_max) AS age_band_max,
+             rr.weight_band_min, rr.weight_band_max,
              rr.seating_capacity_min, rr.seating_capacity_max, rr.volume_tier,
              rr.rate_type, rr.rate_value,
              rr.remarks, rr.state, rc.effective_from,
              ROW_NUMBER() OVER (
                PARTITION BY rr.insurer, rr.product, rr.sheet_name, rr.region, rr.segment,
                             rr.make, rr.model, rr.sub_type, rr.fuel_type,
-                            rr.cc_band_min, rr.cc_band_max, rr.age_band_min, rr.age_band_max,
+                            rr.cc_band_min, rr.cc_band_max,
+                            COALESCE(rr.age_band_min, rr.vehicle_age_min),
+                            COALESCE(rr.age_band_max, rr.vehicle_age_max),
                             rr.weight_band_min, rr.weight_band_max,
                             rr.seating_capacity_min, rr.seating_capacity_max, rr.volume_tier,
                             rr.rate_type, rr.state
@@ -694,7 +717,9 @@ async function buildLucaBuffer(ids) {
       // bundled long-term package (1+3 / 1+5 / 5+5), which by definition is
       // written on a BRAND-NEW vehicle, so an age band on it is meaningless to
       // Luca. Blank = "all ages". Non-hybrid covers keep their band.
-      coverageType === 'hybrid' ? '' : ageBand(r.age_band_min, r.age_band_max), // vehicle_age
+      coverageType === 'hybrid' ? ''                                           // vehicle_age
+        : (ageBand(r.age_band_min, r.age_band_max)
+           || (function () { const b = ageBandFromSegment(r.segment); return b ? ageBand(b[0], b[1]) : ''; })()),
       seatBand(r.seating_capacity_min, r.seating_capacity_max),                 // seating_capacity
       gvwBand(r.weight_band_min, r.weight_band_max),                            // gross_vehicle_weight (kg)
       lucaFuel(r.fuel_type),                                  // fuel_type
