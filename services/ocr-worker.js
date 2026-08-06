@@ -31,11 +31,17 @@ const ENABLED = String(process.env.OCR_WORKER_ENABLED || '0') === '1';
 const TICK_MS = parseInt(process.env.OCR_WORKER_TICK_MS || '8000', 10);
 const FOLDERS_PER_TICK = parseInt(process.env.OCR_FOLDERS_PER_TICK || '1', 10);
 const PDFS_PER_TICK = parseInt(process.env.OCR_PDFS_PER_TICK || '3', 10);
-// How many PDFs to OCR concurrently per tick. Each OCR round-trip to the engine
-// takes ~40s, so serial processing (=1) is the throughput bottleneck. The claim
-// query is READPAST-safe, so N workers never grab the same row. Tune via
-// OCR_CONCURRENCY; keep modest so the shared OCR engine isn't overwhelmed.
-const CONCURRENCY = Math.max(1, parseInt(process.env.OCR_CONCURRENCY || '5', 10));
+// How many PDFs to OCR concurrently per tick. MUST be 1: the OCR engine writes
+// the extracted policy number to a shared/"current" record, so running PDFs in
+// parallel lands one PDF's policy number on another PDF's tracker (observed
+// wrong-policy-to-wrong-tracker corruption). The row-claim query is READPAST-safe
+// (no double-grab), but that does NOT make the engine call itself isolated — so
+// we serialize. Parallelism is OPT-IN ONLY via OCR_ALLOW_PARALLEL=1, and even
+// then only if you've confirmed the engine is per-request isolated; a stale
+// OCR_CONCURRENCY env alone will NOT re-enable it.
+const CONCURRENCY = String(process.env.OCR_ALLOW_PARALLEL || '') === '1'
+  ? Math.max(1, parseInt(process.env.OCR_CONCURRENCY || '5', 10))
+  : 1;
 const MAX_RETRY = parseInt(process.env.OCR_MAX_RETRY || '3', 10);
 const DROP_DIR = process.env.OCR_ZIP_DROP_DIR
   || path.join(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'), 'ocr_dropzone');
