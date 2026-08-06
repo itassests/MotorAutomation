@@ -104,19 +104,17 @@ const baseCols = (scope) => `
       CASE WHEN m.InsuranceType IN (16, 17) THEN 1 ELSE 0 END AS is_motor,
       -- Motor premium lives in motor-details; non-motor premium in Beeinsured RF (deduped).
       -- Motor-only scope (the default) skips the cross-DB RF join entirely for speed.
-      ${scope === 'motor'
-        ? 'ISNULL(md.ANNUAL_PREMIUM, 0) AS premium'
-        : 'CASE WHEN m.InsuranceType IN (16, 17) THEN ISNULL(md.ANNUAL_PREMIUM, 0) ELSE ISNULL(rfp.prem, 0) END AS premium'}`;
+      -- Motor premium comes from motor-details here; non-motor premium is filled
+      -- AFTER #base by a subtree-scoped RF update (the old inline full-table RF
+      -- GROUP BY was the scope=all timeout). Non-motor rows start at 0 here.
+      ISNULL(md.ANNUAL_PREMIUM, 0) AS premium`;
 // Head joins. Motor-only scope uses INNER md (every motor policy has details) and
 // omits the heavy Beeinsured RF group-by; wider scopes use LEFT md + the RF join.
 const joinsHead = (scope) => `
     FROM TRN_PrarambhMain m WITH (NOLOCK)
     ${scope === 'motor'
       ? 'INNER JOIN TRN_PrarambhMotorDetails md WITH (NOLOCK) ON md.PrarambhMainId = m.Id AND md.ISACTIVE = 1'
-      : `LEFT JOIN TRN_PrarambhMotorDetails md WITH (NOLOCK) ON md.PrarambhMainId = m.Id AND md.ISACTIVE = 1
-    LEFT JOIN (SELECT CurrentTrackerNo, MAX(ISNULL(NULLIF(AnnualPremium, 0), TotalPremium)) AS prem
-               FROM Beeinsured_v3_2.dbo.TRN_ReportedFieldsPrarambh WITH (NOLOCK)
-               WHERE CurrentTrackerNo IS NOT NULL GROUP BY CurrentTrackerNo) rfp ON rfp.CurrentTrackerNo = m.TrackerNo`}
+      : 'LEFT JOIN TRN_PrarambhMotorDetails md WITH (NOLOCK) ON md.PrarambhMainId = m.Id AND md.ISACTIVE = 1'}
     -- (Proposer is NOT joined here — customer is only needed by the capped case
     --  list, which re-joins it for its own rows. See the baseCols perf note.)
     LEFT JOIN TRN_PrarambhReportedFields r WITH (NOLOCK) ON r.PrarambhMainId = m.Id AND r.ISACTIVE = 1
@@ -264,6 +262,18 @@ router.get('/dashboard', async (req, res, next) => {
       ${HEMP_SQL}
       ${ctes(scope)}
       SELECT * INTO #base FROM base WHERE rn = 1${OPT};
+      ${scope !== 'motor' ? `
+      -- Non-motor premium: fill from Beeinsured RF, but joined to ONLY the
+      -- subtree's non-motor trackers in #base (not the whole RF table). The old
+      -- inline full-table GROUP BY was the scope=all/nonmotor timeout.
+      UPDATE b SET b.premium = rf.prem
+      FROM #base b
+      JOIN (SELECT r.CurrentTrackerNo,
+                   MAX(ISNULL(NULLIF(r.AnnualPremium, 0), r.TotalPremium)) AS prem
+            FROM Beeinsured_v3_2.dbo.TRN_ReportedFieldsPrarambh r WITH (NOLOCK)
+            JOIN #base bb ON bb.TrackerNo = r.CurrentTrackerNo AND bb.is_motor = 0
+            GROUP BY r.CurrentTrackerNo) rf ON rf.CurrentTrackerNo = b.TrackerNo
+      WHERE b.is_motor = 0;` : ''}
 
       -- 1) Summary + online/offline (NatureOfSale-based)
       SELECT COUNT(*) AS nop, ISNULL(SUM(b.premium),0) AS premium,

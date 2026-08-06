@@ -4775,6 +4775,9 @@
       }
       const qs = new URLSearchParams();
       const g = (id) => document.getElementById(id).value;
+      // Combined Motor + Non-Motor counts/premium (USER): the dashboard totals
+      // include both. Optimised base build keeps this fast.
+      qs.set('scope', 'all');
       if (g('empFrom')) qs.set('from', g('empFrom'));
       if (g('empTo'))   qs.set('to', g('empTo'));
       if (g('empVertical'))  qs.set('vertical', g('empVertical'));
