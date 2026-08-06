@@ -7077,6 +7077,25 @@
       finally { btn.disabled = false; btn.innerHTML = old; }
     }
 
+    /** Re-queue ONE already-done folder for a fresh OCR run. Clears the folder's
+     *  prior entries + PDF queue server-side and flips it back to pending, so the
+     *  worker (or "Process now") re-OCRs it. */
+    async function ocrReprocess(uid, btn) {
+      if (!confirm('Reprocess this folder?\n\nThis clears the existing OCR results for this folder and runs OCR again from scratch. The folder returns to "Not done" and will process on the next tick (or click "Process now").')) return;
+      const old = btn ? btn.innerHTML : '';
+      if (btn) { btn.disabled = true; btn.innerHTML = 'Re-queuing…'; }
+      try {
+        const r = await fetch(API + `/ocr-bulk/uploads/${uid}/reprocess`, { method: 'POST' }).then(x => x.json());
+        if (!r.success) throw new Error(r.error || 'Reprocess failed');
+        showToast(`Folder re-queued (cleared ${r.entriesDeleted || 0} entr${(r.entriesDeleted === 1) ? 'y' : 'ies'}, ${r.pdfsCleared || 0} PDF row${(r.pdfsCleared === 1) ? '' : 's'})`, 'success');
+        ocrLoadSummary();
+        ocrLoadList();   // rebuilds the row (button state resets with it)
+      } catch (e) {
+        showToast(e.message, 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = old; }
+      }
+    }
+
     async function ocrShowFailures(uploadId) {
       try {
         const r = await fetch(API + `/ocr-bulk/uploads/${uploadId}/failures`).then(x => x.json());
@@ -7165,6 +7184,8 @@
           const dt = u.CreatedDate ? new Date(u.CreatedDate).toLocaleString() : '';
           const excel = `<button class="btn" style="padding:4px 12px;" onclick="window.location.href='${API}/ocr-bulk/uploads/${u.Id}/export?token='+encodeURIComponent(_authToken||'')">Excel</button>`;
           const notDone = u.Status !== 2;
+          // Reprocess is offered for DONE folders only — re-runs OCR from scratch.
+          const reproc = notDone ? '' : `<button class="btn" style="padding:4px 10px; margin-left:6px; background:#8a5a00; color:#fff; border-color:#8a5a00;" onclick="ocrReprocess(${u.Id}, this)">Reprocess</button>`;
           const totAttr = (u.TotalPdfs != null) ? u.TotalPdfs : '';
           const totLabel = (u.TotalPdfs != null) ? (u.TotalPdfs + ' PDFs') : '';
           const statusTxt = notDone
@@ -7179,7 +7200,7 @@
             <td>${dt}</td>
             <td class="ocr-progress" id="ocrProg-${u.Id}">${progCell}</td>
             <td>${statusTxt}</td>
-            <td>${excel}</td>
+            <td>${excel}${reproc}</td>
           </tr>`;
         }).join('');
         await ocrRefreshAllProgress();   // one pass over not-done rows (throttled)

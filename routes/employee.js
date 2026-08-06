@@ -82,9 +82,18 @@ const DECLARES = `
 // by the capped case list (customer / policy_no / reg_no / created_dt / channel /
 // status) are therefore NOT carried here — result set 5 re-joins them for its
 // 1000 rows. Keep this list narrow: anything added here is paid 42.5k times.
+//
+// Date axis = the case's FINAL submission for logging: the LATEST of SubmissionDate
+// and Re_SubmissionDate (a returned case is re-submitted, and that later date is
+// when it re-enters the cycle — Re_ is later in ~7.2k cases, earlier in only ~49,
+// so we take the max, not a blind Re_ preference). Falls back to CREATED_DATE for
+// the ~1.6k not-yet-submitted (U/W-pending) rows so they still appear in-window.
+// Matches the MIS file's submission/re-submission-based periods.
+const SUBMIT_DT = "ISNULL(CASE WHEN ISNULL(m.Re_SubmissionDate,'1900-01-01') > ISNULL(m.SubmissionDate,'1900-01-01') THEN m.Re_SubmissionDate ELSE m.SubmissionDate END, m.CREATED_DATE)";
+const SUBMIT_DATE = `CAST(${SUBMIT_DT} AS date)`;
 const baseCols = (scope) => `
       m.Id AS _id, m.TrackerNo,
-      CAST(m.CREATED_DATE AS date) AS cdate,
+      ${SUBMIT_DATE} AS cdate,
       m.NatureOfSale, m.LogStatusId, mis.POLICY_STATUS_ID AS policy_status_id,
       CASE WHEN mt.PTrackerno IS NOT NULL THEN 1 ELSE 0 END AS in_txn,
       f1.Name AS vertical, msb.Location AS branch, mssb.Sub_Location AS sub_branch,
@@ -133,7 +142,7 @@ const JOINS_TAIL = `
 // fast; nonmotor/all widen it. This is the primary driver of dashboard load time.
 const baseWhere = (scope) => `${scope === 'motor' ? 'm.InsuranceType IN (16, 17) AND ' : scope === 'nonmotor' ? 'm.InsuranceType NOT IN (16, 17) AND ' : ''}m.IsActive = 1
       AND m.LogStatusId IS NOT NULL AND m.LogStatusId NOT IN (15, 16)   -- 15=dup, 16=Hold, NULL=in-process
-      AND CAST(m.CREATED_DATE AS date) BETWEEN @fy AND @today`;
+      AND ${SUBMIT_DATE} BETWEEN @fy AND @today`;
 
 // Full hierarchy employee roster (with names) → #hemp. Lets the employee
 // leaderboard rank EVERY employee in the subtree, including those with zero
@@ -151,38 +160,89 @@ const HEMP_SQL = `
   )
   SELECT EmployeeCode AS code, MAX(DisplayName) AS name INTO #hemp FROM hier GROUP BY EmployeeCode OPTION (MAXRECURSION 1000);`;
 
+// Effective-employee map: every employee → their NEAREST active+valid ancestor
+// (an active employee maps to itself). Business booked by a since-deactivated
+// employee must still count toward the overall totals, so it is rolled UP to the
+// first active manager above them — instead of vanishing (the recursive `hier`
+// only keeps IsActive=1/IsValid=1 nodes, which silently dropped ~3.5k logged
+// policies whose booking rep was deactivated). We deliberately do NOT relax the
+// `hier` recursion to walk THROUGH inactive nodes: the reporting graph has
+// inactive-node cycles/bridges that make full relaxation reach the whole company
+// from any login. Rolling business up to the nearest active ancestor recovers the
+// same policies without exploding subtree scope. #prof dedupes EmployeeCode first
+// (duplicates would fan out the recursion); #eff resolves the chain downward from
+// active anchors (safe: a pure-inactive chain never anchors, so no infinite loop).
+const EFF_PREP = `
+      IF OBJECT_ID('tempdb..#prof') IS NOT NULL DROP TABLE #prof;
+      SELECT ec, mgr, act INTO #prof FROM (
+        SELECT CONVERT(varchar(50), EmployeeCode) AS ec,
+               CONVERT(varchar(50), reportingmgremployeecode) AS mgr,
+               CASE WHEN IsActive = 1 AND IsValid = 1 THEN 1 ELSE 0 END AS act,
+               ROW_NUMBER() OVER (PARTITION BY CONVERT(varchar(50), EmployeeCode)
+                 ORDER BY CASE WHEN IsActive = 1 AND IsValid = 1 THEN 0 ELSE 1 END) AS rn
+        FROM BugNet_UserProfiles WITH (NOLOCK) WHERE EmployeeCode IS NOT NULL
+      ) z WHERE rn = 1;
+      CREATE INDEX ix_prof_mgr ON #prof(mgr);
+      IF OBJECT_ID('tempdb..#eff') IS NOT NULL DROP TABLE #eff;
+      ;WITH eff AS (
+        SELECT ec, ec AS eff FROM #prof WHERE act = 1
+        UNION ALL
+        SELECT c.ec, e.eff FROM #prof c INNER JOIN eff e ON c.mgr = e.ec WHERE c.act = 0
+      )
+      SELECT DISTINCT ec, eff INTO #eff FROM eff OPTION (MAXRECURSION 1000);
+      CREATE INDEX ix_eff_ec ON #eff(ec);`;
+
+// In-scope employees for THIS root: every employee (active or not) whose
+// effective (nearest-active) node lands in the active subtree #hemp. Built once
+// so the base attribution is a SINGLE indexed join on the booking rep's code
+// (ec) — instead of re-running the recursive hierarchy a second time inside the
+// base CTE. Carries `eff` so each case is attributed to the live manager.
+// Requires #eff (EFF_PREP) and #hemp (HEMP_SQL) to exist first.
+const SCOPE_PREP = `
+      IF OBJECT_ID('tempdb..#scope') IS NOT NULL DROP TABLE #scope;
+      SELECT ef.ec, ef.eff INTO #scope
+      FROM #eff ef INNER JOIN #hemp h ON h.code = ef.eff;
+      CREATE INDEX ix_scope_ec ON #scope(ec);`;
+
+// Full hierarchy prelude every base build shares: #eff (org effective-node map),
+// #hemp (active subtree roster), #scope (in-subtree reps → live manager). Both
+// /dashboard and /compare run this before ctes()/ctesCmp(), which now join #scope.
+// (Self-guards every temp with IF OBJECT_ID … DROP so a pooled connection can
+// re-run it without collisions.)
+const HIER_PREP = `
+      IF OBJECT_ID('tempdb..#hemp') IS NOT NULL DROP TABLE #hemp;
+      ${EFF_PREP}
+      ${HEMP_SQL}
+      ${SCOPE_PREP}`;
+
 // hier (reporting tree) + base (one deduped row per TrackerNo). Attribution is
 // a UNION: offline cases match on m.ReportingEmployeeCode (fast, indexed); online
 // cases (no ReportingEmployeeCode) fall back to tmp_poscodes.referal_code keyed
-// on the case's POS/UPIN code. Every query reads `FROM #base WHERE rn = 1`.
+// on the case's POS/UPIN code. Subtree membership is tested on the booking rep's
+// EFFECTIVE (nearest-active) node via #eff, and the case is attributed to that
+// active node — so a deactivated rep's business rolls up to their live manager.
+// Every query reads `FROM #base WHERE rn = 1`.
 const ctes = (scope) => `
-  ;WITH hier AS (
-    SELECT EmployeeCode, reportingmgremployeecode, CAST('|' + EmployeeCode + '|' AS VARCHAR(8000)) AS path
-    FROM BugNet_UserProfiles WITH (NOLOCK)
-    WHERE EmployeeCode = @emp AND IsActive = 1 AND IsValid = 1
-    UNION ALL
-    SELECT c.EmployeeCode, c.reportingmgremployeecode, CAST(h.path + c.EmployeeCode + '|' AS VARCHAR(8000))
-    FROM BugNet_UserProfiles c WITH (NOLOCK)
-    INNER JOIN hier h ON c.reportingmgremployeecode = h.EmployeeCode
-    WHERE c.IsActive = 1 AND c.IsValid = 1 AND CHARINDEX('|' + c.EmployeeCode + '|', h.path) = 0
-  ),
-  base AS (
+  ;WITH base AS (
     SELECT u.*, ROW_NUMBER() OVER (PARTITION BY u.TrackerNo ORDER BY u._id DESC) AS rn
     FROM (
-      -- A) cases with a ReportingEmployeeCode (offline + most business)
+      -- A) cases with a ReportingEmployeeCode (offline + most business). #scope
+      --    already holds every in-subtree rep (incl. since-deactivated ones,
+      --    rolled up to their live manager via #eff) → single indexed join.
       SELECT ${baseCols(scope)}
       ${joinsHead(scope)}
-      INNER JOIN (SELECT DISTINCT EmployeeCode FROM hier) hh ON hh.EmployeeCode = CONVERT(varchar(50), m.ReportingEmployeeCode)
-      LEFT JOIN BugNet_UserProfiles up WITH (NOLOCK) ON up.EmployeeCode = CONVERT(varchar(50), m.ReportingEmployeeCode)
+      INNER JOIN #scope sc ON sc.ec = CONVERT(varchar(50), m.ReportingEmployeeCode)
+      LEFT JOIN BugNet_UserProfiles up WITH (NOLOCK) ON up.EmployeeCode = sc.eff
       ${JOINS_TAIL}
       WHERE ${baseWhere(scope)} AND m.ReportingEmployeeCode IS NOT NULL
       UNION ALL
-      -- B) online cases (no ReportingEmployeeCode) → referring employee via POS code
+      -- B) online cases (no ReportingEmployeeCode) → referring employee via POS code,
+      --    likewise resolved through #scope to its nearest-active node.
       SELECT ${baseCols(scope)}
       ${joinsHead(scope)}
       INNER JOIN Beeinsured_v3_2.dbo.tmp_poscodes pc WITH (NOLOCK) ON pc.upincode = ISNULL(r.IDVpos, r.UPIN_CODE) AND pc.referal_code <> 'Direct'
-      INNER JOIN (SELECT DISTINCT EmployeeCode FROM hier) hh ON hh.EmployeeCode = pc.referal_code
-      LEFT JOIN BugNet_UserProfiles up WITH (NOLOCK) ON up.EmployeeCode = pc.referal_code
+      INNER JOIN #scope sc ON sc.ec = pc.referal_code
+      LEFT JOIN BugNet_UserProfiles up WITH (NOLOCK) ON up.EmployeeCode = sc.eff
       ${JOINS_TAIL}
       WHERE ${baseWhere(scope)} AND m.ReportingEmployeeCode IS NULL
     ) u
@@ -258,8 +318,7 @@ router.get('/dashboard', async (req, res, next) => {
     const batch = `
       ${DECLARES}
       IF OBJECT_ID('tempdb..#base') IS NOT NULL DROP TABLE #base;
-      IF OBJECT_ID('tempdb..#hemp') IS NOT NULL DROP TABLE #hemp;
-      ${HEMP_SQL}
+      ${HIER_PREP}
       ${ctes(scope)}
       SELECT * INTO #base FROM base WHERE rn = 1${OPT};
       ${scope !== 'motor' ? `
@@ -305,7 +364,7 @@ router.get('/dashboard', async (req, res, next) => {
       --    #base (writing those wide columns for every row was ~16s of tempdb
       --    for a company-wide root). Re-join them for just these ${LIST_CAP} rows.
       SELECT TOP ${LIST_CAP}
-        b.TrackerNo AS tracker_no, m.CREATED_DATE AS created_date, fn.Name AS channel,
+        b.TrackerNo AS tracker_no, ${SUBMIT_DT} AS created_date, fn.Name AS channel,
         CASE WHEN b.NatureOfSale IN ${ONLINE_SET} THEN 1 ELSE 0 END AS is_online,
         b.vertical, b.branch, b.sub_branch, b.agent_code, b.employee_code, b.employee_name,
         b.vehicle_type, b.product_type, b.insurer, p.FULLNAME_PROPOSER AS customer,
@@ -318,7 +377,7 @@ router.get('/dashboard', async (req, res, next) => {
       LEFT JOIN TRN_PrarambhMotorDetails md WITH (NOLOCK) ON md.PrarambhMainId = b._id AND md.ISACTIVE = 1
       LEFT JOIN MST_FieldMasters fn WITH (NOLOCK) ON fn.MasterId = 4030 AND fn.Value = m.NatureOfSale
       LEFT JOIN MST_FieldMasters ff WITH (NOLOCK) ON ff.MasterId = 8050 AND ff.Value = m.FinalStatus
-      WHERE 1=1${DATE_SEL}${cl.full} ORDER BY m.CREATED_DATE DESC;
+      WHERE 1=1${DATE_SEL}${cl.full} ORDER BY ${SUBMIT_DT} DESC;
 
       -- 6) Period buckets (YTD / MTD / FTD) — every status side by side
       SELECT
@@ -652,6 +711,7 @@ router.get('/compare', async (req, res, next) => {
       DECLARE @pmtd_end date = DATEADD(DAY, -1, @mtd);
       DECLARE @pytd_end date = DATEADD(YEAR, -1, @today);
       IF OBJECT_ID('tempdb..#cbase') IS NOT NULL DROP TABLE #cbase;
+      ${HIER_PREP}
       ${ctesCmp(scope)}
       SELECT * INTO #cbase FROM base WHERE rn = 1${OPT};
       SELECT

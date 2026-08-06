@@ -268,6 +268,64 @@ router.get('/uploads/:id/failures', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/** POST /uploads/:id/reprocess — re-queue ONE already-done folder for a fresh
+ *  OCR run. Reverses settleFolders: clears the folder's per-PDF queue and its
+ *  prior shared entries, un-claims the Node meta (state → NULL), and flips the
+ *  shared folder back to Isactive=1 so enumerateFolders re-picks it on the next
+ *  tick (or "Process now"). Prior trn_OCRBulkEntry rows are deleted first so the
+ *  re-run doesn't double-count in progress/export — scoped by the meta's
+ *  transaction_id (which upsertMeta preserves across re-runs) and falling back to
+ *  the folder_key match the export uses. */
+router.post('/uploads/:id/reprocess', async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) return res.status(400).json({ success: false, error: 'Invalid id' });
+    const app = await getPool();
+    const live = await getPrarambhPool();
+
+    // Folder must exist in the shared table.
+    const f = await live.request().input('id', sql.Int, id)
+      .query('SELECT id, FolderPath, Isactive FROM dbo.Trn_PrarambhOCRBulkUploadDetails WHERE id = @id');
+    if (!f.recordset[0]) return res.status(404).json({ success: false, error: 'Folder not found' });
+
+    // Meta gives the transaction_id (precise entry key) + folder_key (fallback).
+    const mr = await app.request().input('id', sql.Int, id)
+      .query('SELECT folder_key, transaction_id FROM dbo.ocr_bulk_meta WHERE upload_id = @id');
+    const meta = mr.recordset[0] || { folder_key: folderKey(f.recordset[0].FolderPath), transaction_id: null };
+
+    // 1) Clear prior shared entries for this folder (avoids export/progress
+    //    double-count). Prefer the exact transaction_id; else the folder_key match.
+    let entriesDeleted = 0;
+    if (meta.transaction_id) {
+      const d = await live.request().input('tx', sql.NVarChar(50), meta.transaction_id)
+        .query('DELETE FROM dbo.trn_OCRBulkEntry WHERE TransactionID = @tx');
+      entriesDeleted = d.rowsAffected[0] || 0;
+    } else if (meta.folder_key) {
+      const d = await live.request().input('k', sql.NVarChar(500), meta.folder_key)
+        .query('DELETE FROM dbo.trn_OCRBulkEntry WHERE CHARINDEX(@k, FolderPath) > 0');
+      entriesDeleted = d.rowsAffected[0] || 0;
+    }
+
+    // 2) Drop the Node per-PDF queue so enumerateFolders re-queues from disk.
+    const dq = await app.request().input('id', sql.Int, id)
+      .query('DELETE FROM dbo.ocr_bulk_pdf WHERE upload_id = @id');
+    const pdfsCleared = dq.rowsAffected[0] || 0;
+
+    // 3) Un-claim the meta so the worker re-enumerates it (state IS NULL check).
+    await app.request().input('id', sql.Int, id)
+      .query('UPDATE dbo.ocr_bulk_meta SET state = NULL WHERE upload_id = @id');
+
+    // 4) Flip the shared folder back to pending.
+    await live.request().input('id', sql.Int, id)
+      .query('UPDATE dbo.Trn_PrarambhOCRBulkUploadDetails SET Isactive = 1 WHERE id = @id');
+
+    res.json({
+      success: true, id, entriesDeleted, pdfsCleared,
+      message: 'Folder re-queued. It will process on the next tick — or click "Process now".',
+    });
+  } catch (err) { next(err); }
+});
+
 /** POST /process — kick a single processing tick on demand (manual run). */
 router.post('/process', async (req, res, next) => {
   try {
