@@ -27,6 +27,16 @@ const sql = require('mssql');
 const { getPrarambhPool } = require('../db/prarambh-connection');
 const { getPool } = require('../db/connection');
 const { attachUser } = require('./auth');
+const { STATE_PREFIX_FULL } = require('./policy');
+
+// md.StateName is blank on ~90% of rows (source-data gap) but md.RTO_Code is
+// present, so derive the state from the RTO's 2-letter state prefix when the
+// StateName is missing — turns the "Unknown" geography bucket into real states.
+const STATE_FROM_RTO_SQL = 'CASE UPPER(LEFT(LTRIM(md.RTO_Code), 2)) '
+  + Object.entries(STATE_PREFIX_FULL || {})
+      .map(([k, v]) => `WHEN '${k}' THEN '${String(v).replace(/'/g, "''")}'`).join(' ')
+  + ' ELSE NULL END';
+const STATE_EXPR = `ISNULL(NULLIF(LTRIM(RTRIM(md.StateName)), ''), ${STATE_FROM_RTO_SQL})`;
 
 const router = express.Router();
 router.use(attachUser(), (req, res, next) => {
@@ -82,7 +92,7 @@ const baseCols = (scope) => `
       up.EmployeeCode AS employee_code, up.DisplayName AS employee_name,
       f3.Name AS vehicle_type, f5.Name AS product_type,
       i.CompanyName AS insurer,
-      md.RTO_Code AS rto, md.StateName AS state,
+      md.RTO_Code AS rto, ${STATE_EXPR} AS state,
       CASE WHEN ISNULL(md.NCB, 0) > 0 THEN 1 ELSE 0 END AS has_ncb,
       CASE WHEN ISNULL(md.Addon_Premium, 0) > 0 OR ISNULL(md.ADD_ON_PREMIUM, 0) > 0 THEN 1 ELSE 0 END AS has_addon,
       -- Renewal: IsRenewal flag; same/different insurer compares the OCR-captured
