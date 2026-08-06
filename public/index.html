@@ -2076,6 +2076,8 @@
             <option value="2">Done only</option>
             <option value="all">All</option>
           </select>
+          <input id="ocrSearch" type="search" placeholder="Search folder / POS / location…" style="padding:6px 10px; min-width:230px;"
+                 oninput="ocrDebouncedSearch()" onkeydown="if(event.key==='Enter')ocrLoadList()" />
           <button class="btn" style="padding:6px 14px;" onclick="ocrLoadList()">
             <span style="margin-right:6px;">&#128260;</span>Refresh
           </button>
@@ -7164,13 +7166,22 @@
       window.location.href = url;
     }
 
+    let _ocrSearchTimer = null;
+    function ocrDebouncedSearch() {
+      clearTimeout(_ocrSearchTimer);
+      _ocrSearchTimer = setTimeout(ocrLoadList, 350);
+    }
+
     async function ocrLoadList() {
       const body = document.getElementById('ocrFoldersBody');
       try {
         const filterEl = document.getElementById('ocrStatusFilter');
         const status = filterEl ? filterEl.value : 'all';
+        const searchEl = document.getElementById('ocrSearch');
+        const q = searchEl ? searchEl.value.trim() : '';
         ocrLoadSummary();
-        const res = await fetch(API + '/ocr-bulk/uploads?status=' + encodeURIComponent(status));
+        const res = await fetch(API + '/ocr-bulk/uploads?status=' + encodeURIComponent(status)
+          + (q ? '&q=' + encodeURIComponent(q) : ''));
         const data = await res.json();
         const rows = data.uploads || [];
         const label = status === '1' ? 'pending' : status === '2' ? 'done' : '';

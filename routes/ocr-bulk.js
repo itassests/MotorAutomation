@@ -140,12 +140,21 @@ router.get('/uploads', async (req, res, next) => {
     // narrows to one; anything else (or "all") shows both.
     const st = parseInt(req.query.status, 10);
     const statusWhere = (st === 1 || st === 2) ? `Isactive = ${st}` : 'Isactive IN (1, 2)';
+    // ?q= free-text search across folder name / POS / booking location. When a
+    // search is active, widen the cap so matches aren't hidden below the top-N.
+    const q = String(req.query.q || '').trim();
     const live = await getPrarambhPool();
+    const rq = live.request().input('lim', sql.Int, q ? Math.max(limit, 1000) : limit);
+    let searchWhere = '';
+    if (q) {
+      rq.input('q', sql.NVarChar(300), '%' + q + '%');
+      searchWhere = ' AND (FolderPath LIKE @q OR Poscode LIKE @q OR BookedLocation LIKE @q)';
+    }
     // Show done folders too so they stay listed for the Excel download.
-    const det = await live.request().input('lim', sql.Int, limit).query(
+    const det = await rq.query(
       `SELECT TOP (@lim) id, FolderPath, Poscode, Producttype, BookedLocation, PortalUserId, CreatedDate, Isactive
        FROM dbo.Trn_PrarambhOCRBulkUploadDetails
-       WHERE ${statusWhere}
+       WHERE ${statusWhere}${searchWhere}
        ORDER BY CreatedDate DESC, id DESC`);
     const rows = det.recordset;
     if (rows.length === 0) return res.json({ success: true, uploads: [] });
