@@ -582,6 +582,33 @@ function citiesFromRtoList(rtoStr) {
   return out.join(', ');
 }
 
+// Go Digit Pvt-Car SATP is keyed by a DEDICATED "4W TP" cluster taxonomy
+// (HP_Bad, WB_Good, PB_Good … — 92 clusters), NOT the Comp cluster in
+// rto_mappings. The SATP rate_rules carry the cluster name as `region`, which
+// rto_mappings can't resolve — so ALL 92 clusters render with a BLANK rto/city
+// in the Luca file and collapse to one look-alike key per (cc,age,fuel), leaving
+// ~530 "same key, different rate" rows that Luca rejects as conflicts. Invert the
+// SATP config's rtoCluster {RTO→cluster} into {cluster→RTO list} so each cluster
+// gets its real included_rto and the rows stay distinct (USER 2026-08, Digit).
+const GD_SATP_CLUSTER_RTOS = (() => {
+  const out = new Map();
+  try {
+    const rc = (require('../config/go_digit_car_tp_jun26.json') || {}).rtoCluster || {};
+    const inv = new Map();
+    for (const [rto, cluster] of Object.entries(rc)) {
+      const code = normRto(rto);
+      if (!code) continue;
+      const key = String(cluster).toUpperCase().replace(/\s+/g, ' ').trim();
+      if (!inv.has(key)) inv.set(key, new Set());
+      inv.get(key).add(code);
+    }
+    for (const [k, s] of inv) out.set(k, [...s].sort().join(','));
+  } catch (_) { /* config missing → no-op */ }
+  return out;
+})();
+const gdSatpRtos = (region) =>
+  GD_SATP_CLUSTER_RTOS.get(String(region || '').toUpperCase().replace(/\s+/g, ' ').trim()) || '';
+
 async function buildLucaBuffer(ids, opts) {
   // Restrict to specific canonical vehicle types when requested (USER 2026-08-04:
   // Luca file = Pvt Car / TW / GCV only, ignore PCV & MISC). null = no filter.
@@ -706,6 +733,11 @@ async function buildLucaBuffer(ids, opts) {
     const coverageType = cover === 'Comp' ? (isBundled ? 'hybrid' : 'comprehensive')
                        : cover === 'SAOD' ? 'own_damage'
                        : 'third_party';
+    // Bundle tenure (1+5 / 5+5 / 3+3 …) for hybrid rows. A hybrid row blanks the
+    // vehicle_age, so WITHOUT this two different bundles (1+5 vs 5+5) on the same
+    // cell collapse to one key and differ only in rate → a Luca conflict. Carry
+    // the tenure into its own column so they stay distinct (USER 2026-08, Digit).
+    const tenureVal = (coverageType === 'hybrid' && bt) ? (bt[1] + '+' + bt[2]) : '';
     const d = r.effective_from ? new Date(r.effective_from) : null;
     const region = String(r.region || r.state || '').trim();
     let rtoList = rtoListFor(rtoIdx, r.insurer, region);     // shared by city + included_rto
@@ -714,6 +746,9 @@ async function buildLucaBuffer(ids, opts) {
     // the state, so AP16 and AP25 (different rates) collapse to look-alikes. If the
     // region is itself a valid RTO code, use it directly as the included_rto.
     if (!rtoList) { const c = normRto(region); if (c) rtoList = c; }
+    // Go Digit SATP: region is a "4W TP" cluster (HP_Bad …) — resolve to its RTOs
+    // so the 92 clusters don't collapse to a blank look-alike key (see map above).
+    if (!rtoList && /go_digit/i.test(String(r.insurer || ''))) { const rl = gdSatpRtos(region); if (rl) rtoList = rl; }
 
     const rowArr = [
       0,                                                      // id — assigned below after the dedupe check
@@ -731,7 +766,7 @@ async function buildLucaBuffer(ids, opts) {
       // blank + carried only in the REMARK ("slab:X"), which collapsed premium-tiered
       // rules into look-alike rows (same visible params, different rate). Populate the
       // structured column so each band is distinct (USER 2026-08). slab_on/tenure/flat blank.
-      r.volume_tier ? String(r.volume_tier).trim() : '', '', '', '',
+      r.volume_tier ? String(r.volume_tier).trim() : '', '', tenureVal, '',
       '',                                                     // excluded_vehicles
       mm.make,                                                // vehicle_make (manufacturer)
       mm.model,                                               // vehicle_model
