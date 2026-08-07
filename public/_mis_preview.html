@@ -1,0 +1,131 @@
+<!doctype html><html><head><meta charset="utf-8"><title>MIS Preview</title>
+<style>
+  :root{
+    --oi-blue:#00B0FF;--oi-blue-dark:#0082C8;--oi-blue-deep:#00243E;--oi-orange:#F5A011;
+    --oi-g400:#9AA3AF;--oi-g500:#6B7585;--oi-display:'Plus Jakarta Sans',system-ui,sans-serif;
+    --oi-sans:'Montserrat',system-ui,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:#f0f2f5;font-family:var(--oi-sans);padding:24px;}
+  .wrap{max-width:1180px;margin:0 auto;}
+</style></head>
+<body>
+  <div class="wrap"><div id="misRoot" class="mis-root"></div></div>
+  <script>
+  window.MIS_PREVIEW_DATA = {
+    success:true, root:'EMP1042 · Ravi Sharma (Regional Head)',
+    periods:{
+      fy_start:'2026-04-01', mtd_start:'2026-07-02', today:'2026-07-15',
+      ftd:{ nop:38, premium:2140000,
+            ok_to_log:{nop:24,premium:1380000}, uw_pending:{nop:9,premium:520000},
+            return_to_bops:{nop:5,premium:240000}, cqb:{nop:2,premium:90000}, online:{nop:11,premium:610000} },
+      mtd:{ nop:612, premium:34800000,
+            ok_to_log:{nop:430,premium:24900000}, uw_pending:{nop:118,premium:6300000},
+            return_to_bops:{nop:64,premium:3600000}, cqb:{nop:31,premium:1450000}, online:{nop:205,premium:11200000} },
+      ytd:{ nop:5840, premium:342000000,
+            ok_to_log:{nop:4180,premium:246000000}, uw_pending:{nop:980,premium:56000000},
+            return_to_bops:{nop:520,premium:29000000}, cqb:{nop:160,premium:8400000}, online:{nop:2010,premium:118000000} },
+    },
+    by_month:[
+      {label:'Apr 2026',nop:1180,premium:66000000},{label:'May 2026',nop:1320,premium:74500000},
+      {label:'Jun 2026',nop:1410,premium:82300000},{label:'Jul 2026',nop:612,premium:34800000},
+    ],
+    tree:[
+      {branch:'Mumbai',sub_branch:'Andheri',emp_code:'EMP2201',emp_name:'Anita Desai',nop:820,premium:49000000},
+      {branch:'Mumbai',sub_branch:'Andheri',emp_code:'EMP2202',emp_name:'Rohit Kulkarni',nop:540,premium:31000000},
+      {branch:'Mumbai',sub_branch:'Thane',emp_code:'EMP2210',emp_name:'Sneha Patil',nop:610,premium:35500000},
+      {branch:'Pune',sub_branch:'Kothrud',emp_code:'EMP2301',emp_name:'Vikram Joshi',nop:470,premium:26800000},
+      {branch:'Pune',sub_branch:'Hinjewadi',emp_code:'EMP2310',emp_name:'Meera Nair',nop:390,premium:22100000},
+      {branch:'Nagpur',sub_branch:'Dharampeth',emp_code:'EMP2401',emp_name:'Sunil Rao',nop:280,premium:15400000},
+      {branch:'Nashik',sub_branch:'CBS',emp_code:'EMP2501',emp_name:'Kavya Shah',nop:210,premium:11900000},
+    ],
+    by_vehicle_type:[{vehicle_type:'Private Car',nop:2600,premium:168000000},{vehicle_type:'Two Wheeler',nop:2100,premium:52000000},{vehicle_type:'GCV',nop:640,premium:78000000},{vehicle_type:'PCV',nop:320,premium:31000000},{vehicle_type:'MISC',nop:180,premium:13000000}],
+    by_insurer:[{k:'HDFC Ergo',nop:1300,premium:86000000},{k:'ICICI Lombard',nop:1150,premium:74000000},{k:'Bajaj Allianz',nop:900,premium:52000000},{k:'TATA AIG',nop:720,premium:41000000},{k:'SBI General',nop:640,premium:34000000},{k:'Reliance',nop:520,premium:26000000},{k:'Shriram',nop:610,premium:29000000}],
+    by_product:[{k:'Comprehensive',nop:3400,premium:224000000},{k:'SATP / Liability',nop:1900,premium:88000000},{k:'SAOD',nop:540,premium:30000000}],
+    by_state:[{k:'Maharashtra',nop:3900,premium:236000000},{k:'Gujarat',nop:820,premium:41000000},{k:'Karnataka',nop:540,premium:29000000},{k:'Tamil Nadu',nop:360,premium:19000000},{k:'Delhi',nop:220,premium:17000000}],
+    by_rto:[{k:'MH12',state:'Maharashtra',nop:540,premium:33000000},{k:'MH04',state:'Maharashtra',nop:480,premium:29000000},{k:'MH01',state:'Maharashtra',nop:410,premium:31000000},{k:'GJ01',state:'Gujarat',nop:260,premium:14000000},{k:'KA05',state:'Karnataka',nop:230,premium:13000000},{k:'MH14',state:'Maharashtra',nop:390,premium:22000000}],
+    agent_pos:{ total:340, producing:212, idle:128 },
+    agent_activity:[
+      {code:'POS10021',name:'Sharma Insurance Services',cur_nop:40,prev_nop:38,prev2_nop:35,last_biz:'2026-07-14',ytd_nop:410,ytd_premium:24000000},
+      {code:'POS10044',name:'Nirmal Associates',cur_nop:0,prev_nop:22,prev2_nop:19,last_biz:'2026-06-28',ytd_nop:360,ytd_premium:21000000},
+      {code:'POS10102',name:'Guardian Risk',cur_nop:0,prev_nop:18,prev2_nop:16,last_biz:'2026-06-25',ytd_nop:320,ytd_premium:19500000},
+      {code:'POS10203',name:'Trust Advisors',cur_nop:0,prev_nop:0,prev2_nop:0,last_biz:'2026-05-10',ytd_nop:280,ytd_premium:16800000},
+      {code:'POS10310',name:'Prime POS',cur_nop:0,prev_nop:0,prev2_nop:0,last_biz:'2026-04-30',ytd_nop:250,ytd_premium:14200000},
+      {code:'POS10420',name:'Reliable Cover',cur_nop:15,prev_nop:12,prev2_nop:10,last_biz:'2026-07-13',ytd_nop:220,ytd_premium:12900000},
+    ],
+    by_branch:[], by_agent:[{code:'POS10021',name:'Sharma Insurance Services',nop:410,premium:24000000},{code:'POS10044',name:'Nirmal Associates',nop:360,premium:21000000},{code:'POS10102',name:'Guardian Risk',nop:320,premium:19500000},{code:'POS10203',name:'Trust Advisors',nop:280,premium:16800000},{code:'POS10310',name:'Prime POS',nop:250,premium:14200000},{code:'POS10420',name:'Reliable Cover',nop:220,premium:12900000},{code:'POS10555',name:'Apex Assure',nop:190,premium:11100000}],
+    summary:{nop:5840,premium:342000000,online_nop:2010,online_premium:118000000,offline_nop:3830,offline_premium:224000000},
+    renewals:{ renewed_nop:1240, renewed_premium:74000000, new_nop:4600, new_premium:268000000,
+      same_nop:1180, same_premium:70500000, diff_nop:52, diff_premium:3200000, unknown_nop:8,
+      from_insurers:[{k:'ICICI Lombard',nop:18,premium:1100000},{k:'HDFC Ergo',nop:14,premium:900000},{k:'Bajaj Allianz',nop:11,premium:700000},{k:'TATA AIG',nop:9,premium:500000}],
+      by_month:[{ym:'2026-04',renewed:290,same:278,diff:11,new_nop:890},{ym:'2026-05',renewed:330,same:316,diff:13,new_nop:990},{ym:'2026-06',renewed:360,same:342,diff:16,new_nop:1050},{ym:'2026-07',renewed:260,same:244,diff:12,new_nop:670}] },
+    options:{ branches:['Mumbai','Pune','Nagpur','Nashik'], vehicle_types:['Private Car','Two Wheeler','GCV','PCV','MISC'],
+      employees:[{code:'EMP2201',name:'Anita Desai'},{code:'EMP2202',name:'Rohit Kulkarni'},{code:'EMP2301',name:'Vikram Joshi'}] },
+    cases:[],
+  };
+  // generate a realistic employee roster (~100) summing to the YTD premium
+  (function(){ const arr=[]; let rem=342000000; for(let i=0;i<100;i++){ const pr=Math.max(0,Math.round((rem/(100-i))*(0.5+((i*37)%100)/100))); const m=Math.round(pr*(0.06+((i*13)%40)/400)); arr.push({code:'EMP'+(3000+i),name:'Employee '+(i+1),nop:Math.round(pr/58000),premium:pr,mtd_nop:Math.round(m/58000),mtd_premium:m}); rem=Math.max(0,rem-pr); } window.MIS_PREVIEW_DATA.by_employee=arr; })();
+  window.MIS_PREVIEW_DATA.by_agent = window.MIS_PREVIEW_DATA.by_agent.map((a,i)=>Object.assign({},a,{mtd_nop:Math.round(a.nop*(0.08+((i*11)%30)/300)),mtd_premium:Math.round(a.premium*(0.08+((i*11)%30)/300))}));
+  // build cascading filter combinations from the tree × vehicle/product/insurer
+  (function(){ const t=window.MIS_PREVIEW_DATA.tree; const vts=['Private Car','Two Wheeler','GCV']; const prods=['Comprehensive','SATP / Liability']; const ins=['HDFC Ergo','ICICI Lombard','Bajaj Allianz']; const rows=[]; t.forEach(x=>{ vts.forEach(v=>prods.forEach(p=>ins.forEach(i=>{ rows.push({branch:x.branch,sub_branch:x.sub_branch,emp_code:x.emp_code,emp_name:x.emp_name,vehicle_type:v,product:p,insurer:i}); }))); }); window.MIS_PREVIEW_DATA.filter_rows=rows; })();
+  window.MIS_MARGIN_PREVIEW = {
+    success:true, root:'1001',
+    cycle:{id:13,name:'June 1st Cycle',date_from:'2026-06-01',date_to:'2026-06-15',rows:6362},
+    cycles:[
+      {id:13,name:'June 1st Cycle',date_from:'2026-06-01',date_to:'2026-06-15',rows:6362},
+      {id:12,name:'April 2nd Cycle',date_from:'2026-04-17',date_to:'2026-05-01',rows:5476},
+      {id:11,name:'April 1st Cycle',date_from:'2026-04-02',date_to:'2026-04-16',rows:5052},
+    ],
+    totals:{margin:3012000,income:20478000,payout:17446000,premium:56900000,nop:5062},
+    unattributed:{margin:609000,premium:11500000,nop:1296},
+    levels:[
+      {level:'Regional',order:1,totals:{margin:148000,income:1050000,payout:902000,premium:2900000,nop:386},
+        nodes:[{code:'108253',name:'MANISH TIWARI',designation:'Regional Manager',location:'Ahmedabad',margin:148000,income:1050000,payout:902000,premium:2900000,nop:386,margin_pct:5.05}]},
+      {level:'Branch / Location Head',order:2,totals:{margin:2194000,income:14800000,payout:12606000,premium:41300000,nop:3045},
+        nodes:[{code:'5544',name:'RITESH AGRAWAL',designation:'Center Manager',location:'Indore',margin:2194000,income:14800000,payout:12606000,premium:41300000,nop:3045,margin_pct:5.31}]},
+      {level:'Relationship Manager',order:3,totals:{margin:516000,income:3600000,payout:3084000,premium:9800000,nop:844},
+        nodes:[
+          {code:'a1',name:'VIJAPURA SAJJADBHAI AKBARBHAI',designation:'Relationship Manager',location:'Surat',margin:140000,income:980000,payout:840000,premium:2600000,nop:292,margin_pct:5.47},
+          {code:'a2',name:'KARAN GULABBHAI SUTARIYA',designation:'Relationship Manager',location:'Rajkot',margin:91000,income:640000,payout:549000,premium:1500000,nop:118,margin_pct:5.88},
+          {code:'a3',name:'PRAJAPATI JIGNESHKUMAR',designation:'Relationship Manager',location:'Vadodara',margin:87000,income:610000,payout:523000,premium:1500000,nop:145,margin_pct:5.77},
+        ]},
+      {level:'Frontline / POS-owner',order:5,totals:{margin:2685000,income:18200000,payout:15515000,premium:50900000,nop:4529},
+        nodes:[
+          {code:'f1',name:'PANKAJ SURESH SONAWANE',designation:null,location:null,margin:83000,income:560000,payout:477000,premium:1600000,nop:78,margin_pct:5.14},
+          {code:'f2',name:'Ruchi Kalyan Pillai',designation:null,location:null,margin:81000,income:550000,payout:469000,premium:1530000,nop:103,margin_pct:5.29},
+        ]},
+      {level:'Other',order:6,totals:{margin:3012000,income:20478000,payout:17446000,premium:56900000,nop:5062},
+        nodes:[{code:'1001',name:'AJAY BANSAL',designation:'National Head',location:'Mumbai',margin:3012000,income:20478000,payout:17446000,premium:56900000,nop:5062,margin_pct:5.29}]},
+    ],
+  };
+  window.MIS_POSP_PREVIEW = {
+    success:true, root:'1001', range:{from:'2026-04-01',to:'2026-07-15'},
+    totals:{created:294,active:294}, unattributed:{created:51,active:51},
+    by_month:[{ym:'2026-04',created:65,active:65},{ym:'2026-05',created:79,active:78},{ym:'2026-06',created:109,active:107},{ym:'2026-07',created:41,active:41}],
+    by_location:[{location:'Maharashtra',created:150,active:149},{location:'Gujarat',created:38,active:38},{location:'Uttar Pradesh',created:27,active:26},{location:'Delhi',created:14,active:14},{location:'Tamil Nadu',created:13,active:13}],
+    levels:[
+      {level:'Regional',order:1,totals:{created:13,active:13},nodes:[{code:'108253',name:'MANISH TIWARI',designation:'Regional Manager',location:'Ahmedabad',created:13,active:13}]},
+      {level:'Branch / Location Head',order:2,totals:{created:225,active:225},nodes:[{code:'5544',name:'RITESH AGRAWAL',designation:'Center Manager',location:'Indore',created:225,active:225}]},
+      {level:'Relationship Manager',order:3,totals:{created:17,active:17},nodes:[
+        {code:'a1',name:'RAJPUT MADHAV',designation:'Assistant Sales Manager',location:'Surat',created:6,active:6},
+        {code:'a2',name:'PRITAM GUPTA',designation:'Relationship Manager',location:'Lucknow',created:4,active:4}]},
+      {level:'Frontline / POS-owner',order:5,totals:{created:290,active:290},nodes:[
+        {code:'f1',name:'Priyanka Bhojraj Thakare',designation:null,location:null,created:12,active:12},
+        {code:'f2',name:'Sagar Bhagwatrao Kakde',designation:null,location:null,created:11,active:11}]},
+      {level:'Other',order:6,totals:{created:294,active:294},nodes:[{code:'1001',name:'AJAY BANSAL',designation:'National Head',location:'Mumbai',created:294,active:294}]},
+    ],
+  };
+  window.MIS_PREVIEW_COMPARE = {
+    success:true,
+    mtd:{ current:{nop:612,premium:34800000,ok_to_log:{nop:430,premium:24900000}},
+          previous:{nop:548,premium:30100000,ok_to_log:{nop:372,premium:21200000}},
+          cur_range:['2026-07-02','2026-07-15'], prev_range:['2026-06-02','2026-06-15'] },
+    ytd:{ current:{nop:5840,premium:342000000,ok_to_log:{nop:4180,premium:246000000}},
+          previous:{nop:5120,premium:298000000,ok_to_log:{nop:3510,premium:212000000}},
+          cur_range:['2026-04-01','2026-07-15'], prev_range:['2025-04-01','2025-07-15'] },
+  };
+  </script>
+  <script src="/vendor/chart.umd.min.js"></script>
+  <script src="/mis-dashboard.js?v=23"></script>
+  <script>window.addEventListener('load',()=>{ if(typeof misInit==='function') misInit(); });</script>
+</body></html>

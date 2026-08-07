@@ -338,6 +338,7 @@
            <div class="fgrp"><label>From</label><input type="date" data-f="from" value="${F.from || ''}"></div>
            <div class="fgrp"><label>To</label><input type="date" data-f="to" value="${F.to || ''}"></div>
            <button class="fbtn" data-freset="1">↺ Reset</button>
+           <button class="fbtn" data-fexport="1" title="Download the filtered data (all fields) as Excel" style="background:#1E9E5A;border-color:#1E9E5A;color:#fff;">⬇ Download</button>
          </div>
        </div>`;
     c.querySelectorAll('[data-f]').forEach(inp => inp.addEventListener('change', () => {
@@ -347,6 +348,32 @@
     }));
     const rb = c.querySelector('[data-freset]');
     if (rb) rb.addEventListener('click', () => { MIS.filters = { scope: 'motor', branch: '', sub_branch: '', employee: '', vehicle_type: '', product: '', insurer: '', channel: '', ncb: '', addon: '', from: '', to: '' }; loadData(true); });
+    const xb = c.querySelector('[data-fexport]');
+    if (xb) xb.addEventListener('click', () => misExport(xb));
+  }
+
+  // Download the current filtered selection (ALL fields) as .xlsx. Fetched as a
+  // blob so the page's wrapped fetch supplies auth (no token needed in the URL).
+  async function misExport(btn) {
+    const old = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Preparing…'; }
+    try {
+      const API = window.location.origin + '/api';
+      const qs = new URLSearchParams();
+      Object.entries(MIS.filters).forEach(([k, v]) => { if (v) qs.set(k, v); });
+      const resp = await fetch(API + '/employee/export?' + qs.toString());
+      if (!resp.ok) throw new Error('Export failed (' + resp.status + ')');
+      const blob = await resp.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `business_data_${MIS.filters.from || 'FY'}_to_${MIS.filters.to || 'today'}.xlsx`;
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 200);
+    } catch (e) {
+      alert('Download failed: ' + (e && e.message ? e.message : e));
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = old; }
+    }
   }
 
   // ---- body router ---------------------------------------------------------
