@@ -733,11 +733,9 @@ async function buildLucaBuffer(ids, opts) {
     const coverageType = cover === 'Comp' ? (isBundled ? 'hybrid' : 'comprehensive')
                        : cover === 'SAOD' ? 'own_damage'
                        : 'third_party';
-    // Bundle tenure (1+5 / 5+5 / 3+3 …) for hybrid rows. A hybrid row blanks the
-    // vehicle_age, so WITHOUT this two different bundles (1+5 vs 5+5) on the same
-    // cell collapse to one key and differ only in rate → a Luca conflict. Carry
-    // the tenure into its own column so they stay distinct (USER 2026-08, Digit).
-    const tenureVal = (coverageType === 'hybrid' && bt) ? (bt[1] + '+' + bt[2]) : '';
+    // NB: bundle tenure (1+5 / 5+5) is deliberately NOT written to the slab/tenure
+    // column — USER 2026-08 asked to leave it blank for now. (This means 1+5 vs 5+5
+    // bundles on the same cell can still look like a Luca conflict; revisit later.)
     const d = r.effective_from ? new Date(r.effective_from) : null;
     const region = String(r.region || r.state || '').trim();
     let rtoList = rtoListFor(rtoIdx, r.insurer, region);     // shared by city + included_rto
@@ -766,7 +764,7 @@ async function buildLucaBuffer(ids, opts) {
       // blank + carried only in the REMARK ("slab:X"), which collapsed premium-tiered
       // rules into look-alike rows (same visible params, different rate). Populate the
       // structured column so each band is distinct (USER 2026-08). slab_on/tenure/flat blank.
-      r.volume_tier ? String(r.volume_tier).trim() : '', '', tenureVal, '',
+      r.volume_tier ? String(r.volume_tier).trim() : '', '', '', '',
       '',                                                     // excluded_vehicles
       mm.make,                                                // vehicle_make (manufacturer)
       mm.model,                                               // vehicle_model
