@@ -68,8 +68,16 @@ function rootEmpFor(req) {
 }
 
 // FY / business-month / today are computed in SQL from the DB's current date.
+// Period anchor (@today) drives the FTD / MTD / YTD cards. It follows the filter's
+// "To" date when that is a real, on-or-before-today date — so the cards show an
+// "as of <To>" snapshot (e.g. MTD/YTD as of 5-Aug), not just live totals. When
+// "To" is blank / the 2999 sentinel / in the future, it falls back to today.
+// @fy (FY start) and @mtd (business-month start) are derived from @today, so all
+// three cards move together with the chosen as-of date.
 const DECLARES = `
-  DECLARE @today date = CAST(GETDATE() AS date);
+  DECLARE @today date = CASE
+    WHEN TRY_CONVERT(date, @to) IS NOT NULL AND TRY_CONVERT(date, @to) <= CAST(GETDATE() AS date)
+      THEN TRY_CONVERT(date, @to) ELSE CAST(GETDATE() AS date) END;
   DECLARE @fy date = DATEFROMPARTS(CASE WHEN MONTH(@today) >= 4 THEN YEAR(@today) ELSE YEAR(@today) - 1 END, 4, 1);
   DECLARE @mtd date = CASE WHEN DAY(@today) >= 2 THEN DATEFROMPARTS(YEAR(@today), MONTH(@today), 2)
                            ELSE DATEADD(MONTH, -1, DATEFROMPARTS(YEAR(@today), MONTH(@today), 2)) END;`;
