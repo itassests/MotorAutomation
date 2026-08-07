@@ -24,6 +24,7 @@
  */
 const express = require('express');
 const sql = require('mssql');
+const XLSX = require('xlsx');
 const { getPrarambhPool } = require('../db/prarambh-connection');
 const { getPool } = require('../db/connection');
 const { attachUser } = require('./auth');
@@ -260,6 +261,26 @@ const OPT = ' OPTION (MAXRECURSION 1000)';
 // Date window for the "current selection" queries (summary / breakdowns / list).
 const DATE_SEL = ' AND b.cdate BETWEEN CONVERT(date, @from) AND CONVERT(date, @to)';
 
+// Non-motor premium fill (RF), scoped to the subtree's non-motor #base trackers.
+const NONMOTOR_PREM_UPDATE = `
+      UPDATE b SET b.premium = rf.prem
+      FROM #base b
+      JOIN (SELECT r.CurrentTrackerNo,
+                   MAX(ISNULL(NULLIF(r.AnnualPremium, 0), r.TotalPremium)) AS prem
+            FROM Beeinsured_v3_2.dbo.TRN_ReportedFieldsPrarambh r WITH (NOLOCK)
+            JOIN #base bb ON bb.TrackerNo = r.CurrentTrackerNo AND bb.is_motor = 0
+            GROUP BY r.CurrentTrackerNo) rf ON rf.CurrentTrackerNo = b.TrackerNo
+      WHERE b.is_motor = 0;`;
+// Full base materialisation (DECLARES + hierarchy prelude + deduped #base +
+// non-motor premium fill). Shared by /dashboard (inline) and /export.
+const buildBaseSql = (scope) => `
+      ${DECLARES}
+      IF OBJECT_ID('tempdb..#base') IS NOT NULL DROP TABLE #base;
+      ${HIER_PREP}
+      ${ctes(scope)}
+      SELECT * INTO #base FROM base WHERE rn = 1${OPT};
+      ${scope !== 'motor' ? NONMOTOR_PREM_UPDATE : ''}`;
+
 // Bind the always-present params + optional filters on a single request, and
 // return two WHERE fragments (referencing the materialised #base alias `b`):
 //   full — every filter incl. the status drills (summary / breakdowns / list)
@@ -300,6 +321,72 @@ function buildClauses(rq, root, from, to, q) {
   if (q.online_txn)    { onlyFull('b.in_txn = 1'); }
   return { full, base };
 }
+
+/** GET /export — full policy-level data (ALL fields) for the CURRENT selection
+ *  (same root + scope + date range + every dimension/status filter as the
+ *  dashboard), as an .xlsx. Not capped at LIST_CAP like the on-screen case list.
+ *  Triggered via window.location so the browser downloads it (?token= for auth). */
+router.get('/export', async (req, res, next) => {
+  try {
+    const root = rootEmpFor(req);
+    if (!root) return res.status(400).json({ success: false, error: 'No employee code on this login' });
+    const from = String(req.query.from || '').trim() || '2026-04-01';
+    const to   = String(req.query.to || '').trim() || '2999-12-31';
+    const q = req.query;
+    const scope = String(q.scope || 'motor').toLowerCase();
+    const pool = await getPrarambhPool();
+    const rq = pool.request();
+    rq.timeout = 600000;
+    const cl = buildClauses(rq, root, from, to, q);
+    const batch = `
+      ${buildBaseSql(scope)}
+      SELECT TOP 200000
+        b.TrackerNo                                   AS [Tracker No],
+        CONVERT(varchar(10), ${SUBMIT_DT}, 105)       AS [Submission Date],
+        mis.POLICY_NO                                 AS [Policy No],
+        p.FULLNAME_PROPOSER                           AS [Customer],
+        md.VEHICLE_REGISTRATION_NO                    AS [Reg No],
+        b.vehicle_type                                AS [Vehicle Type],
+        b.product_type                                AS [Product],
+        b.insurer                                     AS [Insurer],
+        b.rto                                         AS [RTO],
+        b.state                                       AS [State],
+        CASE WHEN b.has_ncb = 1 THEN 'Yes' ELSE 'No' END    AS [NCB],
+        CASE WHEN b.has_addon = 1 THEN 'Yes' ELSE 'No' END  AS [Add-on],
+        CASE WHEN b.is_renewal = 1 THEN 'Yes' ELSE 'No' END AS [Renewal],
+        b.premium                                     AS [Premium],
+        b.vertical                                    AS [Vertical],
+        b.branch                                      AS [Branch],
+        b.sub_branch                                  AS [Sub Branch],
+        b.employee_code                               AS [Employee Code],
+        b.employee_name                               AS [Employee],
+        b.agent_code                                  AS [Agent/POS],
+        CASE WHEN b.NatureOfSale IN ${ONLINE_SET} THEN 'Online' ELSE 'Offline' END AS [Channel],
+        CASE b.LogStatusId WHEN 2 THEN 'Ok to Log' WHEN 1 THEN 'U/W Pending' WHEN 6 THEN 'Return to Bops'
+             ELSE CONVERT(varchar(12), b.LogStatusId) END AS [Log Status],
+        ff.Name                                       AS [Final Status]
+      FROM #base b
+      JOIN TRN_PrarambhMain m WITH (NOLOCK) ON m.Id = b._id
+      LEFT JOIN TRN_PrarambhProposerDetails p WITH (NOLOCK) ON p.PrarambhMainId = b._id AND p.ISACTIVE = 1
+      LEFT JOIN TRN_PrarambhMotorMISUpdation mis WITH (NOLOCK) ON mis.PrarambhMainId = b._id AND mis.ISACTIVE = 1
+      LEFT JOIN TRN_PrarambhMotorDetails md WITH (NOLOCK) ON md.PrarambhMainId = b._id AND md.ISACTIVE = 1
+      LEFT JOIN MST_FieldMasters ff WITH (NOLOCK) ON ff.MasterId = 8050 AND ff.Value = m.FinalStatus
+      WHERE 1=1${DATE_SEL}${cl.full}
+      ORDER BY ${SUBMIT_DT} DESC${OPT};`;
+    const result = await rq.query(batch);
+    const rows = result.recordsets[result.recordsets.length - 1] || result.recordset || [];
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Policies');
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const fname = `dashboard_export_${from}_to_${to}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+    res.setHeader('Content-Length', buffer.length);
+    res.send(buffer);
+  } catch (err) { next(err); }
+});
 
 router.get('/dashboard', async (req, res, next) => {
   try {

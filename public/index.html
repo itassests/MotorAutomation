@@ -3864,6 +3864,8 @@
           <select id="empChannel" style="height:30px;font-size:13px;"><option value="">All</option><option value="online">Online</option><option value="offline">Offline</option></select></div>
         <button class="btn btn-sm" onclick="empClear()" style="background:#fff;border:1px solid #e0a800;color:#b8860b;">Clear</button>
         <button class="btn btn-primary btn-sm" onclick="empSearch()">Search</button>
+        <button class="btn btn-sm" onclick="empExport()" title="Download the current selection (all fields) as Excel"
+                style="background:#1b5e20;border:1px solid #1b5e20;color:#fff;">&#11015; Download</button>
         </div>
       </div>
 
@@ -4767,18 +4769,12 @@
       el.value = cur;
     }
 
-    async function loadEmployeeDashboard() {
-      const meta = document.getElementById('empMeta');
-      // Default dates on first open.
-      if (!document.getElementById('empFrom').value) {
-        const today = new Date();
-        document.getElementById('empFrom').value = '2026-04-01';
-        document.getElementById('empTo').value = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
-      }
+    // Current dashboard filter selection as query params. Shared by the dashboard
+    // fetch and the full-data Export so they always agree on what's shown.
+    function empFilterParams() {
       const qs = new URLSearchParams();
-      const g = (id) => document.getElementById(id).value;
-      // Combined Motor + Non-Motor counts/premium (USER): the dashboard totals
-      // include both. Optimised base build keeps this fast.
+      const g = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+      // Combined Motor + Non-Motor (dashboard totals include both).
       qs.set('scope', 'all');
       if (g('empFrom')) qs.set('from', g('empFrom'));
       if (g('empTo'))   qs.set('to', g('empTo'));
@@ -4792,6 +4788,25 @@
       if (_empState.logStatus != null) qs.set('log_status', _empState.logStatus);
       if (_empState.policyStatus != null) qs.set('policy_status', _empState.policyStatus);
       if (_empState.onlineTxn != null) qs.set('online_txn', _empState.onlineTxn);
+      return qs;
+    }
+
+    // Download the current selection (ALL fields, no row cap) as .xlsx.
+    function empExport() {
+      const qs = empFilterParams();
+      qs.set('token', _authToken || '');
+      window.location.href = API + '/employee/export?' + qs.toString();
+    }
+
+    async function loadEmployeeDashboard() {
+      const meta = document.getElementById('empMeta');
+      // Default dates on first open.
+      if (!document.getElementById('empFrom').value) {
+        const today = new Date();
+        document.getElementById('empFrom').value = '2026-04-01';
+        document.getElementById('empTo').value = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+      }
+      const qs = empFilterParams();
       if (meta) meta.textContent = 'Loading…';
       // Case details stay hidden until the user explicitly drills in.
       const _cc = document.getElementById('empCasesCard'); if (_cc) _cc.style.display = 'none';
