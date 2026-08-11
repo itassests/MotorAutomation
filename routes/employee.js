@@ -33,11 +33,16 @@ const { STATE_PREFIX_FULL } = require('./policy');
 // md.StateName is blank on ~90% of rows (source-data gap) but md.RTO_Code is
 // present, so derive the state from the RTO's 2-letter state prefix when the
 // StateName is missing — turns the "Unknown" geography bucket into real states.
-const STATE_FROM_RTO_SQL = 'CASE UPPER(LEFT(LTRIM(md.RTO_Code), 2)) '
+const _stateCase = (col) => 'CASE UPPER(LEFT(LTRIM(' + col + '), 2)) '
   + Object.entries(STATE_PREFIX_FULL || {})
       .map(([k, v]) => `WHEN '${k}' THEN '${String(v).replace(/'/g, "''")}'`).join(' ')
   + ' ELSE NULL END';
-const STATE_EXPR = `ISNULL(NULLIF(LTRIM(RTRIM(md.StateName)), ''), ${STATE_FROM_RTO_SQL})`;
+const STATE_FROM_RTO_SQL = _stateCase('md.RTO_Code');
+// The vehicle registration number also starts with the state prefix (MH04… → MH),
+// so use it as a THIRD fallback when both StateName and RTO_Code are blank —
+// further shrinks the "Unknown" geography bucket (#9).
+const STATE_FROM_REG_SQL = _stateCase('md.VEHICLE_REGISTRATION_NO');
+const STATE_EXPR = `ISNULL(ISNULL(NULLIF(LTRIM(RTRIM(md.StateName)), ''), ${STATE_FROM_RTO_SQL}), ${STATE_FROM_REG_SQL})`;
 
 const router = express.Router();
 router.use(attachUser(), (req, res, next) => {
