@@ -252,6 +252,11 @@
     }
     const body = document.getElementById('misBody');
     if (body) body.innerHTML = '<div class="mis-empty">Loading business data…</div>';
+    // #13 — sequence guard: if the user changes a 2nd filter while a load is in
+    // flight, that fires another loadData(). Only the LATEST request may apply its
+    // data/re-render; a stale earlier response must not clobber it (which dropped
+    // the 2nd filter's effect).
+    const seq = (MIS._loadSeq = (MIS._loadSeq || 0) + 1);
     try {
       const API = window.location.origin + '/api';
       const qs = new URLSearchParams();
@@ -259,6 +264,7 @@
       // filters change the current selection → invalidate the compare cache too
       MIS.compare = null;
       const r = await fetch(API + '/employee/dashboard?' + qs.toString()).then(x => x.json());
+      if (seq !== MIS._loadSeq) return;           // superseded by a newer load
       if (!r || !r.success) throw new Error((r && r.error) || 'Failed to load');
       MIS.data = r;
       const sub = document.getElementById('misHeroSub');
@@ -266,6 +272,7 @@
       renderFilters();
       renderBody();
     } catch (e) {
+      if (seq !== MIS._loadSeq) return;           // a newer load is in charge
       if (body) body.innerHTML = `<div class="mis-empty">Could not load MIS data — ${escapeHtml(e.message || e)}</div>`;
     }
   }
