@@ -531,9 +531,13 @@ async function loadRtoIndex(pool) {
   const rs = await pool.request().query(
     'SELECT insurer, region, cluster, rto_code FROM rto_mappings WHERE rto_code IS NOT NULL');
   const sets = new Map();
+  const byState = new Map();   // state prefix ("MH") -> Set of "MH-01" codes
   for (const r of rs.recordset) {
     const code = normRto(r.rto_code);   // uniform MH-01 shape; drops ALL / PIN / junk
     if (!code) continue;
+    const st = code.slice(0, 2);        // "MH-01" -> "MH"
+    if (!byState.has(st)) byState.set(st, new Set());
+    byState.get(st).add(code);
     for (const g of [r.region, r.cluster]) {
       if (!g || !String(g).trim()) continue;
       const k = _rkey(r.insurer, g);
@@ -543,7 +547,27 @@ async function loadRtoIndex(pool) {
   }
   const out = new Map();
   for (const [k, s] of sets) out.set(k, [...s].sort().join(','));
+  const stateRtos = new Map();
+  for (const [st, s] of byState) stateRtos.set(st, [...s].sort().join(','));
+  out._stateRtos = stateRtos;   // attach the global state->RTO map to the index
   return out;
+}
+// Valid 2-letter RTO/state prefixes (STATE_TO_RTO_PREFIX values + UTs/islands not
+// in the state-name map). A rate_rule whose region is one of these is a whole-STATE
+// rule; expand it to every RTO in that state so it is not left blank.
+const STATE_PREFIXES = new Set([
+  ...Object.values(STATE_TO_RTO_PREFIX),
+  'AN', 'LD', 'DN', 'DD', 'CH', 'PY', 'TG', 'UA', 'OR', 'UT', 'SK', 'MN', 'MZ', 'AR',
+]);
+function asStatePrefix(region) {
+  const g = String(region || '').toUpperCase().replace(/\s+/g, ' ').trim();
+  if (STATE_PREFIXES.has(g)) return g === 'TG' ? 'TS' : (g === 'OR' ? 'OD' : (g === 'UA' || g === 'UT' ? 'UK' : g));
+  return STATE_TO_RTO_PREFIX[g] || '';
+}
+// Whole-state fallback: region is a state code/name -> every RTO in that state.
+function stateRtoList(idx, region) {
+  const p = asStatePrefix(region);
+  return (p && idx && idx._stateRtos && idx._stateRtos.get(p)) || '';
 }
 function rtoListFor(idx, insurer, region) {
   const g = String(region || '').trim();
@@ -747,6 +771,9 @@ async function buildLucaBuffer(ids, opts) {
     // Go Digit SATP: region is a "4W TP" cluster (HP_Bad …) — resolve to its RTOs
     // so the 92 clusters don't collapse to a blank look-alike key (see map above).
     if (!rtoList && /go_digit/i.test(String(r.insurer || ''))) { const rl = gdSatpRtos(region); if (rl) rtoList = rl; }
+    // Whole-state region (Chola "JH"/"MH", and any insurer whose rule region is a
+    // bare state code/name): expand to every RTO in that state so it isn't blank.
+    if (!rtoList) { const rl = stateRtoList(rtoIdx, region); if (rl) rtoList = rl; }
 
     const rowArr = [
       0,                                                      // id — assigned below after the dedupe check
