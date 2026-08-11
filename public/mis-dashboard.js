@@ -701,7 +701,9 @@
         try {
           const API = window.location.origin + '/api';
           const qs = new URLSearchParams();
-          Object.entries(MIS.filters).forEach(([k, v]) => { if (v && k !== 'from' && k !== 'to') qs.set(k, v); });
+          // Send `to` (the as-of anchor) so Growth matches the Overview periods;
+          // `from` is omitted — MTD/YTD windows start at the month/FY start, not From.
+          Object.entries(MIS.filters).forEach(([k, v]) => { if (v && k !== 'from') qs.set(k, v); });
           const r = await fetch(API + '/employee/compare?' + qs.toString()).then(x => x.json());
           if (!r || !r.success) throw new Error((r && r.error) || 'failed');
           MIS.compare = r;

@@ -769,6 +769,9 @@ router.get('/compare', async (req, res, next) => {
     const round = (n) => +Number(n || 0).toFixed(2);
     const rq = pool.request();
     rq.input('emp', sql.VarChar(50), root);
+    // Anchor the periods to the filter's "To" date (as-of), same as /dashboard —
+    // so the Growth tab and the Overview period cards agree (#10/#14).
+    rq.input('to', sql.VarChar(20), String(q.to || '').trim() || '2999-12-31');
     // dimension filters (no date / no status — periods are computed in SQL)
     let dim = '';
     const addDim = (name, type, val, col) => { if (val) { rq.input(name, type, val); dim += ` AND ${col} = @${name}`; } };
@@ -797,13 +800,18 @@ router.get('/compare', async (req, res, next) => {
       ISNULL(SUM(CASE WHEN b.cdate BETWEEN ${lo} AND ${hi} AND b.LogStatusId = 2 THEN b.premium ELSE 0 END),0) AS ${alias}_ok_prem`;
 
     const batch = `
-      DECLARE @today date = CAST(GETDATE() AS date);
+      DECLARE @today date = CASE
+        WHEN TRY_CONVERT(date, @to) IS NOT NULL AND TRY_CONVERT(date, @to) <= CAST(GETDATE() AS date)
+          THEN TRY_CONVERT(date, @to) ELSE CAST(GETDATE() AS date) END;
       DECLARE @fy date = DATEFROMPARTS(CASE WHEN MONTH(@today) >= 4 THEN YEAR(@today) ELSE YEAR(@today) - 1 END, 4, 1);
       DECLARE @mtd date = CASE WHEN DAY(@today) >= 2 THEN DATEFROMPARTS(YEAR(@today), MONTH(@today), 2)
                                ELSE DATEADD(MONTH, -1, DATEFROMPARTS(YEAR(@today), MONTH(@today), 2)) END;
       DECLARE @pfy date = DATEADD(YEAR, -1, @fy);
       DECLARE @pmtd date = DATEADD(MONTH, -1, @mtd);
-      DECLARE @pmtd_end date = DATEADD(DAY, -1, @mtd);
+      -- Previous MTD must cover the SAME window length as the current MTD (2nd →
+      -- as-of), not the whole previous business month — else prev NOP/premium are
+      -- inflated and the growth % is wrong (#15, #20). End = as-of date, one month back.
+      DECLARE @pmtd_end date = DATEADD(MONTH, -1, @today);
       DECLARE @pytd_end date = DATEADD(YEAR, -1, @today);
       IF OBJECT_ID('tempdb..#cbase') IS NOT NULL DROP TABLE #cbase;
       ${HIER_PREP}
