@@ -818,11 +818,15 @@
     chan.appendChild(channelCard('Offline', s.offline_nop, s.offline_premium, s.nop, s.premium, COLORS.navy));
     chan.appendChild(channelCard('Online', s.online_nop, s.online_premium, s.nop, s.premium, COLORS.online));
     body.appendChild(chan);
-    // breakdown grid
+    // breakdown grid. Drop blank / placeholder buckets (null vehicle_type/product
+    // rendered by the API as "—" — a handful of incomplete records, 0 premium):
+    // showing a "-" row is noise, so filter them out (#17, #18).
+    const notBlankK = (r) => r && r.k != null && !/^(—|-|–|unknown|null|n\/a|)$/i.test(String(r.k).trim());
     const g = el('div', 'mis-blgrid');
-    g.appendChild(barListCard('By Vehicle Type', (d.by_vehicle_type || []).map(r => ({ k: r.vehicle_type, nop: r.nop, premium: r.premium }))));
-    g.appendChild(barListCard('By Insurer', d.by_insurer, { limit: 12 }));
-    g.appendChild(barListCard('By Product / Policy Type', d.by_product));
+    g.appendChild(barListCard('By Vehicle Type', (d.by_vehicle_type || [])
+      .map(r => ({ k: r.vehicle_type, nop: r.nop, premium: r.premium })).filter(notBlankK)));
+    g.appendChild(barListCard('By Insurer', (d.by_insurer || []).filter(notBlankK), { limit: 12 }));
+    g.appendChild(barListCard('By Product / Policy Type', (d.by_product || []).filter(notBlankK)));
     body.appendChild(g);
     // fuel / addon / NCB / category — only in uploaded PRs
     body.appendChild(el('div', 'mis-note',
