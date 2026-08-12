@@ -633,6 +633,23 @@ const GD_SATP_CLUSTER_RTOS = (() => {
 const gdSatpRtos = (region) =>
   GD_SATP_CLUSTER_RTOS.get(String(region || '').toUpperCase().replace(/\s+/g, ' ').trim()) || '';
 
+// The `slab` column is a PREMIUM / VOLUME band (e.g. "0-50K", "1-2L", "3L+",
+// "Below 1L", "1L-25L", "Above 25L", "Upto 2L"). Some volume_tier values are NOT
+// slabs — they are segment/model text or stray numbers mis-parsed into the column
+// (Bajaj: "Max Scooter" 13.5k rows, "50", "20-40%"). Populating those as a slab is
+// wrong and also makes non-slab rows look distinct. Only treat a value as a slab
+// when it carries a money magnitude (K/L/CR/lakh) or a band keyword; else blank
+// (USER 2026-08, Bajaj). Percent values ("20-40%") are discount ranges, not slabs.
+function slabValue(vt) {
+  const s = String(vt == null ? '' : vt).trim();
+  if (!s) return '';
+  const u = s.toUpperCase();
+  if (/%/.test(u)) return '';                                       // discount range, not a slab
+  if (/\d\s*(K|L|CR|LAKH|LAC|LACS|LAKHS)\b/.test(u)) return s;      // 0-50K, 1-2L, 3L+, Above 25L
+  if (/\b(BELOW|ABOVE|UP\s*TO|UPTO|OVER|LESS THAN|MORE THAN)\b/.test(u)) return s;
+  return '';                                                        // "Max Scooter", "50", plain text
+}
+
 async function buildLucaBuffer(ids, opts) {
   // Restrict to specific canonical vehicle types when requested (USER 2026-08-04:
   // Luca file = Pvt Car / TW / GCV only, ignore PCV & MISC). null = no filter.
@@ -791,7 +808,7 @@ async function buildLucaBuffer(ids, opts) {
       // blank + carried only in the REMARK ("slab:X"), which collapsed premium-tiered
       // rules into look-alike rows (same visible params, different rate). Populate the
       // structured column so each band is distinct (USER 2026-08). slab_on/tenure/flat blank.
-      r.volume_tier ? String(r.volume_tier).trim() : '', '', '', '',
+      slabValue(r.volume_tier), '', '', '',
       '',                                                     // excluded_vehicles
       mm.make,                                                // vehicle_make (manufacturer)
       mm.model,                                               // vehicle_model
