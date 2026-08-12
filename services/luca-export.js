@@ -800,10 +800,28 @@ async function buildLucaBuffer(ids, opts) {
   // engine never pays alongside the correct config-expanded ones.
   const dbRows = result.recordset.filter(r => !isSuppressed(r));
 
+  // Liberty TW comprehensive is owned by the "TW SATP MC" grid (rate_type COMP, flat
+  // ~0.54) where it exists; the Robinhood grid's PACK_LIBERTY_OD (the comp OD leg,
+  // region-specific 0.43/0.48) duplicates the same coverage with a DIFFERENT rate →
+  // 38 Luca conflicts. Per USER 2026-08 the TW SATP MC COMP wins. Build the set of
+  // region+segment the COMP grid actually covers, and drop ONLY the matching OD-leg
+  // rows below — so the ~41 regions the COMP grid omits keep their Robinhood comp.
+  const _libTwCompCov = new Set();
+  for (const r of dbRows) {
+    if (/liberty/i.test(String(r.insurer || '')) && String(r.product || '').toUpperCase() === 'TW'
+        && /^COMP$/i.test(String(r.rate_type || ''))) {
+      _libTwCompCov.add(_normKey(r.region) + '|' + _normKey(r.segment));
+    }
+  }
+
   const rows = [LUCA_HEADERS.slice()];
   const _emitted = new Set();   // output-level dedupe (see the push below)
   let id = 1;
   for (const r of dbRows.concat(configRows)) {
+    // Drop the duplicate Robinhood TW comp OD leg where the TW SATP MC COMP wins.
+    if (/liberty/i.test(String(r.insurer || '')) && String(r.product || '').toUpperCase() === 'TW'
+        && /^PACK_LIBERTY_OD$/i.test(String(r.rate_type || ''))
+        && _libTwCompCov.has(_normKey(r.region) + '|' + _normKey(r.segment))) continue;
     const insurer = lucaInsurer(r.insurer || '');
     const vt = ex.inferVehicleType(r.sheet_name, r.product, r.segment, r.sub_type);
     // Product scope (USER): the Luca file covers Pvt Car / TW / GCV only — skip
