@@ -866,11 +866,10 @@ async function buildLucaBuffer(ids, opts) {
       mm.make,                                                // vehicle_make (manufacturer)
       mm.model,                                               // vehicle_model
       ccBand(r.cc_band_min, r.cc_band_max),                   // vehicle_cc — [min,max]
-      // vehicle_age — [min,max]; blank for HYBRID (USER): a hybrid row is a
-      // bundled long-term package (1+3 / 1+5 / 5+5), which by definition is
-      // written on a BRAND-NEW vehicle, so an age band on it is meaningless to
-      // Luca. Blank = "all ages". Non-hybrid covers keep their band.
-      coverageType === 'hybrid' ? ''                                           // vehicle_age
+      // vehicle_age — [min,max]. A HYBRID row is a bundled long-term package
+      // (1+3 / 1+5 / 5+5), always written on a BRAND-NEW vehicle → age ZERO
+      // (USER 2026-08: set 0, was blank). Non-hybrid covers keep their band.
+      coverageType === 'hybrid' ? ageBand(0, 0)                               // vehicle_age
         : (ageBand(r.age_band_min, r.age_band_max)
            || (function () { const b = ageBandFromSegment(r.segment); return b ? ageBand(b[0], b[1]) : ''; })()),
       seatBand(r.seating_capacity_min, r.seating_capacity_max),                 // seating_capacity
@@ -985,11 +984,13 @@ async function buildLucaBuffer(ids, opts) {
         // distinct volume tiers → keep the highest tier (USER: 3L+).
         best = grp[0];
         for (const r0 of grp) if (tierMag(r0._vt) > tierMag(best._vt)) best = r0;
-      } else if (/bajaj|icici/i.test(String(grp[0][I_INS] || ''))) {
+      } else if (/bajaj|icici|royal|chola/i.test(String(grp[0][I_INS] || ''))) {
         // Same exact cell+RTO at different rates, collapse to the HIGHER rate:
         //  - Bajaj: duplicated per-RTO override (base-with-note vs explicit row).
-        //  - ICICI: MHCV truck-body variants (Tanker/Tipper/Trailer/Truck) that
-        //    share tonnage+RTO but have no Luca body column (USER 2026-08).
+        //  - ICICI: MHCV truck-body variants (Tanker/Tipper/Trailer/Truck).
+        //  - Royal: OD-discount bands whose distinguisher (volume_tier) is now blank.
+        //  - Chola: our NOP-volume tiers ("100-500 NOP" …) carried in the segment.
+        // (USER 2026-08: agent payout doesn't depend on OUR volume/discount band.)
         // Scoped so Go Digit bundles (differ by tenure) are left untouched.
         best = grp[0];
         for (const r0 of grp) if (rateOf(r0) > rateOf(best)) best = r0;
