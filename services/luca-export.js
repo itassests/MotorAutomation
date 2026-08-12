@@ -962,7 +962,7 @@ async function buildLucaBuffer(ids, opts) {
     // tiers — a same-tier different-rate group is a real conflict, left untouched.
     const tierMag = (vt) => {
       const u = String(vt || '').toUpperCase();
-      if (/\+/.test(u)) return 1e12;                       // "3L+" open-ended = highest
+      if (/\+|\bABOVE\b|\bOVER\b|\bMORE THAN\b/.test(u)) return 1e12;   // open-ended top band = highest
       const mag = { K: 1e3, L: 1e5, LAKH: 1e5, LAC: 1e5, CR: 1e7 };
       const m = [...u.matchAll(/(\d+(?:\.\d+)?)\s*(K|L|CR|LAKH|LAC)/g)];
       return m.length ? Math.max(...m.map((x) => Number(x[1]) * (mag[x[2]] || 1))) : 0;
