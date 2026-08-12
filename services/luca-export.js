@@ -675,6 +675,31 @@ function bajajDistrictRtos(region) {
   return BAJAJ_DISTRICT_RTOS.get(k) || BAJAJ_METRO_RTOS[k] || '';
 }
 
+// Liberty prices TP by product-specific GEO-CLUSTERS (region = "GUJARAT - 3 RBJB",
+// "MAHARASHTRA - 5 R" …). The SAME RTO sits in a DIFFERENT cluster depending on the
+// product group — Pvt Car/TW vs light GCV(≤7.5T)/PCV-3W vs heavy GCV(>7.5T) — so the
+// single RTO→cluster row in rto_mappings can't resolve them all; the unmapped
+// clusters collapse to the bare state and distinct per-zone rates collide into Luca
+// conflicts. config/liberty_geo_cluster.json holds the 3 product columns from
+// Liberty's "Geo Cluster" master, each {cluster→RTO list}. Pick the column by
+// product group so every cluster gets its real, distinct RTOs (USER 2026-08).
+const LIBERTY_GEO = (() => {
+  try { return require('../config/liberty_geo_cluster.json') || {}; }
+  catch (_) { return {}; }
+})();
+function libertyClusterRtos(canon, r, region) {
+  let grp = null;
+  if (canon === 'CAR' || canon === 'TW') grp = 'pc_tw';
+  else if (canon === 'GCV') {
+    const hay = `${r.segment || ''} ${r.sub_type || ''}`.toUpperCase();
+    if (/3\s*W|3\s*WHEEL|THREE\s*WHEEL/.test(hay)) grp = 'gcv_light';        // GCV 3W → col G
+    else grp = (Number(r.weight_band_max) > 7.5) ? 'gcv_heavy' : 'gcv_light'; // >7.5T → col H
+  }
+  if (!grp) return '';
+  const tbl = LIBERTY_GEO[grp];
+  return (tbl && tbl[_normKey(region)]) || '';
+}
+
 // The `slab` column is a PREMIUM / VOLUME band (e.g. "0-50K", "1-2L", "3L+",
 // "Below 1L", "1L-25L", "Above 25L", "Upto 2L"). Some volume_tier values are NOT
 // slabs — they are segment/model text or stray numbers mis-parsed into the column
@@ -829,6 +854,12 @@ async function buildLucaBuffer(ids, opts) {
     {
       const codes = String(r.sub_type || '').split(/[,\s;/]+/).map(normRto).filter(Boolean);
       if (codes.length) rtoList = [...new Set(codes)].sort().join(',');
+    }
+    // Liberty product-specific geo-cluster (authoritative over the generic
+    // rto_mappings resolve above, which can't tell light vs heavy GCV apart).
+    if (/liberty/i.test(String(r.insurer || ''))) {
+      const rl = libertyClusterRtos(canonVt(vt), r, region);
+      if (rl) rtoList = rl;
     }
     // Some insurers (Kotak GCV) file per-RTO with the RTO CODE itself AS the region
     // ("AP16", "BR39"). The cluster lookup then finds nothing and the row shows only
