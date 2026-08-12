@@ -985,10 +985,12 @@ async function buildLucaBuffer(ids, opts) {
         // distinct volume tiers → keep the highest tier (USER: 3L+).
         best = grp[0];
         for (const r0 of grp) if (tierMag(r0._vt) > tierMag(best._vt)) best = r0;
-      } else if (/bajaj/i.test(String(grp[0][I_INS] || ''))) {
-        // Bajaj same exact cell+RTO at different rates = a duplicated per-RTO
-        // override (base-with-note vs explicit row) → keep the higher rate. Scoped
-        // to Bajaj so Go Digit bundles (differ by tenure) are left untouched.
+      } else if (/bajaj|icici/i.test(String(grp[0][I_INS] || ''))) {
+        // Same exact cell+RTO at different rates, collapse to the HIGHER rate:
+        //  - Bajaj: duplicated per-RTO override (base-with-note vs explicit row).
+        //  - ICICI: MHCV truck-body variants (Tanker/Tipper/Trailer/Truck) that
+        //    share tonnage+RTO but have no Luca body column (USER 2026-08).
+        // Scoped so Go Digit bundles (differ by tenure) are left untouched.
         best = grp[0];
         for (const r0 of grp) if (rateOf(r0) > rateOf(best)) best = r0;
       } else {
