@@ -836,18 +836,18 @@ async function buildLucaBuffer(ids, opts) {
     // have a +1 driver, so require the second number ≥ 2 (also excludes plain 1+1).
     const covHay = `${r.segment || ''} ${r.sub_type || ''} ${r.sheet_name || ''} ${r.rate_type || ''}`.toUpperCase();
     const bt = /(\d+)\s*\+\s*(\d+)/.exec(covHay);
-    // Liberty encodes NEW business purely as an age band of exactly [0,0] (paired
-    // with a [1,99] rollover tier) and NO 1+5/bundled keyword — so a new-vehicle
+    // Liberty & HDFC encode NEW business as an age band of exactly [0,0] (paired with
+    // a [1,99] rollover tier) and NO 1+5/bundled keyword — so a new-vehicle
     // comprehensive policy, which is really a bundled long-term package, was falling
-    // to 'comprehensive'. Treat Liberty Comp rows with age [0,0] as hybrid. Scoped to
-    // Liberty on purpose: for most insurers a bare [0,0] is a no-age-dimension default
-    // (magma/sbi/bajaj carry thousands), NOT "new" (USER 2026-08, Liberty).
-    const isLibertyNew = /liberty/i.test(String(r.insurer || ''))
+    // to 'comprehensive'. Treat their Comp rows with age [0,0] as hybrid. Scoped to
+    // these two on purpose: for most insurers a bare [0,0] is a no-age-dimension
+    // default (magma/sbi/bajaj CAR carry thousands), NOT "new" (USER 2026-08).
+    const isNewTierZero = /liberty|hdfc/i.test(String(r.insurer || ''))
       && r.age_band_min != null && r.age_band_max != null
       && Number(r.age_band_min) === 0 && Number(r.age_band_max) === 0;
     const isBundled = /BUNDL|LONG[\s-]?TERM|\bLT\b/.test(covHay)
                    || (bt && +bt[1] >= 1 && +bt[1] <= 5 && +bt[2] >= 2 && +bt[2] <= 5)
-                   || isLibertyNew;
+                   || isNewTierZero;
     const coverageType = cover === 'Comp' ? (isBundled ? 'hybrid' : 'comprehensive')
                        : cover === 'SAOD' ? 'own_damage'
                        : 'third_party';
