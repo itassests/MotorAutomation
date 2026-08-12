@@ -114,6 +114,10 @@ function lucaProduct(vt, seg, sub, sheet, wMin, wMax) {
     return 'pcv';
   }
   if (V === 'GCV') {
+    // A 3-wheeler goods carrier (GCV3W / goods auto) is NOT a light truck — keep it
+    // distinct so it doesn't collapse onto an LCV of the same tonnage (USER 2026-08,
+    // Bajaj: "GCV3W" vs "GCV4W 1.8-2.5T" both fell to 'lcv').
+    if (/GCV\s*3\s*W|\b3\s*W\b|3\s*WHEEL|THREE\s*WHEEL/.test(hay)) return 'gcv_3w';
     if (/\bHCV\b|HEAVY/.test(hay)) return 'hcv';
     if (/\bLCV\b|\bMCV\b|LIGHT/.test(hay)) return 'lcv';
     // Tonnage from the weight band (or the largest number in the segment text).
@@ -818,6 +822,14 @@ async function buildLucaBuffer(ids, opts) {
     const d = r.effective_from ? new Date(r.effective_from) : null;
     const region = String(r.region || r.state || '').trim();
     let rtoList = rtoListFor(rtoIdx, r.insurer, region);     // shared by city + included_rto
+    // A sub_type that is a comma/space-separated RTO list is MORE specific than the
+    // region (Bajaj GCV per-RTO overrides: sub_type "WB73,WB76,WB77,WB79" / "NL01").
+    // Use it as the included_rto so the override rows carry their real RTOs instead
+    // of collapsing onto the base region row (USER 2026-08, Bajaj GCV).
+    {
+      const codes = String(r.sub_type || '').split(/[,\s;/]+/).map(normRto).filter(Boolean);
+      if (codes.length) rtoList = [...new Set(codes)].sort().join(',');
+    }
     // Some insurers (Kotak GCV) file per-RTO with the RTO CODE itself AS the region
     // ("AP16", "BR39"). The cluster lookup then finds nothing and the row shows only
     // the state, so AP16 and AP25 (different rates) collapse to look-alikes. If the
@@ -848,7 +860,8 @@ async function buildLucaBuffer(ids, opts) {
       // blank + carried only in the REMARK ("slab:X"), which collapsed premium-tiered
       // rules into look-alike rows (same visible params, different rate). Populate the
       // structured column so each band is distinct (USER 2026-08). slab_on/tenure/flat blank.
-      slabValue(r.volume_tier), '', '', '',
+      '', '', '', '',   // slab / slab_on / tenure / flat — blank: the agent payout
+                        // does not depend on OUR volume slab (USER 2026-08).
       '',                                                     // excluded_vehicles
       mm.make,                                                // vehicle_make (manufacturer)
       mm.model,                                               // vehicle_model
@@ -893,6 +906,7 @@ async function buildLucaBuffer(ids, opts) {
     if (_emitted.has(sig)) continue;
     _emitted.add(sig);
     rowArr[0] = id++;
+    rowArr._vt = String(r.volume_tier || '');   // source volume tier (for the slab-collapse below)
     rows.push(rowArr);
   }
 
@@ -940,8 +954,52 @@ async function buildLucaBuffer(ids, opts) {
       }
       kept.push(row);
     }
+
+    // Slab collapse (USER 2026-08): the slab column is blank (agent payout does not
+    // depend on OUR volume slab), so rows that differ ONLY by volume tier now share a
+    // key with different rates. Keep the HIGHEST tier's row (3L+ > 2-3L > … > 0-50K)
+    // and drop the rest. Only fires when the group's members carry DISTINCT volume
+    // tiers — a same-tier different-rate group is a real conflict, left untouched.
+    const tierMag = (vt) => {
+      const u = String(vt || '').toUpperCase();
+      if (/\+/.test(u)) return 1e12;                       // "3L+" open-ended = highest
+      const mag = { K: 1e3, L: 1e5, LAKH: 1e5, LAC: 1e5, CR: 1e7 };
+      const m = [...u.matchAll(/(\d+(?:\.\d+)?)\s*(K|L|CR|LAKH|LAC)/g)];
+      return m.length ? Math.max(...m.map((x) => Number(x[1]) * (mag[x[2]] || 1))) : 0;
+    };
+    const I_INS = HI('insurers'), I_TP = HI('tp_commission_percentage'), I_OD = HI('irdai_commission_percentage');
+    const rateOf = (row) => Math.max(Number(row[I_TP]) || 0, Number(row[I_OD]) || 0);
+    const collKey = (row) => KEY_COLS.map((i) => String(row[i])).join('|') + '|' + String(row[I_RTO]);
+    const byColl = new Map();
+    for (const row of kept.slice(1)) {
+      const k = collKey(row);
+      if (!byColl.has(k)) byColl.set(k, []);
+      byColl.get(k).push(row);
+    }
+    const dropped = new Set();
+    for (const grp of byColl.values()) {
+      if (grp.length < 2) continue;
+      const tiers = new Set(grp.map((r0) => String(r0._vt || '')));
+      let best;
+      if (tiers.size >= 2) {
+        // distinct volume tiers → keep the highest tier (USER: 3L+).
+        best = grp[0];
+        for (const r0 of grp) if (tierMag(r0._vt) > tierMag(best._vt)) best = r0;
+      } else if (/bajaj/i.test(String(grp[0][I_INS] || ''))) {
+        // Bajaj same exact cell+RTO at different rates = a duplicated per-RTO
+        // override (base-with-note vs explicit row) → keep the higher rate. Scoped
+        // to Bajaj so Go Digit bundles (differ by tenure) are left untouched.
+        best = grp[0];
+        for (const r0 of grp) if (rateOf(r0) > rateOf(best)) best = r0;
+      } else {
+        continue;   // other insurers: same-tier different-rate = real conflict, keep all
+      }
+      for (const r0 of grp) if (r0 !== best) dropped.add(r0);
+    }
+    const kept2 = kept.filter((row, i) => i === 0 || !dropped.has(row));
+
     rows.length = 0;
-    for (const row of kept) rows.push(row);
+    for (const row of kept2) rows.push(row);
   }
 
   // Reorder every row (header included) from build order to the Luca output order.
