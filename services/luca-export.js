@@ -896,6 +896,54 @@ async function buildLucaBuffer(ids, opts) {
     rows.push(rowArr);
   }
 
+  // De-conflict overlapping definitions (USER 2026-08, Bajaj part A):
+  //   1. Catch-all regions ("Rest of <state>", "Other RTOs") that resolve to the
+  //      SAME RTOs as a specific sibling row → give the catch-all the WHOLE state
+  //      MINUS the specific rows' RTOs, so it covers only the leftover RTOs (and
+  //      drop it if nothing is left). This is the "rest except X" Luca can't express.
+  //   2. MISP rows (agent's own arrangement) are dropped when a grid row exists for
+  //      the same cell — the file should carry the standard grid payout.
+  {
+    const HI = (n) => LUCA_HEADERS.indexOf(n);
+    const I_RTO = HI('included_rto'), I_CITY = HI('city'), I_STATE = HI('included_states'), I_REM = HI('REMARK');
+    const KEY_COLS = ['insurers', 'products', 'coverage_type', 'ncb', 'commission_on', 'slab',
+      'vehicle_make', 'vehicle_model', 'vehicle_cc', 'vehicle_age', 'seating_capacity',
+      'gross_vehicle_weight', 'fuel_type', 'business_type'].map(HI);
+    const cellKey = (row) => KEY_COLS.map((i) => String(row[i])).join('|');
+    const isCatchAll = (row) => /\brest\s+of\b|\bother\s+rtos?\b|\bremaining\s+rtos?\b/i.test(String(row[I_REM] || ''));
+    const isMisp = (row) => /\bMISP\b/i.test(String(row[I_REM] || ''));
+
+    const data = rows.slice(1);
+    const specificRtos = new Map();   // cellKey → Set of RTO codes claimed by specific rows
+    const hasGrid = new Set();        // cellKeys that have a non-MISP row
+    for (const row of data) {
+      if (!isMisp(row)) hasGrid.add(cellKey(row));
+      if (isCatchAll(row) || isMisp(row)) continue;
+      const k = cellKey(row);
+      if (!specificRtos.has(k)) specificRtos.set(k, new Set());
+      String(row[I_RTO] || '').split(',').forEach((c) => { const t = c.trim(); if (t) specificRtos.get(k).add(t); });
+    }
+    const kept = [rows[0]];
+    for (const row of data) {
+      const k = cellKey(row);
+      if (isMisp(row) && hasGrid.has(k)) continue;          // rule 2: drop MISP, keep grid
+      if (isCatchAll(row)) {                                 // rule 1: catch-all = state − specific
+        const spec = specificRtos.get(k);
+        if (spec && spec.size) {
+          const stPrefix = asStatePrefix(String(row[I_STATE] || '').replace(/_/g, ' '));
+          const stateAll = (stPrefix && rtoIdx._stateRtos && rtoIdx._stateRtos.get(stPrefix)) || String(row[I_RTO] || '');
+          const remaining = stateAll.split(',').map((s) => s.trim()).filter((c) => c && !spec.has(c));
+          if (!remaining.length) continue;                  // catch-all covers nothing new → drop
+          row[I_RTO] = remaining.join(',');
+          row[I_CITY] = citiesFromRtoList(row[I_RTO]) || row[I_CITY];
+        }
+      }
+      kept.push(row);
+    }
+    rows.length = 0;
+    for (const row of kept) rows.push(row);
+  }
+
   // Reorder every row (header included) from build order to the Luca output order.
   const outRows = rows.map((row) => _OUT_IDX.map((i) => row[i]));
   const ws = XLSX.utils.aoa_to_sheet(outRows);
