@@ -560,7 +560,9 @@ const STATE_PREFIXES = new Set([
   'AN', 'LD', 'DN', 'DD', 'CH', 'PY', 'TG', 'UA', 'OR', 'UT', 'SK', 'MN', 'MZ', 'AR',
 ]);
 function asStatePrefix(region) {
-  const g = String(region || '').toUpperCase().replace(/\s+/g, ' ').trim();
+  let g = String(region || '').toUpperCase().replace(/\s+/g, ' ').trim();
+  // "REST OF TAMIL NADU" / "ROM" → the state itself (whole-state fallback).
+  g = g.replace(/^REST\s+OF\s+/, '').trim();
   if (STATE_PREFIXES.has(g)) return g === 'TG' ? 'TS' : (g === 'OR' ? 'OD' : (g === 'UA' || g === 'UT' ? 'UK' : g));
   return STATE_TO_RTO_PREFIX[g] || '';
 }
@@ -632,6 +634,42 @@ const GD_SATP_CLUSTER_RTOS = (() => {
 })();
 const gdSatpRtos = (region) =>
   GD_SATP_CLUSTER_RTOS.get(String(region || '').toUpperCase().replace(/\s+/g, ' ').trim()) || '';
+
+// Bajaj files Pvt-Car SATP / OD per DISTRICT (region = "Faridkot", "Amritsar",
+// "Rest of UP" …). config/bajaj_rto_district.json maps RTO→district; invert it so
+// each district region resolves to its RTOs instead of rendering blank and
+// collapsing into same-key conflicts (USER 2026-08, Bajaj — part A). Metros that
+// carry NO district override in the config are added explicitly below.
+const _normKey = (s) => String(s || '').toUpperCase().replace(/\s+/g, ' ').trim();
+const BAJAJ_DISTRICT_RTOS = (() => {
+  const out = new Map();
+  try {
+    const cfg = require('../config/bajaj_rto_district.json') || {};
+    const inv = new Map();
+    for (const [rto, district] of Object.entries(cfg)) {
+      const code = normRto(rto);
+      if (!code) continue;
+      const key = _normKey(district);
+      if (!inv.has(key)) inv.set(key, new Set());
+      inv.get(key).add(code);
+    }
+    for (const [k, s] of inv) out.set(k, [...s].sort().join(','));
+  } catch (_) { /* config missing → no-op */ }
+  return out;
+})();
+// Metros absent from the district-override config (their RTOs sit at the state
+// head, not overridden). Curated city RTO sets (normRto shape).
+const BAJAJ_METRO_RTOS = {
+  'CHENNAI': 'TN-01,TN-02,TN-03,TN-04,TN-05,TN-06,TN-07,TN-09,TN-10,TN-11,TN-12,TN-13,TN-14,TN-18,TN-19,TN-20,TN-22,TN-85',
+  'MUMBAI': 'MH-01,MH-02,MH-03,MH-04,MH-43,MH-47,MH-48',
+  'KOLKATA': 'WB-01,WB-02,WB-03,WB-04,WB-05,WB-06,WB-07,WB-08',
+  'BANGALORE': 'KA-01,KA-02,KA-03,KA-04,KA-05,KA-41,KA-50,KA-51,KA-52,KA-53',
+  'HYDERABAD': 'TS-07,TS-08,TS-09,TS-10,TS-11,TS-12,TS-13,TS-14,TS-15,TS-28,TS-29',
+};
+function bajajDistrictRtos(region) {
+  const k = _normKey(region);
+  return BAJAJ_DISTRICT_RTOS.get(k) || BAJAJ_METRO_RTOS[k] || '';
+}
 
 // The `slab` column is a PREMIUM / VOLUME band (e.g. "0-50K", "1-2L", "3L+",
 // "Below 1L", "1L-25L", "Above 25L", "Upto 2L"). Some volume_tier values are NOT
@@ -788,6 +826,8 @@ async function buildLucaBuffer(ids, opts) {
     // Go Digit SATP: region is a "4W TP" cluster (HP_Bad …) — resolve to its RTOs
     // so the 92 clusters don't collapse to a blank look-alike key (see map above).
     if (!rtoList && /go_digit/i.test(String(r.insurer || ''))) { const rl = gdSatpRtos(region); if (rl) rtoList = rl; }
+    // Bajaj district / metro region (Faridkot, Amritsar, Chennai …) → its RTOs.
+    if (!rtoList && /bajaj/i.test(String(r.insurer || ''))) { const rl = bajajDistrictRtos(region); if (rl) rtoList = rl; }
     // Whole-state region (Chola "JH"/"MH", and any insurer whose rule region is a
     // bare state code/name): expand to every RTO in that state so it isn't blank.
     if (!rtoList) { const rl = stateRtoList(rtoIdx, region); if (rl) rtoList = rl; }
