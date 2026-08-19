@@ -835,6 +835,13 @@ function analyzeCvRemark(text, baseRate) {
   //       "Diesel and CNG -Swift, Beat, Fiesta and I20 Max 25% PO"
   const fuelModelRe = /(Petrol|Diesel|CNG|LPG|EV|Electric)(?:\s+and\s+(Petrol|Diesel|CNG|LPG|EV|Electric))?\s*[-–]\s*([^@]+?)\s+(?:Max\s+|max\s+)?(\d+(?:\.\d+)?)\s*%\s*PO/i;
   const fuelModelMatch = norm.match(fuelModelRe);
+  // 6r2 (multiModelRe) scans this copy. When 6q consumes a fuel-prefixed model
+  // list ("Diesel and CNG -Swift, Beat, Fiesta and I20 Max 25% PO"), blank that
+  // exact span here so 6r2 can't re-scan it starting AFTER the first comma —
+  // which drops the "Diesel and CNG -" prefix (escaping 6r2's fuel-guard) and
+  // greedily absorbs "I20 Max 2" into a model token, leaving "5%" as the rate →
+  // phantom "Beat 5%" / "Fiesta 5%" / make "I20 Max 2" rows (USER 2026-08).
+  let normForMulti = norm;
   if (fuelModelMatch) {
     const fuels = [fuelModelMatch[1]];
     if (fuelModelMatch[2]) fuels.push(fuelModelMatch[2]);
@@ -849,6 +856,9 @@ function analyzeCvRemark(text, baseRate) {
       models.push({ make: inferred.make || 'All', model: inferred.model || tok });
     }
     if (models.length) plan.fuelModelRates.push({ fuels, models, rate });
+    normForMulti = norm.slice(0, fuelModelMatch.index)
+      + ' '.repeat(fuelModelMatch[0].length)
+      + norm.slice(fuelModelMatch.index + fuelModelMatch[0].length);
   }
 
   // 6r. "<City>- <Model> at Max N%" — city-scoped model rate.
@@ -886,7 +896,7 @@ function analyzeCvRemark(text, baseRate) {
   // an optional "(all fuel types)" / "(petrol only)" parenthetical.
   const multiModelRe = /(?:^|[.,;|]|%\s*PO\s+)\s*([A-Z][A-Za-z0-9 ]{0,30}(?:\s*\([^)]+\))?(?:\s*(?:,|and|&)\s*[A-Z][A-Za-z0-9 ]{0,30}(?:\s*\([^)]+\))?){1,15})\s*[-–]?\s*(?:at\s+)?(?:Max\s+|max\s+)?(\d+(?:\.\d+)?)\s*%\s*PO/gi;
   let mmRe;
-  while ((mmRe = multiModelRe.exec(norm)) !== null) {
+  while ((mmRe = multiModelRe.exec(normForMulti)) !== null) {
     const head = mmRe[1].trim();
     // Reject if the head looks like a fuel-prefixed clause (those are handled by fuelModelRe)
     if (/^(Petrol|Diesel|CNG|LPG|EV|Electric)\b/i.test(head)) continue;
