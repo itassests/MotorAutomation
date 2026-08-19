@@ -4118,9 +4118,31 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       // like "Nashik" has no SATP grid row, so the fallback broadens and grabs a
       // metro row (Pune), overwriting the real RTO region. rtoInfo.region keeps
       // the authoritative "Nashik" we need to roll up to "Maharashtra".
-      const rawReg = (rtoInfo && rtoInfo.region) || resolvedRegion;
-      const key = String(rawReg || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-      const satpRegion = key && satpMap[key];
+      let rawReg = (rtoInfo && rtoInfo.region) || resolvedRegion;
+      let key = String(rawReg || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      let satpRegion = key && satpMap[key];
+      // Fallback when HDFC has NO RTO mapping (rtoInfo null → rawReg empty) or the
+      // resolved cluster isn't a satpMap city: resolve the RTO's city from the
+      // SHARED rto_mappings (magma/royal/sbi map MH11 → "Satara"), then satpMap it.
+      // Without this a rest-of-state RTO absent from HDFC's mappings (e.g. MH11
+      // Satara) has no region, so the SATP filter defaults to the metro Mumbai row
+      // (Petrol 990+ = 0.60) instead of the "Maharashtra" catch-all (0.45). Metros
+      // are absent from satpMap, so a Mumbai/Pune RTO stays as-is (USER 2026-08).
+      if (!satpRegion && params.rtoCode) {
+        try {
+          const rr = await pool.request()
+            .input('rc', sql.NVarChar(20), String(params.rtoCode).toUpperCase().replace(/[^A-Z0-9]/g, ''))
+            .query(`SELECT DISTINCT region, cluster FROM rto_mappings
+                    WHERE REPLACE(REPLACE(rto_code,'-',''),' ','') = @rc`);
+          for (const m of rr.recordset) {
+            for (const v of [m.region, m.cluster]) {
+              const k2 = String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+              if (k2 && satpMap[k2]) { satpRegion = satpMap[k2]; rawReg = String(v); key = k2; break; }
+            }
+            if (satpRegion) break;
+          }
+        } catch (_) { /* leave rules unchanged on lookup failure */ }
+      }
       if (satpRegion && satpRegion.toUpperCase() !== String(rawReg || '').toUpperCase()) {
         const fuel = String(params.fuelType || '').toUpperCase();
         const fcol = /DIESEL/.test(fuel) ? 'Diesel' : (/CNG|LPG/.test(fuel) ? 'CNG' : 'Petrol');
