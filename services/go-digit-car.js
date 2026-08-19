@@ -28,15 +28,29 @@ function isHev(fuel) {
   return /HYBRID|\bHEV\b|STRONG\s*HYBRID/.test(norm(fuel));
 }
 
-// Go Digit's summary block prices a specific MAKE group off the "HEV" column
-// regardless of fuel. The grid's left block lists it as "HEV-Mercedes Benz, Ford,
-// BMW, Jeep, Ferrari, Bentley, Rolls Royce, Chevrolet, Datsun, Nissan, Renault,
-// Jaguar, Land Rover, BYD, Citroen, Tesla, Audi, Volvo, Porsche". A diesel GLE
-// (make Mercedes-Benz) therefore takes the HEV rate (24% in MUM), not plain Comp
-// (22%). Match the make so these are priced off g.hev (USER 2026-08).
-const HEV_MAKE_RE = /MERCEDES|\bBMW\b|\bAUDI\b|JAGUAR|LAND\s*ROVER|\bVOLVO\b|PORSCHE|\bTESLA\b|\bBYD\b|\bJEEP\b|FERRARI|BENTLEY|ROLLS\s*ROYCE|\bFORD\b|CHEVROLET|DATSUN|NISSAN|RENAULT|CITRO/;
-function isHevMake(make) {
-  return HEV_MAKE_RE.test(norm(make));
+// Go Digit's summary block prices a specific MAKE+MODEL group off the "HEV" column
+// regardless of fuel (a diesel Mercedes GLE takes HEV 24% in MUM, not plain Comp
+// 22%). The authoritative list is Go Digit's "HEV Make Model List" (config/
+// go_digit_hev_models.json, regenerate from the sheet on re-share). It is MODEL-
+// specific — Mercedes GLE/GLS/S-Class are HEV, but a Toyota Yaris is NOT — so a
+// make-only match is wrong. Match make (prefix either way, handles "Toyota
+// Kirloskar…" ↔ "Toyota") AND model (policy model starts with the listed model).
+const HEV_MODELS = (() => {
+  try { return require('../config/go_digit_hev_models.json') || {}; }
+  catch (_) { return {}; }
+})();
+const strip = (s) => String(s == null ? '' : s).toUpperCase().replace(/[^A-Z0-9]/g, '');
+function isHevMake(make, model) {
+  const pm = strip(make), pmodel = strip(model);
+  if (!pm) return false;
+  for (const key of Object.keys(HEV_MODELS)) {
+    // Brand match: one side is a prefix of the other (min 3 chars to avoid noise).
+    if (key.length < 3 || !(pm.startsWith(key) || key.startsWith(pm))) continue;
+    for (const lm of HEV_MODELS[key]) {
+      if (lm && pmodel && lm.length >= 2 && (pmodel === lm || pmodel.startsWith(lm))) return true;
+    }
+  }
+  return false;
 }
 
 function resolveGoDigitCarRate(params, region) {
@@ -51,7 +65,7 @@ function resolveGoDigitCarRate(params, region) {
   // A residual sub-rupee TP leg (rounding artifact) is a SAOD policy, not Comp.
   const isSaod = tp < 1;
   let pct;
-  if (isHev(params.fuelType) || isHevMake(params.make)) pct = g.hev;
+  if (isHev(params.fuelType) || isHevMake(params.make, params.model)) pct = g.hev;
   else if (isSaod) pct = ncbYes ? g.saodNcb : g.saodNonNcb;    // SAOD
   else pct = ncbYes ? g.compNcb : g.compNonNcb;                // Comp
   if (pct == null || !Number.isFinite(Number(pct))) return null;
