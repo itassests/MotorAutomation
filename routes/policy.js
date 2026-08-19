@@ -931,6 +931,19 @@ router.post('/lookup', async (req, res, next) => {
             return fam;
           })()
         : [];
+      // Shriram's "New Business - 2W" sheet groups states into COMPOUND region
+      // labels ("AP/TELANGANA", "MP/CG", "ASSAM/TRIPURA", "DELHI/NCR") that the bare
+      // state name ("ANDHRA PRADESH") doesn't match — so a new AP bike found no
+      // AP-region rule and fell to an arbitrary region (Mumbai/Goa 70 vs the correct
+      // AP/TELANGANA 40). Add the grouped labels per state so the fallback reaches
+      // them (make is flattened in this grid, so region is the only real key).
+      const shriramCandidates = (insurerSlug === 'shriram')
+        ? ({
+            AP: ['AP/TELANGANA'], TS: ['TELANGANA', 'AP/TELANGANA'], TG: ['TELANGANA', 'AP/TELANGANA'],
+            MP: ['MP/CG'], CG: ['MP/CG'], AS: ['ASSAM/TRIPURA'], TR: ['ASSAM/TRIPURA'],
+            DL: ['DELHI/NCR'], GA: ['MUMBAI (Excl MH-01,48)/GOA', 'MUMBAI (Excl MH-01,48)/ROM/GOA'],
+          }[stateKey] || [])
+        : [];
       // Merge: cluster candidates first (RTO mapping authoritative), then
       // state-prefix candidates, then carrier-specific umbrella, then tier candidates.
       const seen = new Set();
@@ -938,7 +951,7 @@ router.post('/lookup', async (req, res, next) => {
         ...zunoNcbZeroFirst,
         ...clusterCandidates, ...stateCandidates,
         ...hdfcCandidates, ...iciciCandidates, ...relianceCandidates,
-        ...bajajCandidates, ...sbiCandidates, ...uiiCandidates,
+        ...bajajCandidates, ...sbiCandidates, ...uiiCandidates, ...shriramCandidates,
         ...zunoCandidates, ...usCandidates, ...tataCandidates,
         ...tierCandidates,
       ].filter(r => {
