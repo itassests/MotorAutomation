@@ -826,7 +826,11 @@ router.post('/lookup', async (req, res, next) => {
                 'New Delhi'
               );
             }
-            if (stateKey === 'HR') out.push('Haryana', 'HARYANA (Excluding Gurgaon and Faridabad)', 'Gurgaon', 'Faridabad');
+            // Specific "(Excluding Gurgaon & Faridabad)" label FIRST: it canon-matches
+            // the current June/July grid's "Haryana Ex Gurgaon & Faridabad", so the
+            // dated card selection picks the right month. Bare "Haryana" stays as a
+            // later fallback (older cards / months that used the plain label).
+            if (stateKey === 'HR') out.push('HARYANA (Excluding Gurgaon and Faridabad)', 'Haryana', 'Gurgaon', 'Faridabad');
             // Bajaj GCV ships SATP rates under compound region labels that
             // bundle border UTs into the state group (Gujarat + Daman/Diu/DNH,
             // Tamil Nadu + Lakshadweep, J&K + Ladakh, Assam + Sikkim + NE).
@@ -3389,6 +3393,22 @@ function filterRulesByPolicy(rules, params, _trace) {
           && params.vehicleAge === rule.vehicle_age_max) {
         score += 2;
       }
+    }
+
+    // Bajaj Pvt-Car Comp encodes NCB in the AGE band ([0,0]=NCB0, [1,99]=NCB>0)
+    // with vehicle_age NULL — so the vehicle-age filter above never chooses between
+    // the two NCB rows (both survive) and the lower NCB0 rate wins the tie-break.
+    // Match the band to the policy's NCB instead. A NEW vehicle (age 0) has no prior
+    // NCB but is rated WITH-NCB (product owner), mirroring the rate_type NCB rule
+    // above. Scoped to Bajaj COMP with an NCB-shaped age band (USER 2026-08).
+    if (matches && rule.insurer === 'bajaj_allianz' && /COMP/i.test(String(rule.rate_type || ''))
+        && rule.vehicle_age_min == null && rule.vehicle_age_max == null
+        && rule.age_band_min != null && rule.age_band_max != null) {
+      const bandNcb0   = Number(rule.age_band_min) === 0 && Number(rule.age_band_max) === 0;
+      const bandNcbPos = Number(rule.age_band_min) >= 1;
+      const effHasNcb  = (params.ncbPct || 0) > 0 || params.vehicleAge === 0;
+      if (bandNcb0 && effHasNcb) matches = false;          // NCB0 row can't apply to an NCB>0 policy
+      else if (bandNcbPos && !effHasNcb) matches = false;  // NCB>0 row can't apply to an NCB=0 policy
     }
 
     // Addon flag — when a rule is explicitly conditioned on add-on status

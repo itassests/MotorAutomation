@@ -130,6 +130,27 @@ async function lookupRates(pool, params) {
         request.input(nName, sql.NVarChar, normVal);
         parts.push(`REPLACE(REPLACE(REPLACE(rr.region, ' ', ''), '-', ''), '_', '') = @${nName}`);
       }
+      // Label-variant canonicalisation. The SAME region is spelled differently by
+      // an insurer's RTO master vs its grid sheet — Bajaj resolves the RTO to
+      // "HARYANA (Excluding Gurgaon and Faridabad)" but the June/July Pvt-Car grid
+      // stores "Haryana Ex Gurgaon & Faridabad". Exact/separator-stripped equality
+      // misses it, so the current-month card is skipped and the lookup falls back to
+      // an EXPIRED older card whose plain "Haryana" still matches — pricing a June
+      // policy on the April grid. Fold EXCLUDING→EX / INCLUDING→INC, drop " AND "/"&"
+      // and all punctuation on BOTH sides so the two forms match (USER 2026-08, Bajaj).
+      // Only ADDS matches for genuinely-equivalent labels, so other regions are safe.
+      const canonVal = safe.toUpperCase()
+        .replace(/EXCLUDING/g, 'EX').replace(/INCLUDING/g, 'INC')
+        .replace(/ AND /g, '').replace(/[^A-Z0-9]/g, '');
+      if (canonVal && canonVal !== normVal && canonVal !== safe) {
+        const cName = `${namePrefix}c${i}`;
+        request.input(cName, sql.NVarChar, canonVal);
+        parts.push(
+          "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(" +
+          "UPPER(rr.region),'EXCLUDING','EX'),'INCLUDING','INC'),' AND ',''),'&',''),' ',''),'-',''),'_','')," +
+          "'(',''),')',''),',',''),'.','') = @" + cName
+        );
+      }
       if (regionMode === 'token') {
         parts.push(`CHARINDEX('/' + @${pName} + '/', '/' + rr.region + '/') > 0`);
       }
@@ -535,16 +556,24 @@ async function resolveRTO(pool, insurer, product, rtoCode) {
   };
   const aliases = productAliases[product] || [product];
 
-  // Try exact product match first
-  const exact = rows.find(r => r.product === product);
-  if (exact) return exact;
-
-  // Try alias match
-  const aliasMatch = rows.find(r => aliases.includes(r.product));
-  if (aliasMatch) return aliasMatch;
-
-  // Fallback: return first available
-  return rows[0];
+  // Match by product, treating an 'ALL' row as a product wildcard, and let the
+  // NEWEST card generation win (rows are ordered card_id DESC). This matters when a
+  // newer RTO master re-files an RTO under a coarser 'ALL' row carrying a REVISED
+  // region label — Bajaj relabeled HR02 "HARYANA" → "HARYANA (Excluding Gurgaon and
+  // Faridabad)" and moved it from a per-product CAR row (old card) to an 'ALL' row
+  // (new card). The stale per-product row must NOT win, or a June policy prices on
+  // the expired April grid (whose plain "Haryana" is the only region that matches).
+  // Product specificity is still honoured WITHIN the newest applicable card
+  // (exact > alias > ALL), so product-split RTO sheets (Digit) are unaffected.
+  const isAll = (r) => /^all$/i.test(String(r.product || ''));
+  const applies = (r) => r.product === product || aliases.includes(r.product) || isAll(r);
+  const applicable = rows.filter(applies);
+  if (applicable.length === 0) return rows[0];
+  const newestCard = applicable[0].rate_card_id;   // rows are card_id DESC
+  const sameCard = applicable.filter(r => r.rate_card_id === newestCard);
+  return sameCard.find(r => r.product === product)
+      || sameCard.find(r => aliases.includes(r.product))
+      || sameCard[0];
 }
 
 /**
