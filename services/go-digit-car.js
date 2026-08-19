@@ -28,6 +28,17 @@ function isHev(fuel) {
   return /HYBRID|\bHEV\b|STRONG\s*HYBRID/.test(norm(fuel));
 }
 
+// Go Digit's summary block prices a specific MAKE group off the "HEV" column
+// regardless of fuel. The grid's left block lists it as "HEV-Mercedes Benz, Ford,
+// BMW, Jeep, Ferrari, Bentley, Rolls Royce, Chevrolet, Datsun, Nissan, Renault,
+// Jaguar, Land Rover, BYD, Citroen, Tesla, Audi, Volvo, Porsche". A diesel GLE
+// (make Mercedes-Benz) therefore takes the HEV rate (24% in MUM), not plain Comp
+// (22%). Match the make so these are priced off g.hev (USER 2026-08).
+const HEV_MAKE_RE = /MERCEDES|\bBMW\b|\bAUDI\b|JAGUAR|LAND\s*ROVER|\bVOLVO\b|PORSCHE|\bTESLA\b|\bBYD\b|\bJEEP\b|FERRARI|BENTLEY|ROLLS\s*ROYCE|\bFORD\b|CHEVROLET|DATSUN|NISSAN|RENAULT|CITRO/;
+function isHevMake(make) {
+  return HEV_MAKE_RE.test(norm(make));
+}
+
 function resolveGoDigitCarRate(params, region) {
   if (norm(params.vehicleType) !== 'CAR') return null;
   const od = Number(params.odPremium) || 0;
@@ -40,7 +51,7 @@ function resolveGoDigitCarRate(params, region) {
   // A residual sub-rupee TP leg (rounding artifact) is a SAOD policy, not Comp.
   const isSaod = tp < 1;
   let pct;
-  if (isHev(params.fuelType)) pct = g.hev;
+  if (isHev(params.fuelType) || isHevMake(params.make)) pct = g.hev;
   else if (isSaod) pct = ncbYes ? g.saodNcb : g.saodNonNcb;    // SAOD
   else pct = ncbYes ? g.compNcb : g.compNonNcb;                // Comp
   if (pct == null || !Number.isFinite(Number(pct))) return null;
