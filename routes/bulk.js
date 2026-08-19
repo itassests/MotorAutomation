@@ -4079,10 +4079,32 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     const ip = String(params.insProduct || '').toUpperCase();
     if (ip === 'COMP' || ip === 'SAOD') {
       const st  = String(rtoStatePrefix(params.rtoCode) || '').toUpperCase();
-      const reg = String(resolvedRegion || '').toUpperCase();
+      let reg = String(resolvedRegion || '').toUpperCase();
+      // GJ/KA split Zone-1 (metro) vs Zone-2 (rest) by CITY, but HDFC has no
+      // rto_mapping for many of their RTOs (e.g. GJ18 Gandhinagar) so resolvedRegion
+      // is null → the city test fails → wrong Zone-2 (27.5) instead of Zone-1 (30).
+      // Resolve the city from the SHARED rto_mappings so the test below sees the real
+      // city (GJ18→Gandhinagar→Z1; GJ05→Surat→Z2) (USER 2026-08, GJ18 Land Rover SAOD).
+      if (!reg && (st === 'GJ' || st === 'KA')) {
+        try {
+          const rq = await pool.request()
+            .input('rc', sql.NVarChar(20), String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, ''))
+            .query(`SELECT DISTINCT region, cluster FROM rto_mappings WHERE REPLACE(REPLACE(rto_code,'-',''),' ','') = @rc`);
+          // Only a SINGLE-city region counts — a compound cluster like
+          // "Ahmedabad, Surat & Baroda" contains "AHMEDABAD" but is used for Surat
+          // (Zone-2) RTOs too, so matching it would wrongly promote GJ05 Surat to
+          // Zone-1. Zone-1 cities only; a non-matching single city (Surat/Rajkot)
+          // leaves reg empty → correct Zone-2 default.
+          const Z1CITY = /^\s*(AHMEDABAD|VADODARA|VADODRA|BARODA|DAMAN|DADRA|GANDHI\s*NAGAR|BANGALORE|BENGALURU)\s*$/i;
+          for (const m of rq.recordset) {
+            const hit = [m.region, m.cluster].find(v => Z1CITY.test(String(v || '')));
+            if (hit) { reg = String(hit).toUpperCase(); break; }
+          }
+        } catch (_) { /* leave reg empty → default zone below */ }
+      }
       const ZONE2 = new Set(['CG','CH','MZ','KL','HR','HP','PB','UP','UA','UK','JK','MP','RJ','TN','PY']);
       let zone;
-      if (st === 'GJ')      zone = /AHMEDABAD|VADODARA|BARODA|DAMAN|DADRA|GANDHINAGAR/.test(reg) ? 1 : 2;
+      if (st === 'GJ')      zone = /AHMEDABAD|VADODARA|BARODA|DAMAN|DADRA|GANDHI\s*NAGAR/.test(reg) ? 1 : 2;
       else if (st === 'KA') zone = /BANGALORE|BENGALURU/.test(reg) ? 1 : 2;
       else if (st === 'AS') zone = /NAGAON/.test(reg) ? 2 : 1;
       else                  zone = ZONE2.has(st) ? 2 : 1;
