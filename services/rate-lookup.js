@@ -500,6 +500,11 @@ function rtoCodeVariants(rtoCode) {
     const n = String(parseInt(num, 10));
     set.add(`${st}${n}${suf}`);                       // unpadded: DL9
     set.add(`${st}${n.padStart(2, '0')}${suf}`);      // 2-padded: DL09
+    // Dashed forms — Magma's RTO master stores "UP-78" / "UP-9", which none of the
+    // undashed variants match, so a policy RTO "UP78" resolved to NULL region and
+    // fell to an arbitrary cluster (UP2/1397 GCV: WB5 West Bengal 31% vs UP3 21%).
+    set.add(`${st}-${n}${suf}`);                      // dashed unpadded: UP-9
+    set.add(`${st}-${n.padStart(2, '0')}${suf}`);     // dashed 2-padded: UP-78 / UP-09
   }
   return [...set];
 }
