@@ -2108,7 +2108,13 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       (/TP|SATP|ACT/i.test(String(params.insProduct || '')) ||
        (Number(params.odPremium) || 0) === 0)) {
     try {
-      const cfg = require('../config/kotak_satp_pvtcar.json');
+      // Date-aware grid: the "SATP Private car Pan india Sep.'26" grid (card 710)
+      // supersedes the 11-June make-grid for policies with risk-start on/after
+      // 1-Sep-2026. Same {RTO:{MAKE:{P,C,D}[<1000,1000-1500,>1500]}} shape.
+      const _kEff = String(_bajajEffDate || params.effective_date || '').slice(0, 10);
+      const cfg = (_kEff && _kEff >= '2026-09-01')
+        ? require('../config/kotak_satp_pvtcar_sep26.json')
+        : require('../config/kotak_satp_pvtcar.json');
       const rto0 = String(params.rtoCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
       const cand = [rto0];
       const mm = rto0.match(/^([A-Z]{2})0*(\d+)$/);
