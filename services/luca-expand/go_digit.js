@@ -426,6 +426,14 @@ module.exports = {
   // still drops /PVT CAR/ + /^2W GRID/.
   suppress: [
     (r) => /^(CV Grid \(excl\. HCV\)|HCV GRID)$/i.test(String(r.sheet_name || '').trim()),
+    // ALL go-digit TW DB sheets are the mis-ingested annual/SATP/bundle grids
+    // (segment = raw config key "MC_180-350_RE", make encoded in the segment, blank
+    // make column) — they DUPLICATE the config expanders (goDigitTwAnnual /
+    // goDigitTwBundle emit clean rows WITH the make in vehicle_make). The old
+    // /^2W GRID/ suppress in luca-config-expand only caught "2W Grid 5+5"; also drop
+    // "TW 1+1 & SATP", "TW 1+5", "TW SAOD with Flexi Options". go-digit TW is 100%
+    // config-driven, so dropping every TW DB sheet is safe.
+    (r) => /^(TW|2W)\b/i.test(String(r.sheet_name || '').trim()),
   ],
   expand: (effFrom) => plausible([
     ...goDigitCarSatp(effFrom),
