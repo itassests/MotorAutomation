@@ -1037,7 +1037,7 @@ async function buildLucaBuffer(ids, opts) {
     // agent-visible column = indistinguishable, so emit it once. Key on the whole
     // row EXCEPT the id (index 0) and the REMARK (last col — free text, not a
     // rate dimension, so it shouldn't create a phantom "distinct" row).
-    const sig = rowArr.slice(1, rowArr.length - 1).join('');
+    const sig = rowArr.slice(1, rowArr.length - 1).join('').toUpperCase();
     if (_emitted.has(sig)) continue;
     _emitted.add(sig);
     rowArr[0] = id++;
@@ -1107,7 +1107,7 @@ async function buildLucaBuffer(ids, opts) {
     };
     const I_INS = HI('insurers'), I_TP = HI('tp_commission_percentage'), I_OD = HI('irdai_commission_percentage');
     const rateOf = (row) => Math.max(Number(row[I_TP]) || 0, Number(row[I_OD]) || 0);
-    const collKey = (row) => KEY_COLS.map((i) => String(row[i])).join('|') + '|' + String(row[I_RTO]);
+    const collKey = (row) => (KEY_COLS.map((i) => String(row[i])).join('|') + '|' + String(row[I_RTO])).toUpperCase();  // case-insensitive: TATA==Tata
     const byColl = new Map();
     for (const row of kept.slice(1)) {
       const k = collKey(row);
