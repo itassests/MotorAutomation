@@ -21,14 +21,17 @@
  */
 const GRID_JUN = require('../config/tata_car_jun26.json').grid;
 const GRID_JUL = require('../config/tata_car_jul26.json').grid;
+const GRID_SEP = require('../config/tata_car_sep26.json').grid;
 const CLUSTER = require('../config/tata_rto_cluster.json');
 const norm = (s) => String(s == null ? '' : s).trim().toUpperCase();
 
-// Pick the grid generation by the policy's risk-start (effective) date: July'26
-// grid on/after 1-Jul-2026, June grid before, and the current (July) grid when
-// no date is available. Mirrors the effective-date card selection for rate_rules.
+// Pick the grid generation by the policy's risk-start (effective) date: Sep'26
+// grid on/after 1-Sep-2026, July'26 on/after 1-Jul, June before. No-date falls to
+// July (the grid in force now — Sep isn't effective until 1-Sep, so we don't apply
+// it to undated policies prematurely). Mirrors the rate_rules card selection.
 function gridFor(params) {
   const d = String(params.effective_date || params.effectiveDate || params.riskStartDate || params.policyStartDate || '').slice(0, 10);
+  if (d >= '2026-09-01') return GRID_SEP;
   return (!d || d >= '2026-07-01') ? GRID_JUL : GRID_JUN;
 }
 

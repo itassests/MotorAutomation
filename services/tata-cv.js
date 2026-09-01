@@ -14,13 +14,16 @@
  */
 const ROWS_JUN = require('../config/tata_cv_jun26.json').rows;
 const ROWS_JUL = require('../config/tata_cv_jul26.json').rows;
+const ROWS_SEP = require('../config/tata_cv_sep26.json').rows;
 const CLUSTER = require('../config/tata_rto_cluster.json');
 const norm = (s) => String(s == null ? '' : s).trim().toUpperCase();
 
-// Pick grid generation by risk-start (effective) date: July'26 grid on/after
-// 1-Jul-2026 (and when no date), June before. Mirrors tata-car.js gridFor.
+// Pick grid generation by risk-start (effective) date: Sep'26 on/after 1-Sep-2026,
+// July'26 on/after 1-Jul (and when no date — Sep isn't in force until 1-Sep), June
+// before. Mirrors tata-car.js gridFor.
 function rowsFor(params) {
   const d = String(params.effective_date || params.effectiveDate || params.riskStartDate || params.policyStartDate || '').slice(0, 10);
+  if (d >= '2026-09-01') return ROWS_SEP;
   return (!d || d >= '2026-07-01') ? ROWS_JUL : ROWS_JUN;
 }
 
