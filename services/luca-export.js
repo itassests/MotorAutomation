@@ -1039,6 +1039,9 @@ async function buildLucaBuffer(ids, opts) {
     _emitted.add(sig);
     rowArr[0] = id++;
     rowArr._vt = String(r.volume_tier || '');   // source volume tier (for the slab-collapse below)
+    // Source card date (NOT the stamped snapshot month) — used by the engine-match
+    // de-conflict below to keep the newest generation when rows collapse.
+    rowArr._eff = r.effective_from ? new Date(r.effective_from).getTime() : 0;
     rows.push(rowArr);
   }
 
@@ -1128,7 +1131,18 @@ async function buildLucaBuffer(ids, opts) {
         best = grp[0];
         for (const r0 of grp) if (rateOf(r0) > rateOf(best)) best = r0;
       } else {
-        continue;   // other insurers: same-tier different-rate = real conflict, keep all
+        // Engine-match de-conflict (USER 2026-09): same cell + RTO + volume tier at
+        // different rates = the source has >1 grid GENERATION or overlapping CLUSTER
+        // collapsing onto one Luca identity (e.g. Kotak "RTO Level TP ULR" LCV grid
+        // vs "GCV Pan India"; Liberty two geo-clusters on the same RTOs; Go Digit HEV
+        // from two clusters). The engine pays the NEWEST generation, so keep the row
+        // from the newest source card; tie on date → keep the higher rate (agent-safe,
+        // deterministic). Resolves the look-alike duplicates the agent can't tell apart.
+        best = grp[0];
+        for (const r0 of grp) {
+          const de = (r0._eff || 0) - (best._eff || 0);
+          if (de > 0 || (de === 0 && rateOf(r0) > rateOf(best))) best = r0;
+        }
       }
       for (const r0 of grp) if (r0 !== best) dropped.add(r0);
     }
