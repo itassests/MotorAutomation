@@ -151,7 +151,10 @@ router.get('/luca', async (req, res, next) => {
     const products = prodParam
       ? (/^all$/i.test(prodParam) ? null : prodParam.split(',').map(s => s.trim().toUpperCase()).filter(Boolean))
       : ['CAR', 'TW', 'GCV'];
-    const buffer = await buildLucaBuffer(ids, products ? { products } : undefined);
+    // Stamp every row's year/month with the snapshot period (the chosen effective
+    // date, else today) so the file is one period — not each grid's filing month.
+    const asOfDate = effDate || new Date().toISOString().slice(0, 10);
+    const buffer = await buildLucaBuffer(ids, { ...(products ? { products } : {}), asOfDate });
     const stem = ['luca', insurer || 'all', effDate ? `eff${effDate}` : ''].filter(Boolean).join('_');
     sendXlsx(res, buffer, `${stem}_${todayStamp()}.xlsx`);
   } catch (err) { next(err); }

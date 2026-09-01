@@ -756,6 +756,10 @@ async function buildLucaBuffer(ids, opts) {
   const allowTypes = (opts && Array.isArray(opts.products) && opts.products.length)
     ? new Set(opts.products.map((p) => String(p).toUpperCase().trim()))
     : null;
+  // Snapshot period: stamp every row's year/month with this date (the effective
+  // date the file was pulled for) instead of the source card's filing month.
+  const asOf = (opts && opts.asOfDate && /^\d{4}-\d{2}-\d{2}$/.test(String(opts.asOfDate)))
+    ? new Date(String(opts.asOfDate) + 'T00:00:00') : null;
   const idList = Array.isArray(ids) ? ids : [ids];
   const pool = await getPool();
   const rq = pool.request();
@@ -911,7 +915,11 @@ async function buildLucaBuffer(ids, opts) {
     // NB: bundle tenure (1+5 / 5+5) is deliberately NOT written to the slab/tenure
     // column — USER 2026-08 asked to leave it blank for now. (This means 1+5 vs 5+5
     // bundles on the same cell can still look like a Luca conflict; revisit later.)
-    const d = r.effective_from ? new Date(r.effective_from) : null;
+    // year/month = the SNAPSHOT period (opts.asOfDate) when the file is an
+    // "as-of <date>" export, NOT each rule's source-card filing month. A Sept
+    // snapshot is all 2026-Sep even for insurers whose in-force grid was filed in
+    // March (USER: "it showing all months"). Falls back to the source date.
+    const d = asOf || (r.effective_from ? new Date(r.effective_from) : null);
     const region = String(r.region || r.state || '').trim();
     let rtoList = rtoListFor(rtoIdx, r.insurer, region);     // shared by city + included_rto
     // A sub_type that is a comma/space-separated RTO list is MORE specific than the
