@@ -1131,7 +1131,11 @@
             <option value="MISC">MISC</option>
           </select>
           <button class="btn btn-primary btn-sm" id="downloadAllMasterBtn" onclick="downloadAllMaster()">Download Master Excel</button>
-          <button class="btn btn-outline btn-sm" id="downloadLucaBtn" onclick="downloadLucaData()" title="All insurers' outgoing rates in Luca format (no income / margin)">Download Luca Data</button>
+          <label style="font-size:12px; color:#555; display:inline-flex; align-items:center; gap:4px;" title="Export the rate generation in force on this date. Leave blank for today.">
+            Luca effective date
+            <input type="date" id="lucaEffectiveDate" class="input input-sm" style="width:150px;">
+          </label>
+          <button class="btn btn-outline btn-sm" id="downloadLucaBtn" onclick="downloadLucaData()" title="All insurers' outgoing rates in Luca format (no income / margin), for the chosen effective date">Download Luca Data</button>
         </div>
         <div id="rateCardsList"></div>
       </div>
@@ -9785,10 +9789,12 @@
     // Download ALL insurers' OUTGOING rates in the Luca format (no income/margin).
     async function downloadLucaData() {
       const insurer = (document.getElementById('exportInsurerFilter') || {}).value || '';
+      const effDate = (document.getElementById('lucaEffectiveDate') || {}).value || '';
       const qs = new URLSearchParams();
       if (insurer) qs.set('insurer', insurer);
+      if (effDate) qs.set('effective_date', effDate);
       const url = API + '/export/luca' + (qs.toString() ? '?' + qs.toString() : '');
-      const stem = ['luca', insurer || 'all'].filter(Boolean).join('_');
+      const stem = ['luca', insurer || 'all', effDate ? 'eff' + effDate : ''].filter(Boolean).join('_');
       const btn = document.getElementById('downloadLucaBtn');
       const originalLabel = btn ? btn.innerHTML : null;
       if (btn) {

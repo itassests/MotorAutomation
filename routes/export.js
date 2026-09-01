@@ -120,13 +120,25 @@ router.get('/all', async (req, res, next) => {
 router.get('/luca', async (req, res, next) => {
   try {
     const insurer = String(req.query.insurer || '').trim();
+    // Optional effective-date filter (YYYY-MM-DD): export the rate GENERATION in
+    // force on that date — every active card with effective_from <= date. We do
+    // NOT gate on effective_to: cards are date-chained (a July card carries
+    // effective_to = 1-Aug even though it is the latest grid in Sept), and
+    // buildLucaBuffer already dedups each rate cell to the newest generation, so
+    // adding an effective_to > date clause would wrongly drop every insurer whose
+    // grid hasn't changed since its last upload. Defaults to today.
+    const edRaw = String(req.query.effective_date || '').trim();
+    const effDate = /^\d{4}-\d{2}-\d{2}$/.test(edRaw) ? edRaw : null;
     const pool = await getPool();
     const reqCard = pool.request();
     reqCard.timeout = 600000;
-    let q = `SELECT id FROM rate_cards
-              WHERE status = 'active'
-                AND (effective_from IS NULL OR effective_from <= CAST(GETDATE() AS DATE))
-                AND (effective_to IS NULL OR effective_to > CAST(GETDATE() AS DATE))`;
+    let q = `SELECT id FROM rate_cards WHERE status = 'active'`;
+    if (effDate) {
+      reqCard.input('eff', effDate);
+      q += ` AND (effective_from IS NULL OR effective_from <= @eff)`;
+    } else {
+      q += ` AND (effective_from IS NULL OR effective_from <= CAST(GETDATE() AS DATE))`;
+    }
     if (insurer) { reqCard.input('ins', insurer); q += ' AND LOWER(insurer) = LOWER(@ins)'; }
     const result = await reqCard.query(q);
     const ids = result.recordset.map(r => r.id);
@@ -140,7 +152,7 @@ router.get('/luca', async (req, res, next) => {
       ? (/^all$/i.test(prodParam) ? null : prodParam.split(',').map(s => s.trim().toUpperCase()).filter(Boolean))
       : ['CAR', 'TW', 'GCV'];
     const buffer = await buildLucaBuffer(ids, products ? { products } : undefined);
-    const stem = ['luca', insurer || 'all'].filter(Boolean).join('_');
+    const stem = ['luca', insurer || 'all', effDate ? `eff${effDate}` : ''].filter(Boolean).join('_');
     sendXlsx(res, buffer, `${stem}_${todayStamp()}.xlsx`);
   } catch (err) { next(err); }
 });
