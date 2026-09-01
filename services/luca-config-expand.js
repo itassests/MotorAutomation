@@ -377,6 +377,12 @@ function goDigitCar(eff) {
  *  MIS-ingested (tonnage in the fuel column) — both are resolved from config
  *  instead (routes/bulk.js). TATA "TW." rules are genuine and stay. */
 const SUPPRESS = [
+  // IndusInd is 100% config-driven (indusindCar/Tw/Cv below); historically it had
+  // ZERO rate_rules. A later upload (card 699 "Aug 16 TW26") landed 1,855 rows
+  // MIS-INGESTED — rate values in segment/sub_type ("0.45 0.425"), tenure in region
+  // ("Fresh(1+5)") — that the engine never pays. Drop ALL IndusInd DB rows; the
+  // config expander is authoritative.
+  { insurer: 'indusind', test: () => true },
   { insurer: 'tata_aig', test: (r) => /PVTCAR|PVT\s*CAR|EXTENDED\s*WARRANTY/i.test(String(r.sheet_name || '')) },
   { insurer: 'tata_aig', test: (r) => /^CV$/i.test(String(r.sheet_name || '').trim()) },
   // "TW." is mis-ingested too: region holds a TONNAGE ("3.5") and rate_type holds

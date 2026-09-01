@@ -324,6 +324,12 @@ module.exports = {
     (r) => prod(r) === 'TW' && /^Grid\s*-\s*Comp,\s*TP only$/i.test(sheet(r)),
     // TW SAOD: state dimension lost + unpaid "TVS 10% less" rows → services/hdfc-tw.js
     (r) => prod(r) === 'TW' && /^Grid\s*-\s*SA-?OD$/i.test(sheet(r)),
+    // "Sheet1" (card 698 "TW_Commission_Grid_Aug'26") is a TW grid mis-ingested
+    // wholesale: region holds the rate-COLUMN headers (BIKE_COMP/BIKE_TP/SC_COMP/
+    // SC_TP), the STATE+RTO+cities landed in `segment`, and the rows are mislabeled
+    // product CAR/GCV. Every row is region-garbage with blank state/city. HDFC TW is
+    // priced from config (hdfc-tw.js → tw()/twSaod() above), so drop the whole sheet.
+    (r) => /^Sheet1$/i.test(sheet(r)),
   ],
   expand: (effFrom) => [
     ...gcv(effFrom),

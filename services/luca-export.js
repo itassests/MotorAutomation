@@ -254,7 +254,7 @@ function band(min, max) {
 const STATE_MAP = {};
 const _sk = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 const _addState = (slug, ...variants) => { for (const v of variants) STATE_MAP[_sk(v)] = slug; };
-_addState('jammu_and_kashmir', 'jammu and kashmir', 'jammu & kashmir', 'j&k', 'jk', 'jammu kashmir', 'jammu', 'kashmir', 'ladakh', 'la');
+_addState('jammu_and_kashmir', 'jammu and kashmir', 'jammu & kashmir', 'j&k', 'jk', 'jandk', 'j and k', 'jammu kashmir', 'jammu', 'kashmir', 'srinagar', 'ladakh', 'la');
 _addState('himachal_pradesh', 'himachal pradesh', 'himachal', 'hp');
 _addState('punjab', 'punjab', 'pb');
 _addState('uttarakhand', 'uttarakhand', 'uttaranchal', 'uk', 'ua');
@@ -329,9 +329,13 @@ const _STATE_FILLER = new Set(['BAD', 'GOOD', 'REF', 'OPEN', 'DECLINED', 'DECLIN
   'CLUSTER', 'GROUP', 'REST', 'OF', 'ALL', 'KEY', 'CITIES', 'CITY', 'ZONE', 'ZONES',
   'REGION', 'OTHERS', 'OTHER', 'NEW', 'OLD', 'TIER', 'GRADE', 'A', 'B', 'C', 'D']);
 
-/** Canonical Luca state slug from a rule's state/region (prefers state). */
-function lucaState(state, region) {
-  return resolveStateSlug(state) || resolveStateSlug(region) || '';
+/** Canonical Luca state slug from a rule's state/region/sub_type (prefers state).
+ * sub_type is a last-resort source: some grids (SBI Pvt-Car SATP) put the STATE
+ * in sub_type ("West Bengal") while region is a cluster code ("WB - K"). It only
+ * resolves when sub_type actually IS a state name — a segment/RTO-list sub_type
+ * returns null and is ignored. */
+function lucaState(state, region, subType) {
+  return resolveStateSlug(state) || resolveStateSlug(region) || resolveStateSlug(subType) || '';
 }
 
 // city — the sub-state locality that distinguishes a rule (USER: "city is not
@@ -365,6 +369,23 @@ function lucaCity(region) {
   if (!n || n === 'ALL' || n === 'PANINDIA' || n === 'ALLINDIA' || n === 'INDIA'
       || _BARE_STATE.has(n)) return '';                         // region IS a state / pan-India / wildcard
   return raw;                                                    // real city / cluster
+}
+
+// A row that is INGEST GARBAGE, not a rate: the generic parser sometimes reads a
+// grid's HEADER row as data (region = a cover/column label like "Comp /SATP
+// (Net)", "RTO Cluster Name", "State Name", "BIKE_COMP") or scrambles a matrix so
+// a rate-number string lands in region/segment ("7.5 8", "0.575 0.55"). Such rows
+// carry no usable dimension and pollute the file with blank-location look-alikes.
+// No legitimate region/segment matches these, so dropping them is safe (USER
+// 2026-09: "give full clean file"). Insurers whose whole sheet is mis-ingested are
+// handled by luca-config-expand SUPPRESS + a config resolver; this is the catch-all.
+const _NUM_ONLY = /^[\d.]+(?:\s+[\d.]+)+$/;                        // "7.5 8", "12 20 20"
+const _HDR_REGION = /\(\s*net\s*\)|rto\s*cluster\s*name|^\s*state\s*name\s*$|^(?:non[\s-]?new\s*)?(?:comp|package|satp|saod)\s*\/?\s*(?:comp|satp|saod|tp|od|net|only)?\s*(?:\(net\))?$|^(?:bike|sc|scooter)_(?:comp|tp|satp|saod)$/i;
+function isGarbageRow(r) {
+  const reg = String(r.region || '').trim();
+  if (_HDR_REGION.test(reg) || _NUM_ONLY.test(reg)) return true;
+  if (_NUM_ONLY.test(String(r.segment || '').trim())) return true;
+  return false;
 }
 
 // Sanitize the vehicle_make column. rr.make is polluted in several grids with
@@ -861,6 +882,7 @@ async function buildLucaBuffer(ids, opts) {
         && _libTwCompCov.has(_normKey(r.region) + '|' + _normKey(r.segment))) continue;
     const insurer = lucaInsurer(r.insurer || '');
     if (!insurer) continue;   // insurer has no canonical Luca slug (kiwi, kshema) → excluded
+    if (isGarbageRow(r)) continue;   // ingest artifact (header/rate-number in region/segment)
     const vt = ex.inferVehicleType(r.sheet_name, r.product, r.segment, r.sub_type);
     // Product scope (USER): the Luca file covers Pvt Car / TW / GCV only — skip
     // PCV and MISC. canonVt folds inferVehicleType's forms (Pvt car/4W→CAR,
@@ -988,7 +1010,7 @@ async function buildLucaBuffer(ids, opts) {
       lucaFuel(r.fuel_type),                                  // fuel_type
       lucaBusinessType(r.segment, r.sub_type, r.rate_type),   // business_type
       '',                                                     // zones
-      lucaState(r.state, r.region),                           // included_states (canonical state slug)
+      lucaState(r.state, r.region, r.sub_type),               // included_states (canonical state slug)
       citiesFromRtoList(rtoList) || lucaCity(region),         // city — cities in the cluster (RTO→city), else clean locality
       '',                                                     // excluded_cities
       rtoList,                                                // included_rto (comma-separated)
