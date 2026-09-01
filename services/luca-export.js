@@ -836,7 +836,12 @@ async function buildLucaBuffer(ids, opts) {
     // keeps the whole rate — mirrors routes/bulk.js so the file cannot promise a
     // rate the engine won't pay. Floors at 0 (a declined/0% grid stays 0).
     const gridP = pct(r.rate_value);
-    const marginP = marginPctForRule(r, canonVt(vt), marginRules, marginCache);
+    // opts.flatMargin (USER): a single flat margin (in points) applied to EVERY
+    // rule, overriding the per-rule company margin — e.g. a 5% flat margin makes
+    // outgoing = grid - 5 for all rows. Falls back to the per-rule margin when unset.
+    const marginP = (opts && opts.flatMargin != null && Number.isFinite(Number(opts.flatMargin)))
+      ? Number(opts.flatMargin)
+      : marginPctForRule(r, canonVt(vt), marginRules, marginCache);
     const rateP = gridP === '' ? ''
       : Math.max(0, +((gridP > 0 && marginP >= gridP) ? gridP : gridP - marginP).toFixed(3));
     // USER 2026-07-17: "if TP, OD, IRDA all rates are either ZERO or blank dont
