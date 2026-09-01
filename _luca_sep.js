@@ -16,7 +16,7 @@ const { buildLucaBuffer }=require("./services/luca-export");
   const sep=await pool.request().query(`SELECT DISTINCT LOWER(insurer) ins FROM rate_cards WHERE status='active' AND effective_from='2026-09-01'`);
   console.log("insurers with a Sept-1 card:",sep.recordset.map(x=>x.ins).join(", "));
   const buf=await buildLucaBuffer(ids,{products:["CAR","TW","GCV"], flatMargin:5});
-  const out="C:/Users/ribweb07/AppData/Local/Temp/claude/D--Code-RateExtract/5a8eb4b2-6123-4f1f-8ce4-3c2ebea5d791/scratchpad/luca_all_Sept2026_5pct.xlsx";
+  const out="C:/Users/ribweb07/AppData/Local/Temp/claude/D--Code-RateExtract/5a8eb4b2-6123-4f1f-8ce4-3c2ebea5d791/scratchpad/luca_all_Sept2026_5pct_v2.xlsx";
   fs.writeFileSync(out, buf);
   console.log("WROTE", out, "("+buf.length+" bytes)");
   process.exit(0);

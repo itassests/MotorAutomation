@@ -917,9 +917,14 @@ async function buildLucaBuffer(ids, opts) {
       lucaProduct(vt, r.segment, r.sub_type, r.sheet_name, r.weight_band_min, r.weight_band_max), // products
       coverageType,                                           // coverage_type
       lucaNcb(r.rate_type),                                   // ncb
-      isTp ? 'TP' : 'OD',                                     // commission_on
-      isTp ? rateP : '',                                      // tp_commission_percentage
-      isTp ? '' : rateP,                                      // irdai_commission_percentage (the outgoing OD rate)
+      isTp ? 'TP' : 'OD',                                     // commission_on (which leg this single rate is)
+      // USER 2026-08: each row carries a SINGLE commission (TP-only, OD-only, or a
+      // Net rate where OD & TP aren't split) → it goes in irdai_commission_percentage.
+      // tp_commission_percentage is used ONLY when a row genuinely carries SEPARATE
+      // OD and TP legs (OD→irdai, TP→tp) — which the one-rate-per-row export never
+      // produces, so it stays blank here.
+      '',                                                     // tp_commission_percentage
+      rateP,                                                  // irdai_commission_percentage (the single outgoing rate)
       // slab — the premium/volume band (e.g. "Below 1L", "Upto 2L", "<50K"). Was
       // blank + carried only in the REMARK ("slab:X"), which collapsed premium-tiered
       // rules into look-alike rows (same visible params, different rate). Populate the
