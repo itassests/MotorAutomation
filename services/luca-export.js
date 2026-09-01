@@ -277,7 +277,8 @@ _addState('arunachal_pradesh', 'arunachal pradesh', 'arunachal', 'ar');
 _addState('rajasthan', 'rajasthan', 'rj', 'jaipur');
 _addState('gujarat', 'gujarat', 'gj', 'ahmedabad', 'surat', 'vadodara');
 _addState('goa', 'goa', 'ga');
-_addState('maharashtra', 'maharashtra', 'mh', 'mumbai', 'pune', 'nagpur', 'nashik', 'thane', 'aurangabad');
+_addState('maharashtra', 'maharashtra', 'mh', 'mumbai', 'pune', 'nagpur', 'nashik', 'thane', 'aurangabad',
+  'rom', 'romg', 'rom1', 'rom2', 'rom3', 'rom4');   // go-digit "Rest Of Maharashtra" clusters
 _addState('daman_and_diu', 'daman and diu', 'daman & diu', 'daman', 'diu', 'dd');
 _addState('dadra_and_nagar_haveli', 'dadra and nagar haveli', 'dadra & nagar haveli', 'dadra', 'dnh', 'dn', 'silvassa');
 _addState('andhra_pradesh', 'andhra pradesh', 'andra pradesh', 'ap', 'andhra', 'vijayawada', 'vijaywada', 'visakhapatnam', 'vizag');
