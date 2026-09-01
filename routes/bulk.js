@@ -1685,6 +1685,9 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
       if (_uiss) _bajajEffDate = _uiss;
     }
   }
+  // Surface the resolved risk-start date on params so config resolvers (Tata,
+  // Bajaj Sep'26, …) can select the right grid generation from params directly.
+  if (_bajajEffDate && !params.effective_date) params.effective_date = _bajajEffDate;
 
   // Magma GCV rated-GVW band (USER 2026-07-08): heavy trucks whose MODEL encodes a
   // 37-tonne rated GVW class (37xx / Truxo 37 / Blazo 37 / Pro 6037 / Signa|LPT|LPK|
@@ -3873,6 +3876,29 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
           : { id: -1, insurer: 'go_digit', product: 'CAR', region: resolvedRegion || '',
               rate_type: (Number(params.tpPremium) || 0) <= 0 ? 'SAOD' : 'COMP',
               rate_value: gr, segment: _seg, is_declined: 0 }];
+      }
+    } catch (_) { /* leave rules unchanged on any failure */ }
+  }
+
+  // ---- BAJAJ Private Car Comp/SAOD — Sept'26 "communication" prose grid ----
+  // "Ro Bajaj Pvt Car.xlsx" is free-text per RTO-state (only 6 rows survived the
+  // standard ingest). Resolve config-driven: RTO -> Grid State (Bajaj RTO master) x
+  // fuel x NCB, with the UP West(IRDA)/Rest(35) split, the "Excluding Below RTO"
+  // default for unlisted states, and Jharkhand/HEV left to their own handling.
+  // config/bajaj_pvtcar_sep26.json + services/bajaj-pvtcar-sep.js. Sept-risk only.
+  if (insurerSlug === 'bajaj_allianz' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR') {
+    try {
+      const { resolveBajajPvtCarSepRate } = require('../services/bajaj-pvtcar-sep');
+      const br = resolveBajajPvtCarSepRate(params);
+      if (br != null) {
+        const _b = rules[0];
+        const _seg = 'Pvt Car (Bajaj Sep26 grid)';
+        rules = [_b
+          ? { ..._b, rate_value: br, segment: _seg }
+          : { id: -1, insurer: 'bajaj_allianz', product: 'CAR', region: resolvedRegion || '',
+              rate_type: (Number(params.tpPremium) || 0) <= 0 ? 'SAOD' : 'COMP',
+              rate_value: br, segment: _seg, is_declined: 0 }];
       }
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
