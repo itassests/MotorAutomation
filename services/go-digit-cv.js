@@ -14,13 +14,20 @@
  * Max CD2 fraction — or null (unknown region/segment, ambiguous "/" cell, or a
  * declined "D" cell) to leave the engine's value untouched. Never guesses.
  */
-const CFG = require('../config/go_digit_cv_jun26.json');
+const CFG_JUN = require('../config/go_digit_cv_jun26.json');
+const CFG_SEP = require('../config/go_digit_cv_sep26.json');   // "New CV Format" (card 692)
 const norm = (s) => String(s == null ? '' : s).trim().toUpperCase();
 const segNorm = (s) => norm(s).replace(/[^A-Z0-9]/g, '');
 const regKey = (s) => norm(s).replace(/\s*(CV GRID|RTO CLUSTER|GRID)\s*$/i, '').replace(/[^A-Z0-9]/g, '');
 
-const IDX = {};
-for (const r of Object.keys(CFG.grid)) IDX[regKey(r)] = CFG.grid[r];
+function buildIdx(cfg) { const idx = {}; for (const r of Object.keys(cfg.grid)) idx[regKey(r)] = cfg.grid[r]; return idx; }
+const IDX_JUN = buildIdx(CFG_JUN);
+const IDX_SEP = buildIdx(CFG_SEP);
+// Sept "New CV Format" grid on/after 1-Sep-2026, else the June grid.
+function idxFor(params) {
+  const d = String((params && (params.effective_date || params.effectiveDate || params.riskStartDate || params.policyStartDate)) || '').slice(0, 10);
+  return (d && d >= '2026-09-01') ? IDX_SEP : IDX_JUN;
+}
 
 // strip a trailing age band from a segment label so engine labels line up with base segments
 function baseSeg(seg) {
@@ -50,7 +57,7 @@ function makeMatch(gridMake, polMake, rank) {
 const CV_SEG_OK = /^(GCV3|GCV4|TRACTOR|MISCD|BACKHOELOADER|ERICKSHAW|EAUTO|ELOADERS|PCV3W|PCV2W)/;
 
 function resolveGoDigitCvRate(params, region, matchedSegment) {
-  const rows = IDX[regKey(region)];
+  const rows = idxFor(params)[regKey(region)];
   if (!rows || !rows.length) return null;
 
   const wantSeg = segNorm(baseSeg(matchedSegment));

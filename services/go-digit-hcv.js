@@ -12,12 +12,18 @@
  * config/go_digit_hcv_jun26.json (regen tools/_gen_godigit_hcv.js). Returns the
  * Max CD2 fraction or null (unknown cluster/segment/age or "D" decline → leave engine).
  */
-const CFG = require('../config/go_digit_hcv_jun26.json');
+const CFG_JUN = require('../config/go_digit_hcv_jun26.json');
+const CFG_SEP = require('../config/go_digit_hcv_sep26.json');   // "HCV Grid OLD" (card 692)
 const norm = (s) => String(s == null ? '' : s).trim().toUpperCase();
 const regKey = (s) => norm(s).replace(/\s*(CV GRID|RTO CLUSTER|GRID)\s*$/i, '').replace(/[^A-Z0-9]/g, '');
 
-const IDX = {};
-for (const c of Object.keys(CFG.grid)) IDX[regKey(c)] = CFG.grid[c];
+function buildIdx(cfg) { const idx = {}; for (const c of Object.keys(cfg.grid)) idx[regKey(c)] = cfg.grid[c]; return idx; }
+const IDX_JUN = buildIdx(CFG_JUN);
+const IDX_SEP = buildIdx(CFG_SEP);
+function idxFor(params) {
+  const d = String((params && (params.effective_date || params.effectiveDate || params.riskStartDate || params.policyStartDate)) || '').slice(0, 10);
+  return (d && d >= '2026-09-01') ? IDX_SEP : IDX_JUN;
+}
 
 // tonnage (GVW, tonnes) or the engine's matched segment → HCV tonnage band
 function tonnageSeg(params, matchedSegment) {
@@ -45,7 +51,7 @@ function bodyOf(params) {
 }
 
 function resolveGoDigitHcvRate(params, region, matchedSegment) {
-  const rows = IDX[regKey(region)];
+  const rows = idxFor(params)[regKey(region)];
   if (!rows || !rows.length) return null;
   const seg = tonnageSeg(params, matchedSegment);
   if (!seg) return null;

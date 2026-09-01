@@ -38,6 +38,10 @@
 const TP_CFG  = require('../../config/go_digit_car_tp_jun26.json');
 const TW_CFG  = require('../../config/go_digit_tw_jun26.json');
 const TWB_CFG = require('../../config/go_digit_tw_bundle_jun26.json');
+const CV_JUN  = require('../../config/go_digit_cv_jun26.json');
+const CV_SEP  = require('../../config/go_digit_cv_sep26.json');
+const HCV_JUN = require('../../config/go_digit_hcv_jun26.json');
+const HCV_SEP = require('../../config/go_digit_hcv_sep26.json');
 const { resolveGoDigitCarTpRate }   = require('../go-digit-car-tp');
 const { resolveGoDigitTwRate }      = require('../go-digit-tw');
 const { resolveGoDigitTwBundleRate } = require('../go-digit-tw-bundle');
@@ -316,6 +320,85 @@ function goDigitTwBundle(eff) {
 }
 
 // ---------------------------------------------------------------------------
+// 4) COMMERCIAL (GCV / MISC / tractor / PCV3W) — config/go_digit_cv_{jun,sep}26
+//    and 5) HEAVY CV (>12T) — config/go_digit_hcv_{jun,sep}26.
+// The DB rows for these two sheets ("CV Grid (excl. HCV)" / "HCV GRID") are the
+// region-BLANK mis-ingest (see services/go-digit-cv.js); the engine prices them
+// config-driven, so we emit the config here (proper RTO-cluster region → the
+// export resolves city/state) and SUPPRESS the DB rows. Date-aware: the Sept
+// "New CV Format" / "HCV Grid OLD" grids on/after 1-Sep-2026, else June.
+// ---------------------------------------------------------------------------
+const CV_SEG_OK = /^(GCV3|GCV4|TRACTOR|MISCD|ERICKSHAW|EAUTO|ELOADERS|PCV3W|PCV2W)/;
+const _segNorm = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+// a specific make label to keep, vs an "all / others / non-tata" fallback → null (default row)
+function cvMake(m) {
+  const s = String(m || '').trim();
+  if (!s || /^ALL|OTHERS?$|OTHER\s*MAKES|NON[\s-]?TATA|OTHER\s*THAN|VARIANT|BODY\s*TYPE|^—$/i.test(s)) return null;
+  return s;
+}
+function cvProduct(seg) {
+  const s = _segNorm(seg);
+  if (/^GCV/.test(s)) return 'GCV';
+  if (/^(TRACTOR|MISCD|BACKHOE)/.test(s)) return 'MISC';
+  return 'PCV';   // ERICKSHAW / EAUTO / ELOADERS / PCV3W
+}
+function goDigitCv(eff) {
+  const d = String(eff || '').slice(0, 10);
+  const cfg = (d >= '2026-09-01') ? CV_SEP : CV_JUN;
+  const sheet = (d >= '2026-09-01') ? 'CV Grid Sep26' : 'CV Grid Jun26';
+  const out = [];
+  for (const region of Object.keys(cfg.grid || {})) {
+    for (const r of cfg.grid[region]) {
+      if (r.amb) continue;
+      if (!CV_SEG_OK.test(_segNorm(r.segment))) continue;   // resolver only pays these
+      const base = {
+        product: cvProduct(r.segment), sheet_name: sheet, region,
+        segment: r.segment, make: cvMake(r.make),
+        age_band_min: r.ageMin === 0 ? null : r.ageMin,
+        age_band_max: r.ageMax === 99 ? null : r.ageMax,
+        effective_from: eff,
+      };
+      if (r.compMax != null) out.push(row({ ...base, rate_type: 'COMP', rate_value: r.compMax / 100 }));
+      if (r.satpMax != null) out.push(row({ ...base, rate_type: 'SATP', rate_value: r.satpMax / 100 }));
+    }
+  }
+  return out;
+}
+const HCV_BODY = { nonDumper: 'Non-Dumper/Tipper', dumper: 'Dumper/Tipper', oil: 'Oil Tanker', gas: 'Gas Tanker' };
+function goDigitHcv(eff) {
+  const d = String(eff || '').slice(0, 10);
+  const cfg = (d >= '2026-09-01') ? HCV_SEP : HCV_JUN;
+  const sheet = (d >= '2026-09-01') ? 'HCV Grid Sep26' : 'HCV Grid Jun26';
+  const out = [];
+  for (const region of Object.keys(cfg.grid || {})) {
+    for (const e of cfg.grid[region]) {
+      const base = {
+        product: 'GCV', sheet_name: sheet, region, segment: e.segment,
+        age_band_min: e.ageFrom === 0 ? null : e.ageFrom,
+        age_band_max: e.ageTo === 99 ? null : e.ageTo,
+        effective_from: eff,
+      };
+      for (const [body, bv] of Object.entries(e.bodies || {})) {
+        for (const cover of ['comp', 'satp']) {
+          const leg = bv[cover] || {};
+          const t = leg.tata, o = leg.other;
+          const rt = cover === 'satp' ? 'SATP' : 'COMP';
+          const st = HCV_BODY[body];
+          // collapse tata/other when equal → one default row (make blank)
+          if (t != null && o != null && t === o) {
+            out.push(row({ ...base, sub_type: st, rate_type: rt, rate_value: t / 100 }));
+          } else {
+            if (t != null) out.push(row({ ...base, sub_type: st, make: 'TATA', rate_type: rt, rate_value: t / 100 }));
+            if (o != null) out.push(row({ ...base, sub_type: st, rate_type: rt, rate_value: o / 100 }));
+          }
+        }
+      }
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Corrupt-cell guard. A commission is a fraction in [0,1]. A handful of source
 // cells are outside it — 13 "2W Grid 5+5" cd2 cells hold 5 / 7.5 / 10 (the raw
 // percent leaked through un-normalized: GJ_Good/SUZUKI/MC<=155 = 10 → 1000%),
@@ -335,15 +418,22 @@ function plausible(rows) {
 
 module.exports = {
   insurer: 'go_digit',
-  // Empty on purpose — luca-config-expand.js SUPPRESS already drops go_digit
-  // /PVT CAR/ + /^2W GRID/, and the two sheets expanded here were never
-  // ingested at all. 'CV Grid (excl. HCV)' / 'HCV GRID' stay.
-  suppress: [],
+  // The "CV Grid (excl. HCV)" and "HCV GRID" DB rows are the region-BLANK
+  // mis-ingest (10,773/10,773 HCV rows region-blank on the June card) that the
+  // engine ignores in favour of the config resolvers — so drop them and emit the
+  // config instead (goDigitCv/goDigitHcv). Region-populated PCV sheets (taxi /
+  // school bus) are a different sheet and stay. luca-config-expand.js SUPPRESS
+  // still drops /PVT CAR/ + /^2W GRID/.
+  suppress: [
+    (r) => /^(CV Grid \(excl\. HCV\)|HCV GRID)$/i.test(String(r.sheet_name || '').trim()),
+  ],
   expand: (effFrom) => plausible([
     ...goDigitCarSatp(effFrom),
     ...goDigitTwAnnual(effFrom),
     ...goDigitTwBundle(effFrom),
+    ...goDigitCv(effFrom),
+    ...goDigitHcv(effFrom),
   ]),
   // exported for the verification script
-  _internal: { goDigitCarSatp, goDigitTwAnnual, goDigitTwBundle },
+  _internal: { goDigitCarSatp, goDigitTwAnnual, goDigitTwBundle, goDigitCv, goDigitHcv },
 };
