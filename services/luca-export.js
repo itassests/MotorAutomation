@@ -1025,8 +1025,11 @@ async function buildLucaBuffer(ids, opts) {
       // (USER 2026-07-29). Original remark appended last.
       // volume_tier now lives in the structured `slab` column (above), so it's no
       // longer duplicated here; REMARK keeps segment/sub_type + the original remark.
+      // Strip embedded newlines/tabs: a REMARK with a line break splits a row when
+      // the file is saved/read as CSV, misaligning the id column → the Luca importer
+      // then reports non-unique / missing ids (USER 2026-09).
       ([[r.segment, r.sub_type].map(x => String(x || '').trim()).filter(Boolean).join(' ').trim(),
-        String(r.remarks || '').trim()].filter(Boolean).join(' | ')).slice(0, 250),  // REMARK / comment
+        String(r.remarks || '').trim()].filter(Boolean).join(' | ')).replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim().slice(0, 250),  // REMARK / comment
     ];
     // Output-level dedupe (USER: "it looks duplicate records"). Different source
     // rate_rules can render to a byte-identical Luca row — e.g. two rows that
