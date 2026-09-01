@@ -136,14 +136,30 @@ function lucaProduct(vt, seg, sub, sheet, wMin, wMax) {
   return V.toLowerCase();
 }
 
-// Map our internal insurer slug → the short Luca insurer id (sample uses "hdfc").
-// First token before the underscore covers most (hdfc_ergo→hdfc, tata_aig→tata,
-// icici_lombard→icici …); multi-word govt insurers keep two tokens.
+// Map our internal insurer slug → the CANONICAL Luca insurer id (the exact slug
+// set the Luca importer expects — hyphenated, full names for multi-word insurers:
+// go-digit, new-india, united-india, royal-sundaram, cholamandalam). USER
+// 2026-09-01 supplied the canonical list; earlier truncation (chola/go_digit/royal)
+// was the "insurer name format changed" mismatch. Returns null for insurers with
+// NO Luca slug (kiwi, kshema) — the caller drops those rows.
+const LUCA_INSURER = {
+  bajaj_allianz: 'bajaj', bharti_axa: 'bharti', chola_ms: 'cholamandalam',
+  future_generali: 'future', go_digit: 'go-digit', hdfc_ergo: 'hdfc',
+  icici_lombard: 'icici', iffco_tokio: 'iffco', indusind: 'indusind',
+  kotak: 'kotak', liberty_videocon: 'liberty', magma: 'magma', magma_hdi: 'magma',
+  national_insurance: 'national', new_india_assurance: 'new-india',
+  oriental_insurance: 'oriental', raheja_qbe: 'raheja', reliance: 'reliance',
+  royal_sundaram: 'royal-sundaram', sbi_general: 'sbi', shriram: 'shriram',
+  tata_aig: 'tata', united_india_insurance: 'united-india',
+  universal_sompo: 'universal', zuno: 'zuno',
+  // No canonical Luca slug — exclude from the export (USER 2026-09-01).
+  kiwi: null, kshema: null,
+};
 function lucaInsurer(slug) {
   const s = String(slug || '').toLowerCase().trim().replace(/\s+/g, '_');
-  const KEEP_TWO = new Set(['new_india', 'united_india', 'go_digit']);
-  const two = s.split('_').slice(0, 2).join('_');
-  if (KEEP_TWO.has(two)) return two;
+  if (Object.prototype.hasOwnProperty.call(LUCA_INSURER, s)) return LUCA_INSURER[s];
+  // Unknown internal slug: fall back to first token (keeps the file from silently
+  // dropping a newly-added insurer), but this shouldn't happen for known grids.
   return s.split('_')[0] || s;
 }
 
@@ -823,6 +839,7 @@ async function buildLucaBuffer(ids, opts) {
         && /^PACK_LIBERTY_OD$/i.test(String(r.rate_type || ''))
         && _libTwCompCov.has(_normKey(r.region) + '|' + _normKey(r.segment))) continue;
     const insurer = lucaInsurer(r.insurer || '');
+    if (!insurer) continue;   // insurer has no canonical Luca slug (kiwi, kshema) → excluded
     const vt = ex.inferVehicleType(r.sheet_name, r.product, r.segment, r.sub_type);
     // Product scope (USER): the Luca file covers Pvt Car / TW / GCV only — skip
     // PCV and MISC. canonVt folds inferVehicleType's forms (Pvt car/4W→CAR,
