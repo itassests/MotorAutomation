@@ -263,7 +263,7 @@ _addState('haryana', 'haryana', 'hr', 'gurgaon', 'gurugram', 'faridabad');
 _addState('delhi', 'delhi', 'new delhi', 'dl', 'delhi ncr', 'ncr');
 _addState('chandigarh', 'chandigarh', 'ch');
 _addState('bihar', 'bihar', 'br', 'patna');
-_addState('odisha', 'odisha', 'orissa', 'od', 'or', 'bhubaneshwar', 'bhubaneswar', 'cuttack');
+_addState('odisha', 'odisha', 'orissa', 'od', 'or', 'bhubaneshwar', 'bhubaneswar', 'bhubuneshwar', 'bhubneshwar', 'cuttack');
 _addState('jharkhand', 'jharkhand', 'jh', 'ranchi');
 _addState('west_bengal', 'west bengal', 'wb', 'kolkata', 'calcutta');
 _addState('assam', 'assam', 'as', 'guwahati');
@@ -280,7 +280,7 @@ _addState('goa', 'goa', 'ga');
 _addState('maharashtra', 'maharashtra', 'mh', 'mumbai', 'pune', 'nagpur', 'nashik', 'thane', 'aurangabad');
 _addState('daman_and_diu', 'daman and diu', 'daman & diu', 'daman', 'diu', 'dd');
 _addState('dadra_and_nagar_haveli', 'dadra and nagar haveli', 'dadra & nagar haveli', 'dadra', 'dnh', 'dn', 'silvassa');
-_addState('andhra_pradesh', 'andhra pradesh', 'andra pradesh', 'ap', 'andhra', 'vijayawada', 'visakhapatnam');
+_addState('andhra_pradesh', 'andhra pradesh', 'andra pradesh', 'ap', 'andhra', 'vijayawada', 'vijaywada', 'visakhapatnam', 'vizag');
 _addState('karnataka', 'karnataka', 'ka', 'bangalore', 'bengaluru', 'mysore', 'mysuru');
 _addState('kerala', 'kerala', 'kl', 'kochi', 'cochin', 'trivandrum', 'thiruvananthapuram');
 _addState('tamil_nadu', 'tamil nadu', 'tamilnadu', 'tn', 'chennai', 'coimbatore', 'madras');
@@ -309,8 +309,24 @@ function resolveStateSlug(raw) {
   const m = s.match(/^([A-Z]{2})[\s-]?\d/);              // RTO code prefix (MH12 → MH)
   if (m && STATE_MAP[_sk(m[1])]) return STATE_MAP[_sk(m[1])];
   for (const key of _STATE_NAME_KEYS) if (k.includes(key)) return STATE_MAP[key]; // substring
+  // Cluster-coded fallback: go-digit / chola / sbi label regions as a state code
+  // or city plus a quality tier — "GJ_Bad", "MH_Good", "Bad UP", "TN_Chennai",
+  // "RJ_Jaipur", "MH_Mumbai". Strip filler/quality tokens and resolve ONLY when
+  // exactly one state is unambiguous; multi-state clusters ("AP TS", "PB_CH") and
+  // "all except …" negations stay blank rather than guess.
+  if (!/EXCEPT|EXCLUD/.test(s)) {
+    const toks = s.split(/[^A-Z0-9]+/).filter(Boolean)
+      .filter((t) => !_STATE_FILLER.has(t) && !/^\d+$/.test(t) && !/^(GOOD|BAD)\d+$/.test(t));
+    const found = new Set();
+    for (const t of toks) { const sl = STATE_MAP[_sk(t)]; if (sl) found.add(sl); }
+    if (found.size === 1) return [...found][0];
+  }
   return null;
 }
+// Quality-tier / grouping words that decorate a cluster label but carry no state.
+const _STATE_FILLER = new Set(['BAD', 'GOOD', 'REF', 'OPEN', 'DECLINED', 'DECLINE',
+  'CLUSTER', 'GROUP', 'REST', 'OF', 'ALL', 'KEY', 'CITIES', 'CITY', 'ZONE', 'ZONES',
+  'REGION', 'OTHERS', 'OTHER', 'NEW', 'OLD', 'TIER', 'GRADE', 'A', 'B', 'C', 'D']);
 
 /** Canonical Luca state slug from a rule's state/region (prefers state). */
 function lucaState(state, region) {
