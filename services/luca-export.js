@@ -207,14 +207,20 @@ function rangeArr(min, max, opts) {
   if (!Number.isFinite(hi)) hi = null;
   // A 0 lower bound means "no lower bound" — except where 0 is a real value (age).
   if (lo === 0 && minDefault !== 0) lo = null;
+  // LUCA NumericRange END IS EXCLUSIVE, so an inclusive max M must be emitted as
+  // M+1 — else a point band [0,0] / [2,2] is empty and matches NO vehicle (USER
+  // 2026-09, LUCA import: vehicle_age [0,0]→[0,1], seating [2,2]→[2,3]). Applied
+  // to integer bands (age, seating) via opts.exclusiveEnd; done BEFORE the noMax
+  // collapse so a true "no upper bound" band still opens out.
+  if (hi != null && o.exclusiveEnd) hi = hi + 1;
   if (hi != null && o.noMax != null && hi >= o.noMax) hi = null;
   if (lo == null && hi == null) return '';        // unbounded both ways = all
   const sc = (v) => +(v * (o.scale || 1)).toFixed(0);
   return `[${lo == null ? minDefault : sc(lo)},${hi == null ? 'null' : sc(hi)}]`;
 }
 const ccBand   = (mn, mx) => rangeArr(mn, mx, { minDefault: 1, noMax: 99999 });
-const ageBand  = (mn, mx) => rangeArr(mn, mx, { minDefault: 0, noMax: 99 });
-const seatBand = (mn, mx) => rangeArr(mn, mx, { minDefault: 1 });
+const ageBand  = (mn, mx) => rangeArr(mn, mx, { minDefault: 0, noMax: 99, exclusiveEnd: true });
+const seatBand = (mn, mx) => rangeArr(mn, mx, { minDefault: 1, exclusiveEnd: true });
 // GVW: stored in TONNES, Luca wants KG (2.5T -> 2500). 999T = "no upper bound".
 const gvwBand  = (mn, mx) => rangeArr(mn, mx, { minDefault: 1, noMax: 999, scale: 1000 });
 
@@ -371,6 +377,28 @@ function lucaCity(region) {
   return raw;                                                    // real city / cluster
 }
 
+// LUCA matches `city` against the RTO's ACTUAL city — it has no grouped-region
+// concept, so cluster labels ("roe", "rom1-4", "pb1/2", "up1-3", "rj1-5", "ka1/2",
+// "mp1-3") and bare STATE names ("delhi", "haryana", "telengana") never match and
+// leave the row dead (USER 2026-09, LUCA import). Drop those tokens from the
+// comma-joined city list; keep real cities (Mumbai/Pune/… are not bare states).
+const _CITY_CLUSTER = /^(ro[a-z]|rom)\d*$/i;               // ROE / ROM / ROM1-4 / ROW…
+const _CITY_STATE_EXTRA = new Set(['TELENGANA', 'JAMMU', 'KASHMIR', 'LADAKH', 'NCR']);
+function cleanCity(s) {
+  if (!s) return '';
+  const out = [];
+  for (const tok of String(s).split(/\s*,\s*/)) {
+    const t = tok.trim();
+    if (!t) continue;
+    if (_CITY_CLUSTER.test(t)) continue;                   // ROE / ROM1 …
+    if (/^[A-Z]{2}\d+$/i.test(t)) continue;                // UP1 / KA2 / PB1 / MP3 / RJ4 …
+    const k = _sk(t);
+    if (_BARE_STATE.has(k) || _CITY_STATE_EXTRA.has(k)) continue;   // bare state name
+    out.push(t);
+  }
+  return out.join(', ');
+}
+
 // A row that is INGEST GARBAGE, not a rate: the generic parser sometimes reads a
 // grid's HEADER row as data (region = a cover/column label like "Comp /SATP
 // (Net)", "RTO Cluster Name", "State Name", "BIKE_COMP") or scrambles a matrix so
@@ -485,7 +513,8 @@ function _isRealMakeToken(s) {
 function lucaMake(m) {
   const raw = String(m == null ? '' : m).trim();
   if (!raw) return '';
-  const stripped = raw.replace(/\([^)]*\)/g, ' ');                  // drop "(including …)" notes
+  const stripped = raw.replace(/\([^)]*\)/g, ' ')                   // drop "(including …)" notes
+    .replace(/\s*\bOEM\b\s*/ig, ' ');                               // "Yamaha OEM" → "Yamaha" (LUCA master has no OEM variants)
   const out = []; const seen = new Set();
   for (const part of stripped.split(/\s*(?:,|&|\/|\band\b)\s*/i)) {
     const s = part.trim();
@@ -581,7 +610,10 @@ function normRto(raw) {
   if (!s || s === 'ALL' || /^\d+$/.test(s)) return null;
   const m = s.match(/^([A-Z]{2})(\d{1,3})[A-Z]{0,2}$/);   // trailing class letter ignored
   if (!m) return null;
-  return m[1] + '-' + String(parseInt(m[2], 10)).padStart(2, '0');
+  // LUCA registers Telangana under TS-, not TG- (USER 2026-09, LUCA import: 39
+  // distinct TG- codes fully dead). Canonicalise TG → TS.
+  const pfx = m[1] === 'TG' ? 'TS' : m[1];
+  return pfx + '-' + String(parseInt(m[2], 10)).padStart(2, '0');
 }
 
 /** insurer+region/cluster → sorted, comma-separated RTO codes. */
@@ -971,6 +1003,9 @@ async function buildLucaBuffer(ids, opts) {
     // Whole-state region (Chola "JH"/"MH", and any insurer whose rule region is a
     // bare state code/name): expand to every RTO in that state so it isn't blank.
     if (!rtoList) { const rl = stateRtoList(rtoIdx, region); if (rl) rtoList = rl; }
+    // LUCA registers Telangana as TS- (not TG-); some paths (Liberty geo-cluster)
+    // build the RTO list without normRto, so canonicalise the finished list here.
+    if (rtoList) rtoList = String(rtoList).replace(/\bTG-/g, 'TS-');
 
     const rowArr = [
       0,                                                      // id — assigned below after the dedupe check
@@ -1011,7 +1046,7 @@ async function buildLucaBuffer(ids, opts) {
       lucaBusinessType(r.segment, r.sub_type, r.rate_type),   // business_type
       '',                                                     // zones
       lucaState(r.state, r.region, r.sub_type),               // included_states (canonical state slug)
-      citiesFromRtoList(rtoList) || lucaCity(region),         // city — cities in the cluster (RTO→city), else clean locality
+      cleanCity(citiesFromRtoList(rtoList) || lucaCity(region)),   // city — real cities only (drop cluster codes / state names LUCA can't match)
       '',                                                     // excluded_cities
       rtoList,                                                // included_rto (comma-separated)
       '',                                                     // excluded_rto
@@ -1086,8 +1121,8 @@ async function buildLucaBuffer(ids, opts) {
           const stateAll = (stPrefix && rtoIdx._stateRtos && rtoIdx._stateRtos.get(stPrefix)) || String(row[I_RTO] || '');
           const remaining = stateAll.split(',').map((s) => s.trim()).filter((c) => c && !spec.has(c));
           if (!remaining.length) continue;                  // catch-all covers nothing new → drop
-          row[I_RTO] = remaining.join(',');
-          row[I_CITY] = citiesFromRtoList(row[I_RTO]) || row[I_CITY];
+          row[I_RTO] = remaining.join(',').replace(/\bTG-/g, 'TS-');
+          row[I_CITY] = cleanCity(citiesFromRtoList(row[I_RTO]) || row[I_CITY]);
         }
       }
       kept.push(row);
