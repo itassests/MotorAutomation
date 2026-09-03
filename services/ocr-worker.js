@@ -31,17 +31,13 @@ const ENABLED = String(process.env.OCR_WORKER_ENABLED || '0') === '1';
 const TICK_MS = parseInt(process.env.OCR_WORKER_TICK_MS || '8000', 10);
 const FOLDERS_PER_TICK = parseInt(process.env.OCR_FOLDERS_PER_TICK || '1', 10);
 const PDFS_PER_TICK = parseInt(process.env.OCR_PDFS_PER_TICK || '3', 10);
-// How many PDFs to OCR concurrently per tick. MUST be 1: the OCR engine writes
-// the extracted policy number to a shared/"current" record, so running PDFs in
-// parallel lands one PDF's policy number on another PDF's tracker (observed
-// wrong-policy-to-wrong-tracker corruption). The row-claim query is READPAST-safe
-// (no double-grab), but that does NOT make the engine call itself isolated — so
-// we serialize. Parallelism is OPT-IN ONLY via OCR_ALLOW_PARALLEL=1, and even
-// then only if you've confirmed the engine is per-request isolated; a stale
-// OCR_CONCURRENCY env alone will NOT re-enable it.
-const CONCURRENCY = String(process.env.OCR_ALLOW_PARALLEL || '') === '1'
-  ? Math.max(1, parseInt(process.env.OCR_CONCURRENCY || '5', 10))
-  : 1;
+// How many PDFs to OCR concurrently per tick. HARD-LOCKED to 1 (USER 2026-09):
+// the OCR engine writes the extracted policy number to a shared/"current" record,
+// so running PDFs in parallel lands one PDF's policy number on another PDF's
+// tracker (observed wrong-policy-to-wrong-tracker corruption). ONE FILE AT A TIME.
+// The old OCR_ALLOW_PARALLEL / OCR_CONCURRENCY opt-in is REMOVED — the engine is
+// not per-request isolated, so parallelism must never run regardless of env.
+const CONCURRENCY = 1;
 const MAX_RETRY = parseInt(process.env.OCR_MAX_RETRY || '3', 10);
 const DROP_DIR = process.env.OCR_ZIP_DROP_DIR
   || path.join(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'), 'ocr_dropzone');
@@ -309,17 +305,17 @@ async function handlePdf(app, live, row) {
   }
 }
 
-/** Phase 2 — claim a wave of up to CONCURRENCY queued PDFs and OCR them in
- *  parallel. Settling runs after each wave (in tick), so folders roll to "done"
- *  incrementally rather than all at the very end. */
+/** Phase 2 — OCR queued PDFs STRICTLY ONE AT A TIME (USER 2026-09): claim one,
+ *  finish it end-to-end, then claim the next, up to PDFS_PER_TICK per tick. The
+ *  OCR engine keeps a shared "current" policy record, so two PDFs must never be
+ *  in flight together (parallel = wrong-policy-to-wrong-tracker corruption). This
+ *  keeps throughput (several PDFs drained per tick) while never overlapping. */
 async function processPdfs(app, live) {
-  const wave = [];
-  for (let i = 0; i < CONCURRENCY; i++) {
+  for (let i = 0; i < PDFS_PER_TICK; i++) {
     const row = await claimOnePdf(app);
     if (!row) break;
-    wave.push(row);
+    await handlePdf(app, live, row);          // await fully before claiming the next
   }
-  if (wave.length) await Promise.all(wave.map((r) => handlePdf(app, live, r)));
 }
 
 /** Phase 3 — flip folders whose PDFs are all settled to Done (Isactive=2). */
@@ -364,7 +360,7 @@ async function startWorker() {
     await app.request().query('UPDATE dbo.ocr_bulk_pdf SET status = 1 WHERE status = 4');   // reclaim stale
   } catch (err) { console.warn('[ocr-worker] startup reclaim skipped:', err.message); }
   setInterval(tick, TICK_MS);
-  console.log(`[ocr-worker] started (tick ${TICK_MS}ms, ${FOLDERS_PER_TICK} folder(s)/tick, ${CONCURRENCY} PDF(s) in parallel per wave)`);
+  console.log(`[ocr-worker] started (tick ${TICK_MS}ms, ${FOLDERS_PER_TICK} folder(s)/tick, SERIAL: 1 PDF at a time, up to ${PDFS_PER_TICK}/tick)`);
 }
 
 module.exports = { startWorker, tick, locateFolderPdfs };
