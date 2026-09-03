@@ -222,7 +222,14 @@ const ccBand   = (mn, mx) => rangeArr(mn, mx, { minDefault: 1, noMax: 99999 });
 const ageBand  = (mn, mx) => rangeArr(mn, mx, { minDefault: 0, noMax: 99, exclusiveEnd: true });
 const seatBand = (mn, mx) => rangeArr(mn, mx, { minDefault: 1, exclusiveEnd: true });
 // GVW: stored in TONNES, Luca wants KG (2.5T -> 2500). 999T = "no upper bound".
-const gvwBand  = (mn, mx) => rangeArr(mn, mx, { minDefault: 1, noMax: 999, scale: 1000 });
+const gvwBand  = (mn, mx) => {
+  // Mis-ingest guard (USER 2026-09, LUCA #2): iffco "GVW GT 40000 kg" rows stored
+  // weight_band [4,0] — a stray comma split 40,000 into min=4 / max=0, giving the
+  // empty band [4000,0]. The intent is GVW > 40000 kg → [40000, null].
+  if (Number(mn) === 4 && Number(mx) === 0) return '[40000,null]';
+  if (Number(mx) === 0 && Number(mn) > 0) mx = null;   // any ">X" band with max=0 → open-ended
+  return rangeArr(mn, mx, { minDefault: 1, noMax: 999, scale: 1000 });
+};
 
 // Some insurers encode the age band ONLY in the segment text (e.g. Magma TP rows
 // "GCV 12T-20T Age<5" / "Age>=5" ship with both age columns NULL), so the structured
@@ -383,7 +390,8 @@ function lucaCity(region) {
 // leave the row dead (USER 2026-09, LUCA import). Drop those tokens from the
 // comma-joined city list; keep real cities (Mumbai/Pune/… are not bare states).
 const _CITY_CLUSTER = /^(ro[a-z]|rom)\d*$/i;               // ROE / ROM / ROM1-4 / ROW…
-const _CITY_STATE_EXTRA = new Set(['TELENGANA', 'JAMMU', 'KASHMIR', 'LADAKH', 'NCR']);
+const _CITY_STATE_EXTRA = new Set(['TELENGANA', 'JAMMU', 'KASHMIR', 'LADAKH', 'NCR',
+  'ALLGEOS', 'ALLGEO', 'DELHINCR', 'ALLINDIA', 'PANINDIA']);   // USER 2026-09 #8: all_geos wildcard / delhi-ncr → blank
 // Spelling corrections → LUCA's master city name (USER 2026-09, LUCA import).
 // Keyed on the _sk (upper, alnum-only) form so "Vishakapatnam"/"vishakapattnam"
 // both hit. Value is the canonical spelling LUCA accepts.
@@ -500,10 +508,19 @@ function expandMake(s) {
 // map it to Hero MotoCorp; "Mercedes"→Mercedes-Benz, "Rover"→Land Rover. Keyed on
 // the token's upper-cased alnum form; only fires on the EXACT bare token (so
 // "Hero Honda"/"Land Rover"/"Range Rover" pass through untouched).
-const MAKE_CANON = { HERO: 'Hero MotoCorp', MERCEDES: 'Mercedes-Benz', ROVER: 'Land Rover' };
+const MAKE_CANON = {
+  HERO: 'Hero MotoCorp', MERCEDES: 'Mercedes-Benz', ROVER: 'Land Rover',
+  // USER 2026-09, LUCA import #5: brands whose internal spaces/spelling were lost.
+  LANDROVER: 'Land Rover', MERCEDESBENZ: 'Mercedes-Benz', ROLLSROYCE: 'Rolls Royce',
+  SSANGYONG: 'SsangYong', SSANGYONGMOTOR: 'SsangYong', KIAMOTORS: 'Kia',
+  MARUTISUZUKI: 'Maruti Suzuki', SMLISUZU: 'SML Isuzu', CITRONE: 'Citroen',
+  CITROEN: 'Citroen', VOLKS: 'Volkswagen',
+};
 // Model strings that leaked into the make column and are not brands → drop (blank
-// make). "I20 Max 2" is a Bajaj SATP model list, not a manufacturer.
-const MAKE_BLOCK = new Set(['I20', 'MAX2', 'I20MAX2']);
+// make). "I20 Max 2" is a Bajaj SATP model list; hero vida / tvs iqube / bajaj
+// chetak are models; "bike" a category, "alto" a model (USER 2026-09, LUCA #6).
+const MAKE_BLOCK = new Set(['I20', 'MAX2', 'I20MAX2', 'HEROVIDA', 'TVSIQUBE',
+  'BAJAJCHETAK', 'BIKE', 'ALTO']);
 
 // Luca keeps make (manufacturer) and model as SEPARATE fields, but some grids
 // put the MODEL in the make column: Bajaj files make = model = "Thar", ICICI
@@ -541,6 +558,10 @@ function lucaModel(m) {
   const u = s.toUpperCase().replace(/\s+/g, ' ');
   if (/^(OTHER\s+THAN\s+)?(HE|UHE)(\s*\/\s*(HE|UHE))?$/.test(u)) return '';   // HE/UHE tier, not a model
   if (/^(MODEL|MAKE|SEGMENT|ALL|OTHERS?)$/.test(u)) return '';                 // header/placeholder leak
+  // Car SEGMENT tiers parked in the model column (TATA) — not models (USER 2026-09,
+  // LUCA import #1: 2,923 rows). LUCA matches the real model (Nexon/Altroz), so a
+  // segment label matches nothing — blank it.
+  if (/^(HIGH\s*END|ULTRA\s*HIGH\s*END|MID\s*SIZE|COMPACT|MPV\s*SUV|MINI|QUADRICYCLE|SEDAN|HATCHBACK|SUV|MUV|LUXURY)$/.test(u)) return '';
   return s;
 }
 
@@ -1104,7 +1125,9 @@ async function buildLucaBuffer(ids, opts) {
       coverageType === 'hybrid' ? ageBand(0, 0)                               // vehicle_age
         : (ageBand(r.age_band_min, r.age_band_max)
            || (function () { const b = ageBandFromSegment(r.segment); return b ? ageBand(b[0], b[1]) : ''; })()),
-      seatBand(r.seating_capacity_min, r.seating_capacity_max),                 // seating_capacity
+      // Two-wheelers have no meaningful seating band — blank it (USER 2026-09,
+      // LUCA #4: ICICI scooter rows carried a wrong [6,7] seating).
+      (canonVt(vt) === 'TW' ? '' : seatBand(r.seating_capacity_min, r.seating_capacity_max)),  // seating_capacity
       gvwBand(r.weight_band_min, r.weight_band_max),                            // gross_vehicle_weight (kg)
       lucaFuel(r.fuel_type),                                  // fuel_type
       lucaBusinessType(r.segment, r.sub_type, r.rate_type),   // business_type
@@ -1252,6 +1275,37 @@ async function buildLucaBuffer(ids, opts) {
 
     rows.length = 0;
     for (const row of kept2) rows.push(row);
+  }
+
+  // Close cc-band gaps (USER 2026-09, LUCA #3): LUCA's NumericRange end is
+  // EXCLUSIVE, so a ladder authored as [1000,1500]/[1501,null] orphans 1500cc
+  // (matches neither). Ladders authored as touching ([1,75]/[75,150]) are already
+  // correct. Per (identity minus cc) family, if a band ends at M and a SIBLING
+  // starts at M+1, bump the first band's max to M+1 so they touch and M is
+  // covered. Only +1-gap ladders are changed; touching ladders are untouched.
+  {
+    const HI = (n) => LUCA_HEADERS.indexOf(n);
+    const I_CC = HI('vehicle_cc');
+    const famCols = LUCA_HEADERS.map((_, i) => i)
+      .filter((i) => i !== 0 && i !== I_CC && i !== HI('tp_commission_percentage')
+        && i !== HI('irdai_commission_percentage') && i !== (LUCA_HEADERS.length - 1));
+    const parse = (v) => { const m = /^\[(\d+),(\d+|null)\]$/.exec(String(v || '')); return m ? [Number(m[1]), m[2] === 'null' ? null : Number(m[2])] : null; };
+    const fams = new Map();
+    for (const row of rows.slice(1)) {
+      const cc = parse(row[I_CC]); if (!cc) continue;
+      const k = famCols.map((i) => String(row[i])).join('');
+      if (!fams.has(k)) fams.set(k, []);
+      fams.get(k).push({ row, cc });
+    }
+    for (const members of fams.values()) {
+      if (members.length < 2) continue;
+      const mins = new Set(members.map((m) => m.cc[0]));
+      for (const m of members) {
+        if (m.cc[1] != null && mins.has(m.cc[1] + 1)) {           // sibling starts at max+1 → +1 gap
+          m.row[I_CC] = `[${m.cc[0]},${m.cc[1] + 1}]`;            // bump so they touch (covers the edge)
+        }
+      }
+    }
   }
 
   // Reorder every row (header included) from build order to the Luca output order.
