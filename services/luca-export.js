@@ -148,7 +148,7 @@ const LUCA_INSURER = {
   icici_lombard: 'icici', iffco_tokio: 'iffco', indusind: 'indusind',
   kotak: 'kotak', liberty_videocon: 'liberty', magma: 'magma', magma_hdi: 'magma',
   national_insurance: 'national', new_india_assurance: 'new-india',
-  oriental_insurance: 'oriental', raheja_qbe: 'raheja', reliance: 'reliance',
+  oriental_insurance: 'oriental', raheja_qbe: 'raheja', reliance: 'indusind',
   royal_sundaram: 'royal-sundaram', sbi_general: 'sbi', shriram: 'shriram',
   tata_aig: 'tata', united_india_insurance: 'united-india',
   universal_sompo: 'universal', zuno: 'zuno',
