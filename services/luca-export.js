@@ -400,6 +400,11 @@ const _CITY_WORKING = new Set(['BAD', 'GOOD', 'REF', 'OPEN', 'DECLINED', 'DECLIN
   'SWIFTCNG', 'SWIFTDIESEL', 'PACKAGE', 'ALL', 'NEW', 'OLD']);
 function cleanCity(s) {
   if (!s) return '';
+  // Whole-value match FIRST so a compound UT name is not split on "&"
+  // ("Dadra & Nagar Haveli" → one master city, not "Dadra" + "Nagar Haveli").
+  const wholeKey = String(s).trim().toLowerCase().replace(/\s*&\s*/g, '_and_').replace(/\s+/g, '_');
+  if (_CITY_ALIAS[wholeKey]) return _CITY_ALIAS[wholeKey];
+  if (_CITY_MASTER_CI.has(wholeKey)) return _CITY_MASTER_CI.get(wholeKey);
   const out = []; const seen = new Set();
   // Split on comma / & / + / " and " — a value can pack TWO cities ("daman & diu").
   for (let tok of String(s).split(/\s*(?:,|&|\+|\band\b)\s*/i)) {
@@ -408,16 +413,41 @@ function cleanCity(s) {
     if (!t) continue;
     if (_CITY_CLUSTER.test(t)) continue;                   // ROE / ROM1 …
     if (/^[A-Z]{2}\d+$/i.test(t)) continue;                // UP1 / KA2 / PB1 / MP3 / RJ4 …
+    if (/^[A-Z]{2}\s*-\s*[A-Z0-9]+$/i.test(t)) continue;   // "UP - AKLGV" state-dash cluster code
+    if (/_(GOOD|BAD|REF|OPEN|DECL)\d*$/i.test(t)) continue; // "APTS_Good" cluster-quality label
     if (_CITY_REGION_PHRASE.test(t)) continue;             // "rest of AP", "karnataka ex bangalore"
     const k = _sk(t);
     if (!k) continue;
     if (_BARE_STATE.has(k) || _CITY_STATE_EXTRA.has(k)) continue;   // bare state name
     if (_CITY_WORKING.has(k)) continue;                    // bad / good / swift cng …
     t = _CITY_SPELL[k] || t;                               // spelling correction → LUCA master
+    t = canonCity(t);                                      // → LUCA master canonical (underscore/case/alias)
     const kk = _sk(t);
-    if (!seen.has(kk)) { seen.add(kk); out.push(t); }
+    if (t && !seen.has(kk)) { seen.add(kk); out.push(t); }
   }
   return out.join(', ');
+}
+// LUCA matches `city` against its master list, whose multi-word names use
+// UNDERSCORES ("Tarn_Taran", "Udham_Singh_Nagar") and a fixed spelling. Map each
+// token to the master's exact form: exact → underscored → case-insensitive →
+// alias (config/luca_city_alias.json: Moradabad→Muradabad, districts→nearest
+// master city). Unmatched real cities keep the underscored form (best effort —
+// the master may carry a variant not in our copy). (USER 2026-09, LUCA city list.)
+const _CITY_MASTER = (() => { try { return require('../config/luca_city_master.json') || []; } catch (_) { return []; } })();
+const _CITY_ALIAS = (() => { try { return require('../config/luca_city_alias.json') || {}; } catch (_) { return {}; } })();
+const _CITY_MASTER_SET = new Set(_CITY_MASTER);
+const _CITY_MASTER_CI = new Map();                         // lower-underscored → canonical
+for (const c of _CITY_MASTER) _CITY_MASTER_CI.set(String(c).toLowerCase().replace(/\s+/g, '_'), c);
+function canonCity(t) {
+  const raw = String(t || '').trim();
+  if (!raw) return '';
+  const us = raw.replace(/\s+/g, '_');                     // spaces → underscores (master format)
+  if (_CITY_MASTER_SET.has(raw)) return raw;               // exact
+  if (_CITY_MASTER_SET.has(us)) return us;                 // exact after underscore
+  const key = raw.toLowerCase().replace(/\s+/g, '_');
+  if (_CITY_ALIAS[key]) return _CITY_ALIAS[key];           // known spelling/district alias
+  if (_CITY_MASTER_CI.has(key)) return _CITY_MASTER_CI.get(key);   // case-only diff → canonical
+  return us;                                               // no master match → best-effort underscored
 }
 
 // A row that is INGEST GARBAGE, not a rate: the generic parser sometimes reads a
