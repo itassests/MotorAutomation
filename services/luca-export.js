@@ -444,6 +444,16 @@ function expandMake(s) {
   return out.replace(/\s{2,}/g, ' ').trim();
 }
 
+// Canonicalise a make token to LUCA's master brand spelling (USER 2026-09, LUCA
+// import Row 4): bare "Hero" matches neither "Hero Honda" nor "Hero MotoCorp" —
+// map it to Hero MotoCorp; "Mercedes"→Mercedes-Benz, "Rover"→Land Rover. Keyed on
+// the token's upper-cased alnum form; only fires on the EXACT bare token (so
+// "Hero Honda"/"Land Rover"/"Range Rover" pass through untouched).
+const MAKE_CANON = { HERO: 'Hero MotoCorp', MERCEDES: 'Mercedes-Benz', ROVER: 'Land Rover' };
+// Model strings that leaked into the make column and are not brands → drop (blank
+// make). "I20 Max 2" is a Bajaj SATP model list, not a manufacturer.
+const MAKE_BLOCK = new Set(['I20', 'MAX2', 'I20MAX2']);
+
 // Luca keeps make (manufacturer) and model as SEPARATE fields, but some grids
 // put the MODEL in the make column: Bajaj files make = model = "Thar", ICICI
 // files make = "Omni" with an empty model. Map the model back to its maker so
@@ -519,7 +529,10 @@ function lucaMake(m) {
   for (const part of stripped.split(/\s*(?:,|&|\/|\band\b)\s*/i)) {
     const s = part.trim();
     if (!s || !_isRealMakeToken(s)) continue;
-    const exp = expandMake(s); const key = exp.toUpperCase();
+    const alnum = s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (MAKE_BLOCK.has(alnum)) continue;                    // model leaked into make → drop
+    const exp = MAKE_CANON[alnum] || expandMake(s);         // canonical brand, else expand abbrev
+    const key = exp.toUpperCase();
     if (exp && !seen.has(key)) { seen.add(key); out.push(exp); }
   }
   return out.join(', ');
