@@ -384,17 +384,38 @@ function lucaCity(region) {
 // comma-joined city list; keep real cities (Mumbai/Pune/… are not bare states).
 const _CITY_CLUSTER = /^(ro[a-z]|rom)\d*$/i;               // ROE / ROM / ROM1-4 / ROW…
 const _CITY_STATE_EXTRA = new Set(['TELENGANA', 'JAMMU', 'KASHMIR', 'LADAKH', 'NCR']);
+// Spelling corrections → LUCA's master city name (USER 2026-09, LUCA import).
+// Keyed on the _sk (upper, alnum-only) form so "Vishakapatnam"/"vishakapattnam"
+// both hit. Value is the canonical spelling LUCA accepts.
+const _CITY_SPELL = {
+  VIJAYWADA: 'Vijayawada', VISHAKAPATNAM: 'Visakhapatnam', VISHAKAPATTNAM: 'Visakhapatnam',
+  VISHAKHAPATNAM: 'Visakhapatnam', BHUBANESHWAR: 'Bhubaneswar', BHUBNESHWAR: 'Bhubaneswar',
+  CUTTAK: 'Cuttack',
+};
+// A "city" value that is really a REGION PHRASE (not a place) — drop entirely.
+const _CITY_REGION_PHRASE = /^(rest\s+of|entire|all\s+of|whole\s+of)\b|\bex(cl(uding)?)?\b|\bincluding\b|\bexcept\b|\bothers?\b/i;
+// Grid "working" labels that leaked into the city column — drop.
+const _CITY_WORKING = new Set(['BAD', 'GOOD', 'REF', 'OPEN', 'DECLINED', 'DECLINE',
+  'CNG', 'DIESEL', 'PETROL', 'ELECTRIC', 'EV', 'COMP', 'SATP', 'SAOD', 'TP', 'OD', 'NCB',
+  'SWIFTCNG', 'SWIFTDIESEL', 'PACKAGE', 'ALL', 'NEW', 'OLD']);
 function cleanCity(s) {
   if (!s) return '';
-  const out = [];
-  for (const tok of String(s).split(/\s*,\s*/)) {
-    const t = tok.trim();
+  const out = []; const seen = new Set();
+  // Split on comma / & / + / " and " — a value can pack TWO cities ("daman & diu").
+  for (let tok of String(s).split(/\s*(?:,|&|\+|\band\b)\s*/i)) {
+    // Strip a parenthetical state suffix: "aurangabad(bh)", "bilaspur(cgh)" → base.
+    let t = tok.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
     if (!t) continue;
     if (_CITY_CLUSTER.test(t)) continue;                   // ROE / ROM1 …
     if (/^[A-Z]{2}\d+$/i.test(t)) continue;                // UP1 / KA2 / PB1 / MP3 / RJ4 …
+    if (_CITY_REGION_PHRASE.test(t)) continue;             // "rest of AP", "karnataka ex bangalore"
     const k = _sk(t);
+    if (!k) continue;
     if (_BARE_STATE.has(k) || _CITY_STATE_EXTRA.has(k)) continue;   // bare state name
-    out.push(t);
+    if (_CITY_WORKING.has(k)) continue;                    // bad / good / swift cng …
+    t = _CITY_SPELL[k] || t;                               // spelling correction → LUCA master
+    const kk = _sk(t);
+    if (!seen.has(kk)) { seen.add(kk); out.push(t); }
   }
   return out.join(', ');
 }
