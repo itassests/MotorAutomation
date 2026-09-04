@@ -391,7 +391,11 @@ function lucaCity(region) {
 // comma-joined city list; keep real cities (Mumbai/Pune/… are not bare states).
 const _CITY_CLUSTER = /^(ro[a-z]|rom)\d*$/i;               // ROE / ROM / ROM1-4 / ROW…
 const _CITY_STATE_EXTRA = new Set(['TELENGANA', 'JAMMU', 'KASHMIR', 'LADAKH', 'NCR',
-  'ALLGEOS', 'ALLGEO', 'DELHINCR', 'ALLINDIA', 'PANINDIA']);   // USER 2026-09 #8: all_geos wildcard / delhi-ncr → blank
+  'ALLGEOS', 'ALLGEO', 'DELHINCR', 'ALLINDIA', 'PANINDIA',
+  // USER 2026-09 city report: region grouping codes (not supported → blank),
+  // "bh" (Bihar, a state code not a city), and state names mis-parked in city.
+  'BH', 'EAST', 'ROMAHARASHTRA', 'EASTUP', 'NORTHEAST', 'ROKARNATAKA', 'UTTARANCHALKS',
+  'KERELA', 'ANDRAPRADESH']);
 // Spelling corrections → LUCA's master city name (USER 2026-09, LUCA import).
 // Keyed on the _sk (upper, alnum-only) form so "Vishakapatnam"/"vishakapattnam"
 // both hit. Value is the canonical spelling LUCA accepts.
@@ -416,9 +420,15 @@ function cleanCity(s) {
   const out = []; const seen = new Set();
   // Split on comma / & / + / " and " — a value can pack TWO cities ("daman & diu").
   for (let tok of String(s).split(/\s*(?:,|&|\+|\band\b)\s*/i)) {
-    // Strip a parenthetical state suffix: "aurangabad(bh)", "bilaspur(cgh)" → base.
-    let t = tok.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
+    // Strip a parenthetical state suffix: "aurangabad(bh)", "bilaspur(cgh)" → base;
+    // and a trailing full stop ("dehradun." → "dehradun").
+    let t = tok.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s{2,}/g, ' ').replace(/\.+\s*$/, '').trim();
     if (!t) continue;
+    // "daman dui" / "daman diu" packed as one token → the two cities Daman + Diu.
+    if (/^DAMAN[_ ]?(DUI|DIU)$/i.test(t)) {
+      for (const c of ['Daman', 'Diu']) { const ck = _sk(c); if (!seen.has(ck)) { seen.add(ck); out.push(c); } }
+      continue;
+    }
     if (_CITY_CLUSTER.test(t)) continue;                   // ROE / ROM1 …
     if (/^[A-Z]{2}\d+$/i.test(t)) continue;                // UP1 / KA2 / PB1 / MP3 / RJ4 …
     if (/^[A-Z]{2}\s*-\s*[A-Z0-9]+$/i.test(t)) continue;   // "UP - AKLGV" state-dash cluster code
@@ -455,6 +465,8 @@ function canonCity(t) {
   const key = raw.toLowerCase().replace(/\s+/g, '_');
   if (_CITY_ALIAS[key]) return _CITY_ALIAS[key];           // known spelling/district alias
   if (_CITY_MASTER_CI.has(key)) return _CITY_MASTER_CI.get(key);   // case-only diff → canonical
+  const dkey = key.replace(/[–—]/g, '_');        // en/em-dash → _ ("medchal–malkajgiri")
+  if (dkey !== key && _CITY_ALIAS[dkey]) return _CITY_ALIAS[dkey];
   return us;                                               // no master match → best-effort underscored
 }
 
