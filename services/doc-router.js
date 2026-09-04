@@ -133,6 +133,14 @@ function normProductCat(v) {
   return s ? s.replace(/\s+/g, '_') : null;
 }
 
+/** Sentinel/placeholder region values that are not real regions — a lookup/audit
+ *  side-table (e.g. Royal's "As Per Insurer Mapping/Grid Mapping" = "NotFound")
+ *  gets classified as an RTO map, polluting rto_mappings. Skip these. */
+function isJunkRegion(reg) {
+  const t = String(reg || '').trim().toLowerCase().replace(/[\s_]+/g, '');
+  return !t || t === 'notfound' || t === 'na' || t === 'n/a' || t === '-' || t === 'null' || t === 'none';
+}
+
 /** RTO master rows → rto_mappings records. Explodes comma-lists; per-row product;
  *  or per-PRODUCT region columns for a multi-product master. */
 function toRtoMappings(rows, cls, opts = {}) {
@@ -146,13 +154,13 @@ function toRtoMappings(rows, cls, opts = {}) {
     if (productRegions) {                              // one mapping per product column
       for (const pr in productRegions) {
         const reg = cell(row[productRegions[pr]]);
-        if (!reg) continue;
+        if (!reg || isJunkRegion(reg)) continue;
         for (const code of codes) out.push({ insurer: opts.insurer, product: pr, rto_code: code, region: reg, cluster: null });
       }
       continue;
     }
     const reg = cell(row[region]);
-    if (!reg) continue;
+    if (!reg || isJunkRegion(reg)) continue;
     const clust = cluster != null && cluster >= 0 ? cell(row[cluster]) : null;
     const prod = product != null && product >= 0 ? normProductCat(row[product]) : (opts.product || null);
     for (const code of codes) out.push({ insurer: opts.insurer, product: prod, rto_code: code, region: reg, cluster: clust || null });

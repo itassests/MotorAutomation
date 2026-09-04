@@ -896,6 +896,21 @@
           "cluster": 7
         }
       }
+    },
+    {
+      "_comment": "Aug'26 separate PVT CAR RTO master ('RTO_NO_Master...PVT CAR (Comp & STP)'). The region master lives on sheet 'Pvt Car Master' (RTO_NO | RTO_NAME | TP_ULR_Location_2026_27 | State), not a sheet named 'RTO' — matched by CONTENT. region = TP_ULR_Location (col 2). Scoped by file_pattern so it can't grab the main grid workbook.",
+      "name": "Pvt Car Master",
+      "content_signature": ["rto_no", "tp_ulr_location"],
+      "file_pattern": "RTO[_ ]?NO[_ ]?Master",
+      "layout": "rto_mapping",
+      "product": "CAR",
+      "config": {
+        "data_start_row": 1,
+        "column_map": {
+          "rto_code": 0,
+          "region": 2
+        }
+      }
     }
   ]
 }
