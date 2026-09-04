@@ -3707,6 +3707,44 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
+  // ---- ICICI GCV metro→state Comp fallback (USER 2026-09, July unmatched) ----
+  // ICICI files medium/heavy GCV Comp at the STATE region (MAHARASHTRA / GUJARAT),
+  // but the metro regions a truck resolves to (MUMBAI / SURAT / VAPI) carry only a
+  // TP row or a 0-Comp for that weight band. A Comp GCV policy in a metro therefore
+  // latches a spurious 0 (or no rule) and the region fallback never reaches the
+  // state Comp rate. When the current match has NO real Comp rate, pull the bare
+  // STATE-region Comp rate for the policy's weight band. Additive only — never
+  // downgrades a real matched rate. (e.g. MH04 Tata 11.9T Comp: no-rule → MAHARASHTRA
+  // LCV 7.5-12T Comp 0.4.)
+  if (insurerSlug === 'icici_lombard'
+      && /GCV/.test(String(params.vehicleType || '').toUpperCase())
+      && (Number(params.odPremium) || 0) > 0) {
+    const _cur = rules[0];
+    const _isTpRt = (rt) => /(^|_)TP(_|$)|SATP/i.test(String(rt || ''));
+    const _hasRealComp = _cur && Number(_cur.rate_value) > 0 && !_isTpRt(_cur.rate_type);
+    if (!_hasRealComp) {
+      try {
+        const _pol = require('./policy');
+        const _st = _pol.STATE_PREFIX_FULL[rtoStatePrefix(params.rtoCode)];
+        if (_st) {
+          const _eff = _bajajEffDate || params.effective_date || null;
+          const _cands = [_st.toUpperCase(), _st];
+          for (const reg of _cands) {
+            const at = await lookupRates(pool, { ...baseLookup, region: reg, cluster: '', region_match_mode: 'token', ins_product: 'Comp', ...(_eff ? { effective_date: _eff } : {}) });
+            if (!at.length) continue;
+            const af = filterRulesByPolicy(at, params);
+            const comp = af.find(r => Number(r.rate_value) > 0 && !_isTpRt(r.rate_type));
+            if (comp) {
+              rules = [{ ...comp, segment: `${comp.segment} (ICICI ${reg} state fallback)` }];
+              resolvedRegion = reg;
+              break;
+            }
+          }
+        }
+      } catch (_) { /* leave rules unchanged on any failure */ }
+    }
+  }
+
   // ---- ICICI Misc-D CE — Mobile Plant / Drilling Rig are DECLINED ----
   // The grid's Misc-D CE cell declines these body types ("Drilling Rig|Cranes|Mobile
   // Plant:0%"); the engine misses the body and pays OTHERS (e.g. NASHIK 40). Decline
