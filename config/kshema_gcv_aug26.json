@@ -1,0 +1,1093 @@
+{
+ "gcv": {
+  "ANDHRA PRADESH": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.57
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.56
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.35
+    },
+    {
+     "maxT": 12,
+     "rate": 0.33
+    },
+    {
+     "maxT": 20,
+     "rate": 0.35
+    },
+    {
+     "maxT": 40,
+     "rate": 0.37
+    },
+    {
+     "maxT": 45,
+     "rate": 0.32
+    },
+    {
+     "maxT": null,
+     "rate": 0.17
+    }
+   ],
+   "tractor": 0.49,
+   "schoolBus": 0.71
+  },
+  "TELANGANA": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.57
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.56
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.37
+    },
+    {
+     "maxT": 12,
+     "rate": 0.37
+    },
+    {
+     "maxT": 20,
+     "rate": 0.37
+    },
+    {
+     "maxT": 40,
+     "rate": 0.37
+    },
+    {
+     "maxT": 45,
+     "rate": 0.27
+    },
+    {
+     "maxT": null,
+     "rate": 0.14
+    }
+   ],
+   "tractor": 0.49,
+   "schoolBus": 0.71
+  },
+  "MAHARASHTRA": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.57
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.57
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.495
+    },
+    {
+     "maxT": 12,
+     "rate": 0.395
+    },
+    {
+     "maxT": 20,
+     "rate": 0.41
+    },
+    {
+     "maxT": 40,
+     "rate": 0.42
+    },
+    {
+     "maxT": 45,
+     "rate": 0.42
+    },
+    {
+     "maxT": null,
+     "rate": 0.35
+    }
+   ],
+   "tractor": 0.49,
+   "schoolBus": 0.71
+  },
+  "GOA": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.57
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.57
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.495
+    },
+    {
+     "maxT": 12,
+     "rate": 0.39
+    },
+    {
+     "maxT": 20,
+     "rate": 0.42
+    },
+    {
+     "maxT": 40,
+     "rate": 0.42
+    },
+    {
+     "maxT": 45,
+     "rate": 0.405
+    },
+    {
+     "maxT": null,
+     "rate": 0.36
+    }
+   ],
+   "tractor": 0.49,
+   "schoolBus": 0.71
+  },
+  "GUJARAT": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.57
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.57
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.495
+    },
+    {
+     "maxT": 12,
+     "rate": 0.36
+    },
+    {
+     "maxT": 20,
+     "rate": 0.42
+    },
+    {
+     "maxT": 40,
+     "rate": 0.42
+    },
+    {
+     "maxT": 45,
+     "rate": 0.405
+    },
+    {
+     "maxT": null,
+     "rate": 0.35
+    }
+   ],
+   "tractor": 0.49,
+   "schoolBus": 0.71
+  },
+  "DAMAN & DIU": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.57
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.57
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.495
+    },
+    {
+     "maxT": 12,
+     "rate": 0.375
+    },
+    {
+     "maxT": 20,
+     "rate": 0.42
+    },
+    {
+     "maxT": 40,
+     "rate": 0.42
+    },
+    {
+     "maxT": 45,
+     "rate": 0.35
+    },
+    {
+     "maxT": null,
+     "rate": 0.35
+    }
+   ],
+   "tractor": 0.49,
+   "schoolBus": 0.71
+  },
+  "DADRA & NAGAR HAVELI": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.57
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.57
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.495
+    },
+    {
+     "maxT": 12,
+     "rate": 0.375
+    },
+    {
+     "maxT": 20,
+     "rate": 0.42
+    },
+    {
+     "maxT": 40,
+     "rate": 0.42
+    },
+    {
+     "maxT": 45,
+     "rate": 0.35
+    },
+    {
+     "maxT": null,
+     "rate": 0.35
+    }
+   ],
+   "tractor": 0.49,
+   "schoolBus": 0.71
+  },
+  "BIHAR": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.57
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.55
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.495
+    },
+    {
+     "maxT": 12,
+     "rate": 0.35
+    },
+    {
+     "maxT": 20,
+     "rate": 0.41
+    },
+    {
+     "maxT": 40,
+     "rate": 0.43
+    },
+    {
+     "maxT": 45,
+     "rate": 0.39
+    },
+    {
+     "maxT": null,
+     "rate": 0.35
+    }
+   ],
+   "tractor": 0.49,
+   "schoolBus": 0.71
+  },
+  "JHARKHAND": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.57
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.56
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 12,
+     "rate": 0.35
+    },
+    {
+     "maxT": 20,
+     "rate": 0.415
+    },
+    {
+     "maxT": 40,
+     "rate": 0.42
+    },
+    {
+     "maxT": 45,
+     "rate": 0.39
+    },
+    {
+     "maxT": null,
+     "rate": 0.37
+    }
+   ],
+   "tractor": 0.49,
+   "schoolBus": 0.71
+  },
+  "ODISHA": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.445
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.445
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.22
+    },
+    {
+     "maxT": 12,
+     "rate": 0.245
+    },
+    {
+     "maxT": 20,
+     "rate": 0.42
+    },
+    {
+     "maxT": 40,
+     "rate": 0.43
+    },
+    {
+     "maxT": 45,
+     "rate": 0.4
+    },
+    {
+     "maxT": null,
+     "rate": 0.37
+    }
+   ],
+   "tractor": 0.49,
+   "schoolBus": 0.71
+  },
+  "ODISHA__SPECIAL": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.57
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.55
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.39
+    },
+    {
+     "maxT": 12,
+     "rate": 0.39
+    },
+    {
+     "maxT": 20,
+     "rate": null
+    },
+    {
+     "maxT": 40,
+     "rate": null
+    },
+    {
+     "maxT": 45,
+     "rate": null
+    },
+    {
+     "maxT": null,
+     "rate": null
+    }
+   ],
+   "tractor": null,
+   "schoolBus": null
+  },
+  "WEST BENGAL": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.445
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.445
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.22
+    },
+    {
+     "maxT": 12,
+     "rate": 0.245
+    },
+    {
+     "maxT": 20,
+     "rate": 0.42
+    },
+    {
+     "maxT": 40,
+     "rate": 0.43
+    },
+    {
+     "maxT": 45,
+     "rate": 0.37
+    },
+    {
+     "maxT": null,
+     "rate": 0.37
+    }
+   ],
+   "tractor": 0.49,
+   "schoolBus": 0.71
+  },
+  "WEST BENGAL__SPECIAL": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.57
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.56
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.37
+    },
+    {
+     "maxT": 12,
+     "rate": 0.39
+    },
+    {
+     "maxT": 20,
+     "rate": null
+    },
+    {
+     "maxT": 40,
+     "rate": null
+    },
+    {
+     "maxT": 45,
+     "rate": null
+    },
+    {
+     "maxT": null,
+     "rate": null
+    }
+   ],
+   "tractor": null,
+   "schoolBus": null
+  },
+  "ASSAM": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.275
+    },
+    {
+     "maxT": 12,
+     "rate": 0.4
+    },
+    {
+     "maxT": 20,
+     "rate": 0.3
+    },
+    {
+     "maxT": 40,
+     "rate": 0.4
+    },
+    {
+     "maxT": null,
+     "rate": 0.4
+    }
+   ],
+   "tractor": 0,
+   "schoolBus": 0
+  },
+  "MANIPUR": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 12,
+     "rate": 0.4
+    },
+    {
+     "maxT": 20,
+     "rate": 0.3
+    },
+    {
+     "maxT": 40,
+     "rate": 0.4
+    },
+    {
+     "maxT": null,
+     "rate": 0.4
+    }
+   ],
+   "tractor": 0,
+   "schoolBus": 0
+  },
+  "MEGHALAYA": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 12,
+     "rate": 0.4
+    },
+    {
+     "maxT": 20,
+     "rate": 0.3
+    },
+    {
+     "maxT": 40,
+     "rate": 0.4
+    },
+    {
+     "maxT": null,
+     "rate": 0.4
+    }
+   ],
+   "tractor": 0,
+   "schoolBus": 0
+  },
+  "MIZORAM": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 12,
+     "rate": 0.4
+    },
+    {
+     "maxT": 20,
+     "rate": 0.3
+    },
+    {
+     "maxT": 40,
+     "rate": 0.4
+    },
+    {
+     "maxT": null,
+     "rate": 0.4
+    }
+   ],
+   "tractor": 0,
+   "schoolBus": 0
+  },
+  "NAGALAND": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 12,
+     "rate": 0.4
+    },
+    {
+     "maxT": 20,
+     "rate": 0.3
+    },
+    {
+     "maxT": 40,
+     "rate": 0.4
+    },
+    {
+     "maxT": null,
+     "rate": 0.4
+    }
+   ],
+   "tractor": 0,
+   "schoolBus": 0
+  },
+  "SIKKIM": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 12,
+     "rate": 0.4
+    },
+    {
+     "maxT": 20,
+     "rate": 0.3
+    },
+    {
+     "maxT": 40,
+     "rate": 0.4
+    },
+    {
+     "maxT": null,
+     "rate": 0.4
+    }
+   ],
+   "tractor": 0,
+   "schoolBus": 0
+  },
+  "TRIPURA": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.5
+    },
+    {
+     "maxT": 12,
+     "rate": 0.4
+    },
+    {
+     "maxT": 20,
+     "rate": 0.3
+    },
+    {
+     "maxT": 40,
+     "rate": 0.4
+    },
+    {
+     "maxT": null,
+     "rate": 0.4
+    }
+   ],
+   "tractor": 0,
+   "schoolBus": 0
+  },
+  "TAMIL NADU": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.1
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.1
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.1
+    },
+    {
+     "maxT": 12,
+     "rate": 0.1
+    },
+    {
+     "maxT": 20,
+     "rate": 0.1
+    },
+    {
+     "maxT": 40,
+     "rate": 0
+    },
+    {
+     "maxT": null,
+     "rate": 0
+    }
+   ],
+   "tractor": 0,
+   "schoolBus": 0.7
+  },
+  "ANDAMAN & NICOBAR": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.1
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.1
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.1
+    },
+    {
+     "maxT": 12,
+     "rate": 0.1
+    },
+    {
+     "maxT": 20,
+     "rate": 0.1
+    },
+    {
+     "maxT": 40,
+     "rate": 0
+    },
+    {
+     "maxT": null,
+     "rate": 0
+    }
+   ],
+   "tractor": 0,
+   "schoolBus": 0.7
+  },
+  "KARNATAKA": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.3
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.275
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.25
+    },
+    {
+     "maxT": 12,
+     "rate": 0.1
+    },
+    {
+     "maxT": 20,
+     "rate": 0.1
+    },
+    {
+     "maxT": 40,
+     "rate": 0
+    },
+    {
+     "maxT": null,
+     "rate": 0
+    }
+   ],
+   "tractor": 0.45,
+   "schoolBus": 0.7
+  },
+  "RAJASTHAN": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.15
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.1
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.1
+    },
+    {
+     "maxT": 12,
+     "rate": 0.1
+    },
+    {
+     "maxT": 20,
+     "rate": 0.075
+    },
+    {
+     "maxT": 40,
+     "rate": 0
+    },
+    {
+     "maxT": null,
+     "rate": 0
+    }
+   ],
+   "tractor": 0,
+   "schoolBus": 0.7
+  },
+  "HARYANA": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.15
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.1
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.1
+    },
+    {
+     "maxT": 12,
+     "rate": 0.1
+    },
+    {
+     "maxT": 20,
+     "rate": 0.075
+    },
+    {
+     "maxT": 40,
+     "rate": 0
+    },
+    {
+     "maxT": null,
+     "rate": 0
+    }
+   ],
+   "tractor": 0,
+   "schoolBus": 0.7
+  },
+  "DELHI": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.3
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.3
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.3
+    },
+    {
+     "maxT": 12,
+     "rate": 0.1
+    },
+    {
+     "maxT": 20,
+     "rate": 0.075
+    },
+    {
+     "maxT": 40,
+     "rate": 0
+    },
+    {
+     "maxT": null,
+     "rate": 0
+    }
+   ],
+   "tractor": 0,
+   "schoolBus": 0.7
+  },
+  "PUNJAB": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.3
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.4
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.3
+    },
+    {
+     "maxT": 12,
+     "rate": 0.1
+    },
+    {
+     "maxT": 20,
+     "rate": 0.075
+    },
+    {
+     "maxT": 40,
+     "rate": 0
+    },
+    {
+     "maxT": null,
+     "rate": 0
+    }
+   ],
+   "tractor": 0.4,
+   "schoolBus": 0.7
+  },
+  "HIMACHAL PRADESH": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.3
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.4
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.3
+    },
+    {
+     "maxT": 12,
+     "rate": 0.1
+    },
+    {
+     "maxT": 20,
+     "rate": 0.075
+    },
+    {
+     "maxT": 40,
+     "rate": 0
+    },
+    {
+     "maxT": null,
+     "rate": 0
+    }
+   ],
+   "tractor": 0,
+   "schoolBus": 0.7
+  },
+  "UTTAR PRADESH": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.2
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.1
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.1
+    },
+    {
+     "maxT": 12,
+     "rate": 0.1
+    },
+    {
+     "maxT": 20,
+     "rate": 0.075
+    },
+    {
+     "maxT": 40,
+     "rate": 0
+    },
+    {
+     "maxT": null,
+     "rate": 0
+    }
+   ],
+   "tractor": 0,
+   "schoolBus": 0.7
+  },
+  "UTTARAKHAND": {
+   "bands": [
+    {
+     "maxT": 2.5,
+     "rate": 0.2
+    },
+    {
+     "maxT": 3.5,
+     "rate": 0.25
+    },
+    {
+     "maxT": 7.5,
+     "rate": 0.1
+    },
+    {
+     "maxT": 12,
+     "rate": 0.1
+    },
+    {
+     "maxT": 20,
+     "rate": 0.075
+    },
+    {
+     "maxT": 40,
+     "rate": 0
+    },
+    {
+     "maxT": null,
+     "rate": 0
+    }
+   ],
+   "tractor": 0,
+   "schoolBus": 0.7
+  }
+ },
+ "odSpecial": [
+  "OD02",
+  "OD33",
+  "OD05",
+  "OR02",
+  "OR33",
+  "OR05"
+ ],
+ "wbSpecial": [
+  "WB01",
+  "WB02",
+  "WB04",
+  "WB31",
+  "WB37",
+  "WB38",
+  "WB39"
+ ]
+}

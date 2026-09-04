@@ -1,0 +1,179 @@
+{
+ "states": {
+  "ANDAMAN & NICOBAR": [
+   0.2,
+   0.3,
+   0.3
+  ],
+  "ANDHRA PRADESH": [
+   0.3,
+   0.35,
+   0.35
+  ],
+  "ARUNACHAL PRADESH": [
+   0.1,
+   0.15,
+   0.2
+  ],
+  "ASSAM": [
+   0.1,
+   0.15,
+   0.2
+  ],
+  "BIHAR": [
+   0.25,
+   0.3,
+   0.3
+  ],
+  "DELHI": [
+   0.2,
+   0.3,
+   0.35
+  ],
+  "GOA": [
+   0.2,
+   0.25,
+   0.3
+  ],
+  "GUJARAT": [
+   0.2,
+   0.25,
+   0.3
+  ],
+  "HARYANA": [
+   0.2,
+   0.3,
+   0.35
+  ],
+  "HIMACHAL PRADESH": [
+   0.1,
+   0.1,
+   0.1
+  ],
+  "JHARKHAND": [
+   0.25,
+   0.3,
+   0.3
+  ],
+  "MAHARASHTRA": [
+   0.2,
+   0.25,
+   0.3
+  ],
+  "MANIPUR": [
+   0.1,
+   0.15,
+   0.2
+  ],
+  "MEGHALAYA": [
+   0.1,
+   0.15,
+   0.2
+  ],
+  "MIZORAM": [
+   0.1,
+   0.15,
+   0.2
+  ],
+  "NAGALAND": [
+   0.1,
+   0.15,
+   0.2
+  ],
+  "ODISHA": [
+   0.1,
+   0.25,
+   0.3
+  ],
+  "PUNJAB": [
+   0.1,
+   0.1,
+   0.1
+  ],
+  "SIKKIM": [
+   0.1,
+   0.15,
+   0.2
+  ],
+  "TELANGANA": [
+   0.3,
+   0.35,
+   0.35
+  ],
+  "TRIPURA": [
+   0.1,
+   0.15,
+   0.2
+  ],
+  "UTTAR PRADESH": [
+   0.1,
+   0.1,
+   0.1
+  ],
+  "UTTARAKHAND": [
+   0.1,
+   0.1,
+   0.1
+  ],
+  "WEST BENGAL": [
+   0.1,
+   0.25,
+   0.3
+  ]
+ },
+ "cities": {
+  "CHENNAI": [
+   0.4,
+   0.45,
+   0.55
+  ],
+  "BANGALORE": [
+   0.55,
+   0.55,
+   0.55
+  ],
+  "MUMBAI_PUNE": [
+   0.55,
+   0.55,
+   0.55
+  ],
+  "KOLKATA": [
+   0.55,
+   0.55,
+   0.55
+  ],
+  "HYDERABAD": [
+   0.55,
+   0.55,
+   0.55
+  ]
+ },
+ "declinedStates": [
+  "MADHYA PRADESH",
+  "KERALA",
+  "CHHATTISGARH",
+  "JAMMU & KASHMIR",
+  "PUDUCHERRY",
+  "LADAKH",
+  "LAKSHADWEEP",
+  "RAJASTHAN"
+ ],
+ "declinedModels": [
+  "TATA INDICA",
+  "INDIGO",
+  "QUALIS",
+  "TATA MAGIC",
+  "BOLERO PICKUP",
+  "OMNI",
+  "ECCO",
+  "EECO"
+ ],
+ "hrRtos": [
+  "HR26",
+  "HR51",
+  "HR72",
+  "HR38",
+  "HR55",
+  "HR29"
+ ]
+}

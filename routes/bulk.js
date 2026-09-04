@@ -4141,6 +4141,37 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
+  // ---- Kshema — "July" grid (USER-confirmed effective Aug'26) ----
+  // State × tonnage GCV (+ Tractor/School-Bus) with Odisha/WB RTO-city splits,
+  // and Pvt-Car "PV Terms" (state × CC-band + metro-city overrides + declines).
+  // config/kshema_gcv_aug26.json + kshema_pv_aug26.json.
+  if (insurerSlug === 'kshema') {
+    try {
+      const _iEff = String(_bajajEffDate || params.effective_date || '').slice(0, 10);
+      if (_iEff && _iEff >= '2026-08-01') {
+        const vt = String(params.vehicleType || '').toUpperCase();
+        let hit = null, prod = vt;
+        if (vt === 'CAR') {
+          const { resolveKshemaPvRate } = require('../services/kshema-pv');
+          hit = resolveKshemaPvRate(params); prod = 'CAR';
+        } else if (/GCV|GOODS|PCV|PASSENGER|MISC|MIS/.test(vt)) {
+          const { resolveKshemaGcvRate } = require('../services/kshema-gcv');
+          hit = resolveKshemaGcvRate(params);
+          prod = /PCV|PASSENGER/.test(vt) ? 'PCV' : /MISC|MIS/.test(vt) ? 'MISC' : 'GCV';
+        }
+        if (hit) {
+          const _b = rules[0];
+          const _seg = `${prod} (Kshema Aug26 grid)`;
+          rules = [_b
+            ? { ..._b, rate_value: hit.rate, segment: _seg, is_declined: hit.declined ? 1 : 0 }
+            : { id: -1, insurer: 'kshema', product: prod, region: resolvedRegion || '',
+                rate_type: (Number(params.odPremium) || 0) <= 0 ? 'SATP' : 'COMP',
+                rate_value: hit.rate, segment: _seg, is_declined: hit.declined ? 1 : 0 }];
+        }
+      }
+    } catch (_) { /* leave rules unchanged on any failure */ }
+  }
+
   // ---- HDFC Pvt-Car Zone × Fuel × NCB override ----
   // HDFC's ROBINHOOD Pvt-Car grid is Zone-1/Zone-2 × (Petrol vs Non-Petrol) ×
   // (NCB vs No-NCB), but the 4 fuel/NCB columns were mis-ingested as AGE bands
