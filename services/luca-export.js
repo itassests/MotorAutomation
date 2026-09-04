@@ -288,7 +288,7 @@ _addState('mizoram', 'mizoram', 'mz');
 _addState('tripura', 'tripura', 'tr', 'agartala');
 _addState('arunachal_pradesh', 'arunachal pradesh', 'arunachal', 'ar');
 _addState('rajasthan', 'rajasthan', 'rj', 'jaipur');
-_addState('gujarat', 'gujarat', 'gj', 'ahmedabad', 'surat', 'vadodara');
+_addState('gujarat', 'gujarat', 'gujrat', 'gj', 'ahmedabad', 'surat', 'vadodara');
 _addState('goa', 'goa', 'ga');
 _addState('maharashtra', 'maharashtra', 'mh', 'mumbai', 'pune', 'nagpur', 'nashik', 'thane', 'aurangabad',
   'rom', 'romg', 'rom1', 'rom2', 'rom3', 'rom4');   // go-digit "Rest Of Maharashtra" clusters
@@ -395,7 +395,10 @@ const _CITY_STATE_EXTRA = new Set(['TELENGANA', 'JAMMU', 'KASHMIR', 'LADAKH', 'N
   // USER 2026-09 city report: region grouping codes (not supported → blank),
   // "bh" (Bihar, a state code not a city), and state names mis-parked in city.
   'BH', 'EAST', 'ROMAHARASHTRA', 'EASTUP', 'NORTHEAST', 'ROKARNATAKA', 'UTTARANCHALKS',
-  'KERELA', 'ANDRAPRADESH']);
+  'KERELA', 'ANDRAPRADESH',
+  // USER 2026-09 city report: "gujrat" = misspelled state Gujarat parked in the
+  // city column → drop from city; STATE_MAP maps it to gujarat for included_states.
+  'GUJRAT']);
 // Spelling corrections → LUCA's master city name (USER 2026-09, LUCA import).
 // Keyed on the _sk (upper, alnum-only) form so "Vishakapatnam"/"vishakapattnam"
 // both hit. Value is the canonical spelling LUCA accepts.
@@ -527,12 +530,23 @@ const MAKE_CANON = {
   SSANGYONG: 'SsangYong', SSANGYONGMOTOR: 'SsangYong', KIAMOTORS: 'Kia',
   MARUTISUZUKI: 'Maruti Suzuki', SMLISUZU: 'SML Isuzu', CITRONE: 'Citroen',
   CITROEN: 'Citroen', VOLKS: 'Volkswagen',
+  // USER 2026-09 make report: real brands emitted in lower/short form → LUCA master
+  // spelling. "jawa" → the master's "Jawa Motors"; the rest are new EV/marque brands.
+  JAWA: 'Jawa Motors', KIA: 'Kia', ATHER: 'Ather', BYD: 'BYD', CADILLAC: 'Cadillac',
+  TESLA: 'Tesla', MG: 'MG', MINI: 'Mini', OLA: 'Ola Electric', ULTRAVIOLETTE: 'Ultraviolette',
 };
 // Model strings that leaked into the make column and are not brands → drop (blank
 // make). "I20 Max 2" is a Bajaj SATP model list; hero vida / tvs iqube / bajaj
 // chetak are models; "bike" a category, "alto" a model (USER 2026-09, LUCA #6).
 const MAKE_BLOCK = new Set(['I20', 'MAX2', 'I20MAX2', 'HEROVIDA', 'TVSIQUBE',
-  'BAJAJCHETAK', 'BIKE', 'ALTO']);
+  'BAJAJCHETAK', 'BIKE', 'ALTO',
+  // USER 2026-09 make report: unrecoverable/truncated garbage in the make column.
+  'NZD', 'MAXPO']);
+// Leading-brand reduction: a make cell that packs "brand + model" ("Maruti Alto")
+// → the brand only (model belongs in vehicle_model). Only brands whose bare name
+// IS the LUCA make are listed, to avoid clobbering real multi-word makes
+// ("Ashok Leyland", "Land Rover"). USER 2026-09 make report.
+const MAKE_LEADING = { MARUTI: 'Maruti Suzuki' };
 
 // Luca keeps make (manufacturer) and model as SEPARATE fields, but some grids
 // put the MODEL in the make column: Bajaj files make = model = "Thar", ICICI
@@ -541,9 +555,9 @@ const MAKE_BLOCK = new Set(['I20', 'MAX2', 'I20MAX2', 'HEROVIDA', 'TVSIQUBE',
 // Only well-known models are listed — an unmapped value is left untouched
 // rather than risk asserting the wrong manufacturer to an agent.
 const MODEL_TO_MAKE = {
-  // Maruti Suzuki
+  // Maruti Suzuki ("ecco"/"eeco" = Eeco misspelled, leaked into make col — USER 2026-09)
   'OMNI': 'Maruti Suzuki', 'CIAZ': 'Maruti Suzuki', 'IGNIS': 'Maruti Suzuki',
-  'JIMNY': 'Maruti Suzuki', 'GRAND VITARA': 'Maruti Suzuki',
+  'JIMNY': 'Maruti Suzuki', 'GRAND VITARA': 'Maruti Suzuki', 'ECCO': 'Maruti Suzuki', 'EECO': 'Maruti Suzuki',
   // Hyundai
   'CRETA': 'Hyundai', 'VENUE': 'Hyundai', 'ALCAZAR': 'Hyundai',
   // Tata
@@ -594,7 +608,8 @@ function _isRealMakeToken(s) {
   if (/[%:_+<>]/.test(s)) return false;                              // rate/remark/spec leak
   if (/^\d+(\.\d+)?$/.test(s)) return false;                         // pure number / rate
   if (/\b(YR|YRS|YEAR|YEARS|YS)\b/.test(u) || /^\d+\s*[-]/.test(s)) return false; // age band
-  if (/^ALL\b/.test(u) || /^NON[\s-]/.test(u)) return false;         // "All ..." / "Non Tata"
+  if (/^ALL\b/.test(u) || /^NON[\s-]/.test(u) || /^NOT\s/.test(u)) return false;    // "All ..." / "Non Tata" / "Not Maruti" (exclusion text)
+  if (/^(SCOOTER|SCOOTY|MOTOR\s*CYCLE|MOTORCYCLE|MOPED|\bCAR\b)$/.test(u)) return false; // vehicle category, not a make
   if (/EXCLUD|EXCEPT|OTHER\s+MAKE|OTHER\s+MODEL|OTHER\s+THAN|\bREF\b/.test(u)) return false;
   if (/GCV|PCV|LCV|HCV|MCV|GCCV|PCCV|\bMISC\b|SEATER|SEAT|TONNE|\bTON\b|GVW|LAKH|\bLAC\b|UPTO|DUMPER|TIPPER|BACKHOE|EXCAVATOR|LOADER|CRANE|HARVESTER|TAXI|\bBUS\b|TANKER|DRILLING|\bRIG\b|MOBILEPLANT|RICKSHAW|E-?LOADER/.test(u)) return false;
   if (/\d\s*T\b/.test(u) || /^[A-Z]{2}\s?\d/.test(u)) return false;  // tonnage / RTO-region code
@@ -608,6 +623,7 @@ function lucaMake(m) {
   const raw = String(m == null ? '' : m).trim();
   if (!raw) return '';
   const stripped = raw.replace(/\([^)]*\)/g, ' ')                   // drop "(including …)" notes
+    .replace(/^\s*HEV[\s-]+/i, ' ')                                 // stray "hev-" prefix → drop ("hev-Mercedes Benz" → Mercedes-Benz)
     .replace(/\s*\bOEM\b\s*/ig, ' ');                               // "Yamaha OEM" → "Yamaha" (LUCA master has no OEM variants)
   const out = []; const seen = new Set();
   for (const part of stripped.split(/\s*(?:,|&|\/|\band\b)\s*/i)) {
@@ -615,7 +631,9 @@ function lucaMake(m) {
     if (!s || !_isRealMakeToken(s)) continue;
     const alnum = s.toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (MAKE_BLOCK.has(alnum)) continue;                    // model leaked into make → drop
-    const exp = MAKE_CANON[alnum] || expandMake(s);         // canonical brand, else expand abbrev
+    // "brand + model" packed in one cell ("Maruti Alto") → the brand only.
+    const lead = MAKE_LEADING[s.trim().split(/\s+/)[0].toUpperCase()];
+    const exp = lead || MAKE_CANON[alnum] || expandMake(s); // brand-lead, canonical brand, else expand abbrev
     const key = exp.toUpperCase();
     if (exp && !seen.has(key)) { seen.add(key); out.push(exp); }
   }
