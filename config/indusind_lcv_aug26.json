@@ -1,0 +1,1154 @@
+{
+ "MUMBAI": {
+  "zone": "WEST",
+  "group": "MUMBAI",
+  "A": {
+   "comp": 0.7,
+   "stp": 0.7
+  },
+  "B": {
+   "comp": 0.675,
+   "stp": 0.675
+  },
+  "C": {
+   "comp": 0.6,
+   "stp": 0.575
+  }
+ },
+ "NAGPUR": {
+  "zone": "WEST",
+  "group": "NAGPUR",
+  "A": {
+   "comp": 0.25,
+   "stp": 0.25
+  },
+  "B": {
+   "comp": 0.225,
+   "stp": 0.225
+  },
+  "C": {
+   "comp": 0.15,
+   "stp": 0.1
+  }
+ },
+ "PUNE": {
+  "zone": "WEST",
+  "group": "PUNE",
+  "A": {
+   "comp": 0.7,
+   "stp": 0.7
+  },
+  "B": {
+   "comp": 0.675,
+   "stp": 0.675
+  },
+  "C": {
+   "comp": 0.6,
+   "stp": 0.575
+  }
+ },
+ "AHMEDNAGAR": {
+  "zone": "WEST",
+  "group": "ROM",
+  "A": {
+   "comp": 0.675,
+   "stp": 0.675
+  },
+  "B": {
+   "comp": 0.65,
+   "stp": 0.65
+  },
+  "C": {
+   "comp": 0.575,
+   "stp": 0.55
+  }
+ },
+ "AURANGABAD": {
+  "zone": "WEST",
+  "group": "ROM",
+  "A": {
+   "comp": 0.25,
+   "stp": 0.25
+  },
+  "B": {
+   "comp": 0.225,
+   "stp": 0.225
+  },
+  "C": {
+   "comp": 0.15,
+   "stp": 0.1
+  }
+ },
+ "KOLHAPUR": {
+  "zone": "WEST",
+  "group": "ROM",
+  "A": {
+   "comp": 0.675,
+   "stp": 0.675
+  },
+  "B": {
+   "comp": 0.65,
+   "stp": 0.65
+  },
+  "C": {
+   "comp": 0.575,
+   "stp": 0.55
+  }
+ },
+ "NASHIK": {
+  "zone": "WEST",
+  "group": "ROM",
+  "A": {
+   "comp": 0.675,
+   "stp": 0.675
+  },
+  "B": {
+   "comp": 0.65,
+   "stp": 0.65
+  },
+  "C": {
+   "comp": 0.575,
+   "stp": 0.55
+  }
+ },
+ "SOLAPUR": {
+  "zone": "WEST",
+  "group": "ROM",
+  "A": {
+   "comp": 0.675,
+   "stp": 0.675
+  },
+  "B": {
+   "comp": 0.65,
+   "stp": 0.65
+  },
+  "C": {
+   "comp": 0.575,
+   "stp": 0.55
+  }
+ },
+ "ROM": {
+  "zone": "WEST",
+  "group": "ROM",
+  "A": {
+   "comp": 0.675,
+   "stp": 0.675
+  },
+  "B": {
+   "comp": 0.65,
+   "stp": 0.65
+  },
+  "C": {
+   "comp": 0.575,
+   "stp": 0.55
+  }
+ },
+ "GOA": {
+  "zone": "WEST",
+  "group": "GOA",
+  "A": {
+   "comp": 0.675,
+   "stp": 0.675
+  },
+  "B": {
+   "comp": 0.65,
+   "stp": 0.65
+  },
+  "C": {
+   "comp": 0.575,
+   "stp": 0.55
+  }
+ },
+ "AHMEDABAD": {
+  "zone": "WEST",
+  "group": "AHMEDABAD",
+  "A": {
+   "comp": 0.65,
+   "stp": 0.65
+  },
+  "B": {
+   "comp": 0.625,
+   "stp": 0.625
+  },
+  "C": {
+   "comp": 0.55,
+   "stp": 0.525
+  }
+ },
+ "SURAT": {
+  "zone": "WEST",
+  "group": "SURAT",
+  "A": {
+   "comp": 0.65,
+   "stp": 0.65
+  },
+  "B": {
+   "comp": 0.625,
+   "stp": 0.625
+  },
+  "C": {
+   "comp": 0.55,
+   "stp": 0.525
+  }
+ },
+ "VADODARA": {
+  "zone": "WEST",
+  "group": "VADODARA",
+  "A": {
+   "comp": 0.65,
+   "stp": 0.65
+  },
+  "B": {
+   "comp": 0.625,
+   "stp": 0.625
+  },
+  "C": {
+   "comp": 0.55,
+   "stp": 0.525
+  }
+ },
+ "GANDHIDHAM": {
+  "zone": "WEST",
+  "group": "GUJARAT",
+  "A": {
+   "comp": 0.65,
+   "stp": 0.65
+  },
+  "B": {
+   "comp": 0.625,
+   "stp": 0.625
+  },
+  "C": {
+   "comp": 0.55,
+   "stp": 0.525
+  }
+ },
+ "JAMNAGAR": {
+  "zone": "WEST",
+  "group": "GUJARAT",
+  "A": {
+   "comp": 0.65,
+   "stp": 0.65
+  },
+  "B": {
+   "comp": 0.625,
+   "stp": 0.625
+  },
+  "C": {
+   "comp": 0.55,
+   "stp": 0.525
+  }
+ },
+ "RAJKOT": {
+  "zone": "WEST",
+  "group": "GUJARAT",
+  "A": {
+   "comp": 0.65,
+   "stp": 0.65
+  },
+  "B": {
+   "comp": 0.625,
+   "stp": 0.625
+  },
+  "C": {
+   "comp": 0.55,
+   "stp": 0.525
+  }
+ },
+ "VAPI": {
+  "zone": "WEST",
+  "group": "GUJARAT",
+  "A": {
+   "comp": 0.65,
+   "stp": 0.65
+  },
+  "B": {
+   "comp": 0.625,
+   "stp": 0.625
+  },
+  "C": {
+   "comp": 0.55,
+   "stp": 0.525
+  }
+ },
+ "GUJ 1": {
+  "zone": "WEST",
+  "group": "GUJARAT",
+  "A": {
+   "comp": 0.65,
+   "stp": 0.65
+  },
+  "B": {
+   "comp": 0.625,
+   "stp": 0.625
+  },
+  "C": {
+   "comp": 0.55,
+   "stp": 0.525
+  }
+ },
+ "MADHYA PRADESH": {
+  "zone": "WEST",
+  "group": "MADHYA PRADESH",
+  "A": {
+   "comp": 0,
+   "stp": 0
+  },
+  "B": {
+   "comp": 0,
+   "stp": 0
+  },
+  "C": {
+   "comp": 0,
+   "stp": 0
+  }
+ },
+ "ANDHRA PRADESH": {
+  "zone": "SOUTH",
+  "group": "ANDHRA PRADESH",
+  "A": {
+   "comp": 0.275,
+   "stp": 0.25
+  },
+  "B": {
+   "comp": 0.25,
+   "stp": 0.225
+  },
+  "C": {
+   "comp": 0.175,
+   "stp": 0.125
+  }
+ },
+ "HYDERABAD": {
+  "zone": "SOUTH",
+  "group": "HYDERABAD",
+  "A": {
+   "comp": 0.425,
+   "stp": 0.4
+  },
+  "B": {
+   "comp": 0.4,
+   "stp": 0.375
+  },
+  "C": {
+   "comp": 0.325,
+   "stp": 0.275
+  }
+ },
+ "TELANGANA": {
+  "zone": "SOUTH",
+  "group": "TELANGANA",
+  "A": {
+   "comp": 0,
+   "stp": 0
+  },
+  "B": {
+   "comp": 0,
+   "stp": 0
+  },
+  "C": {
+   "comp": 0,
+   "stp": 0
+  }
+ },
+ "BANGALORE": {
+  "zone": "SOUTH",
+  "group": "BANGALORE",
+  "A": {
+   "comp": 0.425,
+   "stp": 0.4
+  },
+  "B": {
+   "comp": 0.4,
+   "stp": 0.375
+  },
+  "C": {
+   "comp": 0.325,
+   "stp": 0.275
+  }
+ },
+ "KARNATAKA": {
+  "zone": "SOUTH",
+  "group": "KARNATAKA",
+  "A": {
+   "comp": 0.375,
+   "stp": 0.35
+  },
+  "B": {
+   "comp": 0.35,
+   "stp": 0.325
+  },
+  "C": {
+   "comp": 0.275,
+   "stp": 0.225
+  }
+ },
+ "MANGALORE": {
+  "zone": "SOUTH",
+  "group": "KARNATAKA",
+  "A": {
+   "comp": 0.375,
+   "stp": 0.35
+  },
+  "B": {
+   "comp": 0.35,
+   "stp": 0.325
+  },
+  "C": {
+   "comp": 0.275,
+   "stp": 0.225
+  }
+ },
+ "MYSORE": {
+  "zone": "SOUTH",
+  "group": "KARNATAKA",
+  "A": {
+   "comp": 0.375,
+   "stp": 0.35
+  },
+  "B": {
+   "comp": 0.35,
+   "stp": 0.325
+  },
+  "C": {
+   "comp": 0.275,
+   "stp": 0.225
+  }
+ },
+ "KERALA": {
+  "zone": "SOUTH",
+  "group": "KERALA",
+  "A": {
+   "comp": 0.375,
+   "stp": 0.35
+  },
+  "B": {
+   "comp": 0.35,
+   "stp": 0.325
+  },
+  "C": {
+   "comp": 0.275,
+   "stp": 0.225
+  }
+ },
+ "CALICUT": {
+  "zone": "SOUTH",
+  "group": "KERALA",
+  "A": {
+   "comp": 0.375,
+   "stp": 0.35
+  },
+  "B": {
+   "comp": 0.35,
+   "stp": 0.325
+  },
+  "C": {
+   "comp": 0.275,
+   "stp": 0.225
+  }
+ },
+ "COCHIN": {
+  "zone": "SOUTH",
+  "group": "KERALA",
+  "A": {
+   "comp": 0.375,
+   "stp": 0.35
+  },
+  "B": {
+   "comp": 0.35,
+   "stp": 0.325
+  },
+  "C": {
+   "comp": 0.275,
+   "stp": 0.225
+  }
+ },
+ "TRIVANDRUM": {
+  "zone": "SOUTH",
+  "group": "KERALA",
+  "A": {
+   "comp": 0.375,
+   "stp": 0.35
+  },
+  "B": {
+   "comp": 0.35,
+   "stp": 0.325
+  },
+  "C": {
+   "comp": 0.275,
+   "stp": 0.225
+  }
+ },
+ "CHENNAI": {
+  "zone": "SOUTH",
+  "group": "CHENNAI",
+  "A": {
+   "comp": 0.425,
+   "stp": 0.4
+  },
+  "B": {
+   "comp": 0.4,
+   "stp": 0.375
+  },
+  "C": {
+   "comp": 0.325,
+   "stp": 0.275
+  }
+ },
+ "COIMBATORE": {
+  "zone": "SOUTH",
+  "group": "COIMBATORE",
+  "A": {
+   "comp": 0.425,
+   "stp": 0.4
+  },
+  "B": {
+   "comp": 0.4,
+   "stp": 0.375
+  },
+  "C": {
+   "comp": 0.325,
+   "stp": 0.275
+  }
+ },
+ "TAMILNADU": {
+  "zone": "SOUTH",
+  "group": "TAMILNADU",
+  "A": {
+   "comp": 0.375,
+   "stp": 0.375
+  },
+  "B": {
+   "comp": 0.35,
+   "stp": 0.35
+  },
+  "C": {
+   "comp": 0.275,
+   "stp": 0.225
+  }
+ },
+ "ERODE": {
+  "zone": "SOUTH",
+  "group": "TAMILNADU",
+  "A": {
+   "comp": 0.375,
+   "stp": 0.35
+  },
+  "B": {
+   "comp": 0.35,
+   "stp": 0.325
+  },
+  "C": {
+   "comp": 0.275,
+   "stp": 0.225
+  }
+ },
+ "MADURAI": {
+  "zone": "SOUTH",
+  "group": "TAMILNADU",
+  "A": {
+   "comp": 0.375,
+   "stp": 0.35
+  },
+  "B": {
+   "comp": 0.35,
+   "stp": 0.325
+  },
+  "C": {
+   "comp": 0.275,
+   "stp": 0.225
+  }
+ },
+ "PONDICHERRY": {
+  "zone": "SOUTH",
+  "group": "TAMILNADU",
+  "A": {
+   "comp": 0.375,
+   "stp": 0.35
+  },
+  "B": {
+   "comp": 0.35,
+   "stp": 0.325
+  },
+  "C": {
+   "comp": 0.275,
+   "stp": 0.225
+  }
+ },
+ "DELHI": {
+  "zone": "NORTH",
+  "group": "DELHI",
+  "A": {
+   "comp": 0.65,
+   "stp": 0.65
+  },
+  "B": {
+   "comp": 0.625,
+   "stp": 0.625
+  },
+  "C": {
+   "comp": 0.6,
+   "stp": 0.575
+  }
+ },
+ "CHANDIGARH": {
+  "zone": "NORTH",
+  "group": "CHANDIGARH",
+  "A": {
+   "comp": 0.5,
+   "stp": 0.475
+  },
+  "B": {
+   "comp": 0.475,
+   "stp": 0.45
+  },
+  "C": {
+   "comp": 0.375,
+   "stp": 0.35
+  }
+ },
+ "HP AND JAMMU": {
+  "zone": "NORTH",
+  "group": "HP AND JAMMU",
+  "A": {
+   "comp": 0.5,
+   "stp": 0.475
+  },
+  "B": {
+   "comp": 0.475,
+   "stp": 0.45
+  },
+  "C": {
+   "comp": 0.375,
+   "stp": 0.35
+  }
+ },
+ "JAMMU": {
+  "zone": "NORTH",
+  "group": "HP AND JAMMU",
+  "A": {
+   "comp": 0.5,
+   "stp": 0.475
+  },
+  "B": {
+   "comp": 0.475,
+   "stp": 0.45
+  },
+  "C": {
+   "comp": 0.375,
+   "stp": 0.35
+  }
+ },
+ "SHIMLA": {
+  "zone": "NORTH",
+  "group": "HP AND JAMMU",
+  "A": {
+   "comp": 0.5,
+   "stp": 0.475
+  },
+  "B": {
+   "comp": 0.475,
+   "stp": 0.45
+  },
+  "C": {
+   "comp": 0.375,
+   "stp": 0.35
+  }
+ },
+ "SRINAGAR": {
+  "zone": "NORTH",
+  "group": "HP AND JAMMU",
+  "A": {
+   "comp": 0.5,
+   "stp": 0.475
+  },
+  "B": {
+   "comp": 0.475,
+   "stp": 0.45
+  },
+  "C": {
+   "comp": 0.375,
+   "stp": 0.35
+  }
+ },
+ "LADAKH": {
+  "zone": "NORTH",
+  "group": "HP AND JAMMU",
+  "A": {
+   "comp": 0.5,
+   "stp": 0.475
+  },
+  "B": {
+   "comp": 0.475,
+   "stp": 0.45
+  },
+  "C": {
+   "comp": 0.375,
+   "stp": 0.35
+  }
+ },
+ "PUNJAB": {
+  "zone": "NORTH",
+  "group": "PUNJAB",
+  "A": {
+   "comp": 0.5,
+   "stp": 0.475
+  },
+  "B": {
+   "comp": 0.475,
+   "stp": 0.45
+  },
+  "C": {
+   "comp": 0.375,
+   "stp": 0.35
+  }
+ },
+ "AMRITSAR": {
+  "zone": "NORTH",
+  "group": "PUNJAB",
+  "A": {
+   "comp": 0.5,
+   "stp": 0.475
+  },
+  "B": {
+   "comp": 0.475,
+   "stp": 0.45
+  },
+  "C": {
+   "comp": 0.375,
+   "stp": 0.35
+  }
+ },
+ "LUDHIANA": {
+  "zone": "NORTH",
+  "group": "PUNJAB",
+  "A": {
+   "comp": 0.5,
+   "stp": 0.475
+  },
+  "B": {
+   "comp": 0.475,
+   "stp": 0.45
+  },
+  "C": {
+   "comp": 0.375,
+   "stp": 0.35
+  }
+ },
+ "HARYANA": {
+  "zone": "NORTH",
+  "group": "HARYANA",
+  "A": {
+   "comp": 0,
+   "stp": 0
+  },
+  "B": {
+   "comp": 0,
+   "stp": 0
+  },
+  "C": {
+   "comp": 0,
+   "stp": 0
+  }
+ },
+ "RAJASTHAN": {
+  "zone": "NORTH",
+  "group": "RAJASTHAN",
+  "A": {
+   "comp": 0,
+   "stp": 0
+  },
+  "B": {
+   "comp": 0,
+   "stp": 0
+  },
+  "C": {
+   "comp": 0,
+   "stp": 0
+  }
+ },
+ "JAIPUR": {
+  "zone": "NORTH",
+  "group": "RAJASTHAN",
+  "A": {
+   "comp": 0,
+   "stp": 0
+  },
+  "B": {
+   "comp": 0,
+   "stp": 0
+  },
+  "C": {
+   "comp": 0,
+   "stp": 0
+  }
+ },
+ "DEHRADUN": {
+  "zone": "NORTH",
+  "group": "UTTARAKHAND",
+  "A": {
+   "comp": 0,
+   "stp": 0
+  },
+  "B": {
+   "comp": 0,
+   "stp": 0
+  },
+  "C": {
+   "comp": 0,
+   "stp": 0
+  }
+ },
+ "LUCKNOW": {
+  "zone": "NORTH",
+  "group": "UP WEST",
+  "A": {
+   "comp": 0,
+   "stp": 0
+  },
+  "B": {
+   "comp": 0,
+   "stp": 0
+  },
+  "C": {
+   "comp": 0,
+   "stp": 0
+  }
+ },
+ "VARANASI": {
+  "zone": "NORTH",
+  "group": "UP EAST",
+  "A": {
+   "comp": 0,
+   "stp": 0
+  },
+  "B": {
+   "comp": 0,
+   "stp": 0
+  },
+  "C": {
+   "comp": 0,
+   "stp": 0
+  }
+ },
+ "UP1": {
+  "zone": "NORTH",
+  "group": "UP EAST",
+  "A": {
+   "comp": 0,
+   "stp": 0
+  },
+  "B": {
+   "comp": 0,
+   "stp": 0
+  },
+  "C": {
+   "comp": 0,
+   "stp": 0
+  }
+ },
+ "UP2": {
+  "zone": "NORTH",
+  "group": "UP WEST",
+  "A": {
+   "comp": 0,
+   "stp": 0
+  },
+  "B": {
+   "comp": 0,
+   "stp": 0
+  },
+  "C": {
+   "comp": 0,
+   "stp": 0
+  }
+ },
+ "UTTARAKHAND": {
+  "zone": "NORTH",
+  "group": "UTTARAKHAND",
+  "A": {
+   "comp": 0,
+   "stp": 0
+  },
+  "B": {
+   "comp": 0,
+   "stp": 0
+  },
+  "C": {
+   "comp": 0,
+   "stp": 0
+  }
+ },
+ "PATNA": {
+  "zone": "EAST",
+  "group": "BIHAR",
+  "A": {
+   "comp": 0.575,
+   "stp": 0.55
+  },
+  "B": {
+   "comp": 0.55,
+   "stp": 0.525
+  },
+  "C": {
+   "comp": 0.45,
+   "stp": 0.4
+  }
+ },
+ "BIHAR": {
+  "zone": "EAST",
+  "group": "BIHAR",
+  "A": {
+   "comp": 0.575,
+   "stp": 0.55
+  },
+  "B": {
+   "comp": 0.55,
+   "stp": 0.525
+  },
+  "C": {
+   "comp": 0.45,
+   "stp": 0.4
+  }
+ },
+ "JAMSHEDPUR": {
+  "zone": "EAST",
+  "group": "JHARKHAND",
+  "A": {
+   "comp": 0.225,
+   "stp": 0.2
+  },
+  "B": {
+   "comp": 0.2,
+   "stp": 0.175
+  },
+  "C": {
+   "comp": 0.1,
+   "stp": 0.05
+  }
+ },
+ "RANCHI": {
+  "zone": "EAST",
+  "group": "JHARKHAND",
+  "A": {
+   "comp": 0.225,
+   "stp": 0.2
+  },
+  "B": {
+   "comp": 0.2,
+   "stp": 0.175
+  },
+  "C": {
+   "comp": 0.1,
+   "stp": 0.05
+  }
+ },
+ "JHARKHAND": {
+  "zone": "EAST",
+  "group": "JHARKHAND",
+  "A": {
+   "comp": 0.225,
+   "stp": 0.2
+  },
+  "B": {
+   "comp": 0.2,
+   "stp": 0.175
+  },
+  "C": {
+   "comp": 0.1,
+   "stp": 0.05
+  }
+ },
+ "BHUBANESHWAR": {
+  "zone": "EAST",
+  "group": "BHUBANESHWAR",
+  "A": {
+   "comp": 0,
+   "stp": 0
+  },
+  "B": {
+   "comp": 0,
+   "stp": 0
+  },
+  "C": {
+   "comp": 0,
+   "stp": 0
+  }
+ },
+ "CUTTACK": {
+  "zone": "EAST",
+  "group": "ODISHA",
+  "A": {
+   "comp": 0,
+   "stp": 0
+  },
+  "B": {
+   "comp": 0,
+   "stp": 0
+  },
+  "C": {
+   "comp": 0,
+   "stp": 0
+  }
+ },
+ "ROURKELA": {
+  "zone": "EAST",
+  "group": "ODISHA",
+  "A": {
+   "comp": 0,
+   "stp": 0
+  },
+  "B": {
+   "comp": 0,
+   "stp": 0
+  },
+  "C": {
+   "comp": 0,
+   "stp": 0
+  }
+ },
+ "ODISHA": {
+  "zone": "EAST",
+  "group": "ODISHA",
+  "A": {
+   "comp": 0,
+   "stp": 0
+  },
+  "B": {
+   "comp": 0,
+   "stp": 0
+  },
+  "C": {
+   "comp": 0,
+   "stp": 0
+  }
+ },
+ "CHHATTISGARH": {
+  "zone": "EAST",
+  "group": "CHHATTISGARH",
+  "A": {
+   "comp": 0,
+   "stp": 0
+  },
+  "B": {
+   "comp": 0,
+   "stp": 0
+  },
+  "C": {
+   "comp": 0,
+   "stp": 0
+  }
+ },
+ "KOLKATA": {
+  "zone": "EAST",
+  "group": "KOLKATA",
+  "A": {
+   "comp": 0.525,
+   "stp": 0.5
+  },
+  "B": {
+   "comp": 0.5,
+   "stp": 0.475
+  },
+  "C": {
+   "comp": 0.4,
+   "stp": 0.35
+  }
+ },
+ "SILIGURI": {
+  "zone": "EAST",
+  "group": "WEST BENGAL",
+  "A": {
+   "comp": 0.375,
+   "stp": 0.35
+  },
+  "B": {
+   "comp": 0.35,
+   "stp": 0.325
+  },
+  "C": {
+   "comp": 0.25,
+   "stp": 0.2
+  }
+ },
+ "WEST BENGAL": {
+  "zone": "EAST",
+  "group": "WEST BENGAL",
+  "A": {
+   "comp": 0.375,
+   "stp": 0.35
+  },
+  "B": {
+   "comp": 0.35,
+   "stp": 0.325
+  },
+  "C": {
+   "comp": 0.25,
+   "stp": 0.2
+  }
+ },
+ "AGARTALA": {
+  "zone": "EAST",
+  "group": "NORTH EAST",
+  "A": {
+   "comp": 0.175,
+   "stp": 0.15
+  },
+  "B": {
+   "comp": 0.15,
+   "stp": 0.125
+  },
+  "C": {
+   "comp": 0.05,
+   "stp": 0
+  }
+ },
+ "AIZWAL": {
+  "zone": "EAST",
+  "group": "NORTH EAST",
+  "A": {
+   "comp": 0.175,
+   "stp": 0.15
+  },
+  "B": {
+   "comp": 0.15,
+   "stp": 0.125
+  },
+  "C": {
+   "comp": 0.05,
+   "stp": 0
+  }
+ },
+ "GUWAHATI": {
+  "zone": "EAST",
+  "group": "NORTH EAST",
+  "A": {
+   "comp": 0.175,
+   "stp": 0.15
+  },
+  "B": {
+   "comp": 0.15,
+   "stp": 0.125
+  },
+  "C": {
+   "comp": 0.05,
+   "stp": 0
+  }
+ },
+ "NORTH EAST": {
+  "zone": "EAST",
+  "group": "NORTH EAST",
+  "A": {
+   "comp": 0.175,
+   "stp": 0.15
+  },
+  "B": {
+   "comp": 0.15,
+   "stp": 0.125
+  },
+  "C": {
+   "comp": 0.05,
+   "stp": 0
+  }
+ }
+}

@@ -1,0 +1,98 @@
+{
+ "ASSAM": {
+  "diesel": 0.15,
+  "nonDiesel": 0.2
+ },
+ "TELANGANA": {
+  "diesel": 0.2,
+  "nonDiesel": 0.25
+ },
+ "JAMMU AND KASHMIR": {
+  "diesel": 0.25,
+  "nonDiesel": 0.3
+ },
+ "UTTARAKHAND": {
+  "diesel": 0.2,
+  "nonDiesel": 0.25
+ },
+ "GUJARAT": {
+  "diesel": 0.3,
+  "nonDiesel": 0.35
+ },
+ "UTTAR PRADESH": {
+  "diesel": 0.25,
+  "nonDiesel": 0.35
+ },
+ "CHANDIGARH": {
+  "diesel": 0.3,
+  "nonDiesel": 0.3
+ },
+ "PUNJAB": {
+  "diesel": 0.25,
+  "nonDiesel": 0.3
+ },
+ "JHARKHAND": {
+  "diesel": 0.25,
+  "nonDiesel": 0.35
+ },
+ "HIMACHAL PRADESH": {
+  "diesel": 0.25,
+  "nonDiesel": 0.3
+ },
+ "DELHI": {
+  "diesel": 0.25,
+  "nonDiesel": 0.35
+ },
+ "WEST BENGAL": {
+  "diesel": 0.3,
+  "nonDiesel": 0.35
+ },
+ "MAHARASHTRA": {
+  "diesel": 0.3,
+  "nonDiesel": 0.35
+ },
+ "BIHAR": {
+  "diesel": 0.3,
+  "nonDiesel": 0.35
+ },
+ "GOA": {
+  "diesel": 0.3,
+  "nonDiesel": 0.35
+ },
+ "ANDAMAN AND NICOBAR ISLANDS": {
+  "diesel": 0.3,
+  "nonDiesel": 0.3
+ },
+ "MANIPUR": {
+  "diesel": 0.3,
+  "nonDiesel": 0.3
+ },
+ "DADRA & NAGAR HAVELI": {
+  "diesel": 0.3,
+  "nonDiesel": 0.3
+ },
+ "NAGALAND": {
+  "diesel": 0.3,
+  "nonDiesel": 0.3
+ },
+ "SIKKIM": {
+  "diesel": 0.3,
+  "nonDiesel": 0.35
+ },
+ "ARUNACHAL PRADESH": {
+  "diesel": 0.3,
+  "nonDiesel": 0.35
+ },
+ "MIZORAM": {
+  "diesel": 0.3,
+  "nonDiesel": 0.3
+ },
+ "MEGHALAYA": {
+  "diesel": 0.3,
+  "nonDiesel": 0.3
+ },
+ "DAMAN & DIU": {
+  "diesel": 0.3,
+  "nonDiesel": 0.35
+ }
+}

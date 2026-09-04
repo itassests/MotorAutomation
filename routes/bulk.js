@@ -4095,6 +4095,52 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
+  // ---- IndusInd Pvt-Car TP — "PVTP Fuel-wise" Aug addendum (eff 24-Aug-26) ----
+  // The June PVT grid sets stp=0; this state×fuel grid gives the real Pvt-Car TP
+  // payout for TP-only cars with risk-start ≥ 24-Aug. config/indusind_car_pvtp_aug26.json.
+  if (insurerSlug === 'indusind' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR' &&
+      (Number(params.odPremium) || 0) <= 0) {
+    try {
+      const _iEff = String(_bajajEffDate || params.effective_date || '').slice(0, 10);
+      if (_iEff && _iEff >= '2026-08-24') {
+        const { resolveIndusindCarPvtpRate } = require('../services/indusind-car-pvtp');
+        const ir = resolveIndusindCarPvtpRate(params);
+        if (ir != null) {
+          const _b = rules[0];
+          const _seg = 'Pvt Car TP (IndusInd PVTP Aug26)';
+          rules = [_b
+            ? { ..._b, rate_type: 'SATP', rate_value: ir, segment: _seg, is_declined: ir === 0 ? 1 : 0 }
+            : { id: -1, insurer: 'indusind', product: 'CAR', region: resolvedRegion || '',
+                rate_type: 'SATP', rate_value: ir, segment: _seg, is_declined: ir === 0 ? 1 : 0 }];
+        }
+      }
+    } catch (_) { /* leave rules unchanged on any failure */ }
+  }
+
+  // ---- IndusInd GCV-LCV — "Addendum LCV" Aug grid (eff 16-Aug-26) ----
+  // Re-prices TATA/Maruti/Mahindra light goods (≤2.5T) by region × make-segment,
+  // overriding the June CV grid for those cells. config/indusind_lcv_aug26.json.
+  if (insurerSlug === 'indusind' &&
+      /GCV|GOODS/.test(String(params.vehicleType || '').toUpperCase())) {
+    try {
+      const _iEff = String(_bajajEffDate || params.effective_date || '').slice(0, 10);
+      if (_iEff && _iEff >= '2026-08-16') {
+        const { resolveIndusindLcvRate } = require('../services/indusind-lcv');
+        const ir = resolveIndusindLcvRate(params);
+        if (ir != null) {
+          const _b = rules[0];
+          const _seg = 'GCV-LCV (IndusInd Addendum Aug26)';
+          rules = [_b
+            ? { ..._b, rate_value: ir, segment: _seg, is_declined: ir === 0 ? 1 : 0 }
+            : { id: -1, insurer: 'indusind', product: 'GCV', region: resolvedRegion || '',
+                rate_type: (Number(params.odPremium) || 0) <= 0 ? 'SATP' : 'COMP',
+                rate_value: ir, segment: _seg, is_declined: ir === 0 ? 1 : 0 }];
+        }
+      }
+    } catch (_) { /* leave rules unchanged on any failure */ }
+  }
+
   // ---- HDFC Pvt-Car Zone × Fuel × NCB override ----
   // HDFC's ROBINHOOD Pvt-Car grid is Zone-1/Zone-2 × (Petrol vs Non-Petrol) ×
   // (NCB vs No-NCB), but the 4 fuel/NCB columns were mis-ingested as AGE bands
