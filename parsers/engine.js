@@ -77,7 +77,7 @@ function parseSheet(sheetData, sheetConfig, meta) {
  */
 function findSheetByContent(workbook, signature, scanRows, usedSheets) {
   const XLSX = require('xlsx');
-  const toks = (signature || []).map((t) => String(t).toLowerCase().replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const toks = (signature || []).map((t) => String(t).toLowerCase().replace(/[\s_]+/g, ' ').trim()).filter(Boolean);
   if (!toks.length) return null;
   const used = usedSheets || new Set();
   let best = null;
@@ -86,7 +86,7 @@ function findSheetByContent(workbook, signature, scanRows, usedSheets) {
     const data = XLSX.utils.sheet_to_json(workbook.Sheets[sn], { header: 1, defval: '' });
     const limit = Math.min(scanRows || 20, data.length);
     for (let i = 0; i < limit; i++) {
-      const cells = (data[i] || []).map((c) => String(c).toLowerCase().replace(/\s+/g, ' ').trim());
+      const cells = (data[i] || []).map((c) => String(c).toLowerCase().replace(/[\s_]+/g, ' ').trim());
       const hit = toks.every((t) => cells.some((c) => c.includes(t)));
       if (hit) {
         const score = (data[i] || []).filter(Boolean).length;

@@ -188,12 +188,14 @@
       }
     },
     {
+      "_comment": "RTO master → mapping. Sheet name changes every cycle (RTO / Sheet1 / RTO List …), so match by CONTENT (an RTO-code header). The engine auto-detects the header row from the signature, so no fixed header_row. Columns: RTO_CODE | STATE | UW ZONE(region) | UW DISTRICT | UW STATE.",
       "name": "RTO",
+      "content_signature": ["rto code", "state"],
       "layout": "rto_mapping",
       "product": "ALL",
       "config": {
-        "header_row": 4,
-        "data_start_row": 5,
+        "header_row": 3,
+        "data_start_row": 4,
         "column_map": {
           "rto_code": 0,
           "region": 2
