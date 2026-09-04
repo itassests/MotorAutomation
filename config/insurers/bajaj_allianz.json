@@ -50,8 +50,9 @@
       }
     },
     {
-      "_comment": "Bajaj TW Comp & SAOD.xlsx — RTO code → state-name mapping.",
+      "_comment": "Bajaj TW Comp & SAOD.xlsx — RTO code → Commission-Grid-State mapping. Content-matched (sheet name changes monthly); engine auto-detects the header row.",
       "name": "RTO State Mapping",
+      "content_signature": ["rto code", "commission grid"],
       "file_pattern": "TW.*Comp",
       "layout": "rto_mapping",
       "product": "ALL",
