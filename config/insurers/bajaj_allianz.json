@@ -64,11 +64,27 @@
         }
       }
     },
+    {
+      "_comment": "Aug'26 TW file — RTO code → TW Grid State mapping (regn_no_new | District Name | TW Grid State). NOT a rate sheet; without this it auto-profiles into ~321 garbage GCV rules.",
+      "name": "RTO Code- TW Comp, SAOD",
+      "name_pattern": "^RTO Code",
+      "file_pattern": "TW.*Comp",
+      "layout": "rto_mapping",
+      "product": "ALL",
+      "config": {
+        "header_row": 0,
+        "data_start_row": 1,
+        "column_map": {
+          "rto_code": 0,
+          "region": 2
+        }
+      }
+    },
 
     {
       "_comment": "For Dec'25_SATP Grid ... Final.xlsx — Pvt Car SATP rates by state with Petrol/Diesel/CNG split.",
       "name": "Private Car SATP",
-      "file_pattern": "^For.*SATP",
+      "file_pattern": "^(For.*SATP|SATP Grid)",
       "layout": "flat_table",
       "product": "CAR",
       "config": {
@@ -89,7 +105,7 @@
     {
       "_comment": "For Dec'25_SATP Grid — TW Motorcycle/Bike SATP rates by state + district.",
       "name": "TW_Bike",
-      "file_pattern": "^For.*SATP",
+      "file_pattern": "^(For.*SATP|SATP Grid)",
       "layout": "flat_table",
       "product": "TW",
       "config": {
@@ -108,7 +124,7 @@
     {
       "_comment": "For Dec'25_SATP Grid — TW Scooter SATP rates by state.",
       "name": "TW- Scooter",
-      "file_pattern": "^For.*SATP",
+      "file_pattern": "^(For.*SATP|SATP Grid)",
       "layout": "flat_table",
       "product": "TW",
       "config": {
@@ -126,7 +142,7 @@
     {
       "_comment": "For Dec'25_SATP Grid — CV SATP rates keyed by state/district + segment (GCV/PCV/Taxi/etc).",
       "name": "SATP - CV",
-      "file_pattern": "^For.*SATP",
+      "file_pattern": "^(For.*SATP|SATP Grid)",
       "layout": "flat_table",
       "product": "CV",
       "config": {
