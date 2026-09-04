@@ -4054,6 +4054,31 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
+  // ---- IndusInd Pvt-Car "Additional Rate Delhi MH" — STATE-BASIS (USER) ----
+  // Robinhood 11BRG286 deal applied to ALL IndusInd Pvt-Car in MH/GJ/DL (agent
+  // id ignored per USER), eff Aug'26. Overrides the June car grid for those
+  // states. config/indusind_car_deal_aug26.json + services/indusind-car-deal.js.
+  if (insurerSlug === 'indusind' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR' &&
+      (Number(params.odPremium) || 0) > 0) {
+    try {
+      const _iEff = String(_bajajEffDate || params.effective_date || '').slice(0, 10);
+      if (_iEff && _iEff >= '2026-08-01') {
+        const { resolveIndusindCarDealRate } = require('../services/indusind-car-deal');
+        const ir = resolveIndusindCarDealRate(params);
+        if (ir != null) {
+          const _b = rules[0];
+          const _seg = 'Pvt Car (IndusInd Delhi/MH deal Aug26)';
+          rules = [_b
+            ? { ..._b, rate_value: ir, segment: _seg, is_declined: ir === 0 ? 1 : 0 }
+            : { id: -1, insurer: 'indusind', product: 'CAR', region: resolvedRegion || '',
+                rate_type: (Number(params.tpPremium) || 0) <= 0 ? 'SAOD' : 'COMP',
+                rate_value: ir, segment: _seg, is_declined: ir === 0 ? 1 : 0 }];
+        }
+      }
+    } catch (_) { /* leave rules unchanged on any failure */ }
+  }
+
   // ---- IndusInd Two-Wheeler — "June TW26" region grid (USER 2026-06-26) ----
   // city/state region × {Fresh(1+5)/Comp/SAOD/STP}. config/indusind_tw.json +
   // services/indusind-tw.js.

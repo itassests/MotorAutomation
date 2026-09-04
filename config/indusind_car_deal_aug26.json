@@ -1,0 +1,7 @@
+{
+ "_source": "IndusInd 'Additional Rate Delhi MH' (Robinhood 11BRG286) — applied STATE-BASIS per USER (agent id ignored)",
+ "_cols": "state -> {highEndSaod, saod, comp (Petrol+Bifuel+EV), diesel, newPvt}",
+ "MAHARASHTRA": { "highEndSaod": 0.3, "saod": 0.3, "comp": 0.3, "diesel": 0.15, "newPvt": 0.3 },
+ "GUJARAT":     { "highEndSaod": 0.3, "saod": 0.3, "comp": 0.3, "diesel": 0.15, "newPvt": 0.3 },
+ "DELHI":       { "highEndSaod": 0.275, "saod": 0.275, "comp": 0.275, "diesel": 0.15, "newPvt": 0.3 }
+}

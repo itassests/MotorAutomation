@@ -102,4 +102,4 @@ function resolveRelianceCarRate(params, resolvedRegion) {
   return { rate: r / 100, label: `Reliance PvtCar ${g} COMP ${diesel ? 'Diesel' : 'Petrol/CNG/LPG/EV'}` };
 }
 
-module.exports = { resolveRelianceCarRate, regionGroup };
+module.exports = { resolveRelianceCarRate, regionGroup, isHighEnd };
