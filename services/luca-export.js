@@ -1333,6 +1333,50 @@ async function buildLucaBuffer(ids, opts) {
     }
   }
 
+  // Collapse location rows (USER 2026-09): per-RTO grids (Kotak SATP = 36k rows)
+  // emit one row PER RTO that are otherwise identical (same rate, product, cover,
+  // make, cc, fuel …). Merge every set of rows equal in all rate/dimension columns
+  // into ONE row whose included_rto / city / included_states carry the comma-joined
+  // (deduped) union. The per-RTO REMARK ("Scooter AP14 | … | AP14 | …") is the same
+  // apart from the embedded RTO code, so we generalise it (strip standalone RTO
+  // codes) BEFORE keying — rows whose remark still differs after that stay separate,
+  // so nothing is lost. Kotak 36,719 → ~673 rows.
+  {
+    const HI = (n) => LUCA_HEADERS.indexOf(n);
+    const I_RTO = HI('included_rto'), I_CITY = HI('city'), I_STATE = HI('included_states');
+    const I_REM = LUCA_HEADERS.length - 1;
+    const locSet = new Set([0, I_RTO, I_CITY, I_STATE, I_REM]);  // excluded from the merge key
+    const keyCols = LUCA_HEADERS.map((_, i) => i).filter((i) => !locSet.has(i));
+    // Generalise a REMARK by removing standalone RTO codes (AP14 / AP-14 / MH 12)
+    // and tidying the leftover separators, so per-RTO remarks collapse to one.
+    const genRemark = (s) => String(s == null ? '' : s)
+      .replace(/\b[A-Z]{2}[-\s]?\d{1,3}\b/g, ' ')
+      .replace(/\s*\|\s*(?=\|)/g, '').replace(/\|\s*$/,'').replace(/^\s*\|/,'')
+      .replace(/\s{2,}/g, ' ').replace(/\s*\|\s*/g, ' | ').trim();
+    const splitAdd = (set, v) => String(v == null ? '' : v).split(',').map((x) => x.trim()).filter(Boolean).forEach((x) => set.add(x));
+    const groups = new Map(); const order = [];
+    for (const row of rows.slice(1)) {
+      const gr = genRemark(row[I_REM]);
+      const key = keyCols.map((i) => String(row[i] == null ? '' : row[i])).join('¦') + '¦' + gr;
+      let g = groups.get(key);
+      if (!g) { g = { row: row.slice(), rtos: new Set(), cities: new Set(), states: new Set(), rem: gr }; groups.set(key, g); order.push(g); }
+      splitAdd(g.rtos, row[I_RTO]); splitAdd(g.cities, row[I_CITY]); splitAdd(g.states, row[I_STATE]);
+    }
+    if (order.length < rows.length - 1) {
+      const merged = [rows[0]]; let nid = 1;
+      for (const g of order) {
+        const row = g.row;
+        row[I_RTO] = [...g.rtos].join(',');
+        row[I_CITY] = [...g.cities].join(',');
+        row[I_STATE] = [...g.states].join(',');
+        row[I_REM] = g.rem;
+        row[0] = nid++;
+        merged.push(row);
+      }
+      rows.length = 0; for (const r of merged) rows.push(r);
+    }
+  }
+
   // Reorder every row (header included) from build order to the Luca output order.
   const outRows = rows.map((row) => _OUT_IDX.map((i) => row[i]));
   const ws = XLSX.utils.aoa_to_sheet(outRows);
