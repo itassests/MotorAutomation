@@ -114,19 +114,14 @@ function lucaProduct(vt, seg, sub, sheet, wMin, wMax) {
     return 'pcv';
   }
   if (V === 'GCV') {
-    // A 3-wheeler goods carrier (GCV3W / goods auto) is NOT a light truck — keep it
-    // distinct so it doesn't collapse onto an LCV of the same tonnage (USER 2026-08,
-    // Bajaj: "GCV3W" vs "GCV4W 1.8-2.5T" both fell to 'lcv').
+    // A 3-wheeler goods carrier (GCV3W / goods auto) is NOT a 4-wheel truck — keep it
+    // distinct so it doesn't collapse onto a truck of the same tonnage (USER 2026-08,
+    // Bajaj: "GCV3W" vs "GCV4W 1.8-2.5T"). 3W is excluded from the GCV/Consolidated cuts.
     if (/GCV\s*3\s*W|\b3\s*W\b|3\s*WHEEL|THREE\s*WHEEL/.test(hay)) return 'gcv_3w';
-    if (/\bHCV\b|HEAVY/.test(hay)) return 'hcv';
-    if (/\bLCV\b|\bMCV\b|LIGHT/.test(hay)) return 'lcv';
-    // Tonnage from the weight band (or the largest number in the segment text).
-    let t = Number(wMax);
-    if (!Number.isFinite(t) || t <= 0) {
-      const nums = (hay.match(/\d+(?:\.\d+)?/g) || []).map(Number).filter((n) => n > 0 && n < 100);
-      t = nums.length ? Math.max(...nums) : null;
-    }
-    if (t != null) return t <= 7.5 ? 'lcv' : 'hcv';
+    // USER 2026-09: do NOT split 4-wheel goods into lcv/hcv — all goods carriers are
+    // one 'gcv' product. The weight-band lcv/hcv split dropped Royal's entire goods
+    // TP from the GCV/Consolidated cut (which excluded lcv+hcv); folding them into
+    // gcv keeps every insurer's goods present under a single product.
     return 'gcv';
   }
   if (V === 'MISC' || V === 'MIS') {
