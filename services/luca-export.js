@@ -475,7 +475,12 @@ function canonCity(t) {
   if (_CITY_MASTER_CI.has(key)) return _CITY_MASTER_CI.get(key);   // case-only diff → canonical
   const dkey = key.replace(/[–—]/g, '_');        // en/em-dash → _ ("medchal–malkajgiri")
   if (dkey !== key && _CITY_ALIAS[dkey]) return _CITY_ALIAS[dkey];
-  return us;                                               // no master match → best-effort underscored
+  // WHITELIST (USER 2026-09 city report #3): the LUCA importer rejects any city not
+  // in its master, so a best-effort underscored non-master token ("MUM_Bad",
+  // "SOUTH_TRIPURA", "West_UP", district names …) only adds invalid rows. Drop it —
+  // the row's included_rto / included_states still carry the location. Salvageable
+  // spellings/districts are mapped via config/luca_city_alias.json above.
+  return '';
 }
 
 // A row that is INGEST GARBAGE, not a rate: the generic parser sometimes reads a
@@ -669,7 +674,7 @@ function lucaBusinessType(seg, sub, rateType) {
   const hay = `${seg || ''} ${sub || ''} ${rateType || ''}`.toUpperCase();
   if (/ROLL[\s-]?OVER/.test(hay)) return 'rollover';
   if (/RENEW/.test(hay)) return 'renewal';
-  if (/\bUSED\b|SECOND[\s-]?HAND|PRE[\s-]?OWNED|\bOLD\b/.test(hay)) return 'used';
+  if (/\bUSED\b|SECOND[\s-]?HAND|PRE[\s-]?OWNED|\bOLD\b/.test(hay)) return 'used_car';
   if (/BRAND[\s-]?NEW|\bNEW\b|\[NEW\]/.test(hay)) return 'new';
   return '';
 }
