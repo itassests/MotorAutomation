@@ -393,7 +393,14 @@ const _CITY_STATE_EXTRA = new Set(['TELENGANA', 'JAMMU', 'KASHMIR', 'LADAKH', 'N
   'KERELA', 'ANDRAPRADESH',
   // USER 2026-09 city report: "gujrat" = misspelled state Gujarat parked in the
   // city column → drop from city; STATE_MAP maps it to gujarat for included_states.
-  'GUJRAT']);
+  'GUJRAT',
+  // USER 2026-09 city report #2: go-digit region/cluster codes that leaked into the
+  // city column (not real cities, "region codes — not supported") → drop. good_*/bad_*
+  // prefixed cluster labels are dropped by a rule in cleanCity below.
+  'GJSAURASHTRA', 'ROMG', 'ROTN', 'CENTRAL',
+  // Districts with NO LUCA-master city equivalent — the row's included_rto carries
+  // the location, so drop the unrecognised city (USER: "use included_rto").
+  'SHEIKHPURA', 'SOUTHDINAJPUR']);
 // Spelling corrections → LUCA's master city name (USER 2026-09, LUCA import).
 // Keyed on the _sk (upper, alnum-only) form so "Vishakapatnam"/"vishakapattnam"
 // both hit. Value is the canonical spelling LUCA accepts.
@@ -422,11 +429,14 @@ function cleanCity(s) {
     // and a trailing full stop ("dehradun." → "dehradun").
     let t = tok.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s{2,}/g, ' ').replace(/\.+\s*$/, '').trim();
     if (!t) continue;
-    // "daman dui" / "daman diu" packed as one token → the two cities Daman + Diu.
-    if (/^DAMAN[_ ]?(DUI|DIU)$/i.test(t)) {
+    // "daman dui" / "daman diu" / "dd" packed as one token → the two cities Daman + Diu.
+    if (/^DAMAN[_ ]?(DUI|DIU)$/i.test(t) || /^DD$/i.test(t)) {
       for (const c of ['Daman', 'Diu']) { const ck = _sk(c); if (!seen.has(ck)) { seen.add(ck); out.push(c); } }
       continue;
     }
+    // go-digit quality-cluster labels ("Good_GJ_South", "Bad_Vizag_Vijayawada") are
+    // region codes, not cities → drop (USER 2026-09 city report #2).
+    if (/^(GOOD|BAD)[\s_]/i.test(t)) continue;
     if (_CITY_CLUSTER.test(t)) continue;                   // ROE / ROM1 …
     if (/^[A-Z]{2}\d+$/i.test(t)) continue;                // UP1 / KA2 / PB1 / MP3 / RJ4 …
     if (/^[A-Z]{2}\s*-\s*[A-Z0-9]+$/i.test(t)) continue;   // "UP - AKLGV" state-dash cluster code
@@ -1385,4 +1395,4 @@ async function buildLucaBuffer(ids, opts) {
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', compression: true });
 }
 
-module.exports = { buildLucaBuffer, LUCA_HEADERS, lucaProduct, lucaState, lucaFuel, lucaMake, lucaMakeModel, lucaBusinessType };
+module.exports = {  buildLucaBuffer, LUCA_HEADERS, lucaProduct, lucaState, lucaFuel, lucaMake, lucaMakeModel, lucaBusinessType };

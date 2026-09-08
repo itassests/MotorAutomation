@@ -72,5 +72,18 @@
  "bengaluru": "Bangalore",
  "mysuru": "Mysore",
  "andamans": "Port_Blair",
- "br_patna": "Patna"
+ "br_patna": "Patna",
+ "sirmaur": "Sangrah_Sirmaur",
+ "ahemedabad": "Ahmedabad",
+ "central_delhi": "Delhi",
+ "east_delhi": "Delhi",
+ "silvasa": "Dadar_and_Nagar_Haveli",
+ "silvassa": "Dadar_and_Nagar_Haveli",
+ "mahesana": "Mehsana",
+ "east_midnapore": "Midnapore",
+ "ballabhgarh": "Ballabgarh",
+ "gandhi_nagar": "Gandhinagar",
+ "chitrakoot": "Chitrakoot_dham",
+ "west_champaran": "Bettiah",
+ "dn": "Dadar_and_Nagar_Haveli"
 }
