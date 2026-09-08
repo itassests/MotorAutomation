@@ -1348,6 +1348,53 @@ async function buildLucaBuffer(ids, opts) {
     }
   }
 
+  // Resolve overlapping bands — NARROWER band wins (USER 2026-09 report #3). Within a
+  // family (identical in every column except this band + the two rate cols + REMARK),
+  // two bands covering the same value at different rates leave LUCA to break the tie by
+  // its own priority, not intent (e.g. age [5,null]@18 vs [6,null]@17; a GCV catch-all
+  // [1,43000]@37.5 under specific weight tiers). Partition each family's number line so
+  // the NARROWEST (most specific) band owns any overlap; wider/catch-all bands are
+  // clipped to the remaining gaps (split into pieces, or dropped if fully covered).
+  {
+    const HI = (n) => LUCA_HEADERS.indexOf(n);
+    const I_TP = HI('tp_commission_percentage'), I_IC = HI('irdai_commission_percentage'), I_REM = LUCA_HEADERS.length - 1;
+    const parseR = (v) => { const m = /^\[(\d+(?:\.\d+)?),(\d+(?:\.\d+)?|null)\]$/.exec(String(v || '')); return m ? [Number(m[1]), m[2] === 'null' ? Infinity : Number(m[2])] : null; };
+    const fmtR = (lo, hi) => `[${lo},${hi === Infinity ? 'null' : hi}]`;
+    const resolveCol = (bi) => {
+      const famCols = LUCA_HEADERS.map((_, i) => i).filter((i) => i !== 0 && i !== bi && i !== I_TP && i !== I_IC && i !== I_REM);
+      const fams = new Map(); const keep = [rows[0]];
+      for (const row of rows.slice(1)) {
+        const rng = parseR(row[bi]);
+        if (!rng) { keep.push(row); continue; }                    // blank / non-range → passthrough
+        const k = famCols.map((i) => String(row[i] == null ? '' : row[i])).join('');
+        if (!fams.has(k)) fams.set(k, []);
+        fams.get(k).push({ row, lo: rng[0], hi: rng[1] });
+      }
+      for (const members of fams.values()) {
+        if (members.length === 1) { keep.push(members[0].row); continue; }
+        const pts = [...new Set(members.flatMap((m) => [m.lo, m.hi]))].sort((a, b) => a - b);
+        const width = (m) => m.hi - m.lo;                          // narrower = smaller span; tie → higher lo (starts later)
+        const rateOf = (m) => { const v = m.row[I_IC]; return (v !== '' && v != null) ? Number(v) : Number(m.row[I_TP]); };
+        const owned = new Map(members.map((m) => [m, []]));
+        for (let k = 0; k < pts.length - 1; k++) {                 // elementary segment [a,b)
+          const a = pts[k], b = pts[k + 1]; if (a >= b) continue;
+          const cov = members.filter((m) => m.lo <= a && m.hi >= b);
+          if (!cov.length) continue;
+          cov.sort((x, y) => (width(x) - width(y)) || (y.lo - x.lo) || (rateOf(y) - rateOf(x)));
+          owned.get(cov[0]).push([a, b]);                          // narrowest covering band owns this segment
+        }
+        for (const m of members) {
+          const segs = owned.get(m); if (!segs.length) continue;   // band fully covered by narrower ones → dropped
+          segs.sort((x, y) => x[0] - y[0]);
+          const mg = []; for (const s of segs) { if (mg.length && mg[mg.length - 1][1] === s[0]) mg[mg.length - 1][1] = s[1]; else mg.push([s[0], s[1]]); }
+          for (const [lo, hi] of mg) { const nr = m.row.slice(); nr[bi] = fmtR(lo, hi); keep.push(nr); }
+        }
+      }
+      rows.length = 0; for (const r of keep) rows.push(r);
+    };
+    for (const c of ['vehicle_age', 'gross_vehicle_weight', 'vehicle_cc', 'seating_capacity']) resolveCol(HI(c));
+  }
+
   // Collapse location rows (USER 2026-09): per-RTO grids (Kotak SATP = 36k rows)
   // emit one row PER RTO that are otherwise identical (same rate, product, cover,
   // make, cc, fuel …). Merge every set of rows equal in all rate/dimension columns
