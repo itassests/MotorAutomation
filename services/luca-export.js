@@ -202,11 +202,11 @@ function rangeArr(min, max, opts) {
   if (!Number.isFinite(hi)) hi = null;
   // A 0 lower bound means "no lower bound" — except where 0 is a real value (age).
   if (lo === 0 && minDefault !== 0) lo = null;
-  // LUCA NumericRange END IS EXCLUSIVE, so an inclusive max M must be emitted as
-  // M+1 — else a point band [0,0] / [2,2] is empty and matches NO vehicle (USER
-  // 2026-09, LUCA import: vehicle_age [0,0]→[0,1], seating [2,2]→[2,3]). Applied
-  // to integer bands (age, seating) via opts.exclusiveEnd; done BEFORE the noMax
-  // collapse so a true "no upper bound" band still opens out.
+  // LUCA NumericRange END IS INCLUSIVE (USER 2026-09 confirmed): a band [lo,hi]
+  // covers hi, and consecutive bands are [a,b]/[b+1,c] with NO shared boundary.
+  // So an inclusive source max M is emitted as-is (M), not M+1. (opts.exclusiveEnd
+  // is retained for callers that still want the old half-open behaviour, but the
+  // motor bands — age/seating/cc/gvw — all pass inclusive maxes now.)
   if (hi != null && o.exclusiveEnd) hi = hi + 1;
   if (hi != null && o.noMax != null && hi >= o.noMax) hi = null;
   if (lo == null && hi == null) return '';        // unbounded both ways = all
@@ -214,8 +214,8 @@ function rangeArr(min, max, opts) {
   return `[${lo == null ? minDefault : sc(lo)},${hi == null ? 'null' : sc(hi)}]`;
 }
 const ccBand   = (mn, mx) => rangeArr(mn, mx, { minDefault: 1, noMax: 99999 });
-const ageBand  = (mn, mx) => rangeArr(mn, mx, { minDefault: 0, noMax: 99, exclusiveEnd: true });
-const seatBand = (mn, mx) => rangeArr(mn, mx, { minDefault: 1, exclusiveEnd: true });
+const ageBand  = (mn, mx) => rangeArr(mn, mx, { minDefault: 0, noMax: 99 });   // inclusive end (USER 2026-09)
+const seatBand = (mn, mx) => rangeArr(mn, mx, { minDefault: 1 });              // inclusive end (USER 2026-09)
 // GVW: stored in TONNES, Luca wants KG (2.5T -> 2500). 999T = "no upper bound".
 const gvwBand  = (mn, mx) => {
   // Mis-ingest guard (USER 2026-09, LUCA #2): iffco "GVW GT 40000 kg" rows stored
@@ -1317,36 +1317,10 @@ async function buildLucaBuffer(ids, opts) {
     for (const row of kept2) rows.push(row);
   }
 
-  // Close cc-band gaps (USER 2026-09, LUCA #3): LUCA's NumericRange end is
-  // EXCLUSIVE, so a ladder authored as [1000,1500]/[1501,null] orphans 1500cc
-  // (matches neither). Ladders authored as touching ([1,75]/[75,150]) are already
-  // correct. Per (identity minus cc) family, if a band ends at M and a SIBLING
-  // starts at M+1, bump the first band's max to M+1 so they touch and M is
-  // covered. Only +1-gap ladders are changed; touching ladders are untouched.
-  {
-    const HI = (n) => LUCA_HEADERS.indexOf(n);
-    const I_CC = HI('vehicle_cc');
-    const famCols = LUCA_HEADERS.map((_, i) => i)
-      .filter((i) => i !== 0 && i !== I_CC && i !== HI('tp_commission_percentage')
-        && i !== HI('irdai_commission_percentage') && i !== (LUCA_HEADERS.length - 1));
-    const parse = (v) => { const m = /^\[(\d+),(\d+|null)\]$/.exec(String(v || '')); return m ? [Number(m[1]), m[2] === 'null' ? null : Number(m[2])] : null; };
-    const fams = new Map();
-    for (const row of rows.slice(1)) {
-      const cc = parse(row[I_CC]); if (!cc) continue;
-      const k = famCols.map((i) => String(row[i])).join('');
-      if (!fams.has(k)) fams.set(k, []);
-      fams.get(k).push({ row, cc });
-    }
-    for (const members of fams.values()) {
-      if (members.length < 2) continue;
-      const mins = new Set(members.map((m) => m.cc[0]));
-      for (const m of members) {
-        if (m.cc[1] != null && mins.has(m.cc[1] + 1)) {           // sibling starts at max+1 → +1 gap
-          m.row[I_CC] = `[${m.cc[0]},${m.cc[1] + 1}]`;            // bump so they touch (covers the edge)
-        }
-      }
-    }
-  }
+  // (Removed the old exclusive-end cc gap-closer that bumped [1000,1500]->[1000,1501]
+  // to make ladders touch. Under the INCLUSIVE convention (USER 2026-09) a ladder
+  // [1000,1500]/[1501,null] already covers 1500 with no shared boundary, and that
+  // bump was what produced the spurious shared 1501.)
 
   // Resolve overlapping bands — NARROWER band wins (USER 2026-09 report #3). Within a
   // family (identical in every column except this band + the two rate cols + REMARK),
@@ -1358,8 +1332,11 @@ async function buildLucaBuffer(ids, opts) {
   {
     const HI = (n) => LUCA_HEADERS.indexOf(n);
     const I_TP = HI('tp_commission_percentage'), I_IC = HI('irdai_commission_percentage'), I_REM = LUCA_HEADERS.length - 1;
-    const parseR = (v) => { const m = /^\[(\d+(?:\.\d+)?),(\d+(?:\.\d+)?|null)\]$/.exec(String(v || '')); return m ? [Number(m[1]), m[2] === 'null' ? Infinity : Number(m[2])] : null; };
-    const fmtR = (lo, hi) => `[${lo},${hi === Infinity ? 'null' : hi}]`;
+    // Bands are INCLUSIVE (USER 2026-09): parse inclusive [lo,hi] into a half-open
+    // [lo, hi+1) internally for the partition math, then emit back inclusive (hi-1)
+    // so consecutive segments are [a,b]/[b+1,c] with NO shared boundary.
+    const parseR = (v) => { const m = /^\[(\d+(?:\.\d+)?),(\d+(?:\.\d+)?|null)\]$/.exec(String(v || '')); return m ? [Number(m[1]), m[2] === 'null' ? Infinity : Number(m[2]) + 1] : null; };
+    const fmtR = (lo, hi) => `[${lo},${hi === Infinity ? 'null' : hi - 1}]`;
     const resolveCol = (bi) => {
       const famCols = LUCA_HEADERS.map((_, i) => i).filter((i) => i !== 0 && i !== bi && i !== I_TP && i !== I_IC && i !== I_REM);
       const fams = new Map(); const keep = [rows[0]];
