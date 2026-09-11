@@ -45,6 +45,85 @@
 const { resolveUnitedCarRate, resolveUnitedGcvRate } = require('../united-car');
 const PREF = require('../../config/united_pref_rtos.json');
 const GCV_PREF = require('../../config/united_gcv_pref.json');
+const CAR_AUG = require('../../config/united_car_aug26.json');
+const GCV_AUG = require('../../config/united_gcv_aug26.json');
+
+// State code → display name, for enumerating the Aug'26 CC×state / GVW×state grids
+// as one row per state (the location-merge then collapses same-rate states into a
+// comma list, and produces the "Other than above" bucket).
+const STATES = [
+  ['AP', 'Andhra Pradesh'], ['AR', 'Arunachal Pradesh'], ['AS', 'Assam'], ['BR', 'Bihar'],
+  ['CG', 'Chhattisgarh'], ['GA', 'Goa'], ['GJ', 'Gujarat'], ['HR', 'Haryana'], ['HP', 'Himachal Pradesh'],
+  ['JH', 'Jharkhand'], ['JK', 'Jammu & Kashmir'], ['KA', 'Karnataka'], ['KL', 'Kerala'], ['MP', 'Madhya Pradesh'],
+  ['MH', 'Maharashtra'], ['MN', 'Manipur'], ['ML', 'Meghalaya'], ['MZ', 'Mizoram'], ['NL', 'Nagaland'],
+  ['OD', 'Odisha'], ['PB', 'Punjab'], ['PY', 'Pondicherry'], ['RJ', 'Rajasthan'], ['SK', 'Sikkim'],
+  ['TN', 'Tamil Nadu'], ['TS', 'Telangana'], ['TR', 'Tripura'], ['UP', 'Uttar Pradesh'], ['UK', 'Uttarakhand'],
+  ['WB', 'West Bengal'], ['DL', 'Delhi'], ['CH', 'Chandigarh'],
+];
+const carBandRate = (band, code) => band.all != null ? band.all
+  : ((CAR_AUG.stateSets[band.set] || []).includes(code) ? band.inR : band.outR);
+const ccLo = (bands, i) => (i === 0 ? 1 : (bands[i - 1].maxCc + 1));
+
+// Pvt-Car (eff Aug'26) enumerated from config: one row per state × cc-band × cover.
+// Covers: Bundled(1+3)=COMP age0; Package family=COMP age1+ AND SATP; SAOD 15%; EV 35%.
+function unitedCarAugRows(eff) {
+  const out = [];
+  const emit = (o) => out.push(row({ product: 'CAR', sheet_name: CAR_SHEET, effective_from: eff, ...o }));
+  const famRows = (fam, rt, ageMin, ageMax, coverLabel) => {
+    fam.forEach((band, i) => {
+      const lo = ccLo(fam, i), hi = band.maxCc;
+      for (const [code, name] of STATES) {
+        emit({ region: name, segment: `Private Car ${coverLabel} ${lo}-${hi == null ? 'up' : hi}cc`,
+          fuel_type: null, cc_band_min: lo, cc_band_max: hi, age_band_min: ageMin, age_band_max: ageMax,
+          rate_type: rt, rate_value: carBandRate(band, code) });
+      }
+    });
+  };
+  famRows(CAR_AUG.bundled, 'COMP', 0, 0, 'Bundled 1+3');                    // brand-new comprehensive
+  famRows(CAR_AUG.package, 'COMP', 1, null, 'Package');                     // renewal/rollover comprehensive
+  famRows(CAR_AUG.package, 'SATP', null, null, 'SATP');                     // standalone TP (same ladder)
+  emit({ region: null, segment: 'Private Car SAOD', rate_type: 'SAOD', rate_value: CAR_AUG.saod });
+  emit({ region: null, segment: 'Private Car Electric (all covers)', fuel_type: 'ELECTRIC', rate_type: 'COMP', rate_value: CAR_AUG.ev });
+  emit({ region: null, segment: 'Private Car Electric (all covers)', fuel_type: 'ELECTRIC', rate_type: 'SATP', rate_value: CAR_AUG.ev });
+  // Preferred-city RTOs → 40% (all segments EXCEPT diesel<=1500). One row per RTO
+  // (region=RTO code) so buildLucaBuffer fills included_rto; the merge collapses them.
+  for (const r0 of (PREF.rtos || [])) {
+    emit({ region: r0, segment: 'Private Car Preferred RTO (40% except diesel<=1500)', rate_type: 'COMP', rate_value: CAR_AUG.preferred });
+    emit({ region: r0, segment: 'Private Car Preferred RTO (40% except diesel<=1500)', rate_type: 'SATP', rate_value: CAR_AUG.preferred });
+  }
+  return out;
+}
+// GCV (eff Aug'26) enumerated: one row per state × GVW band (+ E-Cart).
+function unitedGcvAugRows(eff) {
+  const out = [];
+  const emit = (o) => out.push(row({ product: 'GCV', sheet_name: GCV_SHEET, rate_type: 'COMP', effective_from: eff, ...o }));
+  const subAnn2 = new Set((GCV_AUG.subAnn2Rj || []).map((s) => String(s).toUpperCase()));
+  GCV_AUG.bands.forEach((band, i) => {
+    const loKg = i === 0 ? 1 : (GCV_AUG.bands[i - 1].maxKg + 1);
+    const seg = `GCV ${Math.round(loKg)}-${band.maxKg == null ? 'up' : band.maxKg}kg`;
+    for (const [code, name] of STATES) {
+      let r;
+      if (band.all != null) r = band.all;
+      else {
+        const hit = (band.rules || []).find((x) => x.st.includes(code));
+        r = hit ? hit.r : band.other;
+      }
+      // weight bands stored in TONNES (export scales ×1000)
+      emit({ region: name, segment: seg, weight_band_min: loKg === 1 ? null : loKg / 1000, weight_band_max: band.maxKg == null ? null : band.maxKg / 1000, rate_value: r });
+    }
+    // Rajasthan Sub-Annexure-2 RTOs override for the 2000-3500 band — one row per RTO.
+    const rjRule = (band.rules || []).find((x) => x.subAnn2 && x.st.includes('RJ'));
+    if (rjRule) {
+      for (const r0 of subAnn2) {
+        emit({ region: r0, segment: seg + ' (Sub-Ann2 RJ)', weight_band_min: loKg === 1 ? null : loKg / 1000,
+          weight_band_max: band.maxKg == null ? null : band.maxKg / 1000, rate_value: rjRule.subAnn2 });
+      }
+    }
+  });
+  out.push(row({ product: 'GCV', sheet_name: GCV_SHEET, segment: 'GCV E-Cart', rate_type: 'COMP', rate_value: GCV_AUG.eCart, effective_from: eff }));
+  return out;
+}
+const _isAug = (eff) => String(eff || '').slice(0, 10) >= '2026-08-01';
 
 const CAR_SHEET = 'Pvt Car Commission Structure (May26)';
 const GCV_SHEET = 'GCV Sub Annexure-2 Preferred RTO (May26)';
@@ -189,6 +268,7 @@ function carCellMap(scope, make, probeRto, eff) {
 }
 
 function unitedCar(eff) {
+  if (_isAug(eff)) return unitedCarAugRows(eff);   // revised CC×state grid eff 01-08-2026
   const out = [];
   for (const scope of CAR_SCOPES) {
     // (1) pan-India, any make outside the 7 → the general row.
@@ -238,6 +318,7 @@ const GCV_BAND_META = [
 ];
 
 function unitedGcv(eff) {
+  if (_isAug(eff)) return unitedGcvAugRows(eff);   // full revised GVW×state grid eff 01-08-2026
   const out = [];
   const bands = GCV_PREF.bands || [];
   for (let i = 0; i < bands.length && i < GCV_BAND_META.length; i++) {
@@ -271,8 +352,11 @@ module.exports = {
   // product under the SAME sheet_name (the PDF filename) — TW / PCV / GCV / MIS /
   // CPA rows are live and must survive.
   suppress: [
-    (r) => /commission_structure\.pdf$/i.test(String(r.sheet_name || ''))
-        && /^(CAR|4W|PVT\s*CAR|PVTCAR)$/i.test(String(r.product || '').trim()),
+    // Pvt-Car AND GCV are now fully re-expanded from the Aug'26 grid (config-driven),
+    // so drop ALL PDF-ingested CAR + GCV rate rows regardless of sheet_name (the PDF
+    // filename varies per card, and old rows carry stale segment/EV rates). TW / PCV /
+    // Taxi / Bus / MIS / CPA rows are unchanged and stay live.
+    (r) => /^(CAR|4W|PVT\s*CAR|PVTCAR|GCV|GCCV|GOODS)$/i.test(String(r.product || '').trim()),
   ],
   expand: (effFrom) => [...unitedCar(effFrom), ...unitedGcv(effFrom)],
   // exported for verification
