@@ -1,0 +1,22 @@
+{
+ "SMALL": {
+  "ncb": 0.1,
+  "nonNcb": 0.1
+ },
+ "MIDSIZE": {
+  "ncb": 0.2,
+  "nonNcb": 0.2
+ },
+ "COMPACT": {
+  "ncb": 0.3,
+  "nonNcb": 0.25
+ },
+ "SUVMUV": {
+  "ncb": 0.35,
+  "nonNcb": 0.35
+ },
+ "HIGHEND": {
+  "ncb": 0.35,
+  "nonNcb": 0.35
+ }
+}

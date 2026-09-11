@@ -4117,6 +4117,33 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged on any failure */ }
   }
 
+  // ---- IndusInd Pvt-Car SEGMENT grid (USER, eff 1-Sept-2026) ----
+  // Pan-India payout by car SEGMENT × NCB (Small 10, Midsize 20, Compact 30/25,
+  // SUV-MUV 35, High-end 35). OVERRIDES the existing IndusInd Pvt-Car match for any
+  // OD-bearing car (Comp/SAOD) whose segment resolves, for risk-start ≥ 1-Sept-26.
+  // Runs LAST so it supersedes the June region grid AND the Delhi/MH deal for Sept.
+  // config/indusind_car_segment_sep26.json + services/indusind-car-segment.js.
+  if (insurerSlug === 'indusind' &&
+      String(params.vehicleType || '').toUpperCase() === 'CAR' &&
+      (Number(params.odPremium) || 0) > 0) {
+    try {
+      const _iEff = String(_bajajEffDate || params.effective_date || '').slice(0, 10);
+      if (_iEff && _iEff >= '2026-09-01') {
+        const { resolveIndusindCarSegmentRate } = require('../services/indusind-car-segment');
+        const hit = resolveIndusindCarSegmentRate(params);
+        if (hit) {
+          const _b = rules[0];
+          const _seg = `Pvt Car ${hit.segment} (IndusInd segment grid Sep26)`;
+          rules = [_b
+            ? { ..._b, rate_value: hit.rate, segment: _seg, is_declined: hit.rate === 0 ? 1 : 0 }
+            : { id: -1, insurer: 'indusind', product: 'CAR', region: resolvedRegion || '',
+                rate_type: (Number(params.tpPremium) || 0) <= 0 ? 'SAOD' : 'COMP',
+                rate_value: hit.rate, segment: _seg, is_declined: hit.rate === 0 ? 1 : 0 }];
+        }
+      }
+    } catch (_) { /* leave rules unchanged on any failure */ }
+  }
+
   // ---- IndusInd Two-Wheeler — "June TW26" region grid (USER 2026-06-26) ----
   // city/state region × {Fresh(1+5)/Comp/SAOD/STP}. config/indusind_tw.json +
   // services/indusind-tw.js.
