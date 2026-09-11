@@ -72,6 +72,12 @@ function resolveUnitedCarRate(params) {
   const pol = policyBucket(ip, age);
 
   if (isEV) {
+    // USER 2026-09: from 1-Sept-2026 United pays a FLAT 35% on EVERY electric car —
+    // all covers (Bundled 1+3 / Package / Long-term 3+3 / SATP / Long-term Liability /
+    // SAOD) and all makes — overriding the big-make Segment-C carve-out AND the
+    // preferred-RTO 40%. ("Electric Cars … All Vehicles … 35%" grid line.)
+    const _eff = String(params.effective_date || '').slice(0, 10);
+    if (_eff && _eff >= '2026-09-01') return 0.35;
     // USER 2026-07-14: EVs of the BIG makes (Tata/Maruti/Mahindra/Toyota/Hyundai/Honda/
     // Kia) follow the normal fuel/make SEGMENT (non-diesel → Segment C = 20% Package/SATP,
     // 27.5% Bundled, + the preferred-RTO override), NOT United's flat Electric line.

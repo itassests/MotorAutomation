@@ -122,7 +122,7 @@ const PREF_REGIONS = [
   { region: KERALA_REGION, probe: 'KL01' },
 ];
 
-function carRate(scope, make, ip, age, rtoCode) {
+function carRate(scope, make, ip, age, rtoCode, eff) {
   return resolveUnitedCarRate({
     vehicleType: 'CAR',
     fuelType: scope.fuel,
@@ -131,6 +131,7 @@ function carRate(scope, make, ip, age, rtoCode) {
     insProduct: ip,
     vehicleAge: age,
     rtoCode,
+    effective_date: eff || null,   // so date-gated rules (EV 35% from Sept'26) resolve
   });
 }
 
@@ -145,7 +146,7 @@ function carCell(scope, make, regionLabel, probeRto, eff, baselines) {
   const bases = (Array.isArray(baselines) ? baselines : [baselines]).filter(Boolean);
   const out = [];
   for (const cover of CAR_COVERS) {
-    const vals = cover.ages.map((a) => carRate(scope, make, cover.ip, a.age, probeRto));
+    const vals = cover.ages.map((a) => carRate(scope, make, cover.ip, a.age, probeRto, eff));
     if (vals.some((v) => v == null)) continue;
     const flat = cover.flat && vals.every((v) => v === vals[0]);
     const legs = flat
@@ -175,10 +176,10 @@ function carCell(scope, make, regionLabel, probeRto, eff, baselines) {
 }
 
 /** Index a cell's resolved values so the more-specific level can collapse against it. */
-function carCellMap(scope, make, probeRto) {
+function carCellMap(scope, make, probeRto, eff) {
   const m = new Map();
   for (const cover of CAR_COVERS) {
-    const vals = cover.ages.map((a) => carRate(scope, make, cover.ip, a.age, probeRto));
+    const vals = cover.ages.map((a) => carRate(scope, make, cover.ip, a.age, probeRto, eff));
     if (vals.some((v) => v == null)) continue;
     const flat = cover.flat && vals.every((v) => v === vals[0]);
     if (flat) m.set(cover.rt + '|' + cover.flat + '|:', vals[0]);
@@ -191,14 +192,14 @@ function unitedCar(eff) {
   const out = [];
   for (const scope of CAR_SCOPES) {
     // (1) pan-India, any make outside the 7 → the general row.
-    const genMap = carCellMap(scope, null, NON_PREF_PROBE);
+    const genMap = carCellMap(scope, null, NON_PREF_PROBE, eff);
     out.push(...carCell(scope, null, null, NON_PREF_PROBE, eff, null));
 
     // (2) the 7 carve-out makes, pan-India — only where the make actually moves
     //     the rate (>2500cc Segment B→C, and the Electric line → Segment C).
     const mkGenMap = {};
     for (const mk of BIG_MAKES) {
-      mkGenMap[mk] = carCellMap(scope, mk, NON_PREF_PROBE);
+      mkGenMap[mk] = carCellMap(scope, mk, NON_PREF_PROBE, eff);
       out.push(...carCell(scope, mk, null, NON_PREF_PROBE, eff, genMap));
     }
 
@@ -211,7 +212,7 @@ function unitedCar(eff) {
     //     the big-make EVs survive here — a non-big-make EV keeps the flat
     //     Electric line in a preferred city, a big-make EV takes Segment C → 40%.
     for (const pr of PREF_REGIONS) {
-      const prMap = carCellMap(scope, null, pr.probe);
+      const prMap = carCellMap(scope, null, pr.probe, eff);
       out.push(...carCell(scope, null, pr.region, pr.probe, eff, genMap));
       for (const mk of BIG_MAKES) {
         // Collapse against BOTH the RTO's no-make row and the make's pan-India

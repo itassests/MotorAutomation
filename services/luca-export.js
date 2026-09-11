@@ -1007,7 +1007,14 @@ async function buildLucaBuffer(ids, opts) {
     const effRs = await effRq.query(
       `SELECT LOWER(insurer) AS insurer, MAX(effective_from) AS eff
          FROM rate_cards WHERE id IN (${eph.join(',')}) GROUP BY LOWER(insurer)`);
-    for (const e of effRs.recordset) effByInsurer.set(e.insurer, e.eff);
+    // For a snapshot file (asOfDate set) the config expanders must evaluate
+    // date-gated rules AS OF THE SNAPSHOT, not each card's generation date — else a
+    // rule effective after the newest card (e.g. United EV 35% eff 1-Sept, whose
+    // only card is May) never fires. Use the snapshot date; the card's month is
+    // stamped separately from asOfDate. Falls back to the card eff when no asOf.
+    const _asOfStr = (opts && opts.asOfDate && /^\d{4}-\d{2}-\d{2}$/.test(String(opts.asOfDate)))
+      ? String(opts.asOfDate) : null;
+    for (const e of effRs.recordset) effByInsurer.set(e.insurer, _asOfStr || e.eff);
   }
   const configRows = expandConfigRules(effByInsurer);
   // Drop DB rows the resolvers REPLACE (e.g. Tata's never-ingested Private Car
