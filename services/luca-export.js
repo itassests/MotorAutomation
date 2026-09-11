@@ -1132,16 +1132,19 @@ async function buildLucaBuffer(ids, opts) {
     // build the RTO list without normRto, so canonicalise the finished list here.
     if (rtoList) rtoList = String(rtoList).replace(/\bTG-/g, 'TS-');
 
+    const _prod = lucaProduct(vt, r.segment, r.sub_type, r.sheet_name, r.weight_band_min, r.weight_band_max);
     const rowArr = [
       0,                                                      // id — assigned below after the dedupe check
       (insurer + vt + (cover === 'Comp' ? 'PACKAGE' : cover.toUpperCase())).toUpperCase().replace(/[^A-Z0-9]/g, ''), // name
       insurer,                                                // insurers
       d ? d.getFullYear() : '',                               // year
       d ? MONTHS[d.getMonth()] : '',                          // month
-      lucaProduct(vt, r.segment, r.sub_type, r.sheet_name, r.weight_band_min, r.weight_band_max), // products
+      _prod,                                                  // products
       coverageType,                                           // coverage_type
       lucaNcb(r.rate_type),                                   // ncb
-      isTp ? 'TP' : 'OD',                                     // commission_on (which leg this single rate is)
+      // commission_on: which premium the payout applies to. GCV (all goods carriers)
+      // is paid on NET premium (USER 2026-09); other products carry the single leg.
+      /^gcv/.test(_prod) ? 'NET' : (isTp ? 'TP' : 'OD'),      // commission_on
       // USER 2026-08: each row carries a SINGLE commission (TP-only, OD-only, or a
       // Net rate where OD & TP aren't split) → it goes in irdai_commission_percentage.
       // tp_commission_percentage is used ONLY when a row genuinely carries SEPARATE
