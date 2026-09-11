@@ -1,0 +1,81 @@
+{
+ "_src": "United commission structure wef 01-08-2026 (Sub-Annexure 1 Pvt Car)",
+ "stateSets": {
+  "S5": [
+   "KA",
+   "HR",
+   "MP",
+   "TN",
+   "PY"
+  ],
+  "S8": [
+   "KA",
+   "HR",
+   "MP",
+   "CG",
+   "RJ",
+   "TN",
+   "PY",
+   "UP"
+  ]
+ },
+ "bundled": [
+  {
+   "maxCc": 1000,
+   "all": 0.2
+  },
+  {
+   "maxCc": 1200,
+   "set": "S5",
+   "inR": 0.2,
+   "outR": 0.4
+  },
+  {
+   "maxCc": 1500,
+   "all": 0.2
+  },
+  {
+   "maxCc": 2000,
+   "set": "S8",
+   "inR": 0.15,
+   "outR": 0.4
+  },
+  {
+   "maxCc": null,
+   "set": "S8",
+   "inR": 0.15,
+   "outR": 0.3
+  }
+ ],
+ "package": [
+  {
+   "maxCc": 1000,
+   "all": 0.2
+  },
+  {
+   "maxCc": 1200,
+   "set": "S5",
+   "inR": 0.2,
+   "outR": 0.35
+  },
+  {
+   "maxCc": 1500,
+   "all": 0.2
+  },
+  {
+   "maxCc": 2000,
+   "set": "S8",
+   "inR": 0.2,
+   "outR": 0.35
+  },
+  {
+   "maxCc": null,
+   "set": "S8",
+   "inR": 0.15,
+   "outR": 0.3
+  }
+ ],
+ "saod": 0.15,
+ "ev": 0.35,
+ "preferred": 0.4
+}

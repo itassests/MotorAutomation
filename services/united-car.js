@@ -29,6 +29,60 @@ const PREF_SET = new Set(PREF.rtos.map(norm));
 const KL_EXCEPT = new Set((PREF.keralaAllExcept || []).map(norm));
 const LOW_MAKES = ['TATA', 'MARUTI', 'MAHINDRA', 'TOYOTA', 'HYUNDAI', 'HONDA', 'KIA'];
 
+// ---- REVISED grid effective 01-08-2026 (commission-structure circular) ----
+// Full re-map: Pvt-Car is now CC-band x state (fuel-agnostic except EV & the
+// preferred-RTO diesel<=1500 carve-out), GCV is a full GVW(kg) x state grid, EV
+// cars are a flat 35%, and everything is on NET premium. Date-gated so pre-Aug
+// policies keep the old segment logic. (USER 2026-09, PDF-confirmed.)
+const CAR_AUG = require('../config/united_car_aug26.json');
+const GCV_AUG = require('../config/united_gcv_aug26.json');
+const _SUBANN2_RJ = new Set((GCV_AUG.subAnn2Rj || []).map(norm));
+const AUG_FROM = '2026-08-01';
+const effAug = (params) => {
+  const d = String(params.effective_date || params.effectiveDate || params.riskStartDate || '').slice(0, 10);
+  return d && d >= AUG_FROM;
+};
+// RTO state prefix (MH12 -> MH; PY01 -> PY).
+const stateOf = (rtoCode) => norm(rtoCode).replace(/[0-9].*$/, '').slice(0, 2);
+const pickBand = (bands, val, key) => { for (const b of bands) { if (b[key] == null || val <= b[key]) return b; } return bands[bands.length - 1]; };
+
+// Pvt-Car (eff Aug'26): EV 35% > preferred-RTO 40% (except diesel<=1500) > CC-band x state.
+function unitedCarAug(params) {
+  const fuel = String(params.fuelType || '').toUpperCase();
+  if (/ELECTRIC|\bEV\b|BATTERY/.test(fuel)) return CAR_AUG.ev;              // flat 35% all covers
+  const cc = Number(params.cc) || 0;
+  const dieselLe1500 = /DIESEL/.test(fuel) && cc > 0 && cc <= 1500;
+  if (!dieselLe1500 && isPreferredRto(params.rtoCode)) return CAR_AUG.preferred;  // 40%
+  const ip = String(params.insProduct || '').toUpperCase();
+  if (ip === 'SAOD') return CAR_AUG.saod;                                   // 15%
+  const fam = (ip === 'TP') ? CAR_AUG.package                               // SATP grouped with Package
+            : (isNewVehicle(params.vehicleAge) ? CAR_AUG.bundled : CAR_AUG.package);
+  const b = pickBand(fam, cc, 'maxCc');
+  if (b.all != null) return b.all;
+  const inSet = (CAR_AUG.stateSets[b.set] || []).includes(stateOf(params.rtoCode));
+  return inSet ? b.inR : b.outR;
+}
+// GCV (eff Aug'26): full GVW(kg) x state grid + E-Cart 50%.
+function unitedGcvAug(params) {
+  const hay = `${params.vehicleCategory || ''} ${params.model || ''} ${params.make || ''}`.toUpperCase();
+  if (/E-?\s*CART/.test(hay)) return GCV_AUG.eCart;                         // E-Cart 50%
+  const t = Number(params.tonnage);
+  if (!Number.isFinite(t) || t <= 0) return null;
+  const kg = t * 1000;
+  const st = stateOf(params.rtoCode);
+  const b = pickBand(GCV_AUG.bands, kg, 'maxKg');
+  if (b.all != null) return b.all;
+  for (const rule of (b.rules || [])) {
+    if (rule.st.includes(st)) {
+      if (rule.subAnn2 && st === 'RJ') {   // RJ: only the Sub-Annexure-2 RTOs get the higher rate
+        return rtoVariants(params.rtoCode).some(v => _SUBANN2_RJ.has(v)) ? rule.subAnn2 : rule.r;
+      }
+      return rule.r;
+    }
+  }
+  return b.other;
+}
+
 function rtoVariants(code) {
   const c = norm(code);
   const m = c.match(/^([A-Z]+)(\d+)$/);
@@ -65,6 +119,7 @@ function segBucket(fuel, cc, make) {
 
 function resolveUnitedCarRate(params) {
   if (String(params.vehicleType || '').toUpperCase() !== 'CAR') return null;
+  if (effAug(params)) return unitedCarAug(params);          // revised grid from 01-08-2026
   const fuel = String(params.fuelType || '').toUpperCase();
   const isEV = /ELECTRIC|\bEV\b|BATTERY/.test(fuel);
   const ip = String(params.insProduct || '').toUpperCase();
@@ -136,6 +191,7 @@ function effOnOrAfterJul(params) {
 }
 function resolveUnitedGcvRate(params) {
   if (String(params.vehicleType || '').toUpperCase() !== 'GCV') return null;
+  if (effAug(params)) return unitedGcvAug(params);          // full revised GVW grid from 01-08-2026
   const t = Number(params.tonnage);
   if (!Number.isFinite(t) || t <= 0) return null;
   const bands = effOnOrAfterJul(params) ? GCV_BANDS_JUL : GCV_BANDS_JUN;
