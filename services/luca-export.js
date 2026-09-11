@@ -1149,9 +1149,10 @@ async function buildLucaBuffer(ids, opts) {
       _prod,                                                  // products
       coverageType,                                           // coverage_type
       lucaNcb(r.rate_type),                                   // ncb
-      // commission_on: which premium the payout applies to. GCV (all goods carriers)
-      // is paid on NET premium (USER 2026-09); other products carry the single leg.
-      /^gcv/.test(_prod) ? 'NET' : (isTp ? 'TP' : 'OD'),      // commission_on
+      // commission_on: which premium the payout applies to. NET for GCV (all goods
+      // carriers) and for ALL of United India (every product) — USER 2026-09; other
+      // insurers/products carry the single leg.
+      (/^gcv/.test(_prod) || /united/i.test(String(insurer))) ? 'NET' : (isTp ? 'TP' : 'OD'), // commission_on
       // USER 2026-08: each row carries a SINGLE commission (TP-only, OD-only, or a
       // Net rate where OD & TP aren't split) → it goes in irdai_commission_percentage.
       // tp_commission_percentage is used ONLY when a row genuinely carries SEPARATE
