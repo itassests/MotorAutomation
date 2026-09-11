@@ -67,6 +67,38 @@ const has = (v) => v != null && v !== '' && Number.isFinite(Number(v));
 //   leg once per concrete fuel so Luca's single-valued fuel_type stays truthful.
 // ---------------------------------------------------------------------------
 function indusindCar(eff) {
+  // Sept'26+: the Pvt-Car SEGMENT grid overrides the region grid for OD (Comp/SAOD).
+  // Luca has no "segment" column, so EXPAND each segment into its make/model members
+  // (from the segment master) with the segment's rate. NCB column only where the two
+  // rates differ (Compact 30/25); other segments share NCB=Non-NCB → one row (blank
+  // ncb = applies to both). TP is unchanged (region SATP kept). (USER 2026-09.)
+  if (eff && String(eff).slice(0, 10) >= '2026-09-01') {
+    const LIST = require('../config/indusind_pvtcar_segment_list.json');
+    const RATE = require('../config/indusind_car_segment_sep26.json');
+    const SEGNAME = { SMALL: 'Small', MIDSIZE: 'Midsize', COMPACT: 'Compact', SUVMUV: 'SUV/MUV', HIGHEND: 'High-end' };
+    const out = [];
+    for (const it of LIST) {
+      const r = RATE[it.seg]; if (!r) continue;
+      const base = { insurer: 'indusind', product: 'CAR', sheet_name: 'PVT COM Segment',
+                     segment: `Pvt Car ${SEGNAME[it.seg] || it.seg}`, make: it.make, model: it.model, effective_from: eff };
+      // OD-bearing covers: Comprehensive + SAOD both take the segment rate.
+      if (Number(r.ncb) === Number(r.nonNcb)) {
+        out.push(row({ ...base, rate_type: 'COMP', rate_value: r.ncb }));
+        out.push(row({ ...base, rate_type: 'SAOD', rate_value: r.ncb }));
+      } else {
+        for (const [yes, val] of [[true, r.ncb], [false, r.nonNcb]]) {
+          out.push(row({ ...base, rate_type: 'COMP' + ncbTag(yes), rate_value: val }));
+          out.push(row({ ...base, rate_type: 'SAOD' + ncbTag(yes), rate_value: val }));
+        }
+      }
+    }
+    // Keep TP (region SATP) so Pvt-Car TP coverage isn't lost by the OD override.
+    for (const g of (IND_CAR.grid || [])) {
+      if (has(g.stp)) out.push(row({ insurer: 'indusind', product: 'CAR', sheet_name: 'PVT COM',
+        region: g.region, segment: 'Private Car', rate_type: 'SATP', rate_value: g.stp, effective_from: eff }));
+    }
+    return out;
+  }
   const out = [];
   for (const g of (IND_CAR.grid || [])) {
     const base = { insurer: 'indusind', product: 'CAR', sheet_name: 'PVT COM',
