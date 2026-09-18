@@ -2191,6 +2191,26 @@
         <div id="ppSummaryGrid"></div>
       </div>
 
+      <!-- Successful pushes (to send to vendor) + Excel export -->
+      <div class="card" style="margin-bottom:14px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+          <h2 style="margin:0;"><span class="icon">&#9989;</span> Successful pushes</h2>
+          <label style="font-size:12px; color:#667;">From <input type="date" id="ppSuccFrom" style="padding:4px 6px;"></label>
+          <label style="font-size:12px; color:#667;">To <input type="date" id="ppSuccTo" style="padding:4px 6px;"></label>
+          <button class="btn" style="padding:6px 14px;" onclick="ppLoadSuccess()"><span style="margin-right:6px;">&#128260;</span>Refresh</button>
+          <button class="btn btn-primary" id="ppSuccExportBtn" style="padding:6px 14px;" onclick="ppExportSuccess()" title="Download an Excel of pushed policies (Policy No + Registration No) to send to the vendor">&#11015; Download Excel</button>
+          <span id="ppSuccShowing" style="margin-left:auto; font-size:12px; color:#888;"></span>
+        </div>
+        <table class="data-table" style="width:100%; border-collapse:collapse; font-size:12px;">
+          <thead><tr style="text-align:left; border-bottom:2px solid #e3e8ee;">
+            <th style="padding:6px;">Tracker</th><th style="padding:6px;">Policy No</th>
+            <th style="padding:6px;">Registration No</th><th style="padding:6px;">Submitted</th>
+            <th style="padding:6px;">Pushed At</th>
+          </tr></thead>
+          <tbody id="ppSuccBody"><tr><td colspan="5" style="text-align:center; color:#999; padding:18px;">No records loaded.</td></tr></tbody>
+        </table>
+      </div>
+
       <!-- Failures + correct-and-repush -->
       <div class="card">
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
@@ -6947,6 +6967,7 @@
     function ppInit() {
       ppLoadSummary();
       ppLoadBackfill();
+      ppLoadSuccess();
       ppLoadFailures();
       if (_ppAutoTimer) clearInterval(_ppAutoTimer);
       _ppAutoTimer = setInterval(() => {
@@ -7008,6 +7029,45 @@
         ppLoadBackfill();
       } catch (e) { showToast('Backfill error: ' + e.message, 'error'); }
       finally { btn.disabled = false; }
+    }
+    function _ppSuccQS() {
+      const from = (document.getElementById('ppSuccFrom') || {}).value || '';
+      const to = (document.getElementById('ppSuccTo') || {}).value || '';
+      const qs = new URLSearchParams();
+      if (from) qs.set('from', from);
+      if (to) qs.set('to', to);
+      return qs;
+    }
+    async function ppLoadSuccess() {
+      const body = document.getElementById('ppSuccBody');
+      try {
+        const qs = _ppSuccQS(); qs.set('size', '100');
+        const d = await fetch(API + '/policy-push/success?' + qs.toString()).then(r => r.json());
+        if (!d.success) throw new Error(d.error || 'failed');
+        const rows = d.rows || [];
+        document.getElementById('ppSuccShowing').textContent =
+          `${_ppNum(d.count)} pushed` + (rows.length < d.count ? ` (showing ${rows.length})` : '');
+        if (rows.length === 0) { body.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#999; padding:18px;">No successful pushes in range.</td></tr>'; return; }
+        body.innerHTML = rows.map(r => `<tr style="border-bottom:1px solid #eef2f6;">
+          <td style="padding:6px; font-family:monospace;">${r.tracker_no || ''}</td>
+          <td style="padding:6px;">${r.policy_no || '<span style="color:#bbb;">—</span>'}</td>
+          <td style="padding:6px;">${r.registration_no || '<span style="color:#bbb;">—</span>'}</td>
+          <td style="padding:6px;">${r.submission_date ? String(r.submission_date).slice(0, 10) : ''}</td>
+          <td style="padding:6px; white-space:nowrap;">${r.pushed_at ? new Date(r.pushed_at).toLocaleString() : ''}</td>
+          </tr>`).join('');
+      } catch (e) { body.innerHTML = `<tr><td colspan="5" style="color:#c62828; padding:12px;">Error: ${e.message}</td></tr>`; }
+    }
+    async function ppExportSuccess() {
+      const qs = _ppSuccQS(); qs.set('status', '2');
+      const url = API + '/policy-push/export?' + qs.toString();
+      const btn = document.getElementById('ppSuccExportBtn');
+      const label = btn ? btn.innerHTML : null;
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="display:inline-block; margin-right:6px;"></span>Preparing…'; }
+      try {
+        await fetchAndDownload(url, 'policy_push_pushed.xlsx');
+      } catch (e) {
+        showToast('Export failed: ' + (e && e.message ? e.message : e), 'error');
+      } finally { if (btn) { btn.disabled = false; btn.innerHTML = label; } }
     }
     async function ppLoadFailures() {
       const body = document.getElementById('ppFailBody');

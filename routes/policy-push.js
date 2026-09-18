@@ -14,9 +14,20 @@
  */
 const express = require('express');
 const sql = require('mssql');
+const XLSX = require('xlsx');
 const { getPool } = require('../db/connection');
 const { getPrarambhPool } = require('../db/prarambh-connection');
 const { attachUser, requireAdmin } = require('./auth');
+
+// Registration number is not a queue column — it lives in the pushed payload
+// (services/policy-push-api.js → registration_number). Pull it out safely.
+function regNoFromPayload(payloadJson) {
+  if (!payloadJson) return '';
+  try {
+    const p = JSON.parse(payloadJson);
+    return p.registration_number || p.registrationNumber || '';
+  } catch (_) { return ''; }
+}
 
 const router = express.Router();
 router.use(attachUser());
@@ -85,6 +96,73 @@ router.get('/failures', async (req, res, next) => {
          FROM dbo.policy_push_queue WHERE status = 3
         ORDER BY updated_at DESC, id DESC OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY`)).recordset;
     res.json({ success: true, count: cnt, page, size, rows });
+  } catch (err) { next(err); }
+});
+
+/** GET /success — paged successfully-pushed rows (status = 2) with policy & registration no. */
+router.get('/success', async (req, res, next) => {
+  try {
+    const app = await getPool();
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const size = Math.min(500, Math.max(1, parseInt(req.query.size, 10) || 50));
+    const conds = ['status = 2'];
+    const rq = app.request();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(req.query.from || '')) { rq.input('from', sql.Date, req.query.from); conds.push('submission_date >= @from'); }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(req.query.to || '')) { rq.input('to', sql.Date, req.query.to); conds.push('submission_date <= @to'); }
+    const where = conds.join(' AND ');
+    const cntReq = app.request();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(req.query.from || '')) cntReq.input('from', sql.Date, req.query.from);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(req.query.to || '')) cntReq.input('to', sql.Date, req.query.to);
+    const cnt = (await cntReq.query(`SELECT COUNT(*) AS n FROM dbo.policy_push_queue WHERE ${where}`)).recordset[0].n;
+    const raw = (await rq.input('skip', sql.Int, (page - 1) * size).input('take', sql.Int, size).query(
+      `SELECT id, prarambh_main_id, tracker_no, policy_no, submission_date, pushed_at, payload_json
+         FROM dbo.policy_push_queue WHERE ${where}
+        ORDER BY pushed_at DESC, id DESC OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY`)).recordset;
+    const rows = raw.map((r) => ({
+      id: r.id, tracker_no: r.tracker_no, policy_no: r.policy_no,
+      registration_no: regNoFromPayload(r.payload_json),
+      submission_date: r.submission_date, pushed_at: r.pushed_at,
+    }));
+    res.json({ success: true, count: cnt, page, size, rows });
+  } catch (err) { next(err); }
+});
+
+/**
+ * GET /export — Excel (.xlsx) of pushed policies to send to the vendor.
+ *   ?status=2 (default; use 3 for failed, etc.)  ?from=&to= (submission_date)
+ * Columns: Tracker No, Policy No, Registration No, Submission Date, Pushed At.
+ */
+router.get('/export', async (req, res, next) => {
+  try {
+    const app = await getPool();
+    const status = /^\d+$/.test(req.query.status || '') ? parseInt(req.query.status, 10) : 2;
+    const conds = ['status = @st'];
+    const rq = app.request(); rq.timeout = 600000;
+    rq.input('st', sql.TinyInt, status);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(req.query.from || '')) { rq.input('from', sql.Date, req.query.from); conds.push('submission_date >= @from'); }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(req.query.to || '')) { rq.input('to', sql.Date, req.query.to); conds.push('submission_date <= @to'); }
+    const where = conds.join(' AND ');
+    const recs = (await rq.query(
+      `SELECT tracker_no, policy_no, submission_date, pushed_at, payload_json
+         FROM dbo.policy_push_queue WHERE ${where}
+        ORDER BY pushed_at DESC, id DESC`)).recordset;
+    const fmt = (d) => (d ? new Date(d).toISOString().slice(0, 10) : '');
+    const fmtTs = (d) => (d ? new Date(d).toISOString().slice(0, 19).replace('T', ' ') : '');
+    const aoa = [['Tracker No', 'Policy No', 'Registration No', 'Submission Date', 'Pushed At']];
+    for (const r of recs) {
+      aoa.push([r.tracker_no || '', r.policy_no || '', regNoFromPayload(r.payload_json), fmt(r.submission_date), fmtTs(r.pushed_at)]);
+    }
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{ wch: 22 }, { wch: 24 }, { wch: 18 }, { wch: 15 }, { wch: 20 }];
+    const wb = XLSX.utils.book_new();
+    const label = status === 2 ? 'Pushed' : status === 3 ? 'Failed' : `Status${status}`;
+    XLSX.utils.book_append_sheet(wb, ws, label);
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="policy_push_${label.toLowerCase()}_${stamp}.xlsx"`);
+    res.setHeader('Content-Length', buf.length);
+    res.send(buf);
   } catch (err) { next(err); }
 });
 
