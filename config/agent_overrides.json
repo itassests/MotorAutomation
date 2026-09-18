@@ -1,0 +1,10 @@
+{
+  "_doc": "Per-agent rate overrides for the agent grid. Keyed by agent code. Each override matches base rows by insurer/product/plan/fuel/ncb/region ('*' = any) and REPLACES the rate; set add:true to append a row the base grid lacks. An agent with no entries uses the base grid (no separate sheet).",
+  "SW-DEMO-01": {
+    "name": "Demo Agent (SW-DEMO-01)",
+    "overrides": [
+      { "product": "Pvt Car Package", "insurer": "TATA AIG", "plan": "Comprehensive 1+1", "fuel": "*", "ncb": "With NCB", "region": "*", "rate": 25, "note": "negotiated +3" },
+      { "product": "Pvt Car Package", "insurer": "Chola", "plan": "SAOD", "fuel": "*", "ncb": "*", "region": "AP/TS", "rate": 12, "note": "special SAOD" }
+    ]
+  }
+}

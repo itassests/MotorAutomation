@@ -96,13 +96,14 @@ function regionLabel(r, col) {
 function buildAgentRows(lucaRows, productGroup, stateSlugs) {
   const h = lucaRows[0]; const col = (n) => h.indexOf(n);
   const pI = col('products'), stI = col('included_states'), icI = col('irdai_commission_percentage'), coI = col('commission_on'), mI = col('month');
-  const stateSet = new Set(stateSlugs);
+  const allStates = !stateSlugs || !stateSlugs.length;   // null/empty → every region
+  const stateSet = new Set(stateSlugs || []);
   const out = [];
   for (const r of lucaRows.slice(1)) {
     if (PRODUCT_GROUP[String(r[pI] || '')] !== productGroup) continue;
     const states = String(r[stI] || '').split(',').map(s => s.trim()).filter(Boolean);
     const isPanIndia = states.length === 0;
-    const inGroup = isPanIndia || states.some(s => stateSet.has(s));
+    const inGroup = allStates || isPanIndia || states.some(s => stateSet.has(s));
     if (!inGroup) continue;
     const rate = _num(r[icI]);
     if (rate == null) continue;
@@ -190,4 +191,47 @@ function renderAgentGridPdf(title, guidelines, rows) {
   return done;
 }
 
-module.exports = { buildAgentRows, renderAgentGridPdf, PRODUCT_GROUP, STATE_GROUPS, disp };
+// ---- Per-agent override layer ----
+// config/agent_overrides.json: { <agentCode>: { name, overrides:[{product,insurer,plan,
+// fuel,ncb,region,rate,add?,note}] } }. A base row is matched by insurer/product/plan/
+// fuel/ncb/region ('*' = any; region matches the row's region OR state, substring) and
+// its rate REPLACED. `add:true` appends a row the base grid doesn't have. An agent with
+// no matching overrides falls back to the base grid.
+function loadAgentOverrides() {
+  try { return require('../config/agent_overrides.json') || {}; } catch (_) { return {}; }
+}
+function agentsWithOverrides() {
+  const cfg = loadAgentOverrides();
+  return Object.keys(cfg).filter((k) => !k.startsWith('_') && Array.isArray(cfg[k].overrides) && cfg[k].overrides.length);
+}
+const _wild = (pat, val) => { const p = String(pat == null ? '*' : pat).trim(); if (p === '*' || p === '') return true; return String(val || '').toLowerCase().includes(p.toLowerCase()); };
+/**
+ * Apply an agent's overrides to base agent rows (for one product group). Returns
+ * { rows, applied }. `applied` is false when the agent has no override touching this set
+ * (caller then uses the base grid / skips a separate sheet).
+ */
+function applyAgentOverrides(rows, agentCode, productGroup) {
+  const cfg = loadAgentOverrides();
+  const a = cfg[agentCode];
+  if (!a || !Array.isArray(a.overrides)) return { rows, applied: false };
+  const ovs = a.overrides.filter((o) => _wild(o.product, productGroup));
+  if (!ovs.length) return { rows, applied: false };
+  let applied = false;
+  const out = rows.map((r) => {
+    for (const o of ovs) {
+      if (_wild(o.insurer, r.insurer) && _wild(o.plan, r.plan) && _wild(o.fuel, r.fuel)
+        && _wild(o.ncb, r.ncb) && (_wild(o.region, r.region) || _wild(o.region, r.state))) {
+        applied = true;
+        return { ...r, rate: o.rate, condition: (r.condition && r.condition !== '-' ? r.condition + ' | ' : '') + `AGENT ${agentCode}${o.note ? ' (' + o.note + ')' : ''}` };
+      }
+    }
+    return r;
+  });
+  for (const o of ovs.filter((x) => x.add)) {   // explicit additions
+    applied = true;
+    out.push({ insurer: o.insurer || '-', region: o.region === '*' ? 'Pan India' : (o.region || '-'), plan: o.plan || '-', fuel: o.fuel === '*' ? 'All Fuel Type' : (o.fuel || '-'), ncb: o.ncb === '*' ? '-' : (o.ncb || '-'), condition: `AGENT ${agentCode}${o.note ? ' (' + o.note + ')' : ''}`, rate: o.rate, state: o.region || 'Pan India', onPay: 'OD', eff: '' });
+  }
+  return { rows: out, applied };
+}
+
+module.exports = { buildAgentRows, renderAgentGridPdf, applyAgentOverrides, agentsWithOverrides, PRODUCT_GROUP, STATE_GROUPS, disp };
