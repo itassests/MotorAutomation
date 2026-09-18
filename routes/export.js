@@ -7,6 +7,8 @@ const express = require('express');
 const { getPool } = require('../db/connection');
 const { buildExportBuffer } = require('../services/excel-export');
 const { buildLucaBuffer } = require('../services/luca-export');
+const XLSX = require('xlsx');
+const agentGrid = require('../services/agent-grid');
 
 const router = express.Router();
 
@@ -158,6 +160,62 @@ router.get('/luca', async (req, res, next) => {
     const stem = ['luca', insurer || 'all', effDate ? `eff${effDate}` : ''].filter(Boolean).join('_');
     sendXlsx(res, buffer, `${stem}_${todayStamp()}.xlsx`);
   } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// AGENT RATE GRID (PDF) — the outgoing rates (grid − real per-rule margin) in the
+// agent-facing layout, per product × region, with optional per-agent overrides.
+// ---------------------------------------------------------------------------
+const AGENT_GUIDE = [
+  'Before booking: first check RTO Master & guidelines. Declined make/model & RTO lists apply per insurer.',
+  'SBI: Comprehensive up to 20 yr; check RTO Master. Chola: CPA not collected (individual) → 1.5% of OD deducted.',
+  'Shriram: SAOD 10% where SAOD grid not mentioned; EV & >15yr declined; −10% if discounting breached.',
+  'Magma: CPA premium < Rs 450 not considered for outgo. Royal/Universal: check declined-RTO lists.',
+  'Rates = system OUTGOING (grid minus the applicable margin).',
+];
+
+/**
+ * GET /export/agent-grid?product=&region=&agent=&effective_date=
+ *   product  — a product group (default "Pvt Car Package"; see /agent-grid/options)
+ *   region   — a state-group key ("AP&TS", "MH", …) or "all" (default)
+ *   agent    — optional agent code; applies config/agent_overrides.json for that agent
+ */
+router.get('/agent-grid', async (req, res, next) => {
+  try {
+    const product = String(req.query.product || 'Pvt Car Package').trim();
+    const region = String(req.query.region || 'all').trim();
+    const agent = String(req.query.agent || '').trim();
+    const edRaw = String(req.query.effective_date || '').trim();
+    const asOfDate = /^\d{4}-\d{2}-\d{2}$/.test(edRaw) ? edRaw : new Date().toISOString().slice(0, 10);
+    const pool = await getPool();
+    const rq = pool.request(); rq.timeout = 600000; rq.input('eff', asOfDate);
+    const cards = await rq.query("SELECT id FROM rate_cards WHERE status='active' AND (effective_from IS NULL OR effective_from <= @eff)");
+    const ids = cards.recordset.map((r) => r.id);
+    if (!ids.length) return res.status(404).json({ success: false, error: 'No active rate cards' });
+    const buf = await buildLucaBuffer(ids, { asOfDate });   // real margins (no flatMargin)
+    const rows = XLSX.utils.sheet_to_json(XLSX.read(buf, { type: 'buffer' }).Sheets.Sheet1, { header: 1 });
+    const stateSlugs = (region && region.toLowerCase() !== 'all') ? (agentGrid.STATE_GROUPS[region] || null) : null;
+    let ag = agentGrid.buildAgentRows(rows, product, stateSlugs);
+    let titleAgent = '';
+    if (agent) { const r = agentGrid.applyAgentOverrides(ag, agent, product); ag = r.rows; if (r.applied) titleAgent = ` — Agent ${agent}`; }
+    if (!ag.length) return res.status(404).json({ success: false, error: `No rows for product "${product}"${stateSlugs ? ' in region ' + region : ''}` });
+    const title = `${region.toLowerCase() === 'all' ? '' : region + '  '}${product}  ${asOfDate}${titleAgent}`;
+    const pdf = await agentGrid.renderAgentGridPdf(title, AGENT_GUIDE, ag);
+    const stem = ['Agent', region.replace(/[^A-Za-z0-9]+/g, ''), product.replace(/[^A-Za-z0-9]+/g, '_'), agent].filter(Boolean).join('_');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${stem}_${todayStamp()}.pdf"`);
+    res.setHeader('Content-Length', pdf.length);
+    res.send(pdf);
+  } catch (err) { next(err); }
+});
+
+/** GET /export/agent-grid/options — product groups, regions, and agents-with-overrides (for the UI). */
+router.get('/agent-grid/options', (req, res) => {
+  res.json({
+    products: [...new Set(Object.values(agentGrid.PRODUCT_GROUP))],
+    regions: ['all', ...Object.keys(agentGrid.STATE_GROUPS)],
+    agents: agentGrid.agentsWithOverrides(),
+  });
 });
 
 module.exports = router;

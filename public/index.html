@@ -1137,6 +1137,17 @@
           </label>
           <button class="btn btn-outline btn-sm" id="downloadLucaBtn" onclick="downloadLucaData()" title="All insurers' outgoing rates in Luca format (no income / margin), for the chosen effective date">Download Luca Data</button>
         </div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px; padding-top:8px; border-top:1px dashed #e0e0e0;">
+          <span style="font-size:12px; font-weight:600; color:#444;">Agent rate grid (PDF)</span>
+          <select id="agentGridProduct" class="form-control" style="height:32px; font-size:13px; min-width:150px;" title="Product group"></select>
+          <select id="agentGridRegion" class="form-control" style="height:32px; font-size:13px; min-width:130px;" title="Region (state group)"></select>
+          <select id="agentGridAgent" class="form-control" style="height:32px; font-size:13px; min-width:150px;" title="Agent — applies that agent's overrides. Blank = base grid."></select>
+          <label style="font-size:12px; color:#555; display:inline-flex; align-items:center; gap:4px;" title="Rates in force on this date. Blank for today.">
+            Effective
+            <input type="date" id="agentGridEffDate" class="input input-sm" style="width:150px;">
+          </label>
+          <button class="btn btn-outline btn-sm" id="downloadAgentGridBtn" onclick="downloadAgentGrid()" title="Agent-facing outgoing rate grid (grid minus real per-rule margin) as a PDF, per product & region, with optional per-agent overrides">Download Agent Grid</button>
+        </div>
         <div id="rateCardsList"></div>
       </div>
     </div>
@@ -9570,6 +9581,7 @@
         renderRateCardsList();
       } catch (e) { showToast('Failed to load rate cards', 'error'); }
       loadCoverageMatrix();
+      loadAgentGridOptions();
     }
 
     // Fill the export/Luca insurer picker from EVERY insurer that has a rate card
@@ -9806,6 +9818,58 @@
         await fetchAndDownload(url, stem + '.xlsx');
       } catch (e) {
         showToast('Luca download failed: ' + (e && e.message ? e.message : e), 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalLabel;
+          btn.style.cursor = '';
+        }
+      }
+    }
+
+    // Populate the agent-grid product / region / agent pickers from the server.
+    let _agentGridOptionsLoaded = false;
+    async function loadAgentGridOptions() {
+      if (_agentGridOptionsLoaded) return;
+      try {
+        const r = await fetch(API + '/export/agent-grid/options');
+        if (!r.ok) return;
+        const o = await r.json();
+        const prod = document.getElementById('agentGridProduct');
+        const reg = document.getElementById('agentGridRegion');
+        const agt = document.getElementById('agentGridAgent');
+        if (prod) prod.innerHTML = (o.products || []).map(p => '<option value="' + p + '">' + p + '</option>').join('');
+        if (reg) reg.innerHTML = (o.regions || []).map(g => '<option value="' + g + '">' + (g === 'all' ? 'All regions' : g) + '</option>').join('');
+        if (agt) agt.innerHTML = '<option value="">Base grid (no agent)</option>' +
+          (o.agents || []).map(a => '<option value="' + a + '">' + a + '</option>').join('');
+        _agentGridOptionsLoaded = true;
+      } catch (e) { /* leave selects empty; download still validates server-side */ }
+    }
+
+    // Download the agent-facing outgoing rate grid as a PDF (real per-rule margins).
+    async function downloadAgentGrid() {
+      const product = (document.getElementById('agentGridProduct') || {}).value || 'Pvt Car Package';
+      const region = (document.getElementById('agentGridRegion') || {}).value || 'all';
+      const agent = (document.getElementById('agentGridAgent') || {}).value || '';
+      const effDate = (document.getElementById('agentGridEffDate') || {}).value || '';
+      const qs = new URLSearchParams();
+      qs.set('product', product);
+      qs.set('region', region);
+      if (agent) qs.set('agent', agent);
+      if (effDate) qs.set('effective_date', effDate);
+      const url = API + '/export/agent-grid?' + qs.toString();
+      const stem = ['Agent', region.replace(/[^A-Za-z0-9]+/g, ''), product.replace(/[^A-Za-z0-9]+/g, '_'), agent].filter(Boolean).join('_');
+      const btn = document.getElementById('downloadAgentGridBtn');
+      const originalLabel = btn ? btn.innerHTML : null;
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner" style="display:inline-block; margin-right:6px;"></span>Preparing…';
+        btn.style.cursor = 'wait';
+      }
+      try {
+        await fetchAndDownload(url, stem + '.pdf');
+      } catch (e) {
+        showToast('Agent grid failed: ' + (e && e.message ? e.message : e), 'error');
       } finally {
         if (btn) {
           btn.disabled = false;
