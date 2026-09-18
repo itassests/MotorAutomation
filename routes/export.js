@@ -8,6 +8,7 @@ const { getPool } = require('../db/connection');
 const { buildExportBuffer } = require('../services/excel-export');
 const { buildLucaBuffer } = require('../services/luca-export');
 const XLSX = require('xlsx');
+const AdmZip = require('adm-zip');
 const agentGrid = require('../services/agent-grid');
 
 const router = express.Router();
@@ -206,6 +207,50 @@ router.get('/agent-grid', async (req, res, next) => {
     res.setHeader('Content-Disposition', `attachment; filename="${stem}_${todayStamp()}.pdf"`);
     res.setHeader('Content-Length', pdf.length);
     res.send(pdf);
+  } catch (err) { next(err); }
+});
+
+/**
+ * GET /export/agent-grid/all?region=&agent=&effective_date=
+ * ONE ZIP with an agent-grid PDF for every product group (all vehicle types),
+ * for the chosen region & optional agent. Builds the outgoing snapshot ONCE and
+ * renders every product from it (much cheaper than N separate downloads).
+ */
+router.get('/agent-grid/all', async (req, res, next) => {
+  try {
+    const region = String(req.query.region || 'all').trim();
+    const agent = String(req.query.agent || '').trim();
+    const edRaw = String(req.query.effective_date || '').trim();
+    const asOfDate = /^\d{4}-\d{2}-\d{2}$/.test(edRaw) ? edRaw : new Date().toISOString().slice(0, 10);
+    const pool = await getPool();
+    const rq = pool.request(); rq.timeout = 600000; rq.input('eff', asOfDate);
+    const cards = await rq.query("SELECT id FROM rate_cards WHERE status='active' AND (effective_from IS NULL OR effective_from <= @eff)");
+    const ids = cards.recordset.map((r) => r.id);
+    if (!ids.length) return res.status(404).json({ success: false, error: 'No active rate cards' });
+    // Build the outgoing snapshot once, then render each product group from it.
+    const buf = await buildLucaBuffer(ids, { asOfDate });   // real margins (no flatMargin)
+    const rows = XLSX.utils.sheet_to_json(XLSX.read(buf, { type: 'buffer' }).Sheets.Sheet1, { header: 1 });
+    const stateSlugs = (region && region.toLowerCase() !== 'all') ? (agentGrid.STATE_GROUPS[region] || null) : null;
+    const products = [...new Set(Object.values(agentGrid.PRODUCT_GROUP))];
+    const zip = new AdmZip();
+    let added = 0;
+    for (const product of products) {
+      let ag = agentGrid.buildAgentRows(rows, product, stateSlugs);
+      if (agent) { const r = agentGrid.applyAgentOverrides(ag, agent, product); ag = r.rows; }
+      if (!ag.length) continue;   // no rows for this product in this region — skip
+      const titleAgent = agent ? ` — Agent ${agent}` : '';
+      const title = `${region.toLowerCase() === 'all' ? '' : region + '  '}${product}  ${asOfDate}${titleAgent}`;
+      const pdf = await agentGrid.renderAgentGridPdf(title, AGENT_GUIDE, ag);
+      zip.addFile(`${product.replace(/[^A-Za-z0-9]+/g, '_')}.pdf`, pdf);
+      added++;
+    }
+    if (!added) return res.status(404).json({ success: false, error: `No rows for any product${stateSlugs ? ' in region ' + region : ''}` });
+    const zipBuf = zip.toBuffer();
+    const stem = ['AgentGrids', region.replace(/[^A-Za-z0-9]+/g, ''), agent].filter(Boolean).join('_');
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${stem}_${todayStamp()}.zip"`);
+    res.setHeader('Content-Length', zipBuf.length);
+    res.send(zipBuf);
   } catch (err) { next(err); }
 });
 

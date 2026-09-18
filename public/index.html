@@ -1146,7 +1146,8 @@
             Effective
             <input type="date" id="agentGridEffDate" class="input input-sm" style="width:150px;">
           </label>
-          <button class="btn btn-outline btn-sm" id="downloadAgentGridBtn" onclick="downloadAgentGrid()" title="Agent-facing outgoing rate grid (grid minus real per-rule margin) as a PDF, per product & region, with optional per-agent overrides">Download Agent Grid</button>
+          <button class="btn btn-outline btn-sm" id="downloadAgentGridBtn" onclick="downloadAgentGrid()" title="Agent-facing outgoing rate grid (grid minus real per-rule margin) as a PDF, for the selected product & region, with optional per-agent overrides">Download Agent Grid</button>
+          <button class="btn btn-primary btn-sm" id="downloadAgentGridAllBtn" onclick="downloadAgentGridAll()" title="One ZIP with a PDF for EVERY vehicle type, for the selected region & agent (product picker ignored)">Download All Types (ZIP)</button>
         </div>
         <div id="rateCardsList"></div>
       </div>
@@ -9870,6 +9871,37 @@
         await fetchAndDownload(url, stem + '.pdf');
       } catch (e) {
         showToast('Agent grid failed: ' + (e && e.message ? e.message : e), 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalLabel;
+          btn.style.cursor = '';
+        }
+      }
+    }
+
+    // Download ALL vehicle-type agent grids as one ZIP (product picker ignored).
+    async function downloadAgentGridAll() {
+      const region = (document.getElementById('agentGridRegion') || {}).value || 'all';
+      const agent = (document.getElementById('agentGridAgent') || {}).value || '';
+      const effDate = (document.getElementById('agentGridEffDate') || {}).value || '';
+      const qs = new URLSearchParams();
+      qs.set('region', region);
+      if (agent) qs.set('agent', agent);
+      if (effDate) qs.set('effective_date', effDate);
+      const url = API + '/export/agent-grid/all?' + qs.toString();
+      const stem = ['AgentGrids', region.replace(/[^A-Za-z0-9]+/g, ''), agent].filter(Boolean).join('_');
+      const btn = document.getElementById('downloadAgentGridAllBtn');
+      const originalLabel = btn ? btn.innerHTML : null;
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner" style="display:inline-block; margin-right:6px;"></span>Preparing all types…';
+        btn.style.cursor = 'wait';
+      }
+      try {
+        await fetchAndDownload(url, stem + '.zip');
+      } catch (e) {
+        showToast('Agent grids (all) failed: ' + (e && e.message ? e.message : e), 'error');
       } finally {
         if (btn) {
           btn.disabled = false;
