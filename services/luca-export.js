@@ -1444,15 +1444,18 @@ async function buildLucaBuffer(ids, opts) {
   }
 
   // Reorder every row (header included) from build order to the Luca output order.
-  // When opts.showMargin is set, append two trailing diagnostic columns —
-  // 'income' (grid rate) and 'margin' (grid − outgoing) — so income − margin =
-  // the outgoing rate is visible per row (USER, temporary).
+  // When opts.showMargin is set, insert two diagnostic columns — 'income' (grid
+  // rate) and 'margin' (grid − outgoing) — directly AFTER commission_on (USER),
+  // so each row reads commission_on | income | margin | tp% | irdai% and
+  // income − margin = the outgoing rate.
   const showMargin = !!(opts && opts.showMargin);
+  const _INS_AT = OUTPUT_ORDER.indexOf('commission_on') + 1;
   const outRows = rows.map((row, ri) => {
     const base = _OUT_IDX.map((i) => row[i]);
     if (showMargin) {
-      base.push(ri === 0 ? 'income' : (row._income == null ? '' : row._income));
-      base.push(ri === 0 ? 'margin' : (row._margin == null ? '' : row._margin));
+      const inc = ri === 0 ? 'income' : (row._income == null ? '' : row._income);
+      const mar = ri === 0 ? 'margin' : (row._margin == null ? '' : row._margin);
+      base.splice(_INS_AT, 0, inc, mar);
     }
     return base;
   });
