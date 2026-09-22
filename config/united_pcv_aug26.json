@@ -1,0 +1,27 @@
+{
+ "_src": "United commission structure wef 01-08-2026 (Sub-Annexure 1 PCV). Bands by Passenger-Carrying-Capacity (seats). 4W PCV >6 pax vs Taxi (<=6 pax) split on seating; buses (educational/staff/school) 62.5%; 2W-PCV 10%; 3W handled by the 3W grid.",
+ "buses": 0.625,
+ "twoWheeled": 0.10,
+ "pcv4w": {
+  "_note": ">6 passengers. Package and SATP identical. PCC = seating capacity.",
+  "bands": [
+   { "maxPcc": 10, "set": "S_HR_RJ", "inR": 0.075, "outR": 0.30 },
+   { "maxPcc": 20, "set": "S_TN_PY_KA", "inR": 0.075, "outR": 0.30 },
+   { "maxPcc": 30, "set": "S_TN_PY_MP_UP", "inR": 0.05, "outR": 0.10 },
+   { "maxPcc": null, "all": 0.10, "_note": "PCC>30 non-EV: OD 10% / TP 0% -> 10% headline (OD leg)" }
+  ],
+  "evPcc20": 0.10
+ },
+ "taxi": {
+  "_note": "<=6 passengers. Package vs SATP differ on the 'other states' rate.",
+  "set": "S_TAXI",
+  "package": { "inR": 0.15, "outR": 0.25 },
+  "satp":    { "inR": 0.15, "outR": 0.30 }
+ },
+ "stateSets": {
+  "S_HR_RJ": ["HR", "RJ"],
+  "S_TN_PY_KA": ["TN", "PY", "KA"],
+  "S_TN_PY_MP_UP": ["TN", "PY", "MP", "UP"],
+  "S_TAXI": ["HR", "KA", "RJ", "TN", "PY", "UP", "MP"]
+ }
+}

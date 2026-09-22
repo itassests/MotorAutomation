@@ -47,6 +47,7 @@ const PREF = require('../../config/united_pref_rtos.json');
 const GCV_PREF = require('../../config/united_gcv_pref.json');
 const CAR_AUG = require('../../config/united_car_aug26.json');
 const GCV_AUG = require('../../config/united_gcv_aug26.json');
+const PCV_AUG = require('../../config/united_pcv_aug26.json');
 
 // State code → display name, for enumerating the Aug'26 CC×state / GVW×state grids
 // as one row per state (the location-merge then collapses same-rate states into a
@@ -127,6 +128,41 @@ const _isAug = (eff) => String(eff || '').slice(0, 10) >= '2026-08-01';
 
 const CAR_SHEET = 'Pvt Car Commission Structure (May26)';
 const GCV_SHEET = 'GCV Sub Annexure-2 Preferred RTO (May26)';
+const PCV_SHEET = 'PCV Commission Structure (May26)';
+
+// PCV (eff Aug'26) enumerated: 4W >6-pax PCC(seat)×state bands, Taxi (Package/SATP)
+// ×state, Educational/Staff/School buses 62.5%, 2W-PCV 10%, 3W tiered by state.
+function unitedPcvAugRows(eff) {
+  const out = [];
+  const emit = (o) => out.push(row({ product: 'PCV', sheet_name: PCV_SHEET, rate_type: 'COMP', effective_from: eff, ...o }));
+  const inSet = (key, code) => (PCV_AUG.stateSets[key] || []).includes(code);
+  // 4W PCV > 6 passengers — one row per PCC band × state.
+  PCV_AUG.pcv4w.bands.forEach((band, i) => {
+    const lo = i === 0 ? 7 : (PCV_AUG.pcv4w.bands[i - 1].maxPcc + 1);
+    const seg = `PCV 4W >6 pax (${lo}-${band.maxPcc == null ? 'up' : band.maxPcc} seats)`;
+    for (const [code, name] of STATES) {
+      const r = band.all != null ? band.all : (inSet(band.set, code) ? band.inR : band.outR);
+      emit({ region: name, segment: seg, rate_value: r });
+    }
+  });
+  emit({ region: null, segment: 'PCV 4W >6 pax Electric (>20 seats)', fuel_type: 'ELECTRIC', rate_value: PCV_AUG.pcv4w.evPcc20 });
+  // Taxi (<=6 pax) — Package + SATP per state.
+  for (const [code, name] of STATES) {
+    const hit = inSet(PCV_AUG.taxi.set, code);
+    emit({ region: name, segment: 'PCV Taxi (<=6 pax) Package', rate_type: 'COMP', rate_value: hit ? PCV_AUG.taxi.package.inR : PCV_AUG.taxi.package.outR });
+    emit({ region: name, segment: 'PCV Taxi (<=6 pax) SATP', rate_type: 'SATP', rate_value: hit ? PCV_AUG.taxi.satp.inR : PCV_AUG.taxi.satp.outR });
+  }
+  // Educational/Staff/School buses, 2W-PCV.
+  emit({ region: null, segment: 'PCV Educational/Staff/School Bus', rate_value: PCV_AUG.buses });
+  emit({ region: null, segment: 'PCV Two-Wheeled', rate_value: PCV_AUG.twoWheeled });
+  // 3-Wheeled PCV — MP 25%, 60%-tier states, else 40%.
+  for (const [code, name] of STATES) {
+    const r = code === 'MP' ? 0.25 : (PCV3W_AUG_60.has(code) ? 0.60 : 0.40);
+    emit({ region: name, segment: 'PCV 3-Wheeled', rate_value: r });
+  }
+  return out;
+}
+const PCV3W_AUG_60 = new Set(['WB', 'MH', 'GJ', 'DL', 'UK', 'PB', 'GA', 'JK']);
 
 /** Shape a pseudo rate_rules row (the fields buildLucaBuffer reads). */
 function row(o) {
@@ -352,13 +388,19 @@ module.exports = {
   // product under the SAME sheet_name (the PDF filename) — TW / PCV / GCV / MIS /
   // CPA rows are live and must survive.
   suppress: [
-    // Pvt-Car AND GCV are now fully re-expanded from the Aug'26 grid (config-driven),
-    // so drop ALL PDF-ingested CAR + GCV rate rows regardless of sheet_name (the PDF
-    // filename varies per card, and old rows carry stale segment/EV rates). TW / PCV /
-    // Taxi / Bus / MIS / CPA rows are unchanged and stay live.
-    (r) => /^(CAR|4W|PVT\s*CAR|PVTCAR|GCV|GCCV|GOODS)$/i.test(String(r.product || '').trim()),
+    // Pvt-Car, GCV AND PCV are now fully re-expanded from the Aug'26 grid (config-
+    // driven), so drop ALL PDF-ingested CAR + GCV + PCV rate rows regardless of
+    // sheet_name (the PDF filename varies per card, and old rows carry stale
+    // segment/EV rates). TW / MIS / CPA rows are unchanged and stay live.
+    (r) => /^(CAR|4W|PVT\s*CAR|PVTCAR|GCV|GCCV|GOODS|PCV|PCCV|PASSENGER)$/i.test(String(r.product || '').trim()),
   ],
-  expand: (effFrom) => [...unitedCar(effFrom), ...unitedGcv(effFrom)],
+  expand: (effFrom) => [...unitedCar(effFrom), ...unitedGcv(effFrom), ...unitedPcv(effFrom)],
   // exported for verification
-  unitedCar, unitedGcv,
+  unitedCar, unitedGcv, unitedPcv,
 };
+
+// PCV: revised grid from 01-08-2026; before that, leave the ingested PCV rows
+// (only the 3W override existed pre-Aug, applied at pricing time by bulk.js).
+function unitedPcv(eff) {
+  return _isAug(eff) ? unitedPcvAugRows(eff) : [];
+}

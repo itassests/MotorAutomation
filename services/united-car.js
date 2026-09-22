@@ -36,6 +36,7 @@ const LOW_MAKES = ['TATA', 'MARUTI', 'MAHINDRA', 'TOYOTA', 'HYUNDAI', 'HONDA', '
 // policies keep the old segment logic. (USER 2026-09, PDF-confirmed.)
 const CAR_AUG = require('../config/united_car_aug26.json');
 const GCV_AUG = require('../config/united_gcv_aug26.json');
+const PCV_AUG = require('../config/united_pcv_aug26.json');
 const _SUBANN2_RJ = new Set((GCV_AUG.subAnn2Rj || []).map(norm));
 const AUG_FROM = '2026-08-01';
 const effAug = (params) => {
@@ -212,12 +213,47 @@ function resolveUnitedGcvRate(params) {
 // row. Scoped to 3W passenger autos; returns null otherwise (no regression).
 // State by RTO prefix: Goa registers as GA, Uttarakhand UK, J&K JK.
 const PCV3W_60_STATES = new Set(['WB', 'MH', 'GJ', 'DL', 'UK', 'PB', 'GA', 'JK']);
+const _is3WPcv = (hay, seat) =>
+  /\b3\s*WH|\b3W\b|RIKSHAW|RICKSHAW|E-?RICK|THREE\s*WH/.test(hay) ||
+  (seat > 0 && seat <= 4 && /ATUL|PIAGGIO|\bRE\b|TVS\s*KING|BAJAJ|MAHINDRA\s*ALFA|TREO/.test(hay));
+
+// PCV (eff Aug'26): full revised grid — buses 62.5%, 3W tiered, 2W-PCV 10%, and
+// 4W split on seating: >6 pax = "4W PCV >6 passengers" PCC(=seats)×state bands,
+// <=6 pax = Taxi (Package vs SATP). All on NET premium.
+function unitedPcvAug(params) {
+  const hay = `${params.vehicleCategory || ''} ${params.model || ''} ${params.make || ''}`.toUpperCase();
+  const seat = Number(params.seatingCapacity) || 0;
+  const fuel = String(params.fuelType || '').toUpperCase();
+  const isEV = /ELECTRIC|\bEV\b|BATTERY/.test(fuel);
+  const st = stateOf(params.rtoCode);
+  const inSet = (key) => (PCV_AUG.stateSets[key] || []).includes(st);
+  // Educational / Staff / School buses (NOT ordinary route buses) → 62.5%.
+  if (/SCHOOL|STAFF|EDUCATION/.test(hay)) return PCV_AUG.buses;
+  // Three-wheeled passenger carriers → tiered state grid (unchanged from pre-Aug).
+  if (_is3WPcv(hay, seat)) {
+    if (st === 'MP') return 0.25;
+    if (PCV3W_60_STATES.has(st)) return 0.60;
+    return 0.40;
+  }
+  // Two-wheeled PCV → flat 10%.
+  if (/\b2\s*WH|TWO\s*WH/.test(hay)) return PCV_AUG.twoWheeled;
+  if (seat <= 0) return null;                       // 4W but no seating → leave to engine base
+  if (seat <= 6) {                                  // Taxi
+    const t = (String(params.insProduct || '').toUpperCase() === 'TP') ? PCV_AUG.taxi.satp : PCV_AUG.taxi.package;
+    return inSet(PCV_AUG.taxi.set) ? t.inR : t.outR;
+  }
+  // 4W PCV > 6 passengers — PCC(=seat) × state bands.
+  if (isEV && seat > 20) return PCV_AUG.pcv4w.evPcc20;   // electric >20 pax → 10%
+  const b = pickBand(PCV_AUG.pcv4w.bands, seat, 'maxPcc');
+  if (b.all != null) return b.all;
+  return inSet(b.set) ? b.inR : b.outR;
+}
+
 function resolveUnitedPcvRate(params) {
   if (String(params.vehicleType || '').toUpperCase() !== 'PCV') return null;
+  if (effAug(params)) return unitedPcvAug(params);         // revised full PCV grid from 01-08-2026
   const hay = `${params.vehicleCategory || ''} ${params.model || ''} ${params.make || ''}`.toUpperCase();
-  const is3W = /\b3\s*WH|\b3W\b|RIKSHAW|RICKSHAW|E-?RICK|THREE\s*WH/.test(hay) ||
-    (Number(params.seatingCapacity) > 0 && Number(params.seatingCapacity) <= 4 &&
-      /ATUL|PIAGGIO|\bRE\b|TVS\s*KING|BAJAJ|MAHINDRA\s*ALFA|TREO/.test(hay));
+  const is3W = _is3WPcv(hay, Number(params.seatingCapacity) || 0);
   if (!is3W) return null;
   const st = norm(params.rtoCode).slice(0, 2);
   if (st === 'MP') return 0.25;
