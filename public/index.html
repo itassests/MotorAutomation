@@ -1135,7 +1135,10 @@
             Luca effective date
             <input type="date" id="lucaEffectiveDate" class="input input-sm" style="width:150px;">
           </label>
-          <button class="btn btn-outline btn-sm" id="downloadLucaBtn" onclick="downloadLucaData()" title="All insurers' outgoing rates in Luca format (no income / margin), for the chosen effective date">Download Luca Data</button>
+          <label style="font-size:12px; color:#555; display:inline-flex; align-items:center; gap:4px;" title="Temporary: append 'income' (grid rate) and 'margin' columns so outgoing = income − margin is visible.">
+            <input type="checkbox" id="lucaShowMargin"> show income &amp; margin
+          </label>
+          <button class="btn btn-outline btn-sm" id="downloadLucaBtn" onclick="downloadLucaData()" title="All insurers' outgoing rates in Luca format, for the chosen effective date">Download Luca Data</button>
         </div>
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px; padding-top:8px; border-top:1px dashed #e0e0e0;">
           <span style="font-size:12px; font-weight:600; color:#444;">Agent rate grid (PDF)</span>
@@ -9863,9 +9866,11 @@
     async function downloadLucaData() {
       const insurer = (document.getElementById('exportInsurerFilter') || {}).value || '';
       const effDate = (document.getElementById('lucaEffectiveDate') || {}).value || '';
+      const showMargin = !!(document.getElementById('lucaShowMargin') || {}).checked;
       const qs = new URLSearchParams();
       if (insurer) qs.set('insurer', insurer);
       if (effDate) qs.set('effective_date', effDate);
+      if (showMargin) qs.set('showMargin', '1');
       const url = API + '/export/luca' + (qs.toString() ? '?' + qs.toString() : '');
       const stem = ['luca', insurer || 'all', effDate ? 'eff' + effDate : ''].filter(Boolean).join('_');
       const btn = document.getElementById('downloadLucaBtn');

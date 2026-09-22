@@ -1214,6 +1214,12 @@ async function buildLucaBuffer(ids, opts) {
     if (_emitted.has(sig)) continue;
     _emitted.add(sig);
     rowArr[0] = id++;
+    // opts.showMargin (USER, temporary): carry income (grid rate) + the ACTUAL
+    // margin taken (grid − outgoing, so floored rows read 0) so they can be shown
+    // as extra columns at write time. Stashed as non-index props → invisible to the
+    // dedupe/band/location merges (which index over LUCA_HEADERS only), like _vt/_eff.
+    rowArr._income = gridP;
+    rowArr._margin = (gridP === '' || rateP === '') ? '' : +((gridP - rateP)).toFixed(3);
     rowArr._vt = String(r.volume_tier || '');   // source volume tier (for the slab-collapse below)
     // Source card date (NOT the stamped snapshot month) — used by the engine-match
     // de-conflict below to keep the newest generation when rows collapse.
@@ -1428,7 +1434,18 @@ async function buildLucaBuffer(ids, opts) {
   }
 
   // Reorder every row (header included) from build order to the Luca output order.
-  const outRows = rows.map((row) => _OUT_IDX.map((i) => row[i]));
+  // When opts.showMargin is set, append two trailing diagnostic columns —
+  // 'income' (grid rate) and 'margin' (grid − outgoing) — so income − margin =
+  // the outgoing rate is visible per row (USER, temporary).
+  const showMargin = !!(opts && opts.showMargin);
+  const outRows = rows.map((row, ri) => {
+    const base = _OUT_IDX.map((i) => row[i]);
+    if (showMargin) {
+      base.push(ri === 0 ? 'income' : (row._income == null ? '' : row._income));
+      base.push(ri === 0 ? 'margin' : (row._margin == null ? '' : row._margin));
+    }
+    return base;
+  });
   const ws = XLSX.utils.aoa_to_sheet(outRows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');

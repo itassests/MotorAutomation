@@ -162,7 +162,10 @@ router.get('/luca', async (req, res, next) => {
     // 6%, are for the internal payout only, not the Luca outgoing). Override with
     // ?margin=<points> if a different flat margin is ever needed.
     const flatMargin = /^\d+(\.\d+)?$/.test(String(req.query.margin || '')) ? Number(req.query.margin) : 5;
-    const buffer = await buildLucaBuffer(ids, { ...(products ? { products } : {}), asOfDate, flatMargin });
+    // ?showMargin=1 (USER, temporary): append 'income' (grid) + 'margin' columns so
+    // the outgoing = income − margin is visible. Off by default (strict Luca schema).
+    const showMargin = /^(1|true|yes)$/i.test(String(req.query.showMargin || ''));
+    const buffer = await buildLucaBuffer(ids, { ...(products ? { products } : {}), asOfDate, flatMargin, showMargin });
     const stem = ['luca', insurer || 'all', effDate ? `eff${effDate}` : ''].filter(Boolean).join('_');
     sendXlsx(res, buffer, `${stem}_${todayStamp()}.xlsx`);
   } catch (err) { next(err); }
