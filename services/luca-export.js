@@ -90,6 +90,16 @@ const OUTPUT_ORDER = [
 ];
 const _OUT_IDX = OUTPUT_ORDER.map((h) => LUCA_HEADERS.indexOf(h));
 
+// Copy a built row. Rows carry non-index metadata (_income/_margin for the optional
+// diagnostic columns, _vt/_eff for the de-conflict passes); a bare .slice() drops
+// those, so every row copy in the merge passes must go through here.
+function _copyRow(row) {
+  const nr = row.slice();
+  nr._income = row._income; nr._margin = row._margin;
+  nr._vt = row._vt; nr._eff = row._eff;
+  return nr;
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // Map an internal rule to the granular Luca product taxonomy:
@@ -1381,7 +1391,7 @@ async function buildLucaBuffer(ids, opts) {
           const segs = owned.get(m); if (!segs.length) continue;   // band fully covered by narrower ones → dropped
           segs.sort((x, y) => x[0] - y[0]);
           const mg = []; for (const s of segs) { if (mg.length && mg[mg.length - 1][1] === s[0]) mg[mg.length - 1][1] = s[1]; else mg.push([s[0], s[1]]); }
-          for (const [lo, hi] of mg) { const nr = m.row.slice(); nr[bi] = fmtR(lo, hi); keep.push(nr); }
+          for (const [lo, hi] of mg) { const nr = _copyRow(m.row); nr[bi] = fmtR(lo, hi); keep.push(nr); }
         }
       }
       rows.length = 0; for (const r of keep) rows.push(r);
@@ -1415,7 +1425,7 @@ async function buildLucaBuffer(ids, opts) {
       const gr = genRemark(row[I_REM]);
       const key = keyCols.map((i) => String(row[i] == null ? '' : row[i])).join('¦') + '¦' + gr;
       let g = groups.get(key);
-      if (!g) { g = { row: row.slice(), rtos: new Set(), cities: new Set(), states: new Set(), rem: gr }; groups.set(key, g); order.push(g); }
+      if (!g) { g = { row: _copyRow(row), rtos: new Set(), cities: new Set(), states: new Set(), rem: gr }; groups.set(key, g); order.push(g); }
       splitAdd(g.rtos, row[I_RTO]); splitAdd(g.cities, row[I_CITY]); splitAdd(g.states, row[I_STATE]);
     }
     if (order.length < rows.length - 1) {
