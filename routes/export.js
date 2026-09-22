@@ -157,7 +157,12 @@ router.get('/luca', async (req, res, next) => {
     // Stamp every row's year/month with the snapshot period (the chosen effective
     // date, else today) so the file is one period — not each grid's filing month.
     const asOfDate = effDate || new Date().toISOString().slice(0, 10);
-    const buffer = await buildLucaBuffer(ids, { ...(products ? { products } : {}), asOfDate });
+    // Luca margin: a FLAT 5-point margin applies to EVERY insurer in the Luca file
+    // (USER: "5% margin for luca file" — the per-rule company margins, e.g. Go Digit
+    // 6%, are for the internal payout only, not the Luca outgoing). Override with
+    // ?margin=<points> if a different flat margin is ever needed.
+    const flatMargin = /^\d+(\.\d+)?$/.test(String(req.query.margin || '')) ? Number(req.query.margin) : 5;
+    const buffer = await buildLucaBuffer(ids, { ...(products ? { products } : {}), asOfDate, flatMargin });
     const stem = ['luca', insurer || 'all', effDate ? `eff${effDate}` : ''].filter(Boolean).join('_');
     sendXlsx(res, buffer, `${stem}_${todayStamp()}.xlsx`);
   } catch (err) { next(err); }
