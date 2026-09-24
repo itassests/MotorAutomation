@@ -12,14 +12,35 @@
  * engine for now (operator +2.5 over grid, pending confirmation).
  */
 const CFG = require('../config/icici_cv_po_jun26.json');
+const CFG_SEP = require('../config/icici_cv_po_sep26.json');
 const norm = (s) => String(s == null ? '' : s).trim().toUpperCase();
 // "&"→"AND" so "JAMMU & KASHMIR" == config "JAMMUANDKASHMIR"; then strip non-alnum
 const regKey = (s) => norm(s).replace(/&/g, 'AND').replace(/[^A-Z0-9]/g, '');
 // pre-index each table by normalized region key
-const TBL_IDX = {};
-for (const tbl of ['comp', 'compRight', 'aotp']) {
-  TBL_IDX[tbl] = {};
-  if (CFG[tbl]) for (const k of Object.keys(CFG[tbl])) TBL_IDX[tbl][regKey(k)] = CFG[tbl][k];
+// Sep'26 revision (USER 2026-09-24) is an OVERLAY on the June grid, merged at CELL
+// level so untouched cells keep their June value. Two indices are built once and
+// chosen per policy by risk-start date - a pre-September policy must keep pricing
+// on the June grid.
+const SEP_FROM = '2026-09-01';
+function buildIdx(base, overlay) {
+  const idx = {};
+  for (const tbl of ['comp', 'compRight', 'aotp']) {
+    idx[tbl] = {};
+    if (base[tbl]) for (const k of Object.keys(base[tbl])) idx[tbl][regKey(k)] = base[tbl][k];
+    if (overlay && overlay[tbl]) {
+      for (const k of Object.keys(overlay[tbl])) {
+        const rk = regKey(k);
+        idx[tbl][rk] = Object.assign({}, idx[tbl][rk] || {}, overlay[tbl][k]);
+      }
+    }
+  }
+  return idx;
+}
+const TBL_IDX = buildIdx(CFG, null);                 // June generation
+const TBL_IDX_SEP = buildIdx(CFG, CFG_SEP);          // September = June + overlay
+function idxFor(params) {
+  const d = String((params && (params.effective_date || params.effectiveDate || params.riskStartDate)) || '').slice(0, 10);
+  return (d && d >= SEP_FROM) ? TBL_IDX_SEP : TBL_IDX;
 }
 
 // ---- policy → ICICI segment column name -------------------------------------
@@ -150,7 +171,8 @@ function resolveIciciCvPoRate(params, opts) {
     make: norm(params.make), body: norm(`${params.model} ${params.bodyType}`),
     subCluster: norm(params.subCluster || ''),
   };
-  const regRow = (tbl) => TBL_IDX[tbl] && TBL_IDX[tbl][regKey(region)];
+  const _idx = idxFor(params);   // June vs September generation by risk-start date
+  const regRow = (tbl) => _idx[tbl] && _idx[tbl][regKey(region)];
   // Note 7: AOTP → CV_AOTP first (if segment present), else CV_Comp
   let cell = null;
   if (cover === 'AOTP') { const a = regRow('aotp'); if (a && a[seg] != null) cell = a[seg]; }
