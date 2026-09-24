@@ -58,7 +58,7 @@ const DEFAULT_RATES = {
     slabs: [
       { tier: 'Upto 3L', tier_min: 0, tier_max: 3, comp_net: 0.175, satp_net: 0.20 },
       { tier: '3L-6L',   tier_min: 3, tier_max: 6, comp_net: 0.175, satp_net: 0.175 },
-      { tier: 'Above 6L', tier_min: 6, tier_max: null, comp_net: 0.20, satp_net: 0.20 },
+      { tier: 'Above 6L', tier_min: 6, tier_max: null, comp_net: 0.195, satp_net: 0.20 },   // Sep'26: Comp 20% -> 19.5% On NET (USER 2026-09-24)
     ],
     // Back-compat aliases (still referenced where slab fanout isn't desired):
     comp_net: 0.175,

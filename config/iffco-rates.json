@@ -31,7 +31,7 @@
         "tier": "Above 6L",
         "tier_min": 6,
         "tier_max": null,
-        "comp_net": 0.2,
+        "comp_net": 0.195,
         "satp_net": 0.2
       }
     ],
