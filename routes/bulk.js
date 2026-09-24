@@ -3828,6 +3828,28 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave unchanged */ }
   }
 
+
+  // ---- SBI General School Bus — Sep'26 guideline (USER 2026-09-24) ----
+  // From SBI's "School Bus Guideline" email: KL/MP fully declined, TN/RJ paid 10
+  // POINTS below the agreed slab, 12+1 seaters take a 2-POINT deduction and 18+1
+  // and above take the full slab. Seating is TOTAL incl. driver, so the -2 band is
+  // 13-18 and full payout starts at 19. Adjusts the matched School-Bus base rate
+  // only — never invents one — and is a no-op before 01-09-2026.
+  if (insurerSlug === 'sbi_general' && rules[0]) {
+    try {
+      const _sbiSb = require('../services/sbi-school-bus');
+      if (_sbiSb.isSchoolBus(rules[0].segment, rules[0].sub_type)) {
+        const _adj = _sbiSb.adjustSchoolBusRate(
+          rules[0].rate_value, params, resolvedRegion || rules[0].region);
+        if (_adj) {
+          rules[0] = { ...rules[0], rate_value: _adj.rate,
+            is_declined: _adj.declined ? 1 : (rules[0].is_declined || 0),
+            segment: `${rules[0].segment} [${_adj.note}]` };
+        }
+      }
+    } catch (_) { /* leave rules unchanged */ }
+  }
+
   // ---- TATA AIG Private Car — June'26 flat grid (USER 2026-06-26) ----
   // The real June Tata car grid lives in the "Private Car" sheet of "Grid PCI &
   // TW- June 26", which was NEVER ingested (config matched ^pci$/^pvt car$; the
