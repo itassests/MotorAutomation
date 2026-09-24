@@ -3850,6 +3850,23 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     } catch (_) { /* leave rules unchanged */ }
   }
 
+
+  // ---- Magma special enablers — Sep'26 (USER 2026-09-24) ----
+  // Chhattisgarh CG1/CG3, Comprehensive GCV 20T-40T Age>=5 -> flat 24%, but ONLY
+  // for Magma Own Renewal WITH NCB business. Magma's UW clusters are already the
+  // rule region (CG1..CG7). Overrides the matched rate (negotiated, not a delta);
+  // no-op before 01-09-2026 or when the business/NCB test fails.
+  if (insurerSlug === 'magma_hdi' && rules[0]) {
+    try {
+      const _mag = require('../services/magma-special-enablers');
+      const _en = _mag.findMagmaEnabler(rules[0], params, resolvedRegion || rules[0].region);
+      if (_en) {
+        rules[0] = { ...rules[0], rate_value: _en.rate, is_declined: 0,
+          segment: `${rules[0].segment} [${_en.label}]` };
+      }
+    } catch (_) { /* leave rules unchanged */ }
+  }
+
   // ---- TATA AIG Private Car — June'26 flat grid (USER 2026-06-26) ----
   // The real June Tata car grid lives in the "Private Car" sheet of "Grid PCI &
   // TW- June 26", which was NEVER ingested (config matched ^pci$/^pvt car$; the
