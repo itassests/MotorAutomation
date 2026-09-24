@@ -51,6 +51,8 @@ const REGION_TO_STATES = {
   'APTS': ['Andhra Pradesh', 'Telangana'],
   'Chennai only': ['Tamil Nadu'],
   'Karnataka': ['Karnataka'],
+  // Sep'26 High-end block is region-scoped (not the Apr/Jul city fanout).
+  'Maharashtra & Gujarat': ['Maharashtra', 'Gujarat'],
   'Maharashtra except Aurangabad & Nasik RTOs': ['Maharashtra'],
   'East except North East':
     ['West Bengal', 'Odisha', 'Bihar', 'Jharkhand', 'Sikkim'],
@@ -188,6 +190,16 @@ const PRODUCT_LINES = {
     { product: 'CAR', segment: 'Pvt Car', rate_type: 'COMP', emit: 'comp', sub_type: 'With NCB' },
   'PVT car Pakage With NCB':   // operator's July'26 spelling (typo "Pakage")
     { product: 'CAR', segment: 'Pvt Car', rate_type: 'COMP', emit: 'comp', sub_type: 'With NCB' },
+  // Sep'26 renames the High-end block into two region-scoped lines (USER: map to
+  // the existing High End line). 26% with NCB / 22% without.
+  'Pvt Car Comp & SAOD':
+    { product: 'CAR', segment: 'Pvt Car High End', rate_type: 'COMP', emit: 'comp',
+      makes: ['Mercedes-Benz', 'BMW', 'Audi', 'Volvo', 'Land Rover', 'Mini', 'Jaguar'],
+      remarks_prefix: 'High End — Max IDV Rs. 1.75 Cr. Mandatory add-ons: Zero Dep, Engine Protect (preferred 0-2 yrs), RTI (preferred 0-2 yrs), Tyre Secure, Key Protection, Consumables, Roadside Assistance.' },
+  'Pvt Car Comp SAOD':
+    { product: 'CAR', segment: 'Pvt Car High End', rate_type: 'COMP', emit: 'comp',
+      makes: ['Mercedes-Benz', 'BMW', 'Audi', 'Volvo', 'Land Rover', 'Mini', 'Jaguar'],
+      remarks_prefix: 'High End — Max IDV Rs. 1.75 Cr. Mandatory add-ons: Zero Dep, Engine Protect (preferred 0-2 yrs), RTI (preferred 0-2 yrs), Tyre Secure, Key Protection, Consumables, Roadside Assistance.' },
   'Pvt Car SAOD':
     { product: 'CAR', segment: 'Pvt Car', rate_type: 'SAOD', emit: 'saod' },
   // "High End" → segment carries the marker so the export's inferHEV() tags
@@ -223,7 +235,7 @@ const PVT_CAR_DISCOUNT_TIERS = [
   { trigger: 'NCB = 0',                       sub_type:    'NCB=0', rate: 0.15  },
 ];
 
-function emitSection1Row(rules, meta, productLine, regionLabel, rate, addon) {
+function emitSection1Row(rules, meta, productLine, regionLabel, rate, addon, rateText) {
   const cfg = PRODUCT_LINES[productLine];
   if (!cfg) {
     console.warn(`[zuno] unknown product line: ${productLine}`);
@@ -233,7 +245,7 @@ function emitSection1Row(rules, meta, productLine, regionLabel, rate, addon) {
   // every Section 1 rate applies for NCB 1-99 (any positive NCB). The
   // explicit "<region> Without NCB" rows carry NCB=0 instead. The discount-
   // tier note row also emits a separate global NCB=0 → 15% override rule.
-  const isWithoutNcb = /without\s*ncb/i.test(regionLabel);
+  const isWithoutNcb = /without\s*ncb/i.test(regionLabel) || /without\s*ncb/i.test(rateText || '');   // Sep26: '22%(Without NCB)' rate cell
   const ncbBand = isWithoutNcb ? 'NCB = 0' : 'NCB 1-99';
   // Pan India / "All doable RTO" rows: emit a single rule with no state.
   const isPan = /pan\s*india/i.test(regionLabel) ||
@@ -496,10 +508,10 @@ function parse(sheetData, sheetConfig, meta) {
       if (!c2) continue;
       const rate = c3 ? parseFloat(c3) : NaN;
       if (isNaN(rate) || rate <= 0) {
-        if (currentPL && /^TW\s/i.test(currentPL)) cb(currentPL, c2, 0, false);
+        if (currentPL && /^TW\s/i.test(currentPL)) cb(currentPL, c2, 0, false, c3);
         continue;
       }
-      cb(currentPL, c2, rate > 1 ? rate / 100 : rate, false);
+      cb(currentPL, c2, rate > 1 ? rate / 100 : rate, false, c3);
     }
   };
 
@@ -516,12 +528,12 @@ function parse(sheetData, sheetConfig, meta) {
 
   // Pass 2 — emit.
   let notesDone = false;
-  s1Headers.forEach((h, i) => walkBlock(h, blockEnd(i), (pl, region, rate, isNote) => {
+  s1Headers.forEach((h, i) => walkBlock(h, blockEnd(i), (pl, region, rate, isNote, rateText) => {
     if (isNote) {
       if (!notesDone) { emitPvtCarDiscountTiers(rules, meta); notesDone = true; }
       return;
     }
-    emitSection1Row(rules, meta, pl, region, rate, isSplit(pl) ? h.addon : null);
+    emitSection1Row(rules, meta, pl, region, rate, isSplit(pl) ? h.addon : null, rateText);
   }));
 
   // ---- Section 2 — State × Vehicle Type grid -------------------------------
