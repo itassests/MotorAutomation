@@ -223,7 +223,14 @@ router.post('/upload', async (req, res, next) => {
       if (_supersede) {
         await pool.request().input('insurer', sql.NVarChar, insurer).input('ef', sql.Date, new Date(effFrom))
           .input('self', sql.Int, cardId)
-          .query('UPDATE rate_cards SET effective_to=@ef WHERE insurer=@insurer AND effective_to IS NULL AND effective_from<@ef AND id<>@self');
+          .query(`UPDATE rate_cards SET effective_to=@ef
+                   WHERE insurer=@insurer AND effective_to IS NULL AND effective_from<@ef AND id<>@self
+                     -- Never retire an RTO-MASTER card. Those carry rto_mappings and NO
+                     -- rate rules, and sit on a sentinel date (Reliance's is 1970-01-01)
+                     -- precisely so they always apply. A rate-grid upload closing one
+                     -- silently breaks RTO->region resolution for that insurer.
+                     AND NOT (EXISTS (SELECT 1 FROM rto_mappings rm WHERE rm.rate_card_id = rate_cards.id)
+                              AND NOT EXISTS (SELECT 1 FROM rate_rules rr WHERE rr.rate_card_id = rate_cards.id))`);
       }
 
       let ruleCounts = null;
