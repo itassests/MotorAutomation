@@ -178,6 +178,7 @@ router.get('/luca', async (req, res, next) => {
 const AGENT_GUIDE = [
   'Before booking: first check RTO Master & guidelines. Declined make/model & RTO lists apply per insurer.',
   'SBI: Comprehensive up to 20 yr; check RTO Master. Chola: CPA not collected (individual) → 1.5% of OD deducted.',
+  'SBI School Bus (from 1-Sep-26): LoB "School Bus" only, seating 12+1 & above; 12+1–17 seats −2%, full payout 18+1 & above; KL & MP declined; TN & RJ 10% below slab.',
   'Shriram: SAOD 10% where SAOD grid not mentioned; EV & >15yr declined; −10% if discounting breached.',
   'Magma: CPA premium < Rs 450 not considered for outgo. Royal/Universal: check declined-RTO lists.',
   'Rates = system OUTGOING (grid minus the applicable margin).',
