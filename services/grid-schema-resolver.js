@@ -26,7 +26,7 @@ const HEADER_SYNONYMS = {
   rate:    [/approval\s*grid/i, /payout/i, /\bpo\b/i, /commission/i, /brokerage/i, /\brate\b/i, /\bgrid\b/i, /\bimd\b/i, /net\s*po/i],
   region:  [/^\s*rto\s*$/i, /region/i, /\bzone\b/i, /\bcity\b/i, /\bstate\b/i, /location/i, /cluster/i, /geography/i, /circle/i],
   cover:   [/section\s*text/i, /^\s*section\s*$/i, /\bcover\b/i, /policy\s*type/i, /coverage/i],
-  segment: [/^\s*segment\s*$/i, /sub[\s_-]*type/i, /body\s*type/i, /vehicle\s*type/i, /\bveh\b/i, /^\s*products?\s*$/i, /class\s*of\s*veh/i],
+  segment: [/^\s*segment\s*$/i, /sub[\s_-]*type/i, /body\s*type/i, /vehicle\s*type/i, /\bveh\b/i, /product\s*type/i, /^\s*products?\s*$/i, /class\s*of\s*veh/i],
   fuel:    [/fuel/i],
   ncb:     [/\bncb\b/i, /no\s*claim/i],
   biz:     [/business\s*type/i, /\bbiz\b/i, /new.*renew|renew.*new/i, /nb\s*\/?\s*renewal/i],
@@ -300,7 +300,11 @@ function parseFlatGrid(rows, schema, opts = {}) {
     const biz = roles.biz != null ? normBiz(get(row, 'biz')) : '';
     const make = roles.make != null && cell(get(row, 'make')) ? cell(get(row, 'make')) : 'All';
     const ccB = roles.cc != null ? parseBand(get(row, 'cc')) : { min: null, max: null };
-    const tonB = roles.tonnage != null ? parseBand(get(row, 'tonnage')) : { min: null, max: null };
+    // No dedicated tonnage column? Derive the band from the SEGMENT text. Broker
+    // deal mails put it there ("HCV 20T upto 40T"), and without this the rate was
+    // stored unbanded and applied to EVERY goods vehicle in the state. Mirrors the
+    // stacked-grid path, which already falls back to parseTonnage(segStr).
+    const tonB = roles.tonnage != null ? parseBand(get(row, 'tonnage')) : parseTonnage(segment);
     const seatB = roles.seating != null ? parseBand(get(row, 'seating')) : { min: null, max: null };
     const ageB = roles.age != null ? parseBand(get(row, 'age')) : { min: null, max: null };
     for (const leg of legs) {
@@ -502,6 +506,7 @@ function parseTonnage(s) {
   let m;
   if ((m = t.match(/([\d.]+)\s*(?:to|-|–|—)\s*([\d.]+)\s*(?:gvw|t|ton|mt)\b/))) return { min: +m[1], max: +m[2] };
   if ((m = t.match(/([\d.]+)\s*t(?:on)?s?\s*[-–—to]+\s*([\d.]+)\s*t/))) return { min: +m[1], max: +m[2] };
+  if ((m = t.match(/([\d.]+)\s*t(?:on)?s?\s*(?:upto|up\s*to)\s*([\d.]+)\s*t/))) return { min: +m[1], max: +m[2] };   // "20T upto 40T"
   if ((m = t.match(/(?:<=?|upto|up\s*to|below)\s*([\d.]+)\s*(?:t|gvw)/))) return { min: null, max: +m[1] };
   if ((m = t.match(/(?:>=?|above|more\s*than|over)\s*([\d.]+)\s*(?:t|gvw)/))) return { min: +m[1], max: null };
   if ((m = t.match(/([\d.]+)\s*t\s*[-–—]\s*([\d.]+)/))) return { min: +m[1], max: +m[2] };
@@ -935,6 +940,7 @@ function profileHealth(rows, profile, opts = {}) {
 }
 
 module.exports = {
+  parseTonnage,
   resolveSchema, parseFlatGrid, HEADER_SYNONYMS,
   buildProfile, schemaFromProfile, parseWithProfile, profileHealth,
   guessRateDivisor, parseBand, normFuel, normBiz, coverToRateType,
