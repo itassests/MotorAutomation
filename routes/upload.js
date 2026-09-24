@@ -101,8 +101,17 @@ router.post('/upload', async (req, res, next) => {
       const sheets = [];
       info.tables.forEach((rows, i) => sheets.push({ name: (_isImg ? 'Image Table ' : 'Email Table ') + (i + 1), rows }));
       const attNotes = [];
+      const attachFiles = [];   // spreadsheet attachments for the config-driven parser
       for (const a of info.attachments) {
         if (a.isSheet && a.buffer) {
+          // Stash the workbook so the INSURER'S OWN parser can read it below.
+          // The generic profiler alone got 0 rules out of Chola's Sept .xlsb,
+          // the very same workbook the config path turns into 797.
+          try {
+            const _ap = path.join(path.dirname(filePath), 'att_' + Date.now() + '_' + a.filename.replace(/[^A-Za-z0-9._-]/g, '_'));
+            fs.writeFileSync(_ap, a.buffer);
+            attachFiles.push({ name: a.filename, path: _ap });
+          } catch (_) { /* dynamic profiler still gets its shot below */ }
           try {
             const wb = XLSXlib.read(a.buffer, { type: 'buffer' });
             for (const sn of wb.SheetNames) {
@@ -159,10 +168,9 @@ router.post('/upload', async (req, res, next) => {
         for (let i = sheets.length - 1; i >= 0; i--) if (tblMonth[i] && tblMonth[i] !== effMonth) sheets.splice(i, 1);
       }
 
-      if (!effTo) {
-        await pool.request().input('insurer', sql.NVarChar, insurer).input('ef', sql.Date, new Date(effFrom))
-          .query('UPDATE rate_cards SET effective_to=@ef WHERE insurer=@insurer AND effective_to IS NULL AND effective_from<@ef');
-      }
+      // NOTE: superseding prior open cards is deliberately DEFERRED until after
+      // parsing - see the guarded block below. Closing the standing grid here
+      // would retire a live 797-rule card even when this upload yields nothing.
       const cardRes = await pool.request()
         .input('insurer', sql.NVarChar, insurer).input('fn', sql.NVarChar, fileName)
         .input('ef', sql.Date, new Date(effFrom))
@@ -174,11 +182,49 @@ router.post('/upload', async (req, res, next) => {
       // Classify + route each table: RTO master → rto_mappings, fleet approval →
       // fleet_overrides, enabler → enabler_overrides; rate/unknown continue to the
       // dynamic parse-profile path below.
+      // Config-driven pass over spreadsheet attachments. An insurer with a
+      // config knows its own sheet shapes; the dynamic profiler is only a
+      // fallback for shapes nobody has described yet.
+      let cfgRules = 0;
+      if (attachFiles.length) {
+        const _cfgPath = path.resolve(__dirname, '..', 'config', 'insurers', insurer + '.json');
+        if (fs.existsSync(_cfgPath)) {
+          let _icfg = null;
+          try { _icfg = JSON.parse(fs.readFileSync(_cfgPath, 'utf8')); } catch (_) { _icfg = null; }
+          for (const af of (_icfg ? attachFiles : [])) {
+            try {
+              const _r = await parseWorkbook(af.path, _icfg);
+              const _rate = (_r || []).filter((x) => x.layout !== 'rto_mapping');
+              if (_rate.length) {
+                await pp.insertRules(pool, cardId, insurer, 'attach:' + af.name, _rate);
+                cfgRules += _rate.length;
+                attNotes.push('attachment "' + af.name + '" parsed by the ' + insurer + ' config -> ' + _rate.length + ' rules');
+              }
+            } catch (e) {
+              attNotes.push('attachment "' + af.name + '" config parse failed: ' + e.message);
+            }
+          }
+        }
+      }
+      for (const af of attachFiles) { try { fs.unlinkSync(af.path); } catch (_) {} }
+
       const { routeAndIngest } = require('../services/doc-router');
       const routed = await routeAndIngest(pool, cardId, sheets, { insurer, subject: info.subject, sourceFile: fileName });
       const generated = pp.profileSheets(routed.rateSheets, { insurer });
       const dynCount = await pp.insertAutoRulesFromGenerated(pool, cardId, insurer, generated, null);
       await pp.persistProfiles(pool, cardId, filePath, generated.map(({ rows, ...g }) => g), { insurer });
+
+      // Supersede prior open cards ONLY for an unbounded upload that actually
+      // produced rate rules. A Chola "Payout Grid" mail whose grid rode in as an
+      // .xlsb attachment ingested 0 rules and still closed the live 797-rule card,
+      // leaving the insurer with no standing rates at all. An empty card must
+      // never retire a populated one.
+      const _supersede = !effTo && (dynCount > 0 || cfgRules > 0 || routed.counts.rate > 0);
+      if (_supersede) {
+        await pool.request().input('insurer', sql.NVarChar, insurer).input('ef', sql.Date, new Date(effFrom))
+          .input('self', sql.Int, cardId)
+          .query('UPDATE rate_cards SET effective_to=@ef WHERE insurer=@insurer AND effective_to IS NULL AND effective_from<@ef AND id<>@self');
+      }
 
       let ruleCounts = null;
       try {
@@ -190,11 +236,11 @@ router.post('/upload', async (req, res, next) => {
         ruleCounts = { total: Object.values(bp).reduce((a, p) => a + p.total, 0), by_product: Object.entries(bp).sort((a, b) => b[1].total - a[1].total).map(([product, v]) => ({ product, total: v.total, covers: v.covers })) };
       } catch (_) { /* best effort */ }
 
-      const noGrid = dynCount === 0 && routed.counts.rto_map === 0 && routed.counts.fleet === 0 && routed.counts.enabler === 0;
+      const noGrid = dynCount === 0 && cfgRules === 0 && routed.counts.rto_map === 0 && routed.counts.fleet === 0 && routed.counts.enabler === 0;
       return res.json({
         success: true, rate_card_id: cardId, source: (_isImg ? 'image' : 'email'), format: info.format,
         subject: info.subject, effective_from: effFrom, effective_to: effTo, bounded: !!effTo,
-        rules_count: dynCount, tables_found: info.tables.length,
+        rules_count: dynCount + cfgRules, rules_from_config: cfgRules, tables_found: info.tables.length,
         routed: routed.counts, classified: routed.classified,
         attachments: info.attachments.map((a) => ({ name: a.filename, kind: a.isSheet ? 'sheet' : a.isPdf ? 'pdf' : a.isImage ? 'image' : 'other', size: a.size })),
         notes: attNotes, no_grid: noGrid,
