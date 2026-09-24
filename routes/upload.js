@@ -75,17 +75,31 @@ router.post('/upload', async (req, res, next) => {
     // attachments, parse them with the dynamic engine, and land them as a card.
     // A bounded deal window (e.g. "20th-31st Jul") is an OVERLAY (standing grid
     // stays open); an unbounded grid supersedes prior open cards by effective date.
-    if (/\.(eml|msg)$/i.test(req.file.originalname) || /\.(eml|msg)$/i.test(req.file.path)) {
+    const _media = /\.(eml|msg|png|jpe?g|tiff?|gif|bmp|webp)$/i;
+    const _isImg = /\.(png|jpe?g|tiff?|gif|bmp|webp)$/i.test(req.file.originalname) || /\.(png|jpe?g|tiff?|gif|bmp|webp)$/i.test(req.file.path);
+    if (_media.test(req.file.originalname) || _media.test(req.file.path)) {
       const pool = await getPool();
       const filePath = req.file.path;
       const fileName = req.file.originalname;
       const { extractEmail } = require('../services/email-extract');
       const pp = require('../services/parse-profile');
       const XLSXlib = require('xlsx');
-      const info = await extractEmail(filePath);
+      // An image of a grid is OCR'd into the same {tables,…} shape an email
+      // yields, so everything downstream (doc-router → parse-profile) is shared.
+      const info = _isImg
+        ? await require('../services/image-extract').extractImage(filePath)
+        : await extractEmail(filePath);
+      // A screenshot has no header to date it; try the OCR text before giving up.
+      if (_isImg && !info.effective.from) {
+        try {
+          const { detectWindow } = require('../services/email-extract');
+          const w = detectWindow(info.bodyText, new Date().getFullYear());
+          if (w && w.from) info.effective = w;
+        } catch (_) { /* effective_from from the form still applies */ }
+      }
 
       const sheets = [];
-      info.tables.forEach((rows, i) => sheets.push({ name: 'Email Table ' + (i + 1), rows }));
+      info.tables.forEach((rows, i) => sheets.push({ name: (_isImg ? 'Image Table ' : 'Email Table ') + (i + 1), rows }));
       const attNotes = [];
       for (const a of info.attachments) {
         if (a.isSheet && a.buffer) {
@@ -98,7 +112,20 @@ router.post('/upload', async (req, res, next) => {
         } else if (a.isPdf) {
           attNotes.push('PDF attachment "' + a.filename + '" — needs a config parser (not auto-parsed)');
         } else if (a.isImage && a.size > 4000) {
-          attNotes.push('image attachment "' + a.filename + '" — likely a grid image; route to OCR');
+          // A grid pasted into the mail as a screenshot: OCR it rather than just
+          // noting it, so the tables reach the same parse pipeline as a sheet.
+          let ocrTmp = null;
+          try {
+            ocrTmp = path.join(path.dirname(filePath), 'ocr_' + Date.now() + '_' + a.filename.replace(/[^A-Za-z0-9._-]/g, '_'));
+            fs.writeFileSync(ocrTmp, a.buffer);
+            const shot = await require('../services/image-extract').extractImage(ocrTmp);
+            shot.tables.forEach((rows, k) => sheets.push({ name: 'Image Table ' + a.filename + ':' + (k + 1), rows }));
+            attNotes.push('image attachment "' + a.filename + '" — OCR produced ' + shot.tables.length + ' table(s)');
+          } catch (e) {
+            attNotes.push('image attachment "' + a.filename + '" — OCR unavailable: ' + e.message);
+          } finally {
+            if (ocrTmp) { try { fs.unlinkSync(ocrTmp); } catch (_) {} }
+          }
         }
       }
 
@@ -127,7 +154,7 @@ router.post('/upload', async (req, res, next) => {
         return null;
       };
       const effMonth = String(effFrom).slice(0, 7);
-      const tblMonth = sheets.map((s) => (/^Email Table/.test(s.name) ? monthOf(s.rows) : undefined));
+      const tblMonth = sheets.map((s) => (/^(Email|Image) Table/.test(s.name) ? monthOf(s.rows) : undefined));
       if (tblMonth.some((m) => m === effMonth)) {
         for (let i = sheets.length - 1; i >= 0; i--) if (tblMonth[i] && tblMonth[i] !== effMonth) sheets.splice(i, 1);
       }
@@ -165,7 +192,7 @@ router.post('/upload', async (req, res, next) => {
 
       const noGrid = dynCount === 0 && routed.counts.rto_map === 0 && routed.counts.fleet === 0 && routed.counts.enabler === 0;
       return res.json({
-        success: true, rate_card_id: cardId, source: 'email', format: info.format,
+        success: true, rate_card_id: cardId, source: (_isImg ? 'image' : 'email'), format: info.format,
         subject: info.subject, effective_from: effFrom, effective_to: effTo, bounded: !!effTo,
         rules_count: dynCount, tables_found: info.tables.length,
         routed: routed.counts, classified: routed.classified,
