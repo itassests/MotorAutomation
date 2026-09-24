@@ -1,0 +1,15 @@
+{
+  "_source": "Chola deal/scheme emails (M&H CV Exceptional Deal, Sep'26) write human state names, but the Chola grid keys regions as STATE CODES plus the MH special clusters resolved by services/chola-region.js (Mumbai/GA/Pune/Central MH vs ROM). Without this map the ingested overlay rules matched nothing and the scheme never paid.",
+  "_note": "Keys are matched case-insensitively on the WHOLE region label. A key may map to SEVERAL canonical regions - expandZones() emits one rule per entry, which is how 'Maharashtra & Mumbai' correctly covers both MH clusters (USER 2026-09-24).",
+  "zones": {
+    "Karnataka": ["KA"],
+    "Gujarat": ["GJ"],
+    "Mumbai": ["Mumbai/GA/Pune/Central MH"],
+    "Maharashtra (Except Mumbai)": ["ROM"],
+    "Maharashtra Except Mumbai": ["ROM"],
+    "Rest of Maharashtra": ["ROM"],
+    "Maharashtra & Mumbai": ["Mumbai/GA/Pune/Central MH", "ROM"],
+    "Maharashtra and Mumbai": ["Mumbai/GA/Pune/Central MH", "ROM"],
+    "Maharashtra": ["Mumbai/GA/Pune/Central MH", "ROM"]
+  }
+}
