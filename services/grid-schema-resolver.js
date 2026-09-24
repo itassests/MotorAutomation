@@ -689,7 +689,7 @@ function extractColDims(s) {
  * Detect a wide layout. Returns { layout:'wide', keyCol, headerRows:[..], dataStart,
  * rateCols, colDims:{col→{cc,fuel,cover,segment}}, rate_divisor, confidence } or null.
  */
-function detectWide(rows) {
+function detectWide(rows, opts) {
   const limit = Math.min(20, rows.length);
   // data start: first row with a text key in some left column AND ≥3 numeric cells
   let dataStart = -1, keyCol = -1;
@@ -720,6 +720,36 @@ function detectWide(rows) {
     if (rateLike >= 0.7 && nums.length >= 1 && inBand >= 0.8) rateCols.push(c);
   }
   if (rateCols.length < 3) return null;   // < 3 rate cols → let flat/matrix handle it
+
+  // keyCol is the LEFTMOST text column, but a grid often leads with a COARSE
+  // geography followed by a finer one - Reliance's LCV mail is
+  // "Zone | RTO Region | ... | rates", where keying on Zone discards the RTO and
+  // collapses Mumbai (70%) and Nagpur (25%) into one "West" row.
+  //
+  // OPT-IN (opts.fineKey). Changing keyCol changes how many rules the wide parse
+  // yields, which would otherwise perturb the count-based layout arbitration and
+  // silently flip sheets that legitimately parse flat/region today (measured: 3
+  // such flips across go_digit/indusind). buildProfile therefore applies it ONLY
+  // once wide has already won.
+  if (opts && opts.fineKey) {
+    const firstRate = Math.min.apply(null, rateCols);
+    const lastRow = Math.min(rows.length, dataStart + 200);
+    let bestCol = keyCol, bestN = -1;
+    for (let c = 0; c < firstRate; c++) {
+      const seen = new Set();
+      let textRows = 0, totalRows = 0;
+      for (let r = dataStart; r < lastRow; r++) {
+        const v = cell((rows[r] || [])[c]);
+        if (v === '') continue;
+        totalRows++;
+        if (isNumericish(v)) continue;   // a numeric left column is not a key
+        textRows++; seen.add(v.toUpperCase());
+      }
+      if (!totalRows || textRows / totalRows < 0.8 || seen.size < 2) continue;
+      if (seen.size > bestN) { bestN = seen.size; bestCol = c; }
+    }
+    if (bestN > 0) keyCol = bestCol;
+  }
 
   // header rows: the (up to 2) rows above dataStart that carry column labels
   const headerRowIdx = [];
@@ -881,6 +911,21 @@ function buildProfile(rows, opts = {}) {
     const matN = parseMatrixGrid(rows, matrix, opts).length;
     if (matN > chosenN) { chosen = matrix; chosenN = matN; }
   }
+  // ALL arbitration is settled above. Only now, if the winner is the wide layout,
+  // re-key it on the FINEST leading text column: a grid that leads with a coarse
+  // geography (Reliance LCV: "Zone | RTO Region | ... | rates") otherwise keys on
+  // Zone and collapses Mumbai (70%) with Nagpur (25%).
+  // Deliberately LAST: adopting it raises the rule count, and doing that mid-
+  // arbitration made matrix lose to wide on 7 Chola sheets. Adopted only when it
+  // does not lose rules, so coverage can never shrink.
+  if (chosen && chosen.layout === 'wide') {
+    const fine = detectWide(rows, { fineKey: true });
+    if (fine && fine.keyCol !== chosen.keyCol) {
+      const fineN = parseWideGrid(rows, fine, opts).length;
+      if (fineN >= chosenN) { chosen = fine; chosenN = fineN; }
+    }
+  }
+
   chosen.sheet_name = opts.sheet_name || null;
   return chosen;
 }
