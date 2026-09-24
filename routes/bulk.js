@@ -6167,6 +6167,23 @@ async function processOnePolicy(pool, policy, marginRules, caches, statementInde
     }
   }
 
+  // ---- Zuno add-on rate split (Sep'26) ----
+  // The Sep'26 Robinhood grid prices Pvt Car Package TWICE: a "Without Add-on
+  // With NCB" block (38%) and a "With Add-on & NCB" block (27%). The parser
+  // emits both, tagged addon='No'/'Yes'; without this gate both sit in the pool
+  // and the scorer would pick arbitrarily between a 38% and a 27% rate.
+  // Pick the block matching this policy's add-on premium. Rules with addon NULL
+  // (every other Zuno product) always stay eligible, and the prune is a no-op
+  // unless a matching tagged row actually exists — so no regression on older
+  // Zuno cards, which carry no addon dimension at all.
+  if (insurerSlug === 'zuno') {
+    const _wantAddon = (Number(params.addonPremium) || 0) > 0 ? 'Yes' : 'No';
+    if (rules.some(r => r.addon === _wantAddon)) {
+      rules = rules.filter(r => !r.addon || r.addon === _wantAddon);
+    }
+  }
+
+
   // ---- Zuno Pvt-Car SAOD routing ----
   // Zuno keeps its only CAR-SAOD rates OUTSIDE the regional grids: "All doable
   // RTO'S" SAOD 24% (NCB 1-99) and the Pan-India "NCB = 0 → 15%" floor. A

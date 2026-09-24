@@ -223,7 +223,7 @@ const PVT_CAR_DISCOUNT_TIERS = [
   { trigger: 'NCB = 0',                       sub_type:    'NCB=0', rate: 0.15  },
 ];
 
-function emitSection1Row(rules, meta, productLine, regionLabel, rate) {
+function emitSection1Row(rules, meta, productLine, regionLabel, rate, addon) {
   const cfg = PRODUCT_LINES[productLine];
   if (!cfg) {
     console.warn(`[zuno] unknown product line: ${productLine}`);
@@ -266,6 +266,7 @@ function emitSection1Row(rules, meta, productLine, regionLabel, rate) {
         state: state || undefined,
         region: city || state || (isPan ? panRegion : regionLabel),  // city > state > (pooled Pan India | raw label)
         sub_type: cfg.sub_type || null,
+        addon: addon || null,   // Sep26: "Without Add-on"=No vs "With Add-on"=Yes blocks
         rate_type: cfg.rate_type,
         vehicle_age_min: cfg.vehicle_age_min ?? null,
         vehicle_age_max: cfg.vehicle_age_max ?? null,
@@ -326,29 +327,33 @@ const RESTRICTED_MAKES = ['Tata', 'Maruti', 'Mahindra', 'Ashok Leyland'];
 // column header "Staff Bus (TP & Package)" means the rate applies to both
 // the standalone-TP product AND the Package product.
 const SEC2_COLS = [
-  // GCV-product cols carry "TP & Package" in their headers → emit both COMP
-  // (OD+TP halves) AND SATP (TP only) at the same rate so the export shows
-  // a Package row and a separate TP-only row per state. Staff Bus is also
-  // dual. PCV (3W PCV col 3) is COMP only — its header doesn't list TP.
-  { col: 2, product: 'GCV', segment: '3W GCV', dual: true,
+  // Columns are resolved from the section-2 header row by `match` (NOT by a
+  // fixed index): the operator reflows this grid between months — Sep'26 both
+  // dropped the leading blank column A and inserted a new "3.5 to 7.5" column,
+  // which silently shifted Staff Bus / Tractor under positional parsing.
+  { match: /3\s*W\s*GCV/i, product: 'GCV', segment: '3W GCV', dual: true,
     label: '3W GCV TP & Package' },
-  { col: 3, product: 'PCV', segment: '3W PCV',
+  { match: /3\s*W\s*PCV/i, product: 'PCV', segment: '3W PCV',
     label: '3W PCV TP & Package' },
-  { col: 4, product: 'GCV', segment: 'GCV', dual: true,
+  { match: /upto\s*2\.5/i, product: 'GCV', segment: 'GCV', dual: true,
     weight_min: 0,   weight_max: 2.5,
     makes: RESTRICTED_MAKES,
-    label: 'GCV ≤2.5T TP & Package (Tata/Maruti/Mahindra/Ashok Leyland)' },
-  { col: 5, product: 'GCV', segment: 'GCV', dual: true,
+    label: 'GCV <=2.5T TP & Package (Tata/Maruti/Mahindra/Ashok Leyland)' },
+  { match: /2\.5\s*to\s*3\.5/i, product: 'GCV', segment: 'GCV', dual: true,
     weight_min: 2.5, weight_max: 3.5,
     makes: RESTRICTED_MAKES,
     label: 'GCV 2.5-3.5T TP & Package (Tata/Maruti/Mahindra/Ashok Leyland)' },
-  { col: 6, product: 'PCV', segment: 'Staff Bus', dual: true,
+  { match: /3\.5\s*to\s*7\.5/i, product: 'GCV', segment: 'GCV', dual: true,
+    weight_min: 3.5, weight_max: 7.5,
+    makes: RESTRICTED_MAKES,
+    label: 'GCV 3.5-7.5T TP & Package (Tata/Maruti/Mahindra/Ashok Leyland)' },
+  { match: /staff\s*bus/i, product: 'PCV', segment: 'Staff Bus', dual: true,
     label: 'Staff Bus TP & Package' },
-  { col: 7, product: 'GCV', segment: 'Tractor', dual: true,
+  { match: /tractor/i, product: 'GCV', segment: 'Tractor', dual: true,
     label: 'Tractor (with or w/o single registered trailer) TP & Package' },
 ];
 
-function emitSection2Row(rules, meta, entry, row) {
+function emitSection2Row(rules, meta, entry, row, cols) {
   // entry: { state, city?, excluded[] } — one parsed token from the row's
   // first column. State must always be set; city is optional.
   if (!entry || !entry.state) return;
@@ -361,7 +366,7 @@ function emitSection2Row(rules, meta, entry, row) {
   // documents which products are inapplicable in each state (e.g. TN has
   // no Staff Bus/Tractor entries; Goa has no GCV ≤2.5 / 2.5-3.5 / Tractor;
   // UK has only the GCV mid-tier; Daman / Dadar are all-zero).
-  for (const def of SEC2_COLS) {
+  for (const def of (cols || SEC2_COLS)) {   // cols = header-resolved indices
     const raw = cell(row[def.col]);
     const rate = raw ? parseFloat(raw) : NaN;
     const rateValue = (isNaN(rate) || rate < 0)
@@ -441,58 +446,109 @@ function parse(sheetData, sheetConfig, meta) {
   const rules = [];
   if (!Array.isArray(sheetData) || sheetData.length === 0) return rules;
 
-  // Section 1 — walk rows top-down, tracking the "current product line"
-  // (col B). The cell often spans multiple rows (only the first row of a
-  // group has a non-empty Product Line); we forward-fill.
-  let currentPL = null;
-  let inSection2 = false;
-  for (let r = 1; r < sheetData.length; r++) {
-    const row = sheetData[r] || [];
-    const c1 = cell(row[1]);   // Product Line / Doable State header
-    const c2 = cell(row[2]);   // Region / first rate col
-    const c3 = cell(row[3]);   // Rate / second rate col
+  // ---- Resolve the column layout from the HEADER ROWS ----------------------
+  // Never trust fixed column indices: the operator reflows this sheet between
+  // months. Sep'26 dropped the leading blank column A (shifting every column
+  // left by one) AND inserted a new "3.5 to 7.5" GCV band mid-grid, which under
+  // the old positional parsing silently pushed Staff Bus / Tractor one column
+  // off. Positional parsing produced ZERO rules for that file.
+  const findIdx = (row, re) => (row || []).findIndex((c) => re.test(cell(c)));
 
-    // Detect section-2 header row: "Doable State" in col B
-    if (/^doable\s*state$/i.test(c1)) {
-      inSection2 = true;
-      currentPL = null;
+  // Section-1 header rows carry "Product Line" + "Region/RTO/Zone". There can be
+  // MORE THAN ONE: Sep'26 splits Pvt Car Package into a "Without Add-on With NCB"
+  // block and a "With Add-on & NCB" block, each with its own rate column.
+  const s1Headers = [];
+  let s2Header = -1;
+  for (let r = 0; r < sheetData.length; r++) {
+    const row = sheetData[r] || [];
+    const plCol = findIdx(row, /^product\s*line$/i);
+    const regionCol = findIdx(row, /region\s*\/?\s*rto/i);
+    if (plCol >= 0 && regionCol >= 0) {
+      const rateCol = regionCol + 1;
+      const rateHdr = cell(row[rateCol]);
+      const addon = /without\s*add[\s-]*on/i.test(rateHdr) ? 'No'
+                  : /with\s*add[\s-]*on/i.test(rateHdr) ? 'Yes'
+                  : null;   // Apr/Jul grids: plain "With NCB" — no add-on dimension
+      s1Headers.push({ row: r, plCol, regionCol, rateCol, addon });
       continue;
     }
+    if (s2Header < 0 && findIdx(row, /^doable\s*state$/i) >= 0) s2Header = r;
+  }
 
-    if (!inSection2) {
-      // Section 1 — Product Line × Region × Rate
+  const blockEnd = (i) => (i + 1 < s1Headers.length)
+    ? s1Headers[i + 1].row
+    : (s2Header >= 0 ? s2Header : sheetData.length);
+
+  // Walk one section-1 block, calling back with (productLine, region, rate).
+  const walkBlock = (h, end, cb) => {
+    let currentPL = null;
+    for (let r = h.row + 1; r < end; r++) {
+      const row = sheetData[r] || [];
+      const c1 = cell(row[h.plCol]);
+      const c2 = cell(row[h.regionCol]);
+      const c3 = cell(row[h.rateCol]);
       if (c1) currentPL = c1;
-      // "Note: For OD 85% ..." row — handle once, then move on
       if (/^note\s*:/i.test(currentPL || '') || /^note\s*:/i.test(c1)) {
-        emitPvtCarDiscountTiers(rules, meta);
+        cb(null, null, null, true);   // note row → discount tiers
         currentPL = null;
         continue;
       }
-      // Skip rows with no region or no rate
       if (!c2) continue;
       const rate = c3 ? parseFloat(c3) : NaN;
       if (isNaN(rate) || rate <= 0) {
-        // Empty-rate rows for TW NEW / TW TP — operator wants explicit 0%
-        if (currentPL && /^TW\s/i.test(currentPL)) {
-          emitSection1Row(rules, meta, currentPL, c2, 0);
-        }
+        if (currentPL && /^TW\s/i.test(currentPL)) cb(currentPL, c2, 0, false);
         continue;
       }
-      const rateValue = rate > 1 ? rate / 100 : rate;
-      emitSection1Row(rules, meta, currentPL, c2, rateValue);
-      continue;
+      cb(currentPL, c2, rate > 1 ? rate / 100 : rate, false);
     }
+  };
 
-    // Section 2 — State × Vehicle Type grid
-    if (!c1) continue;
-    // Stop on the "Fleet approvals..." / "Guidelines..." trailer rows
-    if (/^(fleet|for\s*mmv|guidelines|approved\s*luxury|preferred\s*makes|mandatory\s*add|all\s*policies|zero\s*dep|engine\s*protect|return\s*to\s*invoice|tyre|key\s*prot|consumables|roadside|^\d+\.)/i.test(c1)) {
-      break;
+  // Pass 1 — which product lines appear in MORE THAN ONE block? Only those are
+  // genuine add-on variants. Products that merely sit below the second header
+  // (Pvt Car TP Only, Pvt new car business) must NOT inherit its add-on flag.
+  const seenBy = new Map();
+  s1Headers.forEach((h, i) => walkBlock(h, blockEnd(i), (pl) => {
+    if (!pl) return;
+    if (!seenBy.has(pl)) seenBy.set(pl, new Set());
+    seenBy.get(pl).add(i);
+  }));
+  const isSplit = (pl) => (seenBy.get(pl) || new Set()).size > 1;
+
+  // Pass 2 — emit.
+  let notesDone = false;
+  s1Headers.forEach((h, i) => walkBlock(h, blockEnd(i), (pl, region, rate, isNote) => {
+    if (isNote) {
+      if (!notesDone) { emitPvtCarDiscountTiers(rules, meta); notesDone = true; }
+      return;
     }
-    const entries = parseStateCell(c1);
-    if (!entries || entries.length === 0) continue;
-    for (const entry of entries) {
-      emitSection2Row(rules, meta, entry, row);
+    emitSection1Row(rules, meta, pl, region, rate, isSplit(pl) ? h.addon : null);
+  }));
+
+  // ---- Section 2 — State × Vehicle Type grid -------------------------------
+  if (s2Header >= 0) {
+    const hdr = sheetData[s2Header] || [];
+    const stateCol = findIdx(hdr, /^doable\s*state$/i);
+    // Bind each product column to a real index by matching its header text.
+    const cols = SEC2_COLS
+      .map((def) => ({ ...def, col: findIdx(hdr, def.match) }))
+      .filter((def) => def.col >= 0);
+    for (const def of SEC2_COLS) {
+      if (findIdx(hdr, def.match) < 0) {
+        console.warn(`[zuno] section-2 column not found in header: ${def.label}`);
+      }
+    }
+    for (let r = s2Header + 1; r < sheetData.length; r++) {
+      const row = sheetData[r] || [];
+      const c1 = cell(row[stateCol]);
+      if (!c1) continue;
+      if (/^(fleet|for\s*mmv|guidelines|approved\s*luxury|preferred\s*makes|mandatory\s*add|all\s*policies|zero\s*dep|engine\s*protect|return\s*to\s*invoice|tyre|key\s*prot|consumables|roadside|^\d+\.)/i.test(c1)) {
+        break;
+      }
+      const entries = parseStateCell(c1);
+      if (!entries || entries.length === 0) continue;
+      for (const entry of entries) {
+        emitSection2Row(rules, meta, entry, row, cols);
+      }
     }
   }
 
