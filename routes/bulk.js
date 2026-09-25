@@ -28,6 +28,7 @@ const sql = require('mssql');
 const { getPool } = require('../db/connection');
 const { getPrarambhPool } = require('../db/prarambh-connection');
 const { getPrarambhUatPool } = require('../db/prarambh-uat-connection');
+const { repairBlankInsurerNames } = require('../services/insurer-name-repair');
 const { getBeeinsuredPool } = require('../db/beeinsured-connection');
 const { lookupRates, resolveRTO, rtoProductFor } = require('../services/rate-lookup');
 const { determinePremium } = require('../services/calculator');
@@ -7236,7 +7237,10 @@ async function runBulkCalculate(body) {
            OR LOWER(REPLACE(INSURERNAME, ' ', '_')) LIKE LOWER(@cfgSlugFirst${i}) + '%'
           )`;
         });
-        whereBits.push(`(${ors.join(' OR ')})`);
+        // Blank INSURERNAME rows are let through here and repaired from
+        // Prarambh_Live below; anything still uncovered after the repair is
+        // dropped in JS, so the filter's intent is preserved.
+        whereBits.push(`((${ors.join(' OR ')}) OR INSURERNAME IS NULL OR LTRIM(RTRIM(INSURERNAME)) = '')`);
       }
     } catch (_) { /* if rate_cards lookup fails, fall through with no filter */ }
   }
@@ -7312,6 +7316,39 @@ async function runBulkCalculate(body) {
      ORDER BY SubmissionDate DESC, PolicyNo`
   );
   if (skip > 0) rowsResult.recordset = rowsResult.recordset.slice(skip);
+
+  // ---- Repair blank INSURERNAME from Prarambh_Live --------------------------
+  // The slug filter above deliberately lets blank-insurer rows through so they
+  // can be recovered here rather than vanishing before pricing. Anything still
+  // blank (or naming a carrier with no live rate card) is dropped now, which
+  // restores the original filter's intent.
+  let _repair = null;
+  if (!policy_nos && _activeSlugs && _activeSlugs.length > 0) {
+    const slugCovers = (name) => {
+      const n = String(name || '').toLowerCase().replace(/ /g, '_');
+      if (!n) return false;
+      return _activeSlugs.some((sl) => {
+        const c = sl.toLowerCase();
+        const core = c.replace(/_(general|insurance|videocon|hdi|allianz|tokio|sundaram|sompo|lombard|ergo|aig|ms)$/i, '');
+        const first = c.split('_')[0];
+        return n.startsWith(c) || c.startsWith(n) || n.startsWith(core) || n.startsWith(first);
+      });
+    };
+    try {
+      _repair = await repairBlankInsurerNames(rowsResult.recordset);
+      if (_repair.attempted > 0) {
+        console.log('[bulk] blank INSURERNAME: ' + _repair.attempted + ' row(s), repaired ' +
+          _repair.repaired + ' from Prarambh_Live, ' + _repair.unresolved + ' still unknown');
+      }
+    } catch (e) {
+      console.warn('[bulk] blank-insurer repair skipped:', e.message);
+    }
+    const before = rowsResult.recordset.length;
+    rowsResult.recordset = rowsResult.recordset.filter((r) => slugCovers(r.INSURERNAME));
+    const dropped = before - rowsResult.recordset.length;
+    if (dropped > 0) console.log('[bulk] dropped ' + dropped + ' row(s) with no covered insurer after repair');
+  }
+
   const totalCount = rowsResult.recordset.length + skip;
 
   // ---- Excluded-policy diagnostic -------------------------------------------
@@ -7345,6 +7382,9 @@ async function runBulkCalculate(body) {
         });
       };
       let blank = 0, windowTotal = 0;
+      // Blanks we recovered from Prarambh_Live are NOT exclusions - they were
+      // priced. Only the ones we could not resolve still count as skipped.
+      const repairedBlanks = (_repair && _repair.repaired) || 0;
       const unconfigured = [];
       for (const row of dres.recordset) {
         windowTotal += row.n;
@@ -7353,17 +7393,20 @@ async function runBulkCalculate(body) {
       }
       unconfigured.sort((x, y) => y.policies - x.policies);
       const unconfiguredTotal = unconfigured.reduce((t, u) => t + u.policies, 0);
+      blank = Math.max(0, blank - repairedBlanks);
       const skippedTotal = blank + unconfiguredTotal;
-      if (skippedTotal > 0) {
+      if (skippedTotal > 0 || repairedBlanks > 0) {
         _excluded = {
           window_total: windowTotal,
           selected: totalCount,
           skipped_total: skippedTotal,
           no_insurer_name: blank,
+          repaired_from_live: repairedBlanks,
           unconfigured_insurers: unconfigured,
           note: 'Policies in the date window removed by the insurer filter before pricing: ' +
                 blank + ' with no INSURERNAME' +
-                (unconfiguredTotal ? ', ' + unconfiguredTotal + ' for carriers with no live rate card' : '') + '.',
+                (unconfiguredTotal ? ', ' + unconfiguredTotal + ' for carriers with no live rate card' : '') + '.' +
+                (repairedBlanks ? ' ' + repairedBlanks + ' blank-insurer row(s) were recovered from Prarambh_Live and priced.' : ''),
         };
         console.log('[bulk] excluded before pricing: ' + skippedTotal + ' policies (' +
           blank + ' blank insurer, ' + unconfiguredTotal + ' unconfigured carrier)');

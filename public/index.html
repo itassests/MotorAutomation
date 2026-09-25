@@ -12252,7 +12252,7 @@
         // reconciling tracker numbers by hand.
         const _exc = data.excluded_before_pricing;
         let excBanner = '';
-        if (_exc && _exc.skipped_total > 0) {
+        if (_exc && (_exc.skipped_total > 0 || _exc.repaired_from_live > 0)) {
           const bits = [];
           if (_exc.no_insurer_name > 0) bits.push(`<strong>${_exc.no_insurer_name}</strong> with no insurer name`);
           (_exc.unconfigured_insurers || []).slice(0, 6).forEach(u =>
@@ -12265,6 +12265,9 @@
                <strong>${(_exc.window_total || 0).toLocaleString('en-IN')}</strong> policies in this date window were
                <strong>excluded before pricing</strong> &mdash; ${bits.join(', ')}.
                <span style="color:#8d6e63;">These are not "no rule" rows; they never entered the calculation.</span>
+               ${_exc.repaired_from_live > 0
+                 ? `<div style="margin-top:4px; color:#2e7d32;">Recovered <strong>${_exc.repaired_from_live}</strong> blank-insurer row(s) from Prarambh_Live and priced them.</div>`
+                 : ''}
              </div>`;
         }
         status.innerHTML = origin + cap + cycleTools + excBanner;
