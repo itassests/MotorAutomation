@@ -32,12 +32,22 @@ const DRYRUN = String(process.env.POLICY_PUSH_DRYRUN || '1') !== '0' || !DATA_UR
 const DRYRUN_FAIL = (process.env.POLICY_PUSH_DRYRUN_FAIL || '').trim();
 
 let _token = { value: null, expiresAt: 0 };
+// Concurrent pushers all miss the cache on a cold start (or right after expiry)
+// and would each POST the token endpoint. Share the in-flight fetch so N workers
+// cause exactly ONE token call.
+let _tokenInFlight = null;
 
 /** Fetch (and cache) the API token. Pass {force:true} to bypass the cache. */
 async function getToken({ force = false } = {}) {
   if (DRYRUN) return 'dryrun-token';
   const now = Date.now();
   if (!force && _token.value && now < _token.expiresAt - 30000) return _token.value;
+  if (_tokenInFlight) return _tokenInFlight;
+  _tokenInFlight = _fetchToken().finally(() => { _tokenInFlight = null; });
+  return _tokenInFlight;
+}
+
+async function _fetchToken() {
   if (!TOKEN_URL) throw new Error('POLICY_PUSH_TOKEN_URL not configured');
   if (!CLIENT_ID || !CLIENT_SECRET) throw new Error('POLICY_PUSH_CLIENT_ID/SECRET not configured');
   // OAuth2 client_credentials — the OneInsure token endpoint expects

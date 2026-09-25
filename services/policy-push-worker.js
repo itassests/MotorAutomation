@@ -20,6 +20,12 @@ const { getToken, pushData, buildPayload, DRYRUN } = require('./policy-push-api'
 const ENABLED = String(process.env.POLICY_PUSH_ENABLED || '0') === '1';
 const TICK_MS = parseInt(process.env.POLICY_PUSH_TICK_MS || '10000', 10);
 const BATCH_PER_TICK = parseInt(process.env.PUSH_BATCH_PER_TICK || '20', 10);
+// Pushes are almost entirely I/O wait - the payload view costs ~0.8s and the
+// vendor POST ~9s - so draining them one at a time capped throughput at one
+// policy per tick (6/min measured). Run N claims concurrently instead. The
+// claim UPDATE is already atomic (READPAST/ROWLOCK/UPDLOCK), so workers never
+// hand the same row to two pushes. Keep this modest: the vendor API may rate-limit.
+const CONCURRENCY = Math.max(1, parseInt(process.env.POLICY_PUSH_CONCURRENCY || '5', 10));
 const SEED_BATCH = parseInt(process.env.PUSH_SEED_BATCH || '1000', 10);
 const MAX_RETRY = parseInt(process.env.POLICY_PUSH_MAX_RETRY || '3', 10);
 const BACKFILL_FROM = (process.env.POLICY_PUSH_BACKFILL_FROM || '2026-04-01').trim();
@@ -127,52 +133,96 @@ async function buildPayloadFromView(live, row) {
   return { payload: buildPayload(view), policyNo: view['POLICY NO'] || null };
 }
 
-async function drainQueue(app, live) {
-  for (let i = 0; i < BATCH_PER_TICK; i++) {
-    // Claim one pending row atomically (skip locked rows so concurrent ticks/hosts don't collide).
-    const claim = await app.request().query(
-      `UPDATE TOP (1) q SET q.status = 4, q.updated_at = GETDATE()
-       OUTPUT INSERTED.id, INSERTED.prarambh_main_id, INSERTED.tracker_no,
-              INSERTED.policy_no, INSERTED.retry, INSERTED.payload_json
-       FROM dbo.policy_push_queue q WITH (READPAST, ROWLOCK, UPDLOCK) WHERE q.status = 1`);
-    if (claim.recordset.length === 0) break;
-    const row = claim.recordset[0];
+/** Claim ONE pending row atomically, or null when the queue is drained.
+ *  READPAST/ROWLOCK/UPDLOCK means concurrent workers (and other hosts) skip
+ *  rows already locked, so a row is never handed out twice. */
+async function claimOne(app) {
+  const claim = await app.request().query(
+    `UPDATE TOP (1) q SET q.status = 4, q.updated_at = GETDATE()
+     OUTPUT INSERTED.id, INSERTED.prarambh_main_id, INSERTED.tracker_no,
+            INSERTED.policy_no, INSERTED.retry, INSERTED.payload_json
+     FROM dbo.policy_push_queue q WITH (READPAST, ROWLOCK, UPDLOCK) WHERE q.status = 1`);
+  return claim.recordset.length === 0 ? null : claim.recordset[0];
+}
+
+/** Build → push → settle one claimed row. Never throws: a failure is recorded
+ *  on the row (retry or dead) so one bad policy can't stall the pool. */
+async function processOne(app, live, row) {
+  try {
+    let payload, policyNo = row.policy_no;
+    if (row.payload_json) {                 // corrected repush → use the stored/edited payload
+      payload = JSON.parse(row.payload_json);
+      if (payload && payload.policyNo) policyNo = payload.policyNo;
+    } else {
+      const built = await buildPayloadFromView(live, row);
+      payload = built.payload; policyNo = built.policyNo;
+    }
+    // The mobile API upserts by policy_number, so a blank one would create a
+    // junk record. Not-yet-issued policies have no number yet — DEFER them
+    // (status 5 "awaiting policy number"), re-activated daily until issued.
+    if (!policyNo || String(policyNo).trim() === '') {
+      await app.request().input('id', sql.BigInt, row.id)
+        .query("UPDATE dbo.policy_push_queue SET status = 5, error = 'awaiting policy number', updated_at = GETDATE() WHERE id = @id");
+      return 'deferred';
+    }
+    const token = await getToken();
+    await pushData(payload, token);
+    await app.request()
+      .input('id', sql.BigInt, row.id)
+      .input('p', sql.NVarChar(200), policyNo)
+      .input('pl', sql.NVarChar(sql.MAX), JSON.stringify(payload))
+      .query(`UPDATE dbo.policy_push_queue
+                 SET status = 2, pushed_at = GETDATE(), error = NULL,
+                     policy_no = @p, payload_json = @pl, updated_at = GETDATE()
+               WHERE id = @id`);
+    return 'pushed';
+  } catch (err) {
+    const next = (row.retry || 0) + 1;
+    const status = next < MAX_RETRY ? 1 : 3;
     try {
-      let payload, policyNo = row.policy_no;
-      if (row.payload_json) {                 // corrected repush → use the stored/edited payload
-        payload = JSON.parse(row.payload_json);
-        if (payload && payload.policyNo) policyNo = payload.policyNo;
-      } else {
-        const built = await buildPayloadFromView(live, row);
-        payload = built.payload; policyNo = built.policyNo;
-      }
-      // The mobile API upserts by policy_number, so a blank one would create a
-      // junk record. Not-yet-issued policies have no number yet — DEFER them
-      // (status 5 "awaiting policy number"), re-activated daily until issued.
-      if (!policyNo || String(policyNo).trim() === '') {
-        await app.request().input('id', sql.BigInt, row.id)
-          .query("UPDATE dbo.policy_push_queue SET status = 5, error = 'awaiting policy number', updated_at = GETDATE() WHERE id = @id");
-        continue;
-      }
-      const token = await getToken();
-      await pushData(payload, token);
-      await app.request()
-        .input('id', sql.BigInt, row.id)
-        .input('p', sql.NVarChar(200), policyNo)
-        .input('pl', sql.NVarChar(sql.MAX), JSON.stringify(payload))
-        .query(`UPDATE dbo.policy_push_queue
-                   SET status = 2, pushed_at = GETDATE(), error = NULL,
-                       policy_no = @p, payload_json = @pl, updated_at = GETDATE()
-                 WHERE id = @id`);
-    } catch (err) {
-      const next = (row.retry || 0) + 1;
-      const status = next < MAX_RETRY ? 1 : 3;
       await app.request()
         .input('id', sql.BigInt, row.id).input('s', sql.TinyInt, status)
         .input('r', sql.Int, next).input('e', sql.NVarChar(sql.MAX), errMsg(err).slice(0, 3900))
         .query('UPDATE dbo.policy_push_queue SET status = @s, retry = @r, error = @e, updated_at = GETDATE() WHERE id = @id');
+    } catch (e2) {
+      // Could not even record the failure — leave it claimed; startup reclaim
+      // flips status 4 back to pending so it is not lost.
+      console.warn('[policy-push] could not settle row ' + row.id + ':', errMsg(e2));
     }
+    return 'failed';
   }
+}
+
+/**
+ * Drain up to BATCH_PER_TICK rows using CONCURRENCY parallel workers. Each
+ * worker claims its own row, so the pool self-balances across slow pushes.
+ */
+async function drainQueue(app, live) {
+  let budget = BATCH_PER_TICK;
+  const tally = { pushed: 0, failed: 0, deferred: 0 };
+  let drained = false;
+
+  const worker = async () => {
+    for (;;) {
+      if (drained || budget <= 0) return;
+      budget -= 1;                       // reserve a slot before the await
+      let row;
+      try {
+        row = await claimOne(app);
+      } catch (err) {
+        console.warn('[policy-push] claim failed:', errMsg(err));
+        return;
+      }
+      if (!row) { drained = true; return; }
+      tally[await processOne(app, live, row)] += 1;
+    }
+  };
+
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+  if (tally.pushed || tally.failed || tally.deferred) {
+    console.log(`[policy-push] tick: ${tally.pushed} pushed, ${tally.failed} failed, ${tally.deferred} deferred`);
+  }
+  return tally;
 }
 
 /* ----------------------------------------------------------------- tick ----- */
@@ -201,7 +251,7 @@ async function startWorker() {
     await app.request().query('UPDATE dbo.policy_push_queue SET status = 1 WHERE status IN (4, 5)');   // reclaim stale in-progress + retry deferred
   } catch (err) { console.warn('[policy-push] startup reclaim skipped:', errMsg(err)); }
   setInterval(tick, TICK_MS);
-  console.log(`[policy-push] started (tick ${TICK_MS}ms, ${BATCH_PER_TICK}/tick, dryRun=${DRYRUN})`);
+  console.log(`[policy-push] started (tick ${TICK_MS}ms, ${BATCH_PER_TICK}/tick, concurrency ${CONCURRENCY}, dryRun=${DRYRUN})`);
 }
 
-module.exports = { startWorker, tick, seedBackfill, runDailyEnqueue, drainQueue };
+module.exports = { startWorker, tick, seedBackfill, runDailyEnqueue, drainQueue, CONCURRENCY };
