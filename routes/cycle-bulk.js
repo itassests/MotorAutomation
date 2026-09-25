@@ -256,6 +256,10 @@ async function loadStored(pool, cycleId) {
     snapshot_insurer_slug: hdr.recordset[0].snapshot_insurer_slug || null,
     rows,
     totals: recomputeTotals(rows),
+    excluded_before_pricing: (() => {
+      try { return (JSON.parse(hdr.recordset[0].totals_json || '{}'))._excluded_before_pricing || null; }
+      catch (_) { return null; }
+    })(),
   };
 }
 
@@ -326,7 +330,12 @@ async function storeSnapshot(pool, cycleId, result, insurerSlug) {
     await rq()
       .input('cid',    sql.Int, cycleId)
       .input('n',      sql.Int, seen.size)
-      .input('totals', sql.NVarChar(sql.MAX), JSON.stringify(result.totals || {}))
+      // Stash the excluded-policy diagnostic alongside the totals so a REUSED
+      // snapshot still reports what the source filter dropped before pricing.
+      .input('totals', sql.NVarChar(sql.MAX), JSON.stringify({
+        ...(result.totals || {}),
+        ...(result.excluded_before_pricing ? { _excluded_before_pricing: result.excluded_before_pricing } : {}),
+      }))
       .input('ins',    sql.VarChar(100), insurerSlug || null)
       .query(`INSERT INTO cycle_runs (cycle_id, row_count, totals_json, snapshot_insurer_slug)
               VALUES (@cid, @n, @totals, @ins)`);
@@ -554,7 +563,11 @@ router.post('/:cycleId(\\d+)/calculate', async (req, res, next) => {
     }
     await storeSnapshot(pool, cycleId, result, requestedInsurer);
     const out = await loadStored(pool, cycleId);
-    res.json({ success: true, ...out, reused: false, cycle_filtered_dropped: result.cycle_filtered_dropped || 0 });
+    // Carry the excluded-policy diagnostic through: the stored snapshot only
+    // holds priced rows, so without this the caller never learns that policies
+    // in the window were dropped before pricing (blank INSURERNAME etc).
+    res.json({ success: true, ...out, reused: false, cycle_filtered_dropped: result.cycle_filtered_dropped || 0,
+               excluded_before_pricing: result.excluded_before_pricing || null });
   } catch (err) { next(err); }
 });
 

@@ -7158,6 +7158,9 @@ async function runBulkCalculate(body) {
   const pool         = await getPool();
 
   const whereBits = [];
+  // Captured for the excluded-policy diagnostic: which insurer slugs the
+  // "All insurers" filter allowed, and the effective date window used.
+  let _activeSlugs = null, _effFrom = null, _effTo = null;
   const req2 = prarambhPool.request();
   req2.timeout = 180000;
   if (Array.isArray(policy_nos) && policy_nos.length > 0) {
@@ -7201,6 +7204,7 @@ async function runBulkCalculate(body) {
       const slugs = cardsRes.recordset
         .map(r => String(r.insurer || '').trim())
         .filter(Boolean);
+      _activeSlugs = slugs;
       if (slugs.length > 0) {
         // Bidirectional match — handles both directions of brand-name drift:
         //  (1) INSURERNAME more specific than slug: "Bajaj Allianz General"
@@ -7251,11 +7255,13 @@ async function runBulkCalculate(body) {
     if (date_from) {
       const eff = lookbackDays > 0 ? widenDate(date_from, -lookbackDays) : new Date(date_from);
       req2.input('dfrom', sql.DateTime, eff);
+      _effFrom = eff;
       whereBits.push(`SubmissionDate >= @dfrom`);
     }
     if (date_to) {
       const eff = lookforwardDays > 0 ? widenDate(date_to, lookforwardDays) : new Date(date_to);
       req2.input('dto', sql.DateTime, eff);
+      _effTo = eff;
       whereBits.push(`SubmissionDate <= @dto`);
     }
   }
@@ -7307,6 +7313,63 @@ async function runBulkCalculate(body) {
   );
   if (skip > 0) rowsResult.recordset = rowsResult.recordset.slice(skip);
   const totalCount = rowsResult.recordset.length + skip;
+
+  // ---- Excluded-policy diagnostic -------------------------------------------
+  // With "All insurers" the source query keeps only carriers that have a LIVE
+  // rate card, so a policy whose INSURERNAME is blank (or names a carrier we do
+  // not carry) is dropped BEFORE the pipeline sees it - silently. In the Sept'26
+  // cycle that quietly removed real September policies, and the only way to
+  // notice was reconciling tracker numbers by hand. Count what the window held
+  // versus what survived the filter, so the caller can SEE what was left out.
+  let _excluded = null;
+  try {
+    if (!policy_nos && (_effFrom || _effTo)) {
+      const dq = prarambhPool.request();
+      const dbits = [];
+      if (_effFrom) { dq.input('xfrom', sql.DateTime, _effFrom); dbits.push('SubmissionDate >= @xfrom'); }
+      if (_effTo)   { dq.input('xto',   sql.DateTime, _effTo);   dbits.push('SubmissionDate <= @xto'); }
+      const INS_EXPR = "ISNULL(NULLIF(LTRIM(RTRIM(INSURERNAME)), ''), '(blank)')";
+      const dres = await dq.query(
+        'SELECT ' + INS_EXPR + ' AS ins, COUNT(*) AS n FROM tmp_PrarambhData WHERE ' +
+        dbits.join(' AND ') + ' GROUP BY ' + INS_EXPR);
+      // Same bidirectional slug match the WHERE clause above uses.
+      const covered = (name) => {
+        if (!_activeSlugs) return true;                 // no insurer filter was applied
+        const n = String(name || '').toLowerCase().replace(/ /g, '_');
+        if (!n || n === '(blank)') return false;
+        return _activeSlugs.some((sl) => {
+          const c = sl.toLowerCase();
+          const core = c.replace(/_(general|insurance|videocon|hdi|allianz|tokio|sundaram|sompo|lombard|ergo|aig|ms)$/i, '');
+          const first = c.split('_')[0];
+          return n.startsWith(c) || c.startsWith(n) || n.startsWith(core) || n.startsWith(first);
+        });
+      };
+      let blank = 0, windowTotal = 0;
+      const unconfigured = [];
+      for (const row of dres.recordset) {
+        windowTotal += row.n;
+        if (row.ins === '(blank)') { blank += row.n; continue; }
+        if (!covered(row.ins)) unconfigured.push({ insurer: row.ins, policies: row.n });
+      }
+      unconfigured.sort((x, y) => y.policies - x.policies);
+      const unconfiguredTotal = unconfigured.reduce((t, u) => t + u.policies, 0);
+      const skippedTotal = blank + unconfiguredTotal;
+      if (skippedTotal > 0) {
+        _excluded = {
+          window_total: windowTotal,
+          selected: totalCount,
+          skipped_total: skippedTotal,
+          no_insurer_name: blank,
+          unconfigured_insurers: unconfigured,
+          note: 'Policies in the date window removed by the insurer filter before pricing: ' +
+                blank + ' with no INSURERNAME' +
+                (unconfiguredTotal ? ', ' + unconfiguredTotal + ' for carriers with no live rate card' : '') + '.',
+        };
+        console.log('[bulk] excluded before pricing: ' + skippedTotal + ' policies (' +
+          blank + ' blank insurer, ' + unconfiguredTotal + ' unconfigured carrier)');
+      }
+    }
+  } catch (e) { console.warn('[bulk] excluded-policy diagnostic skipped:', e.message); }
 
   // Remap tmp_PrarambhData's snake_case/underscore columns to the view's
   // original names so extractPolicyParams (shared with single-policy lookup)
@@ -8127,7 +8190,7 @@ async function runBulkCalculate(body) {
           switch (r.status) { case 'OK':totals2.status_ok++;break;case 'EX':totals2.status_ex++;break;case 'SCR':totals2.status_scr++;break;case 'CNR':totals2.status_cnr++;break; }
         }
         for (const k of Object.keys(totals2)) if (typeof totals2[k] === 'number') totals2[k] = +totals2[k].toFixed(2);
-        return { totals: totals2, rows: keep, processed: keep.length, total_count: totalCount, limit: cap, offset: skip, permanently_excluded: dropped, volume_uplifts: volumeUplifts };
+        return { totals: totals2, rows: keep, processed: keep.length, total_count: totalCount, limit: cap, offset: skip, permanently_excluded: dropped, volume_uplifts: volumeUplifts, excluded_before_pricing: _excluded };
       }
     }
   } catch (e) { console.error('[bulk] permanent-exclude filter skipped:', e.message); }
@@ -8135,7 +8198,7 @@ async function runBulkCalculate(body) {
   return {
     totals, rows: out, processed: out.length,
     total_count: totalCount, limit: cap, offset: skip,
-    volume_uplifts: volumeUplifts,
+    volume_uplifts: volumeUplifts, excluded_before_pricing: _excluded,
   };
 }
 

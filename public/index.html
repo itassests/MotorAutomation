@@ -12246,7 +12246,28 @@
         const cap = (!cycleId && data.total_count > data.processed)
           ? ` &mdash; hit the row cap; raise the limit or narrow the filters to cover the rest.`
           : '';
-        status.innerHTML = origin + cap + cycleTools;
+        // Policies the SOURCE filter dropped before pricing ever ran (blank
+        // INSURERNAME, or a carrier with no live rate card). These never appear
+        // as a no-rule row, so without this banner the only way to notice was
+        // reconciling tracker numbers by hand.
+        const _exc = data.excluded_before_pricing;
+        let excBanner = '';
+        if (_exc && _exc.skipped_total > 0) {
+          const bits = [];
+          if (_exc.no_insurer_name > 0) bits.push(`<strong>${_exc.no_insurer_name}</strong> with no insurer name`);
+          (_exc.unconfigured_insurers || []).slice(0, 6).forEach(u =>
+            bits.push(`<strong>${u.policies}</strong> ${escapeHtml(u.insurer)}`));
+          const more = Math.max(0, (_exc.unconfigured_insurers || []).length - 6);
+          if (more > 0) bits.push(`+${more} more carrier(s)`);
+          excBanner =
+            `<div style="margin-top:8px; padding:7px 10px; background:#fff8e1; border-left:4px solid #f9a825; font-size:12px; color:#5d4037;">
+               <strong>${_exc.skipped_total.toLocaleString('en-IN')}</strong> of
+               <strong>${(_exc.window_total || 0).toLocaleString('en-IN')}</strong> policies in this date window were
+               <strong>excluded before pricing</strong> &mdash; ${bits.join(', ')}.
+               <span style="color:#8d6e63;">These are not "no rule" rows; they never entered the calculation.</span>
+             </div>`;
+        }
+        status.innerHTML = origin + cap + cycleTools + excBanner;
 
         _bulkLastProcessed = data.processed;
         renderBulkSummary(data.totals, data.processed);
